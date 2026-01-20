@@ -1,3 +1,8 @@
 /* AIDE IRMA - Custom styles */
 
-/* Add app-specific styles here */
+.app-subtitle {
+    font-size: 1.2rem;
+    color: #64748b;
+    text-align: center;
+    margin-top: 2rem;
+}

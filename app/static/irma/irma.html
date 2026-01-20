@@ -9,16 +9,17 @@
     <link rel="stylesheet" href="/static/irma/irma.css">
 </head>
 <body>
-    <div class="app-container page-fill">
+    <div class="app-container">
         <div id="app-header"></div>
 
-        <main class="main-content">
-            <div class="scroll-content">
-                <p data-i18n="hello">Hello</p>
-            </div>
-        </main>
+        <div class="main-content">
+            <p id="app-subtitle" class="app-subtitle"></p>
 
-        <div id="status-widget"></div>
+            <p>A collection of data needed for maintenance and repair of engines.</p>
+            <p>See the <a href="/about?doc=requirements/DataModel.md">Data Model</a></p>
+
+            <div id="status-widget"></div>
+        </div>
     </div>
 
     <script src="/static/frame/vendor/polyglot/polyglot.min.js"></script>
@@ -27,5 +28,6 @@
     <script src="/static/frame/js/status-widget.js"></script>
     <script src="/static/frame/js/pwa.js"></script>
     <script src="/static/irma/irma.js"></script>
+    <script>PWA.init();</script>
 </body>
 </html>
