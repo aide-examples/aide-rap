@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Editor - AIDE IRMA</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .toolbar {
+            background: #333;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .toolbar h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: normal;
+        }
+        .toolbar select, .toolbar button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .toolbar select {
+            background: #555;
+            color: white;
+        }
+        .toolbar button {
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        .toolbar button:hover {
+            background: #45a049;
+        }
+        .toolbar button.secondary {
+            background: #666;
+        }
+        .toolbar button.secondary:hover {
+            background: #777;
+        }
+        .toolbar .spacer {
+            flex: 1;
+        }
+        .toolbar .status {
+            font-size: 12px;
+            color: #aaa;
+        }
+        .canvas-container {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+        }
+        .canvas {
+            background: white;
+            border: 1px solid #ccc;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .class-box {
+            position: absolute;
+            width: 140px;
+            border: 1.5px solid #333;
+            border-radius: 3px;
+            cursor: move;
+            user-select: none;
+            font-size: 12px;
+        }
+        .class-box:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .class-box.dragging {
+            opacity: 0.8;
+            z-index: 1000;
+        }
+        .class-box .header {
+            padding: 4px 8px;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+        .class-box.compact .header {
+            border-bottom: none;
+            padding: 6px 8px;
+        }
+        .class-box .attributes {
+            padding: 4px 8px;
+            font-size: 10px;
+            color: #333;
+        }
+        .class-box .attr-line {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 16px;
+        }
+        .view-toggle {
+            display: flex;
+            gap: 5px;
+        }
+        .view-toggle button {
+            background: #555;
+        }
+        .view-toggle button.active {
+            background: #4CAF50;
+        }
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #888;
+        }
+        .toolbar input[type="number"] {
+            width: 70px;
+            padding: 4px 6px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            background: #555;
+            color: white;
+        }
+        .toolbar .canvas-size {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1>Layout Editor</h1>
+        <label>Document:
+            <select id="docSelect">
+                <option value="">Loading...</option>
+            </select>
+        </label>
+        <div class="view-toggle">
+            <button id="viewCompact" class="active">Compact</button>
+            <button id="viewDetailed">Detailed</button>
+        </div>
+        <div class="canvas-size">
+            Canvas:
+            <input type="number" id="canvasWidth" min="400" step="100" title="Canvas width">
+            x
+            <input type="number" id="canvasHeight" min="300" step="100" title="Canvas height">
+        </div>
+        <div class="spacer"></div>
+        <span class="help-text">Drag boxes to reposition</span>
+        <a id="linkCompact" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Compact</a>
+        <a id="linkDetailed" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Detailed</a>
+        <button id="saveBtn">Save Layout</button>
+        <button id="regenerateBtn" class="secondary">Regenerate Diagrams</button>
+        <span class="status" id="status"></span>
+    </div>
+    <div class="canvas-container">
+        <div class="canvas" id="canvas">
+            <div class="loading">Select a document to edit its layout</div>
+        </div>
+    </div>
+
+    <script>
+        // Constants matching generate-diagram.js
+        const BOX_WIDTH = 140;
+        const BOX_HEIGHT_COMPACT = 30;
+        const ATTR_LINE_HEIGHT = 16;
+        const HEADER_HEIGHT = 24;
+        const BOX_PADDING = 8;
+
+        let currentDoc = null;
+        let model = null;
+        let layout = null;
+        let showDetailed = false;
+        let isDirty = false;
+
+        // DOM elements
+        const docSelect = document.getElementById('docSelect');
+        const canvas = document.getElementById('canvas');
+        const saveBtn = document.getElementById('saveBtn');
+        const regenerateBtn = document.getElementById('regenerateBtn');
+        const statusEl = document.getElementById('status');
+        const viewCompact = document.getElementById('viewCompact');
+        const viewDetailed = document.getElementById('viewDetailed');
+        const canvasWidthInput = document.getElementById('canvasWidth');
+        const canvasHeightInput = document.getElementById('canvasHeight');
+        const linkCompact = document.getElementById('linkCompact');
+        const linkDetailed = document.getElementById('linkDetailed');
+
+        // Calculate box height based on attributes
+        function getBoxHeight(className) {
+            if (!showDetailed) {
+                return BOX_HEIGHT_COMPACT;
+            }
+            const classDef = model.classes[className] || {};
+            const attrs = classDef.attributes || [];
+            return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+        }
+
+        // Get area color for a class
+        function getColor(className) {
+            const classDef = model.classes[className] || {};
+            const area = classDef.area || '';
+            const areaDef = model.areas[area] || {};
+            return areaDef.color || '#FFFFFF';
+        }
+
+        // Load available documents
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/api/layout-editor/documents');
+                const docs = await response.json();
+                docSelect.innerHTML = '<option value="">-- Select --</option>';
+                docs.forEach(doc => {
+                    const option = document.createElement('option');
+                    option.value = doc;
+                    option.textContent = doc;
+                    docSelect.appendChild(option);
+                });
+
+                // Check URL parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const docParam = urlParams.get('doc');
+                if (docParam && docs.includes(docParam)) {
+                    docSelect.value = docParam;
+                    loadDocument(docParam);
+                }
+            } catch (e) {
+                console.error('Failed to load documents:', e);
+                docSelect.innerHTML = '<option value="">Error loading</option>';
+            }
+        }
+
+        // Load document model and layout
+        async function loadDocument(docName) {
+            if (!docName) {
+                canvas.innerHTML = '<div class="loading">Select a document to edit its layout</div>';
+                return;
+            }
+
+            canvas.innerHTML = '<div class="loading">Loading...</div>';
+            statusEl.textContent = '';
+
+            try {
+                const response = await fetch(`/api/layout-editor/load?doc=${encodeURIComponent(docName)}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load');
+                }
+
+                currentDoc = docName;
+                model = data.model;
+                layout = data.layout;
+                isDirty = false;
+
+                // Update canvas size inputs
+                const canvasSize = layout.canvas || { width: 1200, height: 900 };
+                canvasWidthInput.value = canvasSize.width;
+                canvasHeightInput.value = canvasSize.height;
+
+                // Update diagram links
+                linkCompact.href = `/docs-assets/requirements/${docName}-diagram.svg`;
+                linkDetailed.href = `/docs-assets/requirements/${docName}-diagram-detailed.svg`;
+                linkCompact.style.display = 'inline';
+                linkDetailed.style.display = 'inline';
+
+                renderCanvas();
+            } catch (e) {
+                console.error('Failed to load document:', e);
+                canvas.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Render all class boxes on canvas
+        function renderCanvas() {
+            if (!model || !layout) return;
+
+            // Use canvas size from layout, expand if boxes exceed it
+            const canvasSize = layout.canvas || { width: 1200, height: 900 };
+            let maxX = canvasSize.width;
+            let maxY = canvasSize.height;
+            const positions = layout.classes || {};
+
+            for (const className of Object.keys(model.classes)) {
+                const pos = positions[className] || { x: 50, y: 50 };
+                const height = getBoxHeight(className);
+                maxX = Math.max(maxX, pos.x + BOX_WIDTH + 50);
+                maxY = Math.max(maxY, pos.y + height + 50);
+            }
+
+            canvas.style.width = maxX + 'px';
+            canvas.style.height = maxY + 'px';
+            canvas.innerHTML = '';
+
+            // Create class boxes
+            for (const [className, classDef] of Object.entries(model.classes)) {
+                const pos = positions[className] || { x: 50, y: 50 };
+                const box = createClassBox(className, classDef, pos);
+                canvas.appendChild(box);
+            }
+        }
+
+        // Create a draggable class box element
+        function createClassBox(className, classDef, pos) {
+            const box = document.createElement('div');
+            box.className = 'class-box' + (showDetailed ? '' : ' compact');
+            box.dataset.className = className;
+            box.style.left = pos.x + 'px';
+            box.style.top = pos.y + 'px';
+            box.style.backgroundColor = getColor(className);
+            box.style.height = getBoxHeight(className) + 'px';
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'header';
+            header.textContent = className;
+            box.appendChild(header);
+
+            // Attributes (in detailed view)
+            if (showDetailed && classDef.attributes && classDef.attributes.length > 0) {
+                const attrsDiv = document.createElement('div');
+                attrsDiv.className = 'attributes';
+                classDef.attributes.forEach(attr => {
+                    const line = document.createElement('div');
+                    line.className = 'attr-line';
+                    line.textContent = `${attr.name}: ${attr.type}`;
+                    attrsDiv.appendChild(line);
+                });
+                box.appendChild(attrsDiv);
+            }
+
+            // Drag handling
+            makeDraggable(box);
+
+            return box;
+        }
+
+        // Make an element draggable
+        function makeDraggable(el) {
+            let startX, startY, startLeft, startTop;
+
+            el.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Only left click
+
+                e.preventDefault();
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(el.style.left) || 0;
+                startTop = parseInt(el.style.top) || 0;
+
+                el.classList.add('dragging');
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            function onMouseMove(e) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                let newLeft = Math.max(0, startLeft + dx);
+                let newTop = Math.max(0, startTop + dy);
+
+                // Snap to grid (10px)
+                newLeft = Math.round(newLeft / 10) * 10;
+                newTop = Math.round(newTop / 10) * 10;
+
+                el.style.left = newLeft + 'px';
+                el.style.top = newTop + 'px';
+            }
+
+            function onMouseUp() {
+                el.classList.remove('dragging');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                // Update layout
+                const className = el.dataset.className;
+                const newX = parseInt(el.style.left) || 0;
+                const newY = parseInt(el.style.top) || 0;
+
+                if (!layout.classes) layout.classes = {};
+                const oldPos = layout.classes[className] || {};
+
+                if (oldPos.x !== newX || oldPos.y !== newY) {
+                    layout.classes[className] = { x: newX, y: newY };
+                    isDirty = true;
+                    statusEl.textContent = 'Unsaved changes';
+                }
+
+                // Expand canvas if needed
+                const height = getBoxHeight(className);
+                const reqWidth = newX + BOX_WIDTH + 50;
+                const reqHeight = newY + height + 50;
+                if (reqWidth > parseInt(canvas.style.width)) {
+                    canvas.style.width = reqWidth + 'px';
+                }
+                if (reqHeight > parseInt(canvas.style.height)) {
+                    canvas.style.height = reqHeight + 'px';
+                }
+            }
+        }
+
+        // Save layout to server
+        async function saveLayout() {
+            if (!currentDoc || !layout) return;
+
+            statusEl.textContent = 'Saving...';
+            try {
+                const response = await fetch('/api/layout-editor/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        doc: currentDoc,
+                        layout: layout
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    isDirty = false;
+                    statusEl.textContent = 'Saved!';
+                    setTimeout(() => {
+                        if (!isDirty) statusEl.textContent = '';
+                    }, 2000);
+                } else {
+                    throw new Error(result.error || 'Save failed');
+                }
+            } catch (e) {
+                console.error('Save failed:', e);
+                statusEl.textContent = 'Save failed: ' + e.message;
+            }
+        }
+
+        // Regenerate diagrams
+        async function regenerateDiagrams() {
+            if (!currentDoc) return;
+
+            // Save first if dirty
+            if (isDirty) {
+                await saveLayout();
+            }
+
+            statusEl.textContent = 'Regenerating...';
+            try {
+                const response = await fetch(`/api/regenerate-diagrams?doc=${encodeURIComponent(currentDoc)}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    statusEl.textContent = 'Diagrams regenerated!';
+                    setTimeout(() => statusEl.textContent = '', 3000);
+                } else {
+                    throw new Error(result.error || 'Regeneration failed');
+                }
+            } catch (e) {
+                console.error('Regeneration failed:', e);
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        // Toggle view mode
+        function setViewMode(detailed) {
+            showDetailed = detailed;
+            viewCompact.classList.toggle('active', !detailed);
+            viewDetailed.classList.toggle('active', detailed);
+            renderCanvas();
+        }
+
+        // Update canvas size from inputs
+        function updateCanvasSize() {
+            if (!layout) return;
+            const newWidth = parseInt(canvasWidthInput.value) || 1200;
+            const newHeight = parseInt(canvasHeightInput.value) || 900;
+
+            if (!layout.canvas) layout.canvas = {};
+            if (layout.canvas.width !== newWidth || layout.canvas.height !== newHeight) {
+                layout.canvas.width = newWidth;
+                layout.canvas.height = newHeight;
+                isDirty = true;
+                statusEl.textContent = 'Unsaved changes';
+                renderCanvas();
+            }
+        }
+
+        // Event listeners
+        docSelect.addEventListener('change', () => loadDocument(docSelect.value));
+        saveBtn.addEventListener('click', saveLayout);
+        regenerateBtn.addEventListener('click', regenerateDiagrams);
+        viewCompact.addEventListener('click', () => setViewMode(false));
+        viewDetailed.addEventListener('click', () => setViewMode(true));
+        canvasWidthInput.addEventListener('change', updateCanvasSize);
+        canvasHeightInput.addEventListener('change', updateCanvasSize);
+
+        // Warn on unsaved changes
+        window.addEventListener('beforeunload', (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Initialize
+        loadDocuments();
+    </script>
+</body>
+</html>

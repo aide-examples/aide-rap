@@ -100,8 +100,11 @@ function extractPositions(drawioPath) {
 
 /**
  * Update layout.json with new positions.
+ * @param {string} layoutPath - Path to layout.json
+ * @param {Object} newPositions - New positions to merge
+ * @param {string[]} [validClassNames] - If provided, remove classes not in this list
  */
-function updateLayoutJson(layoutPath, newPositions) {
+function updateLayoutJson(layoutPath, newPositions, validClassNames) {
     // Read existing layout
     let layout = {};
     if (fs.existsSync(layoutPath)) {
@@ -115,6 +118,16 @@ function updateLayoutJson(layoutPath, newPositions) {
 
     for (const [className, pos] of Object.entries(newPositions)) {
         layout.classes[className] = pos;
+    }
+
+    // Remove classes not in validClassNames (if provided)
+    if (validClassNames) {
+        const validSet = new Set(validClassNames);
+        for (const className of Object.keys(layout.classes)) {
+            if (!validSet.has(className)) {
+                delete layout.classes[className];
+            }
+        }
     }
 
     // Write back
@@ -168,4 +181,174 @@ if (require.main === module) {
     console.log(`\nNow run: node generate-diagram.js`);
 }
 
-module.exports = { extractPositions, updateLayoutJson, decodeDrawioContent };
+/**
+ * Remove classes from draw.io file that are no longer in the model.
+ * @param {string} drawioPath - Path to the draw.io file
+ * @param {string[]} validClassNames - Class names that should remain
+ * @returns {string[]} - Names of classes that were removed
+ */
+function removeClassesFromDrawio(drawioPath, validClassNames) {
+    if (!fs.existsSync(drawioPath)) {
+        return [];
+    }
+
+    let content = fs.readFileSync(drawioPath, 'utf-8');
+    const validSet = new Set(validClassNames);
+    const removedClasses = [];
+
+    // Find all mxCell elements with a value attribute (class boxes)
+    // Match the entire cell including its closing tag or self-closing
+    const cellPattern = /<mxCell[^>]*value="([^"]+)"[^>]*>[\s\S]*?<\/mxCell>\s*/g;
+
+    content = content.replace(cellPattern, (match, className) => {
+        if (!validSet.has(className)) {
+            removedClasses.push(className);
+            return '';  // Remove the cell
+        }
+        return match;  // Keep the cell
+    });
+
+    if (removedClasses.length > 0) {
+        fs.writeFileSync(drawioPath, content);
+    }
+
+    return removedClasses;
+}
+
+/**
+ * Add missing classes to an existing draw.io file.
+ * @param {string} drawioPath - Path to the draw.io file
+ * @param {string[]} newClassNames - Class names to add
+ * @param {Object} areas - Area definitions with colors { areaKey: { color: '#xxx' } }
+ * @param {Object} classToArea - Mapping of class name to area key
+ * @returns {string[]} - Names of classes that were added
+ */
+function addClassesToDrawio(drawioPath, newClassNames, areas, classToArea) {
+    if (!fs.existsSync(drawioPath) || newClassNames.length === 0) {
+        return [];
+    }
+
+    let content = fs.readFileSync(drawioPath, 'utf-8');
+
+    // Find existing class names in the file
+    const existingClasses = new Set();
+    const valuePattern = /value="([^"]+)"/g;
+    let match;
+    while ((match = valuePattern.exec(content)) !== null) {
+        existingClasses.add(match[1]);
+    }
+
+    // Filter to only truly new classes
+    const classesToAdd = newClassNames.filter(name => !existingClasses.has(name));
+    if (classesToAdd.length === 0) {
+        return [];
+    }
+
+    // Find the highest existing cell id
+    const idPattern = /id="(\d+)"/g;
+    let maxId = 1;
+    while ((match = idPattern.exec(content)) !== null) {
+        const id = parseInt(match[1], 10);
+        if (id > maxId) maxId = id;
+    }
+
+    // Generate new cells for each class
+    // Place them at the bottom of the canvas with auto-layout
+    const startY = 650;  // Below existing content
+    const startX = 50;
+    const cellWidth = 140;
+    const cellHeight = 30;
+    const colSpacing = 180;
+    const rowSpacing = 50;
+    const cols = 5;
+
+    const newCells = classesToAdd.map((className, i) => {
+        const cellId = maxId + 1 + i;
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = startX + col * colSpacing;
+        const y = startY + row * rowSpacing;
+
+        // Determine color from area
+        const areaKey = classToArea[className] || 'unknown';
+        const areaDef = areas[areaKey] || {};
+        const fillColor = areaDef.color || '#FFFFFF';
+
+        return `                <mxCell id="${cellId}" value="${className}" style="rounded=0;whiteSpace=wrap;html=1;fillColor=${fillColor};strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" as="geometry"/>
+                </mxCell>`;
+    });
+
+    // Insert new cells before </root>
+    const insertPoint = content.lastIndexOf('</root>');
+    if (insertPoint === -1) {
+        console.error('Could not find </root> in draw.io file');
+        return [];
+    }
+
+    const newContent = content.slice(0, insertPoint) +
+        newCells.join('\n') + '\n            ' +
+        content.slice(insertPoint);
+
+    fs.writeFileSync(drawioPath, newContent);
+
+    return classesToAdd;
+}
+
+/**
+ * Create a new draw.io file with the given classes.
+ * @param {string} drawioPath - Path to create
+ * @param {string[]} classNames - Class names
+ * @param {Object} areas - Area definitions
+ * @param {Object} classToArea - Class to area mapping
+ */
+function createDrawioFile(drawioPath, classNames, areas, classToArea) {
+    const cellWidth = 140;
+    const cellHeight = 30;
+    const colSpacing = 180;
+    const rowSpacing = 50;
+    const cols = 5;
+    const startX = 50;
+    const startY = 50;
+
+    const cells = classNames.map((className, i) => {
+        const cellId = 3 + i;  // Start after 0, 1, 2 (root cells)
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const x = startX + col * colSpacing;
+        const y = startY + row * rowSpacing;
+
+        const areaKey = classToArea[className] || 'unknown';
+        const areaDef = areas[areaKey] || {};
+        const fillColor = areaDef.color || '#FFFFFF';
+
+        return `                <mxCell id="${cellId}" value="${className}" style="rounded=0;whiteSpace=wrap;html=1;fillColor=${fillColor};strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" as="geometry"/>
+                </mxCell>`;
+    });
+
+    const docName = path.basename(drawioPath, '-layout.drawio');
+    const content = `<mxfile host="65bd71144e">
+    <diagram name="${docName}" id="${docName.toLowerCase()}">
+        <mxGraphModel dx="366" dy="563" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+${cells.join('\n')}
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
+`;
+
+    fs.writeFileSync(drawioPath, content);
+}
+
+module.exports = {
+    extractPositions,
+    updateLayoutJson,
+    decodeDrawioContent,
+    addClassesToDrawio,
+    removeClassesFromDrawio,
+    createDrawioFile
+};

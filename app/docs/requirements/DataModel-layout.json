@@ -5,17 +5,13 @@
     "height": 900
   },
   "classes": {
-    "OEM": {
-      "x": 230,
-      "y": 80
-    },
     "AircraftManufacturer": {
       "x": 840,
       "y": 90
     },
     "EngineManufacturer": {
-      "x": 10,
-      "y": 300
+      "x": 20,
+      "y": 260
     },
     "AircraftType": {
       "x": 640,
@@ -23,7 +19,7 @@
     },
     "EngineType": {
       "x": 200,
-      "y": 300
+      "y": 260
     },
     "MaintenancePlan": {
       "x": 200,
@@ -31,7 +27,7 @@
     },
     "MaintenancePlanTask": {
       "x": 200,
-      "y": 470
+      "y": 560
     },
     "Operator": {
       "x": 20,
@@ -47,43 +43,43 @@
     },
     "Engine": {
       "x": 420,
-      "y": 300
+      "y": 400
     },
     "EngineAssignment": {
       "x": 420,
-      "y": 220
+      "y": 250
     },
     "InspectionType": {
       "x": 420,
-      "y": 400
+      "y": 560
     },
     "Workscope": {
-      "x": 640,
+      "x": 630,
       "y": 400
     },
     "MRO": {
-      "x": 840,
-      "y": 220
+      "x": 870,
+      "y": 720
     },
     "RepairShop": {
-      "x": 840,
-      "y": 300
+      "x": 870,
+      "y": 570
     },
     "RepairOrder": {
-      "x": 840,
+      "x": 870,
       "y": 400
     },
     "Task": {
-      "x": 720,
-      "y": 470
+      "x": 660,
+      "y": 580
     },
     "TaskType": {
       "x": 200,
-      "y": 550
+      "y": 740
     },
     "Finding": {
-      "x": 720,
-      "y": 530
+      "x": 660,
+      "y": 740
     }
   }
 }

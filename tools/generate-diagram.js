@@ -53,12 +53,8 @@ class DiagramGenerator {
         this.canvas = this.layout.canvas || { width: 1200, height: 900 };
     }
 
-    getScaledPosition(className, yScale) {
-        const pos = this.positions[className] || { x: 0, y: 0 };
-        if (yScale !== 1.0) {
-            return { x: pos.x, y: Math.floor(pos.y * yScale) };
-        }
-        return pos;
+    getPosition(className) {
+        return this.positions[className] || { x: 0, y: 0 };
     }
 
     getColor(className) {
@@ -78,15 +74,15 @@ class DiagramGenerator {
         return DiagramGenerator.HEADER_HEIGHT + attrs.length * DiagramGenerator.ATTR_LINE_HEIGHT + DiagramGenerator.BOX_PADDING;
     }
 
-    getBoxCenter(className, showAttributes, yScale) {
-        const pos = this.getScaledPosition(className, yScale);
+    getBoxCenter(className, showAttributes) {
+        const pos = this.getPosition(className);
         const height = this.getBoxHeight(className, showAttributes);
         return { x: pos.x + DiagramGenerator.BOX_WIDTH / 2, y: pos.y + height / 2 };
     }
 
-    getConnectionPoint(fromClass, toClass, showAttributes, yScale) {
-        const fromPos = this.getScaledPosition(fromClass, yScale);
-        const toPos = this.getScaledPosition(toClass, yScale);
+    getConnectionPoint(fromClass, toClass, showAttributes) {
+        const fromPos = this.getPosition(fromClass);
+        const toPos = this.getPosition(toClass);
 
         const fromHeight = this.getBoxHeight(fromClass, showAttributes);
         const toHeight = this.getBoxHeight(toClass, showAttributes);
@@ -131,8 +127,8 @@ class DiagramGenerator {
         return { fromX, fromY, toX, toY };
     }
 
-    renderClassBox(className, showAttributes, yScale) {
-        const pos = this.getScaledPosition(className, yScale);
+    renderClassBox(className, showAttributes) {
+        const pos = this.getPosition(className);
         const color = this.getColor(className);
         const height = this.getBoxHeight(className, showAttributes);
 
@@ -177,14 +173,14 @@ class DiagramGenerator {
         return svgParts.join('\n    ');
     }
 
-    renderRelationship(rel, showAttributes, yScale) {
+    renderRelationship(rel, showAttributes) {
         const fromClass = rel.from;
         const toClass = rel.to;
         const attribute = rel.attribute || '';
         const fromCard = rel.from_cardinality || '*';
         const toCard = rel.to_cardinality || '';
 
-        const { fromX, fromY, toX, toY } = this.getConnectionPoint(fromClass, toClass, showAttributes, yScale);
+        const { fromX, fromY, toX, toY } = this.getConnectionPoint(fromClass, toClass, showAttributes);
 
         const svgParts = [];
 
@@ -260,15 +256,9 @@ class DiagramGenerator {
     generate(options = {}) {
         const showAttributes = options.showAttributes || false;
         const showLegend = options.showLegend !== false;
-        const yScale = options.yScale || 1.0;
 
-        let width = this.canvas.width || 1200;
-        let height = this.canvas.height || 900;
-
-        // Scale height for detailed diagrams
-        if (yScale !== 1.0) {
-            height = Math.floor(height * yScale);
-        }
+        const width = this.canvas.width || 1200;
+        const height = this.canvas.height || 900;
 
         const svgParts = [
             `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
@@ -284,7 +274,7 @@ class DiagramGenerator {
         ];
 
         for (const rel of this.relationships) {
-            svgParts.push('  ' + this.renderRelationship(rel, showAttributes, yScale));
+            svgParts.push('  ' + this.renderRelationship(rel, showAttributes));
         }
 
         svgParts.push('');
@@ -292,7 +282,7 @@ class DiagramGenerator {
 
         for (const className of Object.keys(this.classes)) {
             if (className in this.positions) {
-                svgParts.push('  ' + this.renderClassBox(className, showAttributes, yScale));
+                svgParts.push('  ' + this.renderClassBox(className, showAttributes));
             }
         }
 
@@ -313,7 +303,6 @@ if (require.main === module) {
     const args = process.argv.slice(2);
     let showAttributes = false;
     let showLegend = true;
-    let yScale = null;
     let outputPath = 'diagram.svg';
     let modelPath = null;
     let layoutPath = null;
@@ -323,8 +312,6 @@ if (require.main === module) {
             showAttributes = true;
         } else if (args[i] === '--no-legend') {
             showLegend = false;
-        } else if (args[i] === '-y' || args[i] === '--y-scale') {
-            yScale = parseFloat(args[++i]);
         } else if (args[i] === '-o' || args[i] === '--output') {
             outputPath = args[++i];
         } else if (args[i] === '-m' || args[i] === '--model') {
@@ -339,16 +326,10 @@ if (require.main === module) {
     modelPath = modelPath || path.join(scriptDir, 'DataModel.yaml');
     layoutPath = layoutPath || path.join(scriptDir, 'layout.json');
 
-    // Default y_scale: 1.0 for compact, 2.5 for detailed
-    if (yScale === null) {
-        yScale = showAttributes ? 2.5 : 1.0;
-    }
-
     const generator = new DiagramGenerator(modelPath, layoutPath);
     const svg = generator.generate({
         showAttributes,
-        showLegend,
-        yScale
+        showLegend
     });
 
     fs.writeFileSync(outputPath, svg);

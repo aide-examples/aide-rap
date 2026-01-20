@@ -24,5 +24,7 @@
     "layout": {
         "default": "page-fill",
         "allow_toggle": false
-    }
+    },
+    "docsEditable": false,
+    "helpEditable": false
 }

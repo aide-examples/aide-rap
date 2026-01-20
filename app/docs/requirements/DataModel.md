@@ -1,4 +1,4 @@
-# IRMA Data Model
+# Data Model
 
 ## Areas of Competence
 
@@ -31,12 +31,35 @@
 
 ### Generated SVG Diagrams
 
-- <a href="/docs-assets/requirements/diagram.svg" target="_blank">Compact Diagram (diagram.svg)</a> - Only class names
-- <a href="/docs-assets/requirements/diagram-detailed.svg" target="_blank">Detailed Diagram (diagram-detailed.svg)</a> - With attributes
+- <a href="/docs-assets/requirements/DataModel-diagram.svg" target="_blank">Compact Diagram</a> - Only class names
+- <a href="/docs-assets/requirements/DataModel-diagram-detailed.svg" target="_blank">Detailed Diagram</a> - With attributes
 
 **Source of Truth:** This Markdown file.
 
-<button onclick="fetch('/api/regenerate-diagrams', {method: 'POST'}).then(r => r.json()).then(d => alert(d.success ? 'Diagrams regenerated!' : 'Error: ' + d.error)).catch(e => alert('Error: ' + e))">🔄 Regenerate Diagrams</button>
+<a href="/layout-editor?doc=DataModel" target="_blank"><button type="button">📐 Edit Layout</button></a>
+
+### Workflow: Creating and Editing Data Model Diagrams
+
+1. **Edit this Markdown file** - Add/modify entity descriptions in the tables below. Each `### EntityName` section with an attribute table defines a class.
+
+2. **Open the Layout Editor** - Click the "Edit Layout" button above. The editor loads all classes from this document.
+
+3. **Arrange the diagram**:
+   - Drag class boxes to position them
+   - Toggle between Compact (names only) and Detailed (with attributes) view
+   - Adjust canvas size if needed (width × height inputs)
+   - Boxes snap to a 10px grid
+
+4. **Save and regenerate** - Click "Save Layout" to store positions, then "Regenerate Diagrams" to update the SVG files.
+
+5. **View results** - Use the Compact/Detailed links in the editor toolbar to see the generated diagrams.
+
+**Files involved:**
+- `DataModel.md` - Source of truth (entity definitions)
+- `DataModel-layout.json` - Box positions and canvas size
+- `DataModel-layout.drawio` - Draw.io compatible layout file
+- `DataModel-diagram.svg` - Generated compact diagram
+- `DataModel-diagram-detailed.svg` - Generated detailed diagram
 
 ## Entity Descriptions
 
