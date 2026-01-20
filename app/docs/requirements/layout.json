@@ -1,0 +1,89 @@
+{
+  "_comment": "Layout positions for DataModel diagram. Edit x/y values to reposition classes.",
+  "canvas": {
+    "width": 1200,
+    "height": 900
+  },
+  "classes": {
+    "OEM": {
+      "x": 230,
+      "y": 80
+    },
+    "AircraftManufacturer": {
+      "x": 840,
+      "y": 90
+    },
+    "EngineManufacturer": {
+      "x": 10,
+      "y": 300
+    },
+    "AircraftType": {
+      "x": 640,
+      "y": 90
+    },
+    "EngineType": {
+      "x": 200,
+      "y": 300
+    },
+    "MaintenancePlan": {
+      "x": 200,
+      "y": 400
+    },
+    "MaintenancePlanTask": {
+      "x": 200,
+      "y": 470
+    },
+    "Operator": {
+      "x": 20,
+      "y": 90
+    },
+    "Fleet": {
+      "x": 200,
+      "y": 90
+    },
+    "Aircraft": {
+      "x": 420,
+      "y": 90
+    },
+    "Engine": {
+      "x": 420,
+      "y": 300
+    },
+    "EngineAssignment": {
+      "x": 420,
+      "y": 220
+    },
+    "InspectionType": {
+      "x": 420,
+      "y": 400
+    },
+    "Workscope": {
+      "x": 640,
+      "y": 400
+    },
+    "MRO": {
+      "x": 840,
+      "y": 220
+    },
+    "RepairShop": {
+      "x": 840,
+      "y": 300
+    },
+    "RepairOrder": {
+      "x": 840,
+      "y": 400
+    },
+    "Task": {
+      "x": 720,
+      "y": 470
+    },
+    "TaskType": {
+      "x": 200,
+      "y": 550
+    },
+    "Finding": {
+      "x": 720,
+      "y": 530
+    }
+  }
+}

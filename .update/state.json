@@ -1,0 +1,11 @@
+{
+  "current_version": "1.0",
+  "available_version": null,
+  "update_state": "idle",
+  "pending_verification": false,
+  "consecutive_failures": 0,
+  "updates_disabled": false,
+  "backup_version": null,
+  "last_check": null,
+  "last_update": null
+}

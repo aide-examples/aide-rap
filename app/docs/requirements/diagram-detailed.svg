@@ -1,0 +1,249 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2250" width="1200" height="2250">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="2250" fill="white"/>
+
+  <!-- Relationships -->
+  <line x1="560" y1="297" x2="640" y2="289" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="568" y="291.2" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="600" y="288" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">type</text>
+  <line x1="780" y1="289" x2="840" y2="273" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="786" y="282.4" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="810" y="276" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">manufacturer</text>
+  <line x1="420" y1="814" x2="340" y2="806" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="412" y="808.2" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="380" y="805" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">type</text>
+  <line x1="490" y1="678" x2="490" y2="750" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="490" y="680.2" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="490" y="709" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">engine</text>
+  <line x1="490" y1="550" x2="490" y2="369" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="490" y="526.9" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="490" y="454.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">aircraft</text>
+  <line x1="200" y1="806" x2="150" y2="798" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="195" y="800.2" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="175" y="797" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">manufacturer</text>
+  <line x1="790" y1="1325" x2="790" y2="1303" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="790" y="1317.8" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="790" y="1309" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">task</text>
+  <line x1="200" y1="281" x2="160" y2="281" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="196" y="276" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="180" y="276" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">operator</text>
+  <line x1="340" y1="281" x2="420" y2="297" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="348" y="277.6" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="380" y="284" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">aircraft</text>
+  <line x1="420" y1="1080" x2="340" y2="1056" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="412" y="1072.6" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="380" y="1063" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">maintenance_plan</text>
+  <line x1="270" y1="1000" x2="270" y2="862" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="270" y="981.2" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="270" y="926" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">engine_type</text>
+  <line x1="270" y1="1175" x2="270" y2="1112" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="270" y="1163.7" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="270" y="1138.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">maintenance_plan</text>
+  <line x1="270" y1="1319" x2="270" y2="1375" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="270" y="1319.6" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="270" y="1342" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">task_type</text>
+  <line x1="840" y1="1072" x2="780" y2="1072" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="834" y="1067" font-family="Arial, sans-serif" font-size="10" fill="#666">1</text>
+    <text x="810" y="1067" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">workscope</text>
+    <text x="786" y="1067" font-family="Arial, sans-serif" font-size="10" fill="#666">1</text>
+  <line x1="910" y1="1000" x2="910" y2="646" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="910" y="959.6" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="910" y="818" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">mro</text>
+  <line x1="910" y1="750" x2="910" y2="646" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="910" y="734.6" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="910" y="693" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">mro</text>
+  <line x1="790" y1="1175" x2="910" y2="1144" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="802" y="1166.9" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="850" y="1154.5" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">repair_order</text>
+  <line x1="720" y1="1239" x2="340" y2="1423" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="682" y="1252.4" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="530" y="1326" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">task_type</text>
+  <line x1="710" y1="1000" x2="490" y2="878" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="688" y="982.8" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="600" y="934" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">engine</text>
+  <line x1="640" y1="1072" x2="560" y2="1080" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="632" y="1067.8" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="600" y="1071" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">inspection_type</text>
+
+  <!-- Class boxes -->
+  <rect x="420" y="225" width="140" height="144" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="490" y="241" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Aircraft</text>
+    <line x1="420" y1="249" x2="560" y2="249" stroke="#333" stroke-width="1"/>
+    <text x="425" y="263" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="425" y="279" font-family="Arial, sans-serif" font-size="10">registration: string</text>
+    <text x="425" y="295" font-family="Arial, sans-serif" font-size="10">serial_number: string</text>
+    <text x="425" y="311" font-family="Arial, sans-serif" font-size="10">type_id: int</text>
+    <text x="425" y="327" font-family="Arial, sans-serif" font-size="10">manufacture_datex: date</text>
+    <text x="425" y="343" font-family="Arial, sans-serif" font-size="10">total_flight_hours: int</text>
+    <text x="425" y="359" font-family="Arial, sans-serif" font-size="10">total_cycles: int</text>
+  <rect x="840" y="225" width="140" height="96" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="910" y="241" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">AircraftManufacturer</text>
+    <line x1="840" y1="249" x2="980" y2="249" stroke="#333" stroke-width="1"/>
+    <text x="845" y="263" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="845" y="279" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="845" y="295" font-family="Arial, sans-serif" font-size="10">country: string</text>
+    <text x="845" y="311" font-family="Arial, sans-serif" font-size="10">icao_code: string</text>
+  <rect x="640" y="225" width="140" height="128" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="710" y="241" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">AircraftType</text>
+    <line x1="640" y1="249" x2="780" y2="249" stroke="#333" stroke-width="1"/>
+    <text x="645" y="263" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="645" y="279" font-family="Arial, sans-serif" font-size="10">designation: string</text>
+    <text x="645" y="295" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="645" y="311" font-family="Arial, sans-serif" font-size="10">manufacturer_id: int</text>
+    <text x="645" y="327" font-family="Arial, sans-serif" font-size="10">max_passengers: int</text>
+    <text x="645" y="343" font-family="Arial, sans-serif" font-size="10">max_range_nm: int</text>
+  <rect x="420" y="750" width="140" height="128" fill="#FCE5CD" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="490" y="766" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Engine</text>
+    <line x1="420" y1="774" x2="560" y2="774" stroke="#333" stroke-width="1"/>
+    <text x="425" y="788" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="425" y="804" font-family="Arial, sans-serif" font-size="10">serial_number: string</text>
+    <text x="425" y="820" font-family="Arial, sans-serif" font-size="10">type_id: int</text>
+    <text x="425" y="836" font-family="Arial, sans-serif" font-size="10">manufacture_date: date</text>
+    <text x="425" y="852" font-family="Arial, sans-serif" font-size="10">total_flight_hours: int</text>
+    <text x="425" y="868" font-family="Arial, sans-serif" font-size="10">total_cycles: int</text>
+  <rect x="420" y="550" width="140" height="128" fill="#FCE5CD" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="490" y="566" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">EngineAssignment</text>
+    <line x1="420" y1="574" x2="560" y2="574" stroke="#333" stroke-width="1"/>
+    <text x="425" y="588" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="425" y="604" font-family="Arial, sans-serif" font-size="10">engine_id: int</text>
+    <text x="425" y="620" font-family="Arial, sans-serif" font-size="10">aircraft_id: int</text>
+    <text x="425" y="636" font-family="Arial, sans-serif" font-size="10">position: int</text>
+    <text x="425" y="652" font-family="Arial, sans-serif" font-size="10">installed_date: date</text>
+    <text x="425" y="668" font-family="Arial, sans-serif" font-size="10">removed_date: date</text>
+  <rect x="10" y="750" width="140" height="96" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="80" y="766" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">EngineManufacturer</text>
+    <line x1="10" y1="774" x2="150" y2="774" stroke="#333" stroke-width="1"/>
+    <text x="15" y="788" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="15" y="804" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="15" y="820" font-family="Arial, sans-serif" font-size="10">country: string</text>
+    <text x="15" y="836" font-family="Arial, sans-serif" font-size="10">icao_code: string</text>
+  <rect x="200" y="750" width="140" height="112" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="270" y="766" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">EngineType</text>
+    <line x1="200" y1="774" x2="340" y2="774" stroke="#333" stroke-width="1"/>
+    <text x="205" y="788" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="205" y="804" font-family="Arial, sans-serif" font-size="10">designation: string</text>
+    <text x="205" y="820" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="205" y="836" font-family="Arial, sans-serif" font-size="10">manufacturer_id: int</text>
+    <text x="205" y="852" font-family="Arial, sans-serif" font-size="10">thrust_lbs: int</text>
+  <rect x="720" y="1325" width="140" height="160" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="790" y="1341" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Finding</text>
+    <line x1="720" y1="1349" x2="860" y2="1349" stroke="#333" stroke-width="1"/>
+    <text x="725" y="1363" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="725" y="1379" font-family="Arial, sans-serif" font-size="10">task_id: int</text>
+    <text x="725" y="1395" font-family="Arial, sans-serif" font-size="10">finding_number: string</text>
+    <text x="725" y="1411" font-family="Arial, sans-serif" font-size="10">description: string</text>
+    <text x="725" y="1427" font-family="Arial, sans-serif" font-size="10">severity: string</text>
+    <text x="725" y="1443" font-family="Arial, sans-serif" font-size="10">status: string</text>
+    <text x="725" y="1459" font-family="Arial, sans-serif" font-size="10">reported_date: date</text>
+    <text x="725" y="1475" font-family="Arial, sans-serif" font-size="10">resolved_date: date</text>
+  <rect x="200" y="225" width="140" height="112" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="270" y="241" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Fleet</text>
+    <line x1="200" y1="249" x2="340" y2="249" stroke="#333" stroke-width="1"/>
+    <text x="205" y="263" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="205" y="279" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="205" y="295" font-family="Arial, sans-serif" font-size="10">operator_id: int</text>
+    <text x="205" y="311" font-family="Arial, sans-serif" font-size="10">aircraft_id: int</text>
+    <text x="205" y="327" font-family="Arial, sans-serif" font-size="10">base_location: string</text>
+  <rect x="420" y="1000" width="140" height="160" fill="#FCE5CD" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="490" y="1016" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">InspectionType</text>
+    <line x1="420" y1="1024" x2="560" y2="1024" stroke="#333" stroke-width="1"/>
+    <text x="425" y="1038" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="425" y="1054" font-family="Arial, sans-serif" font-size="10">code: string</text>
+    <text x="425" y="1070" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="425" y="1086" font-family="Arial, sans-serif" font-size="10">description: string</text>
+    <text x="425" y="1102" font-family="Arial, sans-serif" font-size="10">interval_hours: int</text>
+    <text x="425" y="1118" font-family="Arial, sans-serif" font-size="10">interval_cycles: int</text>
+    <text x="425" y="1134" font-family="Arial, sans-serif" font-size="10">interval_days: int</text>
+    <text x="425" y="1150" font-family="Arial, sans-serif" font-size="10">maintenance_plan_id: int</text>
+  <rect x="200" y="1000" width="140" height="112" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="270" y="1016" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MaintenancePlan</text>
+    <line x1="200" y1="1024" x2="340" y2="1024" stroke="#333" stroke-width="1"/>
+    <text x="205" y="1038" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="205" y="1054" font-family="Arial, sans-serif" font-size="10">engine_type_id: int</text>
+    <text x="205" y="1070" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="205" y="1086" font-family="Arial, sans-serif" font-size="10">revision: string</text>
+    <text x="205" y="1102" font-family="Arial, sans-serif" font-size="10">effective_date: date</text>
+  <rect x="200" y="1175" width="140" height="144" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="270" y="1191" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MaintenancePlanTask</text>
+    <line x1="200" y1="1199" x2="340" y2="1199" stroke="#333" stroke-width="1"/>
+    <text x="205" y="1213" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="205" y="1229" font-family="Arial, sans-serif" font-size="10">maintenance_plan_id: int</text>
+    <text x="205" y="1245" font-family="Arial, sans-serif" font-size="10">task_type_id: int</text>
+    <text x="205" y="1261" font-family="Arial, sans-serif" font-size="10">task_code: string</text>
+    <text x="205" y="1277" font-family="Arial, sans-serif" font-size="10">description: string</text>
+    <text x="205" y="1293" font-family="Arial, sans-serif" font-size="10">interval_hours: int</text>
+    <text x="205" y="1309" font-family="Arial, sans-serif" font-size="10">interval_cycles: int</text>
+  <rect x="840" y="550" width="140" height="96" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="910" y="566" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MRO</text>
+    <line x1="840" y1="574" x2="980" y2="574" stroke="#333" stroke-width="1"/>
+    <text x="845" y="588" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="845" y="604" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="845" y="620" font-family="Arial, sans-serif" font-size="10">location: string</text>
+    <text x="845" y="636" font-family="Arial, sans-serif" font-size="10">country: string</text>
+  <rect x="20" y="225" width="140" height="112" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="90" y="241" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Operator</text>
+    <line x1="20" y1="249" x2="160" y2="249" stroke="#333" stroke-width="1"/>
+    <text x="25" y="263" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="25" y="279" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="25" y="295" font-family="Arial, sans-serif" font-size="10">icao_code: string</text>
+    <text x="25" y="311" font-family="Arial, sans-serif" font-size="10">iata_code: string</text>
+    <text x="25" y="327" font-family="Arial, sans-serif" font-size="10">country: string</text>
+  <rect x="840" y="1000" width="140" height="144" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="910" y="1016" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">RepairOrder</text>
+    <line x1="840" y1="1024" x2="980" y2="1024" stroke="#333" stroke-width="1"/>
+    <text x="845" y="1038" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="845" y="1054" font-family="Arial, sans-serif" font-size="10">workscope_id: int</text>
+    <text x="845" y="1070" font-family="Arial, sans-serif" font-size="10">mro_id: int</text>
+    <text x="845" y="1086" font-family="Arial, sans-serif" font-size="10">order_number: string</text>
+    <text x="845" y="1102" font-family="Arial, sans-serif" font-size="10">status: string</text>
+    <text x="845" y="1118" font-family="Arial, sans-serif" font-size="10">start_date: date</text>
+    <text x="845" y="1134" font-family="Arial, sans-serif" font-size="10">end_date: date</text>
+  <rect x="840" y="750" width="140" height="96" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="910" y="766" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">RepairShop</text>
+    <line x1="840" y1="774" x2="980" y2="774" stroke="#333" stroke-width="1"/>
+    <text x="845" y="788" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="845" y="804" font-family="Arial, sans-serif" font-size="10">mro_id: int</text>
+    <text x="845" y="820" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="845" y="836" font-family="Arial, sans-serif" font-size="10">specialization: string</text>
+  <rect x="720" y="1175" width="140" height="128" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="790" y="1191" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Task</text>
+    <line x1="720" y1="1199" x2="860" y2="1199" stroke="#333" stroke-width="1"/>
+    <text x="725" y="1213" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="725" y="1229" font-family="Arial, sans-serif" font-size="10">repair_order_id: int</text>
+    <text x="725" y="1245" font-family="Arial, sans-serif" font-size="10">task_type_id: int</text>
+    <text x="725" y="1261" font-family="Arial, sans-serif" font-size="10">task_number: string</text>
+    <text x="725" y="1277" font-family="Arial, sans-serif" font-size="10">description: string</text>
+    <text x="725" y="1293" font-family="Arial, sans-serif" font-size="10">status: string</text>
+  <rect x="200" y="1375" width="140" height="96" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="270" y="1391" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">TaskType</text>
+    <line x1="200" y1="1399" x2="340" y2="1399" stroke="#333" stroke-width="1"/>
+    <text x="205" y="1413" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="205" y="1429" font-family="Arial, sans-serif" font-size="10">code: string</text>
+    <text x="205" y="1445" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="205" y="1461" font-family="Arial, sans-serif" font-size="10">description: string</text>
+  <rect x="640" y="1000" width="140" height="144" fill="#FCE5CD" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="710" y="1016" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Workscope</text>
+    <line x1="640" y1="1024" x2="780" y2="1024" stroke="#333" stroke-width="1"/>
+    <text x="645" y="1038" font-family="Arial, sans-serif" font-size="10">id: int</text>
+    <text x="645" y="1054" font-family="Arial, sans-serif" font-size="10">name: string</text>
+    <text x="645" y="1070" font-family="Arial, sans-serif" font-size="10">description: string</text>
+    <text x="645" y="1086" font-family="Arial, sans-serif" font-size="10">engine_id: int</text>
+    <text x="645" y="1102" font-family="Arial, sans-serif" font-size="10">inspection_type_id: int</text>
+    <text x="645" y="1118" font-family="Arial, sans-serif" font-size="10">planned_start: date</text>
+    <text x="645" y="1134" font-family="Arial, sans-serif" font-size="10">planned_end: date</text>
+
+  <!-- Legend -->
+  <text x="20" y="2130" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Areas:</text>
+    <rect x="20" y="2140" width="14" height="14" fill="#D6E4F0" stroke="#333" stroke-width="1"/>
+    <text x="40" y="2150" font-family="Arial, sans-serif" font-size="11">OEM</text>
+    <rect x="20" y="2160" width="14" height="14" fill="#D9EAD3" stroke="#333" stroke-width="1"/>
+    <text x="40" y="2170" font-family="Arial, sans-serif" font-size="11">Operations</text>
+    <rect x="20" y="2180" width="14" height="14" fill="#FCE5CD" stroke="#333" stroke-width="1"/>
+    <text x="40" y="2190" font-family="Arial, sans-serif" font-size="11">Engine Management</text>
+    <rect x="20" y="2200" width="14" height="14" fill="#E6D9F2" stroke="#333" stroke-width="1"/>
+    <text x="40" y="2210" font-family="Arial, sans-serif" font-size="11">Maintenance &amp; Repair</text>
+</svg>

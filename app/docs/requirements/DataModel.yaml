@@ -1,0 +1,512 @@
+areas:
+  oem:
+    name: OEM
+    color: '#D6E4F0'
+  operations:
+    name: Operations
+    color: '#D9EAD3'
+  engine_management:
+    name: Engine Management
+    color: '#FCE5CD'
+  maintenance_and_repair:
+    name: Maintenance & Repair
+    color: '#E6D9F2'
+classes:
+  Aircraft:
+    description: Individual aircraft identified by registration and serial number.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: registration
+        type: string
+        description: Aircraft registration (e.g., "D-AIUA")
+      - name: serial_number
+        type: string
+        description: Manufacturer serial number
+      - name: type_id
+        type: int
+        description: Reference to AircraftType
+      - name: manufacture_datex
+        type: date
+        description: Date of manufacture
+      - name: total_flight_hours
+        type: int
+        description: Accumulated flight hours
+      - name: total_cycles
+        type: int
+        description: Accumulated cycles
+    area: operations
+  AircraftManufacturer:
+    description: Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: name
+        type: string
+        description: Company name
+      - name: country
+        type: string
+        description: Country of origin
+      - name: icao_code
+        type: string
+        description: ICAO identifier
+    area: oem
+  AircraftType:
+    description: Specific aircraft models (e.g., A320-200, B737-800, E190).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: designation
+        type: string
+        description: Type designation (e.g., "A320-200")
+      - name: name
+        type: string
+        description: Full name
+      - name: manufacturer_id
+        type: int
+        description: Reference to AircraftManufacturer
+      - name: max_passengers
+        type: int
+        description: Maximum passenger capacity
+      - name: max_range_nm
+        type: int
+        description: Maximum range in nautical miles
+    area: oem
+  Engine:
+    description: Individual engine identified by serial number.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: serial_number
+        type: string
+        description: Engine serial number
+      - name: type_id
+        type: int
+        description: Reference to EngineType
+      - name: manufacture_date
+        type: date
+        description: Date of manufacture
+      - name: total_flight_hours
+        type: int
+        description: Accumulated flight hours
+      - name: total_cycles
+        type: int
+        description: Accumulated cycles
+    area: engine_management
+  EngineAssignment:
+    description: >-
+      Tracks which engine is installed on which aircraft at which position over
+      time.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: engine_id
+        type: int
+        description: Reference to Engine
+      - name: aircraft_id
+        type: int
+        description: Reference to Aircraft
+      - name: position
+        type: int
+        description: Engine position (1, 2, 3, 4)
+      - name: installed_date
+        type: date
+        description: Installation date
+      - name: removed_date
+        type: date
+        description: Removal date (null if current)
+    area: engine_management
+  EngineManufacturer:
+    description: Manufacturers of engines (e.g., CFM, Pratt & Whitney, Rolls-Royce).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: name
+        type: string
+        description: Company name
+      - name: country
+        type: string
+        description: Country of origin
+      - name: icao_code
+        type: string
+        description: ICAO identifier
+    area: oem
+  EngineType:
+    description: Specific engine models (e.g., CFM56-5B, PW1100G).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: designation
+        type: string
+        description: Type designation
+      - name: name
+        type: string
+        description: Full name
+      - name: manufacturer_id
+        type: int
+        description: Reference to EngineManufacturer
+      - name: thrust_lbs
+        type: int
+        description: Thrust in pounds
+    area: oem
+  Finding:
+    description: >-
+      Discrepancy or defect discovered during task execution, requiring
+      disposition.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: task_id
+        type: int
+        description: Reference to Task
+      - name: finding_number
+        type: string
+        description: Finding number
+      - name: description
+        type: string
+        description: Finding description
+      - name: severity
+        type: string
+        description: Severity level
+      - name: status
+        type: string
+        description: Finding status
+      - name: reported_date
+        type: date
+        description: Date reported
+      - name: resolved_date
+        type: date
+        description: Date resolved
+    area: maintenance_and_repair
+  Fleet:
+    description: Logical grouping of aircraft belonging to an operator.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: name
+        type: string
+        description: Fleet name
+      - name: operator_id
+        type: int
+        description: Reference to Operator
+      - name: aircraft_id
+        type: int
+        description: Reference to Aircraft
+      - name: base_location
+        type: string
+        description: Home base
+    area: operations
+  InspectionType:
+    description: >-
+      Scheduled inspection intervals (e.g., A-Check, C-Check, D-Check) with
+      time/cycle limits.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: code
+        type: string
+        description: Inspection code
+      - name: name
+        type: string
+        description: Inspection name
+      - name: description
+        type: string
+        description: Description
+      - name: interval_hours
+        type: int
+        description: Interval in flight hours
+      - name: interval_cycles
+        type: int
+        description: Interval in cycles
+      - name: interval_days
+        type: int
+        description: Interval in calendar days
+      - name: maintenance_plan_id
+        type: int
+        description: Reference to MaintenancePlan
+    area: engine_management
+  MaintenancePlan:
+    description: >-
+      OEM-defined maintenance program for an engine type. Contains the scheduled
+      maintenance tasks.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: engine_type_id
+        type: int
+        description: Reference to EngineType
+      - name: name
+        type: string
+        description: Plan name
+      - name: revision
+        type: string
+        description: Revision number
+      - name: effective_date
+        type: date
+        description: Date plan becomes effective
+    area: oem
+  MaintenancePlanTask:
+    description: >-
+      Individual task defined in the OEM maintenance plan, referencing a
+      TaskType with specific intervals.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: maintenance_plan_id
+        type: int
+        description: Reference to MaintenancePlan
+      - name: task_type_id
+        type: int
+        description: Reference to TaskType
+      - name: task_code
+        type: string
+        description: OEM task code
+      - name: description
+        type: string
+        description: Task description
+      - name: interval_hours
+        type: int
+        description: Interval in flight hours
+      - name: interval_cycles
+        type: int
+        description: Interval in cycles
+    area: oem
+  MRO:
+    description: Maintenance, Repair and Overhaul organization.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: name
+        type: string
+        description: MRO name
+      - name: location
+        type: string
+        description: Location
+      - name: country
+        type: string
+        description: Country
+    area: maintenance_and_repair
+  Operator:
+    description: Airlines or aircraft operators (e.g., Lufthansa, Delta).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: name
+        type: string
+        description: Operator name
+      - name: icao_code
+        type: string
+        description: ICAO code (e.g., "DLH")
+      - name: iata_code
+        type: string
+        description: IATA code (e.g., "LH")
+      - name: country
+        type: string
+        description: Country
+    area: operations
+  RepairOrder:
+    description: >-
+      MRO's execution document corresponding 1:1 to a Workscope. Contains the
+      actual tasks performed.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: workscope_id
+        type: int
+        description: Reference to Workscope
+      - name: mro_id
+        type: int
+        description: Reference to MRO
+      - name: order_number
+        type: string
+        description: MRO order number
+      - name: status
+        type: string
+        description: Order status
+      - name: start_date
+        type: date
+        description: Actual start date
+      - name: end_date
+        type: date
+        description: Actual end date
+    area: maintenance_and_repair
+  RepairShop:
+    description: Specialized workshop within an MRO (e.g., engine shop, avionics shop).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: mro_id
+        type: int
+        description: Reference to MRO
+      - name: name
+        type: string
+        description: Shop name
+      - name: specialization
+        type: string
+        description: Area of specialization
+    area: maintenance_and_repair
+  Task:
+    description: Individual maintenance task within a repair order.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: repair_order_id
+        type: int
+        description: Reference to RepairOrder
+      - name: task_type_id
+        type: int
+        description: Reference to TaskType
+      - name: task_number
+        type: string
+        description: Task number
+      - name: description
+        type: string
+        description: Task description
+      - name: status
+        type: string
+        description: Task status
+    area: maintenance_and_repair
+  TaskType:
+    description: >-
+      Classification of tasks (e.g., inspection, repair, replacement,
+      modification).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: code
+        type: string
+        description: Task type code
+      - name: name
+        type: string
+        description: Task type name
+      - name: description
+        type: string
+        description: Description
+    area: maintenance_and_repair
+  Workscope:
+    description: >-
+      Planning document defining maintenance work to be performed on an engine.
+      Created by Engine Management.
+    attributes:
+      - name: id
+        type: int
+        description: Primary key
+      - name: name
+        type: string
+        description: Workscope name
+      - name: description
+        type: string
+        description: Description
+      - name: engine_id
+        type: int
+        description: Reference to Engine
+      - name: inspection_type_id
+        type: int
+        description: Reference to InspectionType
+      - name: planned_start
+        type: date
+        description: Planned start date
+      - name: planned_end
+        type: date
+        description: Planned end date
+    area: engine_management
+relationships:
+  - from: Aircraft
+    to: AircraftType
+    attribute: type
+    from_cardinality: '*'
+  - from: AircraftType
+    to: AircraftManufacturer
+    attribute: manufacturer
+    from_cardinality: '*'
+  - from: Engine
+    to: EngineType
+    attribute: type
+    from_cardinality: '*'
+  - from: EngineAssignment
+    to: Engine
+    attribute: engine
+    from_cardinality: '*'
+  - from: EngineAssignment
+    to: Aircraft
+    attribute: aircraft
+    from_cardinality: '*'
+  - from: EngineType
+    to: EngineManufacturer
+    attribute: manufacturer
+    from_cardinality: '*'
+  - from: Finding
+    to: Task
+    attribute: task
+    from_cardinality: '*'
+  - from: Fleet
+    to: Operator
+    attribute: operator
+    from_cardinality: '*'
+  - from: Fleet
+    to: Aircraft
+    attribute: aircraft
+    from_cardinality: '*'
+  - from: InspectionType
+    to: MaintenancePlan
+    attribute: maintenance_plan
+    from_cardinality: '*'
+  - from: MaintenancePlan
+    to: EngineType
+    attribute: engine_type
+    from_cardinality: '*'
+  - from: MaintenancePlanTask
+    to: MaintenancePlan
+    attribute: maintenance_plan
+    from_cardinality: '*'
+  - from: MaintenancePlanTask
+    to: TaskType
+    attribute: task_type
+    from_cardinality: '*'
+  - from: RepairOrder
+    to: Workscope
+    attribute: workscope
+    from_cardinality: '1'
+    to_cardinality: '1'
+  - from: RepairOrder
+    to: MRO
+    attribute: mro
+    from_cardinality: '*'
+  - from: RepairShop
+    to: MRO
+    attribute: mro
+    from_cardinality: '*'
+  - from: Task
+    to: RepairOrder
+    attribute: repair_order
+    from_cardinality: '*'
+  - from: Task
+    to: TaskType
+    attribute: task_type
+    from_cardinality: '*'
+  - from: Workscope
+    to: Engine
+    attribute: engine
+    from_cardinality: '*'
+  - from: Workscope
+    to: InspectionType
+    attribute: inspection_type
+    from_cardinality: '*'
