@@ -70,6 +70,37 @@
     text-decoration: none;
 }
 
+.irma-menu-bar .menu-separator {
+    color: #cbd5e1;
+    margin: 0 8px;
+}
+
+.irma-menu-bar .menu-label {
+    color: #64748b;
+    font-size: 0.8rem;
+    margin-right: 4px;
+}
+
+.irma-menu-bar .menu-select {
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 0.8rem;
+    color: #475569;
+    cursor: pointer;
+}
+
+.irma-menu-bar .menu-select:hover {
+    border-color: #2563eb;
+}
+
+.irma-menu-bar .menu-select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
 /* -----------------------------------------------------------------------------
    Main Content Split Layout
    ----------------------------------------------------------------------------- */
@@ -688,14 +719,21 @@
     font-style: italic;
 }
 
-.tree-attribute.hover-field {
+/* Hover-only fields: hidden by default, shown on node hover */
+.tree-attribute.hover-field,
+.tree-fk-node.hover-field {
     display: none;
 }
 
 .tree-node:hover .tree-attribute.hover-field,
+.tree-node:hover .tree-fk-node.hover-field,
 .tree-fk-content .tree-attribute.hover-field {
     display: flex;
     opacity: 0.7;
+}
+
+.tree-node:hover .tree-fk-node.hover-field {
+    display: block;
 }
 
 /* Foreign key nodes */

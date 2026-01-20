@@ -66,7 +66,12 @@ function parseConstraints(description) {
 
 /**
  * Parse UI annotations from description
- * Supported: [LABEL], [LABEL2], [HOVER], [READONLY], [HIDDEN]
+ * Supported: [LABEL], [LABEL2], [DETAIL], [HOVER], [READONLY], [HIDDEN]
+ *
+ * Display logic:
+ * - LABEL/LABEL2/DETAIL: Always visible in tree view ("Grundansicht")
+ * - No tag: Only visible on hover/focus
+ * - HIDDEN: Never visible
  */
 function parseUIAnnotations(description) {
   const ui = {};
@@ -76,6 +81,9 @@ function parseUIAnnotations(description) {
   }
   if (/\[LABEL2\]/i.test(description)) {
     ui.label2 = true;
+  }
+  if (/\[DETAIL\]/i.test(description)) {
+    ui.detail = true;
   }
   if (/\[HOVER\]/i.test(description)) {
     ui.hover = true;
@@ -479,20 +487,44 @@ function generateSchema(mdPath, enabledEntities = null) {
 
 /**
  * Generate extended schema with UI metadata for frontend
+ *
+ * Tag meanings:
+ * - [LABEL], [LABEL2]: Fields used for display label AND basic view (Grundansicht)
+ * - [DETAIL]: Additional fields to show in basic view (Grundansicht)
+ * - [HOVER]: (legacy) Explicit hover-only
+ * - [HIDDEN]: Never visible
+ * - [READONLY]: Not editable
+ *
+ * Field visibility logic:
+ * - detailFields: Fields marked [LABEL], [LABEL2], or [DETAIL] - always visible when expanded
+ * - hoverFields: All other fields (except hidden) - only visible on hover/focus
+ * - hiddenFields: Fields marked [HIDDEN] - never visible
  */
 function generateExtendedSchema(entity, inverseRelationships) {
   const labelFields = [];
+  const detailFields = [];
   const hoverFields = [];
   const readonlyFields = ['id']; // id is always readonly
   const hiddenFields = [];
 
   for (const col of entity.columns) {
-    if (col.ui) {
-      if (col.ui.label) labelFields.push(col.name);
-      if (col.ui.label2) labelFields.push(col.name);
-      if (col.ui.hover) hoverFields.push(col.name);
-      if (col.ui.readonly) readonlyFields.push(col.name);
-      if (col.ui.hidden) hiddenFields.push(col.name);
+    const isLabel = col.ui?.label || col.ui?.label2;
+    const isDetail = col.ui?.detail;
+    const isHidden = col.ui?.hidden;
+
+    // labelFields are for display purposes (title/subtitle)
+    if (col.ui?.label) labelFields.push(col.name);
+    if (col.ui?.label2) labelFields.push(col.name);
+    if (col.ui?.readonly) readonlyFields.push(col.name);
+
+    if (isHidden) {
+      hiddenFields.push(col.name);
+    } else if (isLabel || isDetail) {
+      // LABEL, LABEL2, DETAIL fields are always visible in Grundansicht
+      detailFields.push(col.name);
+    } else {
+      // All other fields are hover-only
+      hoverFields.push(col.name);
     }
   }
 
@@ -503,6 +535,7 @@ function generateExtendedSchema(entity, inverseRelationships) {
     ...entity,
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
+      detailFields: detailFields.length > 0 ? detailFields : null,
       hoverFields: hoverFields.length > 0 ? hoverFields : null,
       readonlyFields,
       hiddenFields: hiddenFields.length > 0 ? hiddenFields : null

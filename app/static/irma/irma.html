@@ -17,6 +17,17 @@
         <nav id="irma-menu-bar" class="irma-menu-bar">
             <a href="/about?doc=requirements/DataModel.md" class="menu-item" data-i18n="data_model">Data Model</a>
             <a href="/layout-editor" class="menu-item" data-i18n="layout_editor">Layout Editor</a>
+            <span class="menu-separator">|</span>
+            <label class="menu-label">Sort:</label>
+            <select id="sort-attributes" class="menu-select" title="Attribute order">
+                <option value="schema">Schema order</option>
+                <option value="alpha">Alphabetical</option>
+            </select>
+            <select id="sort-references" class="menu-select" title="References position">
+                <option value="end">References at end</option>
+                <option value="start">References first</option>
+                <option value="inline">References inline</option>
+            </select>
         </nav>
 
         <!-- Main Content Area -->

@@ -61,6 +61,43 @@
 - `DataModel-diagram.svg` - Generated compact diagram
 - `DataModel-diagram-detailed.svg` - Generated detailed diagram
 
+## Attribute Annotations
+
+Attribute descriptions can include special tags in square brackets `[TAG]` to control database constraints and UI behavior.
+
+### Database Constraints
+
+| Tag | Description | SQL Effect |
+|-----|-------------|------------|
+| `[UNIQUE]` | Single field uniqueness constraint | `UNIQUE` constraint on column |
+| `[UK1]`, `[UK2]`, ... | Composite unique key | Fields with same UKn form a composite unique constraint |
+| `[INDEX]` | Single field index | Creates index on column |
+| `[IX1]`, `[IX2]`, ... | Composite index | Fields with same IXn form a composite index |
+
+### UI Display Annotations
+
+| Tag | Description | Tree View Behavior |
+|-----|-------------|-------------------|
+| `[LABEL]` | Primary display label | Used as node title, **always visible** in expanded view |
+| `[LABEL2]` | Secondary display label | Used as node subtitle, **always visible** in expanded view |
+| `[DETAIL]` | Basic view field | **Always visible** when node is expanded ("Grundansicht") |
+| `[READONLY]` | Non-editable field | Displayed but cannot be modified in forms |
+| `[HIDDEN]` | Never displayed | Field exists in DB but not shown in UI |
+
+**Visibility Logic:**
+- Fields marked with `[LABEL]`, `[LABEL2]`, or `[DETAIL]` are always visible when a tree node is expanded
+- All other fields are **hover-only** - they appear only when the cursor hovers over the node
+- `[HIDDEN]` fields are never displayed in the UI
+
+**Example:**
+```
+| name | string | Company name [LABEL] | Airbus |
+| country | string | Country [LABEL2] | France |
+| type_id | int | Reference to AircraftType [DETAIL] | 5 |
+| internal_code | string | Internal system code | ABC123 |
+```
+In this example: `name` and `country` are always visible (and used as title/subtitle), `type_id` is always visible (basic view), and `internal_code` only appears on hover.
+
 ## Entity Descriptions
 
 ### Aircraft
@@ -71,10 +108,10 @@ Individual aircraft identified by registration and serial number.
 | id | int | Primary key [READONLY] | 1001 |
 | registration | string | Aircraft registration [LABEL] | D-AIUA |
 | serial_number | string | Manufacturer serial number [LABEL2] | MSN 4711 |
-| type_id | int | Reference to AircraftType | 5 |
+| type_id | int | Reference to AircraftType [DETAIL] | 5 |
 | manufacture_date | date | Date of manufacture | 2015-03-15 |
-| total_flight_hours | int | Accumulated flight hours [HOVER] | 45230 |
-| total_cycles | int | Accumulated cycles [HOVER] | 18500 |
+| total_flight_hours | int | Accumulated flight hours | 45230 |
+| total_cycles | int | Accumulated cycles | 18500 |
 
 ### AircraftManufacturer
 Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
@@ -84,7 +121,7 @@ Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
 | id | int | Primary key [READONLY] | 1 |
 | name | string | Company name [LABEL] | Airbus |
 | country | string | Country of origin [LABEL2] | France |
-| icao_code | string | ICAO identifier [HOVER] | AIB |
+| icao_code | string | ICAO identifier | AIB |
 
 ### AircraftType
 Specific aircraft models (e.g., A320-200, B737-800, E190).
@@ -94,9 +131,9 @@ Specific aircraft models (e.g., A320-200, B737-800, E190).
 | id | int | Primary key [READONLY] | 5 |
 | designation | string | Type designation [LABEL] | A320-200 |
 | name | string | Full name [LABEL2] | Airbus A320-200 |
-| manufacturer_id | int | Reference to AircraftManufacturer | 1 |
-| max_passengers | int | Maximum passenger capacity [HOVER] | 180 |
-| max_range_nm | int | Maximum range in nautical miles [HOVER] | 3300 |
+| manufacturer_id | int | Reference to AircraftManufacturer [DETAIL] | 1 |
+| max_passengers | int | Maximum passenger capacity | 180 |
+| max_range_nm | int | Maximum range in nautical miles | 3300 |
 
 ### Engine
 Individual engine identified by serial number.
@@ -105,10 +142,10 @@ Individual engine identified by serial number.
 |-----------|------|-------------|---------|
 | id | int | Primary key [READONLY] | 2001 |
 | serial_number | string | Engine serial number [LABEL] | ESN 738456 |
-| type_id | int | Reference to EngineType | 10 |
+| type_id | int | Reference to EngineType [DETAIL] | 10 |
 | manufacture_date | date | Date of manufacture [LABEL2] | 2014-08-20 |
-| total_flight_hours | int | Accumulated flight hours [HOVER] | 32000 |
-| total_cycles | int | Accumulated cycles [HOVER] | 15000 |
+| total_flight_hours | int | Accumulated flight hours | 32000 |
+| total_cycles | int | Accumulated cycles | 15000 |
 
 ### EngineAssignment
 Tracks which engine is installed on which aircraft at which position over time.
@@ -130,7 +167,7 @@ Manufacturers of engines (e.g., CFM, Pratt & Whitney, Rolls-Royce).
 | id | int | Primary key [READONLY] | 1 |
 | name | string | Company name [LABEL] | CFM International |
 | country | string | Country of origin [LABEL2] | USA/France |
-| icao_code | string | ICAO identifier [HOVER] | CFM |
+| icao_code | string | ICAO identifier | CFM |
 
 ### EngineType
 Specific engine models (e.g., CFM56-5B, PW1100G).
@@ -140,8 +177,8 @@ Specific engine models (e.g., CFM56-5B, PW1100G).
 | id | int | Primary key [READONLY] | 10 |
 | designation | string | Type designation [LABEL] | CFM56-5B4 |
 | name | string | Full name [LABEL2] | CFM56-5B4/3 |
-| manufacturer_id | int | Reference to EngineManufacturer | 1 |
-| thrust_lbs | int | Thrust in pounds [HOVER] | 27000 |
+| manufacturer_id | int | Reference to EngineManufacturer [DETAIL] | 1 |
+| thrust_lbs | int | Thrust in pounds | 27000 |
 
 ### Finding
 Discrepancy or defect discovered during task execution, requiring disposition.
@@ -214,7 +251,7 @@ Maintenance, Repair and Overhaul organization.
 | id | int | Primary key [READONLY] | 1 |
 | name | string | MRO name [LABEL] | Lufthansa Technik |
 | location | string | Location [LABEL2] | Hamburg |
-| country | string | Country [HOVER] | Germany |
+| country | string | Country | Germany |
 
 ### Operator
 Airlines or aircraft operators (e.g., Lufthansa, Delta).
@@ -224,8 +261,8 @@ Airlines or aircraft operators (e.g., Lufthansa, Delta).
 | id | int | Primary key [READONLY] | 1 |
 | name | string | Operator name [LABEL] | Lufthansa |
 | icao_code | string | ICAO code [LABEL2] | DLH |
-| iata_code | string | IATA code [HOVER] | LH |
-| country | string | Country [HOVER] | Germany |
+| iata_code | string | IATA code | LH |
+| country | string | Country | Germany |
 
 ### RepairOrder
 MRO's execution document corresponding 1:1 to a Workscope. Contains the actual tasks performed.

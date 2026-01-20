@@ -9,8 +9,48 @@ const EntityTree = {
   expandedNodes: new Set(),
   selectedNodeId: null,
 
+  // Sort settings
+  attributeOrder: 'schema', // 'schema' or 'alpha'
+  referencePosition: 'end', // 'end', 'start', or 'inline'
+
   init(containerId) {
     this.container = document.getElementById(containerId);
+    this.initSortControls();
+  },
+
+  initSortControls() {
+    const attrSelect = document.getElementById('sort-attributes');
+    const refSelect = document.getElementById('sort-references');
+
+    if (attrSelect) {
+      // Restore from sessionStorage
+      const savedAttr = sessionStorage.getItem('tree-attr-order');
+      if (savedAttr) {
+        this.attributeOrder = savedAttr;
+        attrSelect.value = savedAttr;
+      }
+
+      attrSelect.addEventListener('change', (e) => {
+        this.attributeOrder = e.target.value;
+        sessionStorage.setItem('tree-attr-order', e.target.value);
+        this.render();
+      });
+    }
+
+    if (refSelect) {
+      // Restore from sessionStorage
+      const savedRef = sessionStorage.getItem('tree-ref-position');
+      if (savedRef) {
+        this.referencePosition = savedRef;
+        refSelect.value = savedRef;
+      }
+
+      refSelect.addEventListener('change', (e) => {
+        this.referencePosition = e.target.value;
+        sessionStorage.setItem('tree-ref-position', e.target.value);
+        this.render();
+      });
+    }
   },
 
   /**
@@ -82,30 +122,68 @@ const EntityTree = {
 
   /**
    * Render the expanded content of a node (attributes + relationships)
+   *
+   * Field visibility:
+   * - detailFields (LABEL, LABEL2, DETAIL): always visible
+   * - All other fields: only visible on hover/focus
    */
   async renderNodeContent(entityName, record, schema) {
     let html = '<div class="tree-node-content">';
 
-    // Render attributes
-    for (const col of schema.columns) {
-      // Skip hidden fields
-      if (schema.ui?.hiddenFields?.includes(col.name)) continue;
+    // Separate columns into regular attributes, outbound FKs, and prepare back-references
+    let columns = schema.columns.filter(col => !schema.ui?.hiddenFields?.includes(col.name));
 
-      const value = record[col.name];
-
-      if (col.foreignKey) {
-        // Foreign key - render as expandable sub-node
-        html += await this.renderForeignKeyNode(col, value, record);
-      } else {
-        // Regular attribute
-        const isHover = schema.ui?.hoverFields?.includes(col.name);
-        html += this.renderAttribute(col.name, value, isHover);
-      }
+    // Sort columns if needed
+    if (this.attributeOrder === 'alpha') {
+      columns = [...columns].sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    // Render back-references if available
-    if (schema.backReferences && schema.backReferences.length > 0) {
-      html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+    const regularCols = columns.filter(col => !col.foreignKey);
+    const fkCols = columns.filter(col => col.foreignKey);
+    const hasBackRefs = schema.backReferences && schema.backReferences.length > 0;
+
+    // Helper to determine if field is hover-only (not in detailFields)
+    const isHoverField = (colName) => {
+      const detailFields = schema.ui?.detailFields || [];
+      return !detailFields.includes(colName);
+    };
+
+    // Render based on reference position setting
+    if (this.referencePosition === 'start') {
+      // FKs first, then back-refs, then regular attributes
+      for (const col of fkCols) {
+        html += await this.renderForeignKeyNode(col, record[col.name], record, isHoverField(col.name));
+      }
+      if (hasBackRefs) {
+        html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+      }
+      for (const col of regularCols) {
+        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name));
+      }
+    } else if (this.referencePosition === 'inline') {
+      // Mixed: regular attrs, then FKs inline, then back-refs at end
+      for (const col of columns) {
+        const value = record[col.name];
+        if (col.foreignKey) {
+          html += await this.renderForeignKeyNode(col, value, record, isHoverField(col.name));
+        } else {
+          html += this.renderAttribute(col.name, value, isHoverField(col.name));
+        }
+      }
+      if (hasBackRefs) {
+        html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+      }
+    } else {
+      // 'end' (default): regular attributes first, then FKs, then back-refs
+      for (const col of regularCols) {
+        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name));
+      }
+      for (const col of fkCols) {
+        html += await this.renderForeignKeyNode(col, record[col.name], record, isHoverField(col.name));
+      }
+      if (hasBackRefs) {
+        html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+      }
     }
 
     html += '</div>';
@@ -130,10 +208,12 @@ const EntityTree = {
   /**
    * Render a foreign key as an expandable node
    */
-  async renderForeignKeyNode(col, fkId, parentRecord) {
+  async renderForeignKeyNode(col, fkId, parentRecord, isHover = false) {
+    const hoverClass = isHover ? ' hover-field' : '';
+
     if (!fkId) {
       return `
-        <div class="tree-attribute fk-field">
+        <div class="tree-attribute fk-field${hoverClass}">
           <span class="attr-name">${col.name}:</span>
           <span class="attr-value"><em>null</em></span>
         </div>
@@ -143,19 +223,18 @@ const EntityTree = {
     const nodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${parentRecord.id}`;
     const isExpanded = this.expandedNodes.has(nodeId);
 
-    // Get a label for the referenced record
+    // Get a label for the referenced record (title + subtitle)
     let refLabel = `#${fkId}`;
     try {
       const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
       const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
-      const label = this.getRecordLabel(refRecord, refSchema);
-      refLabel = label.title;
+      refLabel = this.getFullLabel(refRecord, refSchema);
     } catch (e) {
       // Fall back to just the ID
     }
 
     let html = `
-      <div class="tree-fk-node ${isExpanded ? 'expanded' : ''}"
+      <div class="tree-fk-node${hoverClass} ${isExpanded ? 'expanded' : ''}"
            data-node-id="${nodeId}"
            data-entity="${col.foreignKey.entity}"
            data-record-id="${fkId}">
@@ -191,8 +270,8 @@ const EntityTree = {
         const value = record[col.name];
 
         if (col.foreignKey && value) {
-          // Nested FK - show as clickable link but not expandable to prevent deep recursion
-          html += this.renderNestedForeignKey(col, value);
+          // Nested FK - show label with clickable link (no further expansion)
+          html += await this.renderNestedForeignKey(col, value);
         } else {
           const isHover = schema.ui?.hoverFields?.includes(col.name);
           html += this.renderAttribute(col.name, value, isHover);
@@ -208,14 +287,24 @@ const EntityTree = {
 
   /**
    * Render a nested FK (no further expansion to prevent deep nesting)
+   * Always shows the label of the referenced entity
    */
-  renderNestedForeignKey(col, fkId) {
+  async renderNestedForeignKey(col, fkId) {
+    // Get the label for the referenced record (title + subtitle)
+    let refLabel = `#${fkId}`;
+    try {
+      const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
+      const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
+      refLabel = this.getFullLabel(refRecord, refSchema);
+    } catch {
+      // Fall back to just the ID
+    }
+
     return `
       <div class="tree-attribute fk-link">
         <span class="attr-name">${col.name}:</span>
-        <span class="attr-value fk-ref" data-entity="${col.foreignKey.entity}" data-id="${fkId}">
-          ${col.foreignKey.entity} #${fkId}
-        </span>
+        <span class="fk-label">${this.escapeHtml(refLabel)}</span>
+        <span class="fk-entity-link" data-action="navigate-entity" data-entity="${col.foreignKey.entity}" data-id="${fkId}">(${col.foreignKey.entity})</span>
       </div>
     `;
   },
@@ -252,7 +341,7 @@ const EntityTree = {
              data-parent-id="${recordId}">
           <div class="tree-backref-header" data-action="toggle-backref">
             <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
-            <span class="backref-label">[${ref.entity} references] (${count})</span>
+            <span class="backref-label">${ref.entity} [${count}]</span>
           </div>
       `;
 
@@ -337,6 +426,17 @@ const EntityTree = {
   },
 
   /**
+   * Get combined label string for FK display (title + subtitle if available)
+   */
+  getFullLabel(record, schema) {
+    const { title, subtitle } = this.getRecordLabel(record, schema);
+    if (subtitle) {
+      return `${title} · ${subtitle}`;
+    }
+    return title;
+  },
+
+  /**
    * Attach event listeners to tree nodes
    */
   attachEventListeners() {
@@ -392,13 +492,13 @@ const EntityTree = {
       });
     });
 
-    // Navigate to back-reference
+    // Navigate to back-reference (and expand the target record)
     this.container.querySelectorAll('[data-action="navigate"]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const entityName = el.dataset.entity;
         const recordId = parseInt(el.dataset.id);
-        this.onNavigate(entityName, recordId);
+        this.onNavigateAndExpand(entityName, recordId);
       });
     });
 

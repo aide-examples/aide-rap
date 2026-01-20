@@ -322,6 +322,18 @@ function getSchemaInfo(entityName) {
 
 /**
  * Get extended schema info with UI metadata
+ *
+ * Tag meanings:
+ * - [LABEL], [LABEL2]: Fields used for display label AND basic view (Grundansicht)
+ * - [DETAIL]: Additional fields to show in basic view (Grundansicht)
+ * - [HOVER]: (legacy) Explicit hover-only
+ * - [HIDDEN]: Never visible
+ * - [READONLY]: Not editable
+ *
+ * Field visibility logic:
+ * - detailFields: Fields marked [LABEL], [LABEL2], or [DETAIL] - always visible when expanded
+ * - hoverFields: All other fields (except hidden) - only visible on hover/focus
+ * - hiddenFields: Fields marked [HIDDEN] - never visible
  */
 function getExtendedSchemaInfo(entityName) {
   const entity = getEntityMeta(entityName);
@@ -329,17 +341,29 @@ function getExtendedSchemaInfo(entityName) {
 
   // Collect UI annotation fields
   const labelFields = [];
+  const detailFields = [];
   const hoverFields = [];
   const readonlyFields = ['id']; // id is always readonly
   const hiddenFields = [];
 
   for (const col of entity.columns) {
-    if (col.ui) {
-      if (col.ui.label) labelFields.push(col.name);
-      if (col.ui.label2) labelFields.push(col.name);
-      if (col.ui.hover) hoverFields.push(col.name);
-      if (col.ui.readonly && col.name !== 'id') readonlyFields.push(col.name);
-      if (col.ui.hidden) hiddenFields.push(col.name);
+    const isLabel = col.ui?.label || col.ui?.label2;
+    const isDetail = col.ui?.detail;
+    const isHidden = col.ui?.hidden;
+
+    // labelFields are for display purposes (title/subtitle)
+    if (col.ui?.label) labelFields.push(col.name);
+    if (col.ui?.label2) labelFields.push(col.name);
+    if (col.ui?.readonly && col.name !== 'id') readonlyFields.push(col.name);
+
+    if (isHidden) {
+      hiddenFields.push(col.name);
+    } else if (isLabel || isDetail) {
+      // LABEL, LABEL2, DETAIL fields are always visible in Grundansicht
+      detailFields.push(col.name);
+    } else {
+      // All other fields are hover-only
+      hoverFields.push(col.name);
     }
   }
 
@@ -362,6 +386,7 @@ function getExtendedSchemaInfo(entityName) {
     })),
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
+      detailFields: detailFields.length > 0 ? detailFields : null,
       hoverFields: hoverFields.length > 0 ? hoverFields : null,
       readonlyFields,
       hiddenFields: hiddenFields.length > 0 ? hiddenFields : null
