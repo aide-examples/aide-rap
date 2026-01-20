@@ -9,25 +9,92 @@
     <link rel="stylesheet" href="/static/irma/irma.css">
 </head>
 <body>
-    <div class="app-container">
+    <div class="app-container page-fill">
+        <!-- Framework Header Widget -->
         <div id="app-header"></div>
 
-        <div class="main-content">
-            <p id="app-subtitle" class="app-subtitle"></p>
+        <!-- Menu Bar for IRMA-specific navigation -->
+        <nav id="irma-menu-bar" class="irma-menu-bar">
+            <a href="/about?doc=requirements/DataModel.md" class="menu-item" data-i18n="data_model">Data Model</a>
+            <a href="/layout-editor" class="menu-item" data-i18n="layout_editor">Layout Editor</a>
+        </nav>
 
-            <p>A collection of data needed for maintenance and repair of engines.</p>
-            <p>See the <a href="/about?doc=requirements/DataModel.md">Data Model</a></p>
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div class="content-split">
+                <!-- Entity Explorer (left) -->
+                <section id="entity-explorer" class="entity-explorer">
+                    <!-- Toolbar -->
+                    <div class="explorer-toolbar">
+                        <select id="entity-selector" class="entity-selector">
+                            <option value="" data-i18n="select_entity">Select Entity...</option>
+                        </select>
+                        <button id="btn-new" class="btn-toolbar" title="Create new record" data-i18n-title="create_new">+ New</button>
+                        <input type="text" id="filter-input" class="filter-input" placeholder="Filter..." data-i18n-placeholder="filter_placeholder">
+                        <button id="btn-view-toggle" class="btn-view-toggle" title="Toggle view mode">
+                            <span id="view-icon">&#9776;</span>
+                        </button>
+                    </div>
 
-            <div id="status-widget"></div>
-        </div>
+                    <!-- Entity List (flat view) -->
+                    <div id="entity-list" class="entity-list hidden">
+                        <p class="empty-message" data-i18n="select_entity_message">Select an entity type to view records.</p>
+                    </div>
+
+                    <!-- Entity Tree (tree view) -->
+                    <div id="entity-tree-container" class="entity-list">
+                    </div>
+                </section>
+
+                <!-- Detail Panel (right) -->
+                <aside id="detail-panel" class="detail-panel">
+                    <div class="panel-header">
+                        <span id="panel-title" class="panel-title" data-i18n="details">Details</span>
+                        <button id="panel-toggle" class="panel-toggle" title="Collapse panel">&#9666;</button>
+                    </div>
+                    <div id="panel-content" class="panel-content">
+                        <p class="empty-message" data-i18n="select_record_message">Select a record to view details.</p>
+                    </div>
+                </aside>
+
+                <!-- Collapsed Panel Toggle -->
+                <button id="panel-expand" class="panel-expand hidden" title="Expand panel">&#9656;</button>
+            </div>
+
+            <!-- Framework Status Widget (Footer) -->
+            <div id="status-widget" class="status-widget"></div>
+        </main>
     </div>
 
+    <!-- Confirm Dialog Template -->
+    <dialog id="confirm-dialog" class="confirm-dialog">
+        <div class="dialog-content">
+            <p id="confirm-message"></p>
+            <label class="checkbox-row" id="confirm-remember-row">
+                <input type="checkbox" id="confirm-remember">
+                <span data-i18n="dont_ask_again">Don't ask again this session</span>
+            </label>
+            <div class="dialog-buttons">
+                <button id="confirm-cancel" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                <button id="confirm-ok" class="btn-danger" data-i18n="delete">Delete</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Framework Scripts -->
     <script src="/static/frame/vendor/polyglot/polyglot.min.js"></script>
     <script src="/static/frame/js/i18n.js"></script>
+    <script src="/static/frame/js/google-translate.js"></script>
     <script src="/static/frame/js/header-widget.js"></script>
     <script src="/static/frame/js/status-widget.js"></script>
     <script src="/static/frame/js/pwa.js"></script>
+
+    <!-- IRMA Scripts -->
+    <script src="/static/irma/services/api-client.js"></script>
+    <script src="/static/irma/components/entity-tree.js"></script>
+    <script src="/static/irma/components/entity-explorer.js"></script>
+    <script src="/static/irma/components/detail-panel.js"></script>
+    <script src="/static/irma/components/entity-form.js"></script>
     <script src="/static/irma/irma.js"></script>
-    <script>PWA.init();</script>
 </body>
 </html>

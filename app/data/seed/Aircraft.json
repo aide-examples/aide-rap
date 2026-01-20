@@ -1,0 +1,10 @@
+[
+  { "id": 1001, "registration": "D-AIUA", "serial_number": "MSN 4711", "type_id": 1, "manufacture_date": "2015-03-15", "total_flight_hours": 45230, "total_cycles": 18500 },
+  { "id": 1002, "registration": "D-AIUB", "serial_number": "MSN 4712", "type_id": 1, "manufacture_date": "2015-06-20", "total_flight_hours": 38500, "total_cycles": 15200 },
+  { "id": 1003, "registration": "D-AIUC", "serial_number": "MSN 4890", "type_id": 2, "manufacture_date": "2016-01-10", "total_flight_hours": 32000, "total_cycles": 12800 },
+  { "id": 1004, "registration": "D-AIKB", "serial_number": "MSN 1234", "type_id": 3, "manufacture_date": "2012-08-05", "total_flight_hours": 52000, "total_cycles": 8500 },
+  { "id": 1005, "registration": "N789BA", "serial_number": "LN 4521", "type_id": 4, "manufacture_date": "2018-11-22", "total_flight_hours": 18000, "total_cycles": 9200 },
+  { "id": 1006, "registration": "N777WD", "serial_number": "LN 6234", "type_id": 5, "manufacture_date": "2019-04-30", "total_flight_hours": 25000, "total_cycles": 3800 },
+  { "id": 1007, "registration": "PT-TEB", "serial_number": "19000456", "type_id": 6, "manufacture_date": "2017-07-15", "total_flight_hours": 22000, "total_cycles": 14500 },
+  { "id": 1008, "registration": "C-GOJA", "serial_number": "15321", "type_id": 7, "manufacture_date": "2014-02-28", "total_flight_hours": 28000, "total_cycles": 22000 }
+]

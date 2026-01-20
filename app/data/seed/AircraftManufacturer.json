@@ -1,0 +1,6 @@
+[
+  { "id": 1, "name": "Airbus", "country": "France", "icao_code": "AIB" },
+  { "id": 2, "name": "Boeing", "country": "USA", "icao_code": "BOE" },
+  { "id": 3, "name": "Embraer", "country": "Brazil", "icao_code": "EMB" },
+  { "id": 4, "name": "Bombardier", "country": "Canada", "icao_code": "BOM" }
+]

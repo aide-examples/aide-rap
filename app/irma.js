@@ -30,6 +30,7 @@ paths.init(SCRIPT_DIR);
 const parseDatamodel = require(path.join(TOOLS_DIR, 'parse-datamodel'));
 const generateDiagram = require(path.join(TOOLS_DIR, 'generate-diagram'));
 const extractLayout = require(path.join(TOOLS_DIR, 'extract-layout'));
+const backend = require('./server');
 
 // =============================================================================
 // 4. CONFIGURATION
@@ -89,6 +90,21 @@ const server = new HttpServer({
 // =============================================================================
 
 const app = server.getApp();
+
+// =============================================================================
+// 7a. BACKEND INITIALIZATION (CRUD API)
+// =============================================================================
+
+if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0) {
+    backend.init(app, {
+        appDir: SCRIPT_DIR,
+        enabledEntities: cfg.crud.enabledEntities
+    });
+}
+
+// =============================================================================
+// 7b. FRONTEND ROUTES
+// =============================================================================
 
 // Main page
 app.get('/', (req, res) => {

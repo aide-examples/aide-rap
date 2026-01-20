@@ -1,0 +1,9 @@
+[
+  { "id": 1, "designation": "A320-200", "name": "Airbus A320-200", "manufacturer_id": 1, "max_passengers": 180, "max_range_nm": 3300 },
+  { "id": 2, "designation": "A321-200", "name": "Airbus A321-200", "manufacturer_id": 1, "max_passengers": 220, "max_range_nm": 3200 },
+  { "id": 3, "designation": "A330-300", "name": "Airbus A330-300", "manufacturer_id": 1, "max_passengers": 440, "max_range_nm": 6350 },
+  { "id": 4, "designation": "B737-800", "name": "Boeing 737-800", "manufacturer_id": 2, "max_passengers": 189, "max_range_nm": 2935 },
+  { "id": 5, "designation": "B777-300ER", "name": "Boeing 777-300ER", "manufacturer_id": 2, "max_passengers": 550, "max_range_nm": 7370 },
+  { "id": 6, "designation": "E190", "name": "Embraer E190", "manufacturer_id": 3, "max_passengers": 114, "max_range_nm": 2450 },
+  { "id": 7, "designation": "CRJ900", "name": "Bombardier CRJ900", "manufacturer_id": 4, "max_passengers": 90, "max_range_nm": 1550 }
+]

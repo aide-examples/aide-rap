@@ -3,31 +3,51 @@
  */
 
 (async () => {
-    // Initialize i18n first (required for widgets)
-    await i18n.init();
-
-    // Load app config for name and description
-    let appName = 'AIDE IRMA';
-    let appDescription = '';
-    try {
-        const res = await fetch('/api/app/config');
-        if (res.ok) {
-            const config = await res.json();
-            appName = config.app_name || appName;
-            appDescription = config.app_description || '';
-        }
-    } catch (e) {
-        console.warn('Could not load app config:', e);
+  try {
+    // Initialize Framework i18n
+    if (typeof i18n !== 'undefined') {
+      await i18n.init();
     }
 
-    // Show app description (subtitle) on main page
-    const subtitle = document.getElementById('app-subtitle');
-    if (subtitle && appDescription) {
-        subtitle.textContent = appDescription;
-        subtitle.classList.add('notranslate');
+    // Initialize Framework Header Widget
+    if (typeof HeaderWidget !== 'undefined') {
+      HeaderWidget.init('#app-header', {
+        appName: 'AIDE IRMA',
+        showAbout: true,
+        showHelp: true,
+        showLanguage: true,
+        aboutLink: '/about',
+        helpLink: '/about?doc=help/index.md'
+      });
     }
 
-    // Initialize widgets
-    HeaderWidget.init('#app-header', { appName });
-    StatusWidget.init('#status-widget');
+    // Initialize Framework Status Widget (Footer)
+    if (typeof StatusWidget !== 'undefined') {
+      StatusWidget.init('#status-widget', {
+        showRestart: true,
+        showUpdate: true,
+        showInstall: true,
+        showLayoutToggle: false,
+        layoutDefault: 'page-fill'
+      });
+    }
+
+    // Initialize IRMA components
+    await EntityExplorer.init();
+    DetailPanel.init();
+    ConfirmDialog.init();
+
+    console.log('AIDE IRMA initialized');
+
+    // Handle page unload warning for unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+      if (EntityForm.hasUnsavedChanges()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
+  } catch (err) {
+    console.error('Failed to initialize AIDE IRMA:', err);
+  }
 })();
