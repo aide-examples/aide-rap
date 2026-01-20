@@ -874,3 +874,251 @@
     background: #fee2e2;
     border-radius: 4px;
 }
+
+/* -----------------------------------------------------------------------------
+   Entity Table View
+   ----------------------------------------------------------------------------- */
+.entity-table-wrapper {
+    overflow: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.entity-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    min-width: max-content;
+}
+
+.entity-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.entity-table th {
+    background: #f1f5f9;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.entity-table th.sortable {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.entity-table th.sortable:hover {
+    background: #e2e8f0;
+}
+
+.entity-table th .sort-hint {
+    color: #cbd5e1;
+    font-size: 0.75rem;
+}
+
+.entity-table th.fk-column {
+    color: #2563eb;
+}
+
+.entity-table th.actions-column {
+    width: 80px;
+    text-align: center;
+}
+
+.entity-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.entity-table tbody tr {
+    background: #fff;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.entity-table tbody tr.zebra {
+    background: #f8fafc;
+}
+
+.entity-table tbody tr:hover {
+    background: #f1f5f9;
+}
+
+.entity-table tbody tr.selected {
+    background: #eff6ff;
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+}
+
+.entity-table td em.null-value {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* FK cells in table */
+.entity-table .fk-cell {
+    padding: 4px 12px;
+}
+
+.entity-table .fk-loading {
+    color: #9ca3af;
+}
+
+.entity-table .fk-value {
+    color: #2563eb;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+.entity-table .fk-value:hover {
+    text-decoration-style: solid;
+    color: #1d4ed8;
+}
+
+.entity-table .fk-entity-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    background: #e0e7ff;
+    color: #4f46e5;
+    font-size: 0.65rem;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+/* Actions cell */
+.entity-table .actions-cell {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.btn-table-action {
+    padding: 4px 8px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #666;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.15s, border-color 0.15s;
+}
+
+.entity-table tbody tr:hover .btn-table-action {
+    opacity: 1;
+}
+
+.btn-table-action:hover {
+    border-color: #d1d5db;
+}
+
+.btn-table-action.btn-edit:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+.btn-table-action.btn-delete:hover {
+    border-color: #dc2626;
+    color: #dc2626;
+}
+
+/* View mode toggle buttons */
+.view-mode-buttons {
+    display: flex;
+    gap: 2px;
+    background: #e5e7eb;
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.btn-view-mode {
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #666;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-view-mode:hover {
+    color: #333;
+}
+
+.btn-view-mode.active {
+    background: #fff;
+    color: #2563eb;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-view-mode svg {
+    display: block;
+}
+
+/* Back-reference columns in table */
+.entity-table th.backref-column {
+    background: #fef3c7;
+    color: #92400e;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.entity-table th.backref-column .backref-field {
+    font-size: 0.7rem;
+    color: #b45309;
+    font-weight: 400;
+}
+
+.entity-table .backref-cell {
+    text-align: center;
+    padding: 4px 8px;
+}
+
+.entity-table .backref-loading {
+    color: #9ca3af;
+    font-size: 0.75rem;
+}
+
+.entity-table .backref-count {
+    display: inline-block;
+    min-width: 24px;
+    padding: 2px 8px;
+    background: #fef3c7;
+    color: #92400e;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.entity-table .backref-count:hover {
+    background: #fde68a;
+    transform: scale(1.1);
+}
+
+.entity-table .backref-zero {
+    color: #d1d5db;
+    font-size: 0.8rem;
+}
+
+.entity-table .backref-error {
+    color: #dc2626;
+    font-size: 0.75rem;
+}
+
+.entity-table .backref-placeholder {
+    color: #e5e7eb;
+    font-size: 0.8rem;
+}

@@ -88,17 +88,35 @@ function findAll(entityName, options = {}) {
   let sql = `SELECT * FROM ${entity.tableName}`;
   const params = [];
 
-  // Simple filter (search across string columns)
+  // Filter: supports two formats:
+  // 1. "column:value" - exact match on a specific column (e.g., "type_id:5")
+  // 2. "text" - LIKE search across all string columns
   if (options.filter) {
-    const stringColumns = entity.columns
-      .filter(c => c.jsType === 'string' && c.name !== 'id')
-      .map(c => c.name);
+    const colonMatch = options.filter.match(/^(\w+):(.+)$/);
 
-    if (stringColumns.length > 0) {
-      const filterConditions = stringColumns.map(col => `${col} LIKE ?`);
-      sql += ` WHERE (${filterConditions.join(' OR ')})`;
-      const filterValue = `%${options.filter}%`;
-      params.push(...stringColumns.map(() => filterValue));
+    if (colonMatch) {
+      // Exact match on specific column
+      const [, columnName, value] = colonMatch;
+      const validColumn = entity.columns.find(c => c.name === columnName);
+
+      if (validColumn) {
+        sql += ` WHERE ${columnName} = ?`;
+        // Convert to number if it's an int column
+        const paramValue = validColumn.jsType === 'number' ? parseInt(value, 10) : value;
+        params.push(paramValue);
+      }
+    } else {
+      // LIKE search across string columns
+      const stringColumns = entity.columns
+        .filter(c => c.jsType === 'string' && c.name !== 'id')
+        .map(c => c.name);
+
+      if (stringColumns.length > 0) {
+        const filterConditions = stringColumns.map(col => `${col} LIKE ?`);
+        sql += ` WHERE (${filterConditions.join(' OR ')})`;
+        const filterValue = `%${options.filter}%`;
+        params.push(...stringColumns.map(() => filterValue));
+      }
     }
   }
 

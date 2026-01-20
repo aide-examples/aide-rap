@@ -1,34 +1,37 @@
 /**
  * Entity Explorer Component
- * Left panel with entity selector, list/tree view, and filters
+ * Left panel with entity selector, table/tree view, and filters
  */
 const EntityExplorer = {
   selector: null,
-  list: null,
+  tableContainer: null,
   treeContainer: null,
   filterInput: null,
   btnNew: null,
-  btnViewToggle: null,
+  btnViewTable: null,
+  btnViewTree: null,
   currentEntity: null,
   records: [],
   selectedId: null,
   filterTimeout: null,
-  viewMode: 'tree', // 'list' or 'tree'
+  viewMode: 'tree', // 'table' or 'tree'
 
   async init() {
     this.selector = document.getElementById('entity-selector');
-    this.list = document.getElementById('entity-list');
+    this.tableContainer = document.getElementById('entity-table-container');
     this.treeContainer = document.getElementById('entity-tree-container');
     this.filterInput = document.getElementById('filter-input');
     this.btnNew = document.getElementById('btn-new');
-    this.btnViewToggle = document.getElementById('btn-view-toggle');
+    this.btnViewTable = document.getElementById('btn-view-table');
+    this.btnViewTree = document.getElementById('btn-view-tree');
 
-    // Initialize tree component
+    // Initialize components
     EntityTree.init('entity-tree-container');
+    EntityTable.init('entity-table-container');
 
     // Restore view mode from session
     const savedViewMode = sessionStorage.getItem('viewMode');
-    if (savedViewMode) {
+    if (savedViewMode && (savedViewMode === 'table' || savedViewMode === 'tree')) {
       this.viewMode = savedViewMode;
     }
     this.updateViewToggle();
@@ -40,7 +43,8 @@ const EntityExplorer = {
     this.selector.addEventListener('change', () => this.onEntityChange());
     this.filterInput.addEventListener('input', () => this.onFilterChange());
     this.btnNew.addEventListener('click', () => this.onNewClick());
-    this.btnViewToggle.addEventListener('click', () => this.toggleViewMode());
+    this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
+    this.btnViewTree.addEventListener('click', () => this.setViewMode('tree'));
 
     // Initially disable new button
     this.btnNew.disabled = true;
@@ -131,8 +135,8 @@ const EntityExplorer = {
       console.error('Failed to load records:', err);
       this.records = [];
       const message = `<p class="empty-message">Error loading records: ${err.message}</p>`;
-      if (this.viewMode === 'list') {
-        this.list.innerHTML = message;
+      if (this.viewMode === 'table') {
+        this.tableContainer.innerHTML = message;
       } else {
         this.treeContainer.innerHTML = message;
       }
@@ -154,36 +158,43 @@ const EntityExplorer = {
     DetailPanel.showCreateForm(this.currentEntity);
   },
 
-  toggleViewMode() {
-    this.viewMode = this.viewMode === 'list' ? 'tree' : 'list';
+  setViewMode(mode) {
+    this.viewMode = mode;
     sessionStorage.setItem('viewMode', this.viewMode);
     this.updateViewToggle();
     this.renderCurrentView();
   },
 
   updateViewToggle() {
-    const icon = document.getElementById('view-icon');
-    if (this.viewMode === 'tree') {
-      this.btnViewToggle.classList.add('active');
-      icon.innerHTML = '&#9776;'; // hamburger icon for list
-      this.btnViewToggle.title = 'Switch to list view';
-    } else {
-      this.btnViewToggle.classList.remove('active');
-      icon.innerHTML = '&#8801;'; // tree icon
-      this.btnViewToggle.title = 'Switch to tree view';
-    }
+    // Update button states
+    this.btnViewTable.classList.toggle('active', this.viewMode === 'table');
+    this.btnViewTree.classList.toggle('active', this.viewMode === 'tree');
 
     // Show/hide containers
-    this.list.classList.toggle('hidden', this.viewMode === 'tree');
-    this.treeContainer.classList.toggle('hidden', this.viewMode === 'list');
+    this.tableContainer.classList.toggle('hidden', this.viewMode !== 'table');
+    this.treeContainer.classList.toggle('hidden', this.viewMode !== 'tree');
   },
 
   renderCurrentView() {
-    if (this.viewMode === 'list') {
-      this.renderList();
+    if (this.viewMode === 'table') {
+      this.renderTable();
     } else {
       this.renderTree();
     }
+  },
+
+  async renderTable() {
+    if (!this.currentEntity) {
+      this.tableContainer.innerHTML = '<p class="empty-message">Select an entity type to view records.</p>';
+      return;
+    }
+
+    if (this.records.length === 0) {
+      this.tableContainer.innerHTML = '<p class="empty-message">No records found.</p>';
+      return;
+    }
+
+    await EntityTable.loadEntity(this.currentEntity, this.records);
   },
 
   renderList() {

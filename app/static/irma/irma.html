@@ -37,19 +37,32 @@
                 <section id="entity-explorer" class="entity-explorer">
                     <!-- Toolbar -->
                     <div class="explorer-toolbar">
+                        <!-- View mode toggle: Table / Tree -->
+                        <div class="view-mode-buttons">
+                            <button id="btn-view-table" class="btn-view-mode" title="Table view">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <rect x="0" y="0" width="6" height="3"/><rect x="8" y="0" width="6" height="3"/>
+                                    <rect x="0" y="5" width="6" height="3"/><rect x="8" y="5" width="6" height="3"/>
+                                    <rect x="0" y="10" width="6" height="3"/><rect x="8" y="10" width="6" height="3"/>
+                                </svg>
+                            </button>
+                            <button id="btn-view-tree" class="btn-view-mode active" title="Tree view">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <rect x="0" y="0" width="14" height="3"/>
+                                    <rect x="3" y="5" width="11" height="3"/>
+                                    <rect x="6" y="10" width="8" height="3"/>
+                                </svg>
+                            </button>
+                        </div>
                         <select id="entity-selector" class="entity-selector">
                             <option value="" data-i18n="select_entity">Select Entity...</option>
                         </select>
                         <button id="btn-new" class="btn-toolbar" title="Create new record" data-i18n-title="create_new">+ New</button>
                         <input type="text" id="filter-input" class="filter-input" placeholder="Filter..." data-i18n-placeholder="filter_placeholder">
-                        <button id="btn-view-toggle" class="btn-view-toggle" title="Toggle view mode">
-                            <span id="view-icon">&#9776;</span>
-                        </button>
                     </div>
 
-                    <!-- Entity List (flat view) -->
-                    <div id="entity-list" class="entity-list hidden">
-                        <p class="empty-message" data-i18n="select_entity_message">Select an entity type to view records.</p>
+                    <!-- Entity Table (table view) -->
+                    <div id="entity-table-container" class="entity-list hidden">
                     </div>
 
                     <!-- Entity Tree (tree view) -->
@@ -103,6 +116,7 @@
     <!-- IRMA Scripts -->
     <script src="/static/irma/services/api-client.js"></script>
     <script src="/static/irma/components/entity-tree.js"></script>
+    <script src="/static/irma/components/entity-table.js"></script>
     <script src="/static/irma/components/entity-explorer.js"></script>
     <script src="/static/irma/components/detail-panel.js"></script>
     <script src="/static/irma/components/entity-form.js"></script>
