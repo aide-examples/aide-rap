@@ -124,7 +124,14 @@ function loadEntity(entityName, source = activeSource) {
     return { loaded: 0 };
   }
 
-  const columns = entity.columns.map(c => c.name);
+  // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
+  const isComputedColumn = (col) => {
+    if (col.computed) return true;  // Schema already parsed
+    const desc = col.description || '';
+    return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
+  };
+
+  const columns = entity.columns.filter(c => !isComputedColumn(c)).map(c => c.name);
   const placeholders = columns.map(() => '?').join(', ');
   const insertSql = `INSERT OR REPLACE INTO ${entity.tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
   const insert = db.prepare(insertSql);

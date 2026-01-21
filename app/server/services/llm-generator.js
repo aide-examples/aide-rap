@@ -162,18 +162,29 @@ class LLMGenerator {
    * Build the prompt for the LLM
    */
   buildPrompt(entityName, schema, instruction, existingData) {
-    // Prepare column info with types
-    const columnInfo = schema.columns.map(col => {
-      const info = {
-        name: col.name,
-        type: col.type,
-        nullable: col.nullable
-      };
-      if (col.foreignKey) {
-        info.foreignKey = col.foreignKey;
-      }
-      return info;
-    });
+    // Filter out computed columns (DAILY, IMMEDIATE, HOURLY, ON_DEMAND annotations)
+    // These are auto-calculated and should not be generated
+    const isComputedColumn = (col) => {
+      if (col.computed) return true;  // Schema already parsed
+      // Fallback: check description for annotations (before SchemaGenerator parses them)
+      const desc = col.description || '';
+      return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
+    };
+
+    // Prepare column info with types (excluding computed columns)
+    const columnInfo = schema.columns
+      .filter(col => !isComputedColumn(col))
+      .map(col => {
+        const info = {
+          name: col.name,
+          type: col.type,
+          nullable: col.nullable
+        };
+        if (col.foreignKey) {
+          info.foreignKey = col.foreignKey;
+        }
+        return info;
+      });
 
     // Prepare type definitions if available
     const typeDefinitions = schema.types || {};

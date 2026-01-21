@@ -25,6 +25,7 @@ Individual aircraft identified by registration and serial number.
 | total_cycles | int | Accumulated cycles | 18500 |
 | status | [OperationalStatus](../Types.md#operationalstatus) | Operational status | 1 |
 | maintenance_category | MaintenanceCategory [DEFAULT=Line] | Current maintenance category | B |
+| current_operator_id | int | Reference to Operator [READONLY] [DAILY=FleetMember[exit_date=null OR exit_date>TODAY].fleet.operator] | 5 |
 
 ## Data Generator
 

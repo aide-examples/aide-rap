@@ -143,19 +143,92 @@
     flex-shrink: 0;
 }
 
-.entity-selector {
+/* Custom Entity Selector Dropdown */
+.entity-selector-dropdown {
+    position: relative;
+    min-width: 180px;
+}
+
+.entity-selector-trigger {
+    width: 100%;
     padding: 6px 12px;
     border: 1px solid #d1d5db;
     border-radius: 6px;
     background: #fff;
     font-size: 0.9rem;
-    min-width: 160px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #333;
 }
 
-.entity-selector:focus {
+.entity-selector-trigger::after {
+    content: '▼';
+    font-size: 0.7rem;
+    margin-left: 8px;
+    color: #666;
+}
+
+.entity-selector-dropdown.open .entity-selector-trigger::after {
+    content: '▲';
+}
+
+.entity-selector-trigger:focus {
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.entity-selector-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    margin-top: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.entity-selector-dropdown.open .entity-selector-menu {
+    display: block;
+}
+
+.entity-selector-group {
+    padding: 2px 0;
+}
+
+.entity-selector-group-label {
+    padding: 3px 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.entity-selector-item {
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    border-left: 3px solid transparent;
+    line-height: 1.2;
+}
+
+.entity-selector-item:hover {
+    background: #f3f4f6;
+}
+
+.entity-selector-item.selected {
+    background: #e5e7eb;
+    font-weight: 500;
 }
 
 .btn-toolbar {
@@ -836,34 +909,47 @@
     padding: 4px 0 4px 20px;
 }
 
-.tree-backref-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    margin: 2px 0;
-    background: #fffbeb;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.85rem;
-}
-
-.tree-backref-item:hover {
-    background: #fef3c7;
-}
-
-.backref-item-icon {
-    color: #f59e0b;
-}
-
-.backref-item-label {
-    color: #333;
-    font-weight: 500;
-}
-
-.backref-item-subtitle {
-    color: #888;
+/* Back-reference table */
+.tree-backref-table {
+    width: 100%;
+    border-collapse: collapse;
     font-size: 0.8rem;
+    margin: 4px 0;
+}
+
+.tree-backref-table th {
+    background: #fef3c7;
+    padding: 4px 8px;
+    text-align: left;
+    font-weight: 500;
+    color: #92400e;
+    font-size: 0.7rem;
+    border-bottom: 1px solid #fcd34d;
+    white-space: nowrap;
+}
+
+.tree-backref-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #fde68a;
+    color: #333;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: #fffbeb;
+}
+
+.tree-backref-table td em {
+    color: #aaa;
+    font-style: italic;
+}
+
+.backref-table-row {
+    cursor: pointer;
+}
+
+.backref-table-row:hover td {
+    background: #fef3c7;
 }
 
 /* Error message in tree */
@@ -873,6 +959,48 @@
     font-size: 0.85rem;
     background: #fee2e2;
     border-radius: 4px;
+}
+
+/* Tree Attribute Table (horizontal row layout) */
+.tree-attr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    margin: 4px 0;
+}
+
+.tree-attr-table th {
+    background: #f1f5f9;
+    padding: 4px 8px;
+    text-align: left;
+    font-weight: 500;
+    color: #64748b;
+    font-size: 0.7rem;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.tree-attr-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #333;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tree-attr-table td em {
+    color: #aaa;
+    font-style: italic;
+}
+
+.tree-attr-table td.hover-field {
+    opacity: 0.6;
+}
+
+.tree-node:hover .tree-attr-table td.hover-field {
+    opacity: 1;
 }
 
 /* -----------------------------------------------------------------------------

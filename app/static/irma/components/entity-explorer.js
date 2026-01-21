@@ -4,6 +4,9 @@
  */
 const EntityExplorer = {
   selector: null,
+  selectorTrigger: null,
+  selectorMenu: null,
+  selectorValue: '',
   tableContainer: null,
   treeContainer: null,
   filterInput: null,
@@ -18,6 +21,8 @@ const EntityExplorer = {
 
   async init() {
     this.selector = document.getElementById('entity-selector');
+    this.selectorTrigger = this.selector.querySelector('.entity-selector-trigger');
+    this.selectorMenu = this.selector.querySelector('.entity-selector-menu');
     this.tableContainer = document.getElementById('entity-table-container');
     this.treeContainer = document.getElementById('entity-tree-container');
     this.filterInput = document.getElementById('filter-input');
@@ -39,8 +44,14 @@ const EntityExplorer = {
     // Load entity types into selector
     await this.loadEntityTypes();
 
-    // Event listeners
-    this.selector.addEventListener('change', () => this.onEntityChange());
+    // Event listeners for custom dropdown
+    this.selectorTrigger.addEventListener('click', () => this.toggleDropdown());
+    document.addEventListener('click', (e) => {
+      if (!this.selector.contains(e.target)) {
+        this.closeDropdown();
+      }
+    });
+
     this.filterInput.addEventListener('input', () => this.onFilterChange());
     this.btnNew.addEventListener('click', () => this.onNewClick());
     this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
@@ -48,6 +59,21 @@ const EntityExplorer = {
 
     // Initially disable new button
     this.btnNew.disabled = true;
+
+    // Open dropdown on start
+    this.openDropdown();
+  },
+
+  toggleDropdown() {
+    this.selector.classList.toggle('open');
+  },
+
+  openDropdown() {
+    this.selector.classList.add('open');
+  },
+
+  closeDropdown() {
+    this.selector.classList.remove('open');
   },
 
   async loadEntityTypes() {
@@ -63,47 +89,54 @@ const EntityExplorer = {
         grouped[e.areaName].entities.push(e);
       });
 
-      // Create optgroups for each area
+      // Build custom dropdown menu
+      let menuHtml = '';
       for (const [areaName, group] of Object.entries(grouped)) {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = areaName;
-        optgroup.style.backgroundColor = group.color;
-
+        menuHtml += `<div class="entity-selector-group">`;
+        menuHtml += `<div class="entity-selector-group-label" style="background-color: ${group.color};">${areaName}</div>`;
         group.entities.forEach(e => {
-          const option = document.createElement('option');
-          option.value = e.name;
-          option.textContent = e.name;
-          option.style.backgroundColor = e.areaColor;
-          option.dataset.areaColor = e.areaColor;
-          optgroup.appendChild(option);
+          menuHtml += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">${e.name}</div>`;
         });
-
-        this.selector.appendChild(optgroup);
+        menuHtml += `</div>`;
       }
+      this.selectorMenu.innerHTML = menuHtml;
 
-      // Update selector background on change
-      this.selector.addEventListener('change', () => this.updateSelectorColor());
+      // Add click handlers for menu items
+      this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
+        item.addEventListener('click', () => {
+          this.selectEntityFromDropdown(item.dataset.value, item.dataset.color);
+        });
+      });
     } catch (err) {
       console.error('Failed to load entity types:', err);
     }
   },
 
-  updateSelectorColor() {
-    const selected = this.selector.options[this.selector.selectedIndex];
-    if (selected && selected.dataset.areaColor) {
-      this.selector.style.backgroundColor = selected.dataset.areaColor;
-    } else {
-      this.selector.style.backgroundColor = '';
-    }
-  },
+  selectEntityFromDropdown(entityName, areaColor) {
+    this.selectorValue = entityName;
+    // Update trigger text
+    const textSpan = this.selectorTrigger.querySelector('.entity-selector-text');
+    if (textSpan) textSpan.textContent = entityName;
+    this.selectorTrigger.style.backgroundColor = areaColor || '';
 
-  selectEntity(entityName) {
-    this.selector.value = entityName;
+    // Update selected state in menu
+    this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
+      item.classList.toggle('selected', item.dataset.value === entityName);
+    });
+
+    this.closeDropdown();
     this.onEntityChange();
   },
 
+  selectEntity(entityName) {
+    const item = this.selectorMenu.querySelector(`[data-value="${entityName}"]`);
+    if (item) {
+      this.selectEntityFromDropdown(entityName, item.dataset.color);
+    }
+  },
+
   async onEntityChange() {
-    const entityName = this.selector.value;
+    const entityName = this.selectorValue;
 
     if (!entityName) {
       this.currentEntity = null;

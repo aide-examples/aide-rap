@@ -10,6 +10,9 @@
   <line x1="490" y1="170" x2="490" y2="60" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
     <text x="490" y="154" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
     <text x="490" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">type</text>
+  <line x1="420" y1="185" x2="160" y2="45" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="394" y="166" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="290" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">current_operator</text>
   <line x1="560" y1="45" x2="630" y2="45" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
     <text x="567" y="40" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
     <text x="595" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">manufacturer</text>
@@ -34,12 +37,12 @@
   <line x1="340" y1="45" x2="420" y2="45" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
     <text x="348" y="40" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
     <text x="380" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">type</text>
-  <line x1="270" y1="170" x2="270" y2="60" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
-    <text x="270" y="154" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
-    <text x="270" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">fleet</text>
-  <line x1="340" y1="185" x2="420" y2="185" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
-    <text x="348" y="180" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
-    <text x="380" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">aircraft</text>
+  <line x1="290" y1="170" x2="270" y2="60" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="288" y="154" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="280" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">fleet</text>
+  <line x1="360" y1="185" x2="420" y2="185" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+    <text x="366" y="180" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
+    <text x="390" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">aircraft</text>
   <line x1="420" y1="735" x2="370" y2="735" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
     <text x="415" y="730" font-family="Arial, sans-serif" font-size="10" fill="#666">*</text>
     <text x="395" y="730" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#666" font-style="italic">maintenance_plan</text>
@@ -94,8 +97,8 @@
     <text x="790" y="909" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Finding</text>
   <rect x="200" y="30" width="140" height="30" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
     <text x="270" y="49" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Fleet</text>
-  <rect x="200" y="170" width="140" height="30" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
-    <text x="270" y="189" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">FleetMember</text>
+  <rect x="220" y="170" width="140" height="30" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="290" y="189" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">FleetMember</text>
   <rect x="420" y="720" width="140" height="30" fill="#FCE5CD" stroke="#333" stroke-width="1.5" rx="3"/>
     <text x="490" y="739" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">InspectionType</text>
   <rect x="850" y="250" width="140" height="30" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>

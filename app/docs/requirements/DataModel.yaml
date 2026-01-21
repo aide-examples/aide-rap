@@ -42,6 +42,11 @@ classes:
       - name: maintenance_category
         type: MaintenanceCategory [DEFAULT=Line]
         description: Current maintenance category
+      - name: current_operator_id
+        type: int
+        description: >-
+          Reference to Operator [READONLY] [DAILY=FleetMember[exit_date=null OR
+          exit_date>TODAY].fleet.operator]
     area: operations
     types:
       MaintenanceCategory:
@@ -505,6 +510,10 @@ relationships:
   - from: Aircraft
     to: AircraftType
     attribute: type
+    from_cardinality: '*'
+  - from: Aircraft
+    to: Operator
+    attribute: current_operator
     from_cardinality: '*'
   - from: AircraftType
     to: AircraftManufacturer

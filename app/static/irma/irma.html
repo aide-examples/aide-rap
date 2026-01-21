@@ -28,6 +28,10 @@
                 <option value="start">References first</option>
                 <option value="inline">References inline</option>
             </select>
+            <select id="attr-layout" class="menu-select" title="Attribute layout">
+                <option value="list">Vertical list</option>
+                <option value="row">Horizontal row</option>
+            </select>
             <span class="menu-separator">|</span>
             <a href="#" id="menu-tools" class="menu-item">Tools</a>
         </nav>
@@ -59,9 +63,12 @@
                                 </svg>
                             </button>
                         </div>
-                        <select id="entity-selector" class="entity-selector">
-                            <option value="" data-i18n="select_entity">Select Entity...</option>
-                        </select>
+                        <div id="entity-selector" class="entity-selector-dropdown">
+                            <button class="entity-selector-trigger">
+                                <span class="entity-selector-text" data-i18n="select_entity">Select Entity...</span>
+                            </button>
+                            <div class="entity-selector-menu"></div>
+                        </div>
                         <button id="btn-new" class="btn-toolbar" title="Create new record" data-i18n-title="create_new">+ New</button>
                         <input type="text" id="filter-input" class="filter-input" placeholder="Filter..." data-i18n-placeholder="filter_placeholder">
                     </div>

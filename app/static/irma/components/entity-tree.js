@@ -12,6 +12,7 @@ const EntityTree = {
   // Sort settings
   attributeOrder: 'schema', // 'schema' or 'alpha'
   referencePosition: 'end', // 'end', 'start', or 'inline'
+  attributeLayout: 'row', // 'row' (horizontal) or 'list' (vertical)
 
   init(containerId) {
     this.container = document.getElementById(containerId);
@@ -21,6 +22,7 @@ const EntityTree = {
   initSortControls() {
     const attrSelect = document.getElementById('sort-attributes');
     const refSelect = document.getElementById('sort-references');
+    const layoutSelect = document.getElementById('attr-layout');
 
     if (attrSelect) {
       // Restore from sessionStorage
@@ -48,6 +50,21 @@ const EntityTree = {
       refSelect.addEventListener('change', (e) => {
         this.referencePosition = e.target.value;
         sessionStorage.setItem('tree-ref-position', e.target.value);
+        this.render();
+      });
+    }
+
+    if (layoutSelect) {
+      // Restore from sessionStorage
+      const savedLayout = sessionStorage.getItem('tree-attr-layout');
+      if (savedLayout) {
+        this.attributeLayout = savedLayout;
+        layoutSelect.value = savedLayout;
+      }
+
+      layoutSelect.addEventListener('change', (e) => {
+        this.attributeLayout = e.target.value;
+        sessionStorage.setItem('tree-attr-layout', e.target.value);
         this.render();
       });
     }
@@ -112,8 +129,18 @@ const EntityTree = {
 
     let html = '<div class="entity-tree">';
 
-    for (const record of this.records) {
-      html += await this.renderRootNode(this.currentEntity, record, schema);
+    // If a record is selected, show only that record as root
+    if (this.selectedNodeId) {
+      const selectedRecordId = parseInt(this.selectedNodeId.split('-').pop());
+      const selectedRecord = this.records.find(r => r.id === selectedRecordId);
+      if (selectedRecord) {
+        html += await this.renderRootNode(this.currentEntity, selectedRecord, schema);
+      }
+    } else {
+      // No selection: show all records
+      for (const record of this.records) {
+        html += await this.renderRootNode(this.currentEntity, record, schema);
+      }
     }
 
     html += '</div>';
@@ -164,7 +191,8 @@ const EntityTree = {
    * - All other fields: only visible on hover/focus
    */
   async renderNodeContent(entityName, record, schema) {
-    let html = '<div class="tree-node-content">';
+    const isRowLayout = this.attributeLayout === 'row';
+    let html = `<div class="tree-node-content ${isRowLayout ? 'layout-row' : 'layout-list'}">`;
 
     // Separate columns into regular attributes, outbound FKs, and prepare back-references
     let columns = schema.columns.filter(col => !schema.ui?.hiddenFields?.includes(col.name));
@@ -184,6 +212,11 @@ const EntityTree = {
       return !detailFields.includes(colName);
     };
 
+    // Render regular attributes (possibly as row)
+    if (isRowLayout && regularCols.length > 0) {
+      html += this.renderAttributeRow(regularCols, record, schema, isHoverField);
+    }
+
     // Render based on reference position setting
     if (this.referencePosition === 'start') {
       // FKs first, then back-refs, then regular attributes
@@ -193,8 +226,10 @@ const EntityTree = {
       if (hasBackRefs) {
         html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
       }
-      for (const col of regularCols) {
-        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
+      if (!isRowLayout) {
+        for (const col of regularCols) {
+          html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
+        }
       }
     } else if (this.referencePosition === 'inline') {
       // Mixed: regular attrs, then FKs inline, then back-refs at end
@@ -202,7 +237,7 @@ const EntityTree = {
         const value = record[col.name];
         if (col.foreignKey) {
           html += await this.renderForeignKeyNode(col, value, record, isHoverField(col.name));
-        } else {
+        } else if (!isRowLayout) {
           html += this.renderAttribute(col.name, value, isHoverField(col.name), schema);
         }
       }
@@ -211,8 +246,10 @@ const EntityTree = {
       }
     } else {
       // 'end' (default): regular attributes first, then FKs, then back-refs
-      for (const col of regularCols) {
-        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
+      if (!isRowLayout) {
+        for (const col of regularCols) {
+          html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
+        }
       }
       for (const col of fkCols) {
         html += await this.renderForeignKeyNode(col, record[col.name], record, isHoverField(col.name));
@@ -224,6 +261,32 @@ const EntityTree = {
 
     html += '</div>';
     return html;
+  },
+
+  /**
+   * Render attributes as a horizontal row (table-like)
+   */
+  renderAttributeRow(columns, record, schema, isHoverField) {
+    const cells = columns.map(col => {
+      const value = record[col.name];
+      let displayValue;
+      if (value === null || value === undefined) {
+        displayValue = '<em>null</em>';
+      } else {
+        displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+      }
+      const isHover = isHoverField(col.name);
+      return `<td class="${isHover ? 'hover-field' : ''}" title="${col.name}">${displayValue}</td>`;
+    }).join('');
+
+    const headers = columns.map(col => `<th title="${col.name}">${col.name}</th>`).join('');
+
+    return `
+      <table class="tree-attr-table">
+        <thead><tr>${headers}</tr></thead>
+        <tbody><tr>${cells}</tr></tbody>
+      </table>
+    `;
   },
 
   /**
@@ -310,20 +373,33 @@ const EntityTree = {
       const schema = await SchemaCache.getExtended(entityName);
       const record = await ApiClient.getById(entityName, id);
 
+      const isRowLayout = this.attributeLayout === 'row';
       let html = '<div class="tree-fk-content">';
 
-      for (const col of schema.columns) {
-        if (schema.ui?.hiddenFields?.includes(col.name)) continue;
+      // Separate regular columns and FK columns
+      const allCols = schema.columns.filter(col => !schema.ui?.hiddenFields?.includes(col.name));
+      const regularCols = allCols.filter(col => !col.foreignKey);
+      const fkCols = allCols.filter(col => col.foreignKey && record[col.name]);
 
-        const value = record[col.name];
+      // Helper for hover detection
+      const isHoverField = (colName) => {
+        const detailFields = schema.ui?.detailFields || [];
+        return !detailFields.includes(colName);
+      };
 
-        if (col.foreignKey && value) {
-          // Nested FK - show label with clickable link (no further expansion)
-          html += await this.renderNestedForeignKey(col, value);
-        } else {
-          const isHover = schema.ui?.hoverFields?.includes(col.name);
-          html += this.renderAttribute(col.name, value, isHover, schema);
+      // Render regular attributes (as row or list)
+      if (isRowLayout && regularCols.length > 0) {
+        html += this.renderAttributeRow(regularCols, record, schema, isHoverField);
+      } else {
+        for (const col of regularCols) {
+          const isHover = isHoverField(col.name);
+          html += this.renderAttribute(col.name, record[col.name], isHover, schema);
         }
+      }
+
+      // Render nested FKs as links (always as list)
+      for (const col of fkCols) {
+        html += await this.renderNestedForeignKey(col, record[col.name]);
       }
 
       html += '</div>';
@@ -408,7 +484,7 @@ const EntityTree = {
   },
 
   /**
-   * Render expanded back-reference list
+   * Render expanded back-reference list as a table
    */
   async renderExpandedBackReferences(entityName, recordId, refEntity) {
     try {
@@ -421,24 +497,43 @@ const EntityTree = {
 
       const schema = await SchemaCache.getExtended(refEntity);
 
-      let html = '<div class="tree-backref-content">';
+      // Get columns to display (exclude hidden fields and the FK that points back)
+      const displayCols = schema.columns.filter(col => {
+        if (schema.ui?.hiddenFields?.includes(col.name)) return false;
+        // Exclude FK columns for cleaner display
+        if (col.foreignKey) return false;
+        return true;
+      });
 
-      for (const record of refData.records) {
-        const label = this.getRecordLabel(record, schema);
-        html += `
-          <div class="tree-backref-item"
-               data-entity="${refEntity}"
-               data-id="${record.id}"
-               data-action="navigate">
-            <span class="backref-item-icon">&#8594;</span>
-            <span class="backref-item-label">${this.escapeHtml(label.title)}</span>
-            ${label.subtitle ? `<span class="backref-item-subtitle">${this.escapeHtml(label.subtitle)}</span>` : ''}
-          </div>
-        `;
-      }
+      // Build table header
+      const headers = displayCols.map(col =>
+        `<th title="${col.name}">${col.name}</th>`
+      ).join('');
 
-      html += '</div>';
-      return html;
+      // Build table rows
+      const rows = refData.records.map(record => {
+        const cells = displayCols.map(col => {
+          const value = record[col.name];
+          let displayValue;
+          if (value === null || value === undefined) {
+            displayValue = '<em>null</em>';
+          } else {
+            displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+          }
+          return `<td title="${col.name}">${displayValue}</td>`;
+        }).join('');
+
+        return `<tr class="backref-table-row" data-entity="${refEntity}" data-id="${record.id}" data-action="navigate">${cells}</tr>`;
+      }).join('');
+
+      return `
+        <div class="tree-backref-content">
+          <table class="tree-backref-table">
+            <thead><tr>${headers}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
     } catch (e) {
       return `<div class="tree-error">Failed to load references: ${e.message}</div>`;
     }
@@ -545,6 +640,7 @@ const EntityTree = {
     });
 
     // Navigate to back-reference (and expand the target record)
+    // Works for both old list items and new table rows
     this.container.querySelectorAll('[data-action="navigate"]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
