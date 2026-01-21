@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "name": "Lufthansa",
+    "icao_code": "DLH",
+    "iata_code": "LH",
+    "country": "Germany"
+  },
+  {
+    "id": 2,
+    "name": "Swiss International Air Lines",
+    "icao_code": "SWR",
+    "iata_code": "LX",
+    "country": "Switzerland"
+  },
+  {
+    "id": 3,
+    "name": "Austrian Airlines",
+    "icao_code": "AUA",
+    "iata_code": "OS",
+    "country": "Austria"
+  },
+  {
+    "id": 4,
+    "name": "Eurowings",
+    "icao_code": "EWG",
+    "iata_code": "EW",
+    "country": "Germany"
+  },
+  {
+    "id": 5,
+    "name": "Brussels Airlines",
+    "icao_code": "BEL",
+    "iata_code": "SN",
+    "country": "Belgium"
+  },
+  {
+    "id": 6,
+    "name": "Discover Airlines",
+    "icao_code": "OCN",
+    "iata_code": "4Y",
+    "country": "Germany"
+  }
+]

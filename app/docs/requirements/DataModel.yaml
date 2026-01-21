@@ -19,10 +19,10 @@ classes:
         type: int
         description: Primary key [READONLY]
       - name: registration
-        type: string
+        type: TailSign
         description: Aircraft registration [LABEL]
       - name: serial_number
-        type: string
+        type: MSN
         description: Manufacturer serial number [LABEL2]
       - name: type_id
         type: int
@@ -36,7 +36,26 @@ classes:
       - name: total_cycles
         type: int
         description: Accumulated cycles
+      - name: status
+        type: OperationalStatus
+        description: Operational status
+      - name: maintenance_category
+        type: MaintenanceCategory [DEFAULT=Line]
+        description: Current maintenance category
     area: operations
+    types:
+      MaintenanceCategory:
+        kind: enum
+        values:
+          - internal: A
+            external: Line
+            description: Line maintenance (quick checks)
+          - internal: B
+            external: Base
+            description: Base maintenance (hangar required)
+          - internal: C
+            external: Heavy
+            description: Heavy maintenance (extended downtime)
   AircraftManufacturer:
     description: Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
     attributes:
@@ -169,16 +188,16 @@ classes:
         description: Reference to Task
       - name: finding_number
         type: string
-        description: Finding number
+        description: Finding number [LABEL]
       - name: description
         type: string
-        description: Finding description
+        description: Finding description [LABEL2]
       - name: severity
-        type: string
-        description: Severity level
+        type: FindingSeverity [DEFAULT=Minor]
+        description: Severity level [DETAIL]
       - name: status
-        type: string
-        description: Finding status
+        type: FindingStatus [DEFAULT=Open]
+        description: Finding status [DETAIL]
       - name: reported_date
         type: date
         description: Date reported
@@ -186,24 +205,78 @@ classes:
         type: date
         description: Date resolved
     area: maintenance_and_repair
+    types:
+      FindingSeverity:
+        kind: enum
+        values:
+          - internal: 1
+            external: Minor
+            description: Minor defect, no immediate action
+          - internal: 2
+            external: Major
+            description: Significant defect, action required
+          - internal: 3
+            external: Critical
+            description: Safety-critical, immediate action
+      FindingStatus:
+        kind: enum
+        values:
+          - internal: 1
+            external: Open
+            description: Finding reported, not addressed
+          - internal: 2
+            external: In Review
+            description: Under evaluation
+          - internal: 3
+            external: Deferred
+            description: Action postponed
+          - internal: 4
+            external: Resolved
+            description: Finding addressed
+          - internal: 5
+            external: Closed
+            description: Verified and closed
   Fleet:
-    description: Logical grouping of aircraft belonging to an operator.
+    description: >-
+      A fleet represents the collection of aircraft of a specific type operated
+      by an operator.
     attributes:
       - name: id
         type: int
-        description: Primary key
+        description: Primary key [READONLY]
       - name: name
         type: string
-        description: Fleet name
+        description: Fleet name [LABEL] [READONLY]
       - name: operator_id
         type: int
-        description: Reference to Operator
-      - name: aircraft_id
+        description: Reference to Operator [DETAIL]
+      - name: type_id
         type: int
-        description: Reference to Aircraft
+        description: Reference to AircraftType [DETAIL]
       - name: base_location
         type: string
-        description: Home base
+        description: Home base airport [LABEL2]
+    area: operations
+  FleetMember:
+    description: >-
+      An aircraft can move between fleets over time (e.g., wet lease, operator
+      change).
+    attributes:
+      - name: id
+        type: int
+        description: Primary key [READONLY]
+      - name: fleet_id
+        type: int
+        description: Reference to Fleet [DETAIL]
+      - name: aircraft_id
+        type: int
+        description: Reference to Aircraft [DETAIL]
+      - name: entry_date
+        type: date
+        description: Date aircraft joined fleet [LABEL2]
+      - name: exit_date
+        type: date
+        description: Date aircraft left fleet (null if active)
     area: operations
   InspectionType:
     description: >-
@@ -309,10 +382,10 @@ classes:
         type: string
         description: Operator name [LABEL]
       - name: icao_code
-        type: string
+        type: ICAOCode
         description: ICAO code [LABEL2]
       - name: iata_code
-        type: string
+        type: IATACode
         description: IATA code
       - name: country
         type: string
@@ -462,6 +535,14 @@ relationships:
     attribute: operator
     from_cardinality: '*'
   - from: Fleet
+    to: AircraftType
+    attribute: type
+    from_cardinality: '*'
+  - from: FleetMember
+    to: Fleet
+    attribute: fleet
+    from_cardinality: '*'
+  - from: FleetMember
     to: Aircraft
     attribute: aircraft
     from_cardinality: '*'
@@ -510,3 +591,77 @@ relationships:
     to: InspectionType
     attribute: inspection_type
     from_cardinality: '*'
+globalTypes:
+  TailSign:
+    kind: pattern
+    pattern: ^[A-Z]-[A-Z]{4}$
+    description: German aircraft registration (e.g., D-AIUA)
+    example: D-AIUA
+    name: TailSign
+    scope: global
+  IATACode:
+    kind: pattern
+    pattern: ^[A-Z]{2}$
+    description: 2-letter IATA airline code (e.g., LH)
+    example: LH
+    name: IATACode
+    scope: global
+  ICAOCode:
+    kind: pattern
+    pattern: ^[A-Z]{3}$
+    description: 3-letter ICAO airline code (e.g., DLH)
+    example: DLH
+    name: ICAOCode
+    scope: global
+  MSN:
+    kind: pattern
+    pattern: ^MSN \d{4,5}$
+    description: Manufacturer Serial Number (e.g., MSN 4711)
+    example: MSN 4711
+    name: MSN
+    scope: global
+  FlightNumber:
+    kind: pattern
+    pattern: ^[A-Z]{2}\d{1,4}$
+    description: Flight number (e.g., LH123)
+    example: LH123
+    name: FlightNumber
+    scope: global
+  AirportCode:
+    kind: pattern
+    pattern: ^[A-Z]{3}$
+    description: 3-letter IATA airport code (e.g., FRA)
+    example: FRA
+    name: AirportCode
+    scope: global
+  OperationalStatus:
+    kind: enum
+    values:
+      - internal: 1
+        external: Active
+        description: Currently in service
+      - internal: 2
+        external: Grounded
+        description: Temporarily out of service
+      - internal: 3
+        external: Retired
+        description: Permanently decommissioned
+    name: OperationalStatus
+    scope: global
+  MaintenanceLevel:
+    kind: enum
+    values:
+      - internal: A
+        external: A-Check
+        description: Light maintenance (daily/weekly)
+      - internal: B
+        external: B-Check
+        description: Intermediate check (monthly)
+      - internal: C
+        external: C-Check
+        description: Heavy maintenance (yearly)
+      - internal: D
+        external: D-Check
+        description: Major overhaul (multi-year)
+    name: MaintenanceLevel
+    scope: global

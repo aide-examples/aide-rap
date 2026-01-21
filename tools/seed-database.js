@@ -3,7 +3,8 @@
  * Seed Database Tool
  *
  * Usage:
- *   node tools/seed-database.js                   # Load all seed data
+ *   node tools/seed-database.js                   # Load all seed data (from generated)
+ *   node tools/seed-database.js --source imported # Load from imported source
  *   node tools/seed-database.js Aircraft          # Load specific entities
  *   node tools/seed-database.js --reset Aircraft  # Reset table and reload
  *   node tools/seed-database.js --clear           # Clear all tables
@@ -13,7 +14,8 @@ const path = require('path');
 const fs = require('fs');
 
 const SCRIPT_DIR = path.join(__dirname, '..', 'app');
-const SEED_DIR = path.join(SCRIPT_DIR, 'data', 'seed');
+const SEED_GENERATED_DIR = path.join(SCRIPT_DIR, 'data', 'seed_generated');
+const SEED_IMPORTED_DIR = path.join(SCRIPT_DIR, 'data', 'seed_imported');
 const CONFIG_PATH = path.join(SCRIPT_DIR, 'config.json');
 const DATA_MODEL_PATH = path.join(SCRIPT_DIR, 'docs', 'requirements', 'DataModel.md');
 const DB_PATH = path.join(SCRIPT_DIR, 'data', 'irma.sqlite');
@@ -30,17 +32,24 @@ const { getSchema } = require(path.join(SCRIPT_DIR, 'server', 'config', 'databas
 const args = process.argv.slice(2);
 let resetMode = false;
 let clearMode = false;
+let source = 'generated'; // default source
 const entities = [];
 
-for (const arg of args) {
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
   if (arg === '--reset') {
     resetMode = true;
   } else if (arg === '--clear') {
     clearMode = true;
+  } else if (arg === '--source' && args[i + 1]) {
+    source = args[++i];
   } else if (!arg.startsWith('-')) {
     entities.push(arg);
   }
 }
+
+// Determine seed directory based on source
+const SEED_DIR = source === 'imported' ? SEED_IMPORTED_DIR : SEED_GENERATED_DIR;
 
 /**
  * Load seed data for an entity
@@ -114,6 +123,7 @@ function clearAllTables() {
 async function main() {
   console.log('Seed Database Tool');
   console.log('==================');
+  console.log(`Source: ${source} (${SEED_DIR})`);
 
   // Initialize database
   initDatabase(DB_PATH, DATA_MODEL_PATH, enabledEntities);

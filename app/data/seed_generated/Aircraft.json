@@ -1,10 +1,512 @@
 [
-  { "id": 1001, "registration": "D-AIUA", "serial_number": "MSN 4711", "type_id": 1, "manufacture_date": "2015-03-15", "total_flight_hours": 45230, "total_cycles": 18500 },
-  { "id": 1002, "registration": "D-AIUB", "serial_number": "MSN 4712", "type_id": 1, "manufacture_date": "2015-06-20", "total_flight_hours": 38500, "total_cycles": 15200 },
-  { "id": 1003, "registration": "D-AIUC", "serial_number": "MSN 4890", "type_id": 2, "manufacture_date": "2016-01-10", "total_flight_hours": 32000, "total_cycles": 12800 },
-  { "id": 1004, "registration": "D-AIKB", "serial_number": "MSN 1234", "type_id": 3, "manufacture_date": "2012-08-05", "total_flight_hours": 52000, "total_cycles": 8500 },
-  { "id": 1005, "registration": "N789BA", "serial_number": "LN 4521", "type_id": 4, "manufacture_date": "2018-11-22", "total_flight_hours": 18000, "total_cycles": 9200 },
-  { "id": 1006, "registration": "N777WD", "serial_number": "LN 6234", "type_id": 5, "manufacture_date": "2019-04-30", "total_flight_hours": 25000, "total_cycles": 3800 },
-  { "id": 1007, "registration": "PT-TEB", "serial_number": "19000456", "type_id": 6, "manufacture_date": "2017-07-15", "total_flight_hours": 22000, "total_cycles": 14500 },
-  { "id": 1008, "registration": "C-GOJA", "serial_number": "15321", "type_id": 7, "manufacture_date": "2014-02-28", "total_flight_hours": 28000, "total_cycles": 22000 }
+  {
+    "registration": "D-AIBI",
+    "serial_number": "6501",
+    "type_id": 1,
+    "manufacture_date": "2015-05-12",
+    "total_flight_hours": 22400,
+    "total_cycles": 18200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIBJ",
+    "serial_number": "6582",
+    "type_id": 1,
+    "manufacture_date": "2015-11-20",
+    "total_flight_hours": 21100,
+    "total_cycles": 17400,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIBK",
+    "serial_number": "6645",
+    "type_id": 1,
+    "manufacture_date": "2016-03-15",
+    "total_flight_hours": 19800,
+    "total_cycles": 16500,
+    "status": "MAINTENANCE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AIUA",
+    "serial_number": "7012",
+    "type_id": 2,
+    "manufacture_date": "2016-08-10",
+    "total_flight_hours": 18500,
+    "total_cycles": 14200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIUB",
+    "serial_number": "7125",
+    "type_id": 2,
+    "manufacture_date": "2017-01-22",
+    "total_flight_hours": 16200,
+    "total_cycles": 12800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIUC",
+    "serial_number": "7250",
+    "type_id": 2,
+    "manufacture_date": "2017-06-30",
+    "total_flight_hours": 15400,
+    "total_cycles": 12100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIDV",
+    "serial_number": "8045",
+    "type_id": 3,
+    "manufacture_date": "2018-02-14",
+    "total_flight_hours": 14200,
+    "total_cycles": 9800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIDW",
+    "serial_number": "8120",
+    "type_id": 3,
+    "manufacture_date": "2018-09-05",
+    "total_flight_hours": 13100,
+    "total_cycles": 9200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIDX",
+    "serial_number": "8255",
+    "type_id": 3,
+    "manufacture_date": "2019-03-20",
+    "total_flight_hours": 11500,
+    "total_cycles": 8400,
+    "status": "STORED",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AINA",
+    "serial_number": "9501",
+    "type_id": 4,
+    "manufacture_date": "2020-07-15",
+    "total_flight_hours": 8500,
+    "total_cycles": 6200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AINB",
+    "serial_number": "9620",
+    "type_id": 4,
+    "manufacture_date": "2021-02-10",
+    "total_flight_hours": 6400,
+    "total_cycles": 4800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AINC",
+    "serial_number": "9745",
+    "type_id": 4,
+    "manufacture_date": "2021-11-30",
+    "total_flight_hours": 4200,
+    "total_cycles": 3100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIEA",
+    "serial_number": "10200",
+    "type_id": 5,
+    "manufacture_date": "2022-04-12",
+    "total_flight_hours": 3100,
+    "total_cycles": 2200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIEB",
+    "serial_number": "10450",
+    "type_id": 5,
+    "manufacture_date": "2022-10-05",
+    "total_flight_hours": 1800,
+    "total_cycles": 1400,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIEC",
+    "serial_number": "10780",
+    "type_id": 5,
+    "manufacture_date": "2023-05-20",
+    "total_flight_hours": 950,
+    "total_cycles": 720,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIKE",
+    "serial_number": "1150",
+    "type_id": 6,
+    "manufacture_date": "2015-02-28",
+    "total_flight_hours": 35200,
+    "total_cycles": 8400,
+    "status": "ACTIVE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AIKF",
+    "serial_number": "1240",
+    "type_id": 6,
+    "manufacture_date": "2016-06-14",
+    "total_flight_hours": 31400,
+    "total_cycles": 7200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIKG",
+    "serial_number": "1310",
+    "type_id": 6,
+    "manufacture_date": "2017-12-10",
+    "total_flight_hours": 26800,
+    "total_cycles": 6100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIGW",
+    "serial_number": "312",
+    "type_id": 7,
+    "manufacture_date": "2015-04-18",
+    "total_flight_hours": 38500,
+    "total_cycles": 7400,
+    "status": "ACTIVE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AIGX",
+    "serial_number": "345",
+    "type_id": 7,
+    "manufacture_date": "2016-01-22",
+    "total_flight_hours": 34200,
+    "total_cycles": 6800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIGY",
+    "serial_number": "398",
+    "type_id": 7,
+    "manufacture_date": "2016-11-05",
+    "total_flight_hours": 30100,
+    "total_cycles": 6100,
+    "status": "MAINTENANCE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AIHA",
+    "serial_number": "560",
+    "type_id": 8,
+    "manufacture_date": "2015-08-30",
+    "total_flight_hours": 36400,
+    "total_cycles": 6900,
+    "status": "ACTIVE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AIHB",
+    "serial_number": "595",
+    "type_id": 8,
+    "manufacture_date": "2016-04-15",
+    "total_flight_hours": 32100,
+    "total_cycles": 6200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIHC",
+    "serial_number": "630",
+    "type_id": 8,
+    "manufacture_date": "2017-02-12",
+    "total_flight_hours": 28500,
+    "total_cycles": 5500,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIXA",
+    "serial_number": "074",
+    "type_id": 9,
+    "manufacture_date": "2017-12-19",
+    "total_flight_hours": 24500,
+    "total_cycles": 4200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIXB",
+    "serial_number": "112",
+    "type_id": 9,
+    "manufacture_date": "2018-06-25",
+    "total_flight_hours": 21200,
+    "total_cycles": 3800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIXC",
+    "serial_number": "155",
+    "type_id": 9,
+    "manufacture_date": "2019-01-14",
+    "total_flight_hours": 18400,
+    "total_cycles": 3100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIMM",
+    "serial_number": "145",
+    "type_id": 10,
+    "manufacture_date": "2015-03-31",
+    "total_flight_hours": 28200,
+    "total_cycles": 3200,
+    "status": "ACTIVE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-AIMN",
+    "serial_number": "175",
+    "type_id": 10,
+    "manufacture_date": "2016-02-10",
+    "total_flight_hours": 24500,
+    "total_cycles": 2800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-AIMO",
+    "serial_number": "210",
+    "type_id": 10,
+    "manufacture_date": "2017-05-20",
+    "total_flight_hours": 19800,
+    "total_cycles": 2200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABTK",
+    "serial_number": "28500",
+    "type_id": 11,
+    "manufacture_date": "2015-01-15",
+    "total_flight_hours": 41200,
+    "total_cycles": 5800,
+    "status": "ACTIVE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-ABTL",
+    "serial_number": "28510",
+    "type_id": 11,
+    "manufacture_date": "2015-06-12",
+    "total_flight_hours": 38900,
+    "total_cycles": 5400,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABTM",
+    "serial_number": "28520",
+    "type_id": 11,
+    "manufacture_date": "2016-02-18",
+    "total_flight_hours": 35400,
+    "total_cycles": 4900,
+    "status": "STORED",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-ABYA",
+    "serial_number": "37827",
+    "type_id": 12,
+    "manufacture_date": "2015-04-30",
+    "total_flight_hours": 38200,
+    "total_cycles": 5100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABYB",
+    "serial_number": "37828",
+    "type_id": 12,
+    "manufacture_date": "2016-01-25",
+    "total_flight_hours": 34100,
+    "total_cycles": 4600,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABYC",
+    "serial_number": "37829",
+    "type_id": 12,
+    "manufacture_date": "2017-03-12",
+    "total_flight_hours": 28500,
+    "total_cycles": 3900,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABUV",
+    "serial_number": "25400",
+    "type_id": 13,
+    "manufacture_date": "2015-08-14",
+    "total_flight_hours": 37400,
+    "total_cycles": 8200,
+    "status": "ACTIVE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-ABUW",
+    "serial_number": "25410",
+    "type_id": 13,
+    "manufacture_date": "2016-05-20",
+    "total_flight_hours": 32100,
+    "total_cycles": 7100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABUX",
+    "serial_number": "25420",
+    "type_id": 13,
+    "manufacture_date": "2017-04-10",
+    "total_flight_hours": 28200,
+    "total_cycles": 6400,
+    "status": "MAINTENANCE",
+    "maintenance_category": "BASE"
+  },
+  {
+    "registration": "D-ALFA",
+    "serial_number": "42100",
+    "type_id": 14,
+    "manufacture_date": "2015-11-05",
+    "total_flight_hours": 39500,
+    "total_cycles": 6200,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ALFB",
+    "serial_number": "42110",
+    "type_id": 14,
+    "manufacture_date": "2016-10-12",
+    "total_flight_hours": 34200,
+    "total_cycles": 5400,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ALFC",
+    "serial_number": "42120",
+    "type_id": 14,
+    "manufacture_date": "2017-09-30",
+    "total_flight_hours": 29100,
+    "total_cycles": 4800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ALHA",
+    "serial_number": "44500",
+    "type_id": 15,
+    "manufacture_date": "2018-03-15",
+    "total_flight_hours": 26400,
+    "total_cycles": 3800,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ALHB",
+    "serial_number": "44510",
+    "type_id": 15,
+    "manufacture_date": "2019-02-20",
+    "total_flight_hours": 21200,
+    "total_cycles": 3100,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ALHC",
+    "serial_number": "44520",
+    "type_id": 15,
+    "manufacture_date": "2020-05-12",
+    "total_flight_hours": 15800,
+    "total_cycles": 2400,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABPA",
+    "serial_number": "62730",
+    "type_id": 16,
+    "manufacture_date": "2022-08-29",
+    "total_flight_hours": 4200,
+    "total_cycles": 850,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABPB",
+    "serial_number": "62731",
+    "type_id": 16,
+    "manufacture_date": "2022-12-15",
+    "total_flight_hours": 3100,
+    "total_cycles": 640,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABPC",
+    "serial_number": "62732",
+    "type_id": 16,
+    "manufacture_date": "2023-04-20",
+    "total_flight_hours": 1400,
+    "total_cycles": 310,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABYA",
+    "serial_number": "001",
+    "type_id": 17,
+    "manufacture_date": "2023-11-01",
+    "total_flight_hours": 150,
+    "total_cycles": 45,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABYB",
+    "serial_number": "002",
+    "type_id": 17,
+    "manufacture_date": "2023-12-10",
+    "total_flight_hours": 80,
+    "total_cycles": 22,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  },
+  {
+    "registration": "D-ABYC",
+    "serial_number": "003",
+    "type_id": 17,
+    "manufacture_date": "2023-12-28",
+    "total_flight_hours": 25,
+    "total_cycles": 8,
+    "status": "ACTIVE",
+    "maintenance_category": "LINE"
+  }
 ]

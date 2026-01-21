@@ -1,85 +1,89 @@
 {
   "_comment": "Layout positions for DataModel diagram. Edit x/y values to reposition classes.",
   "canvas": {
-    "width": 1200,
-    "height": 900
+    "width": 1000,
+    "height": 1200
   },
   "classes": {
     "AircraftManufacturer": {
-      "x": 840,
-      "y": 90
+      "x": 630,
+      "y": 30
     },
     "EngineManufacturer": {
-      "x": 20,
-      "y": 260
+      "x": 30,
+      "y": 530
     },
     "AircraftType": {
-      "x": 640,
-      "y": 90
+      "x": 420,
+      "y": 30
     },
     "EngineType": {
-      "x": 200,
-      "y": 260
+      "x": 220,
+      "y": 530
     },
     "MaintenancePlan": {
-      "x": 200,
-      "y": 400
+      "x": 230,
+      "y": 720
     },
     "MaintenancePlanTask": {
-      "x": 200,
-      "y": 560
+      "x": 230,
+      "y": 870
     },
     "Operator": {
       "x": 20,
-      "y": 90
+      "y": 30
     },
     "Fleet": {
       "x": 200,
-      "y": 90
+      "y": 30
     },
     "Aircraft": {
       "x": 420,
-      "y": 90
+      "y": 170
     },
     "Engine": {
       "x": 420,
-      "y": 400
+      "y": 550
     },
     "EngineAssignment": {
       "x": 420,
-      "y": 250
+      "y": 380
     },
     "InspectionType": {
       "x": 420,
-      "y": 560
+      "y": 720
     },
     "Workscope": {
       "x": 630,
-      "y": 400
+      "y": 540
     },
     "MRO": {
-      "x": 870,
-      "y": 720
+      "x": 850,
+      "y": 250
     },
     "RepairShop": {
-      "x": 870,
-      "y": 570
+      "x": 850,
+      "y": 390
     },
     "RepairOrder": {
-      "x": 870,
-      "y": 400
+      "x": 850,
+      "y": 540
     },
     "Task": {
-      "x": 660,
-      "y": 580
+      "x": 730,
+      "y": 720
     },
     "TaskType": {
-      "x": 200,
-      "y": 740
+      "x": 420,
+      "y": 920
     },
     "Finding": {
-      "x": 660,
-      "y": 740
+      "x": 720,
+      "y": 890
+    },
+    "FleetMember": {
+      "x": 200,
+      "y": 170
     }
   }
 }

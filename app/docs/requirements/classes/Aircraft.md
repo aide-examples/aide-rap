@@ -25,3 +25,9 @@ Individual aircraft identified by registration and serial number.
 | total_cycles | int | Accumulated cycles | 18500 |
 | status | [OperationalStatus](../Types.md#operationalstatus) | Operational status | 1 |
 | maintenance_category | MaintenanceCategory [DEFAULT=Line] | Current maintenance category | B |
+
+## Data Generator
+
+Generate 3 aircraft per AircraftType listed in the references.
+Use realistic German registrations (D-AXXX pattern) and MSN numbers.
+Manufacture dates should be between 2015 and 2023.

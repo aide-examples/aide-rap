@@ -1,0 +1,308 @@
+[
+  {
+    "fleet_id": 1,
+    "aircraft_id": 1,
+    "entry_date": "2015-05-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 27,
+    "aircraft_id": 2,
+    "entry_date": "2015-11-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 32,
+    "aircraft_id": 3,
+    "entry_date": "2016-03-15",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 2,
+    "aircraft_id": 4,
+    "entry_date": "2016-08-10",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 14,
+    "aircraft_id": 5,
+    "entry_date": "2017-01-22",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 21,
+    "aircraft_id": 6,
+    "entry_date": "2017-06-30",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 3,
+    "aircraft_id": 7,
+    "entry_date": "2018-02-14",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 15,
+    "aircraft_id": 8,
+    "entry_date": "2018-09-05",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 22,
+    "aircraft_id": 9,
+    "entry_date": "2019-03-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 4,
+    "aircraft_id": 10,
+    "entry_date": "2020-07-15",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 16,
+    "aircraft_id": 11,
+    "entry_date": "2021-02-10",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 23,
+    "aircraft_id": 12,
+    "entry_date": "2021-11-30",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 5,
+    "aircraft_id": 13,
+    "entry_date": "2022-04-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 17,
+    "aircraft_id": 14,
+    "entry_date": "2022-10-05",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 31,
+    "aircraft_id": 15,
+    "entry_date": "2023-05-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 6,
+    "aircraft_id": 16,
+    "entry_date": "2015-02-28",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 18,
+    "aircraft_id": 17,
+    "entry_date": "2016-06-14",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 35,
+    "aircraft_id": 18,
+    "entry_date": "2017-12-10",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 7,
+    "aircraft_id": 19,
+    "entry_date": "2015-04-18",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 19,
+    "aircraft_id": 20,
+    "entry_date": "2016-01-22",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 7,
+    "aircraft_id": 21,
+    "entry_date": "2016-11-05",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 8,
+    "aircraft_id": 22,
+    "entry_date": "2015-08-30",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 8,
+    "aircraft_id": 23,
+    "entry_date": "2016-04-15",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 8,
+    "aircraft_id": 24,
+    "entry_date": "2017-02-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 9,
+    "aircraft_id": 25,
+    "entry_date": "2017-12-19",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 9,
+    "aircraft_id": 26,
+    "entry_date": "2018-06-25",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 9,
+    "aircraft_id": 27,
+    "entry_date": "2019-01-14",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 10,
+    "aircraft_id": 28,
+    "entry_date": "2015-03-31",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 10,
+    "aircraft_id": 29,
+    "entry_date": "2016-02-10",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 10,
+    "aircraft_id": 30,
+    "entry_date": "2017-05-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 11,
+    "aircraft_id": 31,
+    "entry_date": "2015-01-15",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 11,
+    "aircraft_id": 32,
+    "entry_date": "2015-06-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 11,
+    "aircraft_id": 33,
+    "entry_date": "2016-02-18",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 12,
+    "aircraft_id": 34,
+    "entry_date": "2015-04-30",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 12,
+    "aircraft_id": 35,
+    "entry_date": "2016-01-25",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 12,
+    "aircraft_id": 36,
+    "entry_date": "2017-03-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 24,
+    "aircraft_id": 37,
+    "entry_date": "2015-08-14",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 24,
+    "aircraft_id": 38,
+    "entry_date": "2016-05-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 24,
+    "aircraft_id": 39,
+    "entry_date": "2017-04-10",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 25,
+    "aircraft_id": 40,
+    "entry_date": "2015-11-05",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 25,
+    "aircraft_id": 41,
+    "entry_date": "2016-10-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 25,
+    "aircraft_id": 42,
+    "entry_date": "2017-09-30",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 20,
+    "aircraft_id": 43,
+    "entry_date": "2018-03-15",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 20,
+    "aircraft_id": 44,
+    "entry_date": "2019-02-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 20,
+    "aircraft_id": 45,
+    "entry_date": "2020-05-12",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 13,
+    "aircraft_id": 46,
+    "entry_date": "2022-08-29",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 26,
+    "aircraft_id": 47,
+    "entry_date": "2022-12-15",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 13,
+    "aircraft_id": 48,
+    "entry_date": "2023-04-20",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 1,
+    "aircraft_id": 49,
+    "entry_date": "2023-11-01",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 27,
+    "aircraft_id": 50,
+    "entry_date": "2023-12-10",
+    "exit_date": null
+  },
+  {
+    "fleet_id": 32,
+    "aircraft_id": 51,
+    "entry_date": "2023-12-28",
+    "exit_date": null
+  }
+]

@@ -23,7 +23,8 @@ Entity definitions are stored in separate files under [classes/](classes/).
 | Entity | Description |
 |--------|-------------|
 | [Operator](classes/Operator.md) | Airlines or aircraft operators |
-| [Fleet](classes/Fleet.md) | Logical grouping of aircraft |
+| [Fleet](classes/Fleet.md) | Operator's fleet of a specific aircraft type |
+| [FleetMember](classes/FleetMember.md) | Aircraft assignment to fleet with dates |
 | [Aircraft](classes/Aircraft.md) | Individual aircraft |
 </div>
 
