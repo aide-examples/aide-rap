@@ -430,6 +430,51 @@ app.post('/api/seed/reset-all', (req, res) => {
     }
 });
 
+// Set active seed source (imported or generated)
+app.post('/api/seed/source', (req, res) => {
+    try {
+        const { source } = req.body;
+        const result = SeedManager.setSource(source);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error('Failed to set source:', e);
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// Upload JSON data for an entity (saves to seed_imported/)
+app.post('/api/seed/upload/:entity', (req, res) => {
+    try {
+        const result = SeedManager.uploadEntity(req.params.entity, req.body);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error(`Failed to upload ${req.params.entity}:`, e);
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// Copy imported file to generated
+app.post('/api/seed/copy-to-generated/:entity', (req, res) => {
+    try {
+        const result = SeedManager.copyToGenerated(req.params.entity);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error(`Failed to copy ${req.params.entity}:`, e);
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// Copy all imported files to generated
+app.post('/api/seed/copy-all-to-generated', (req, res) => {
+    try {
+        const results = SeedManager.copyAllToGenerated();
+        res.json({ success: true, results });
+    } catch (e) {
+        console.error('Failed to copy all:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // =============================================================================
 // 8. START SERVER
 // =============================================================================

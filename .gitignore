@@ -6,3 +6,6 @@ deploy/
 app/config.json
 releases/
 aide-frame
+
+# Logs
+app/logs/

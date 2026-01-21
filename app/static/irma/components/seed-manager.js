@@ -1,11 +1,14 @@
 /**
  * Seed Manager Component
  * Modal dialog for managing seed data - loading and clearing entity data
+ * Supports two sources: imported (uploaded) and generated (synthetic)
  */
 const SeedManager = {
   container: null,
   isOpen: false,
   entities: [],
+  activeSource: 'generated',
+  sources: ['imported', 'generated'],
 
   /**
    * Initialize the seed manager
@@ -44,6 +47,8 @@ const SeedManager = {
       const response = await fetch('/api/seed/status');
       const data = await response.json();
       this.entities = data.entities || [];
+      this.activeSource = data.activeSource || 'generated';
+      this.sources = data.sources || ['imported', 'generated'];
     } catch (err) {
       console.error('Failed to load seed status:', err);
       this.entities = [];
@@ -56,18 +61,30 @@ const SeedManager = {
   render() {
     if (!this.container || !this.isOpen) return;
 
-    const rows = this.entities.map((e, idx) => `
-      <tr>
-        <td class="level">${idx + 1}</td>
-        <td class="entity-name">${e.name}</td>
-        <td class="row-count">${e.rowCount}</td>
-        <td class="seed-count">${e.seedFile ? e.seedCount : '--'}</td>
-        <td class="actions">
-          ${e.seedFile ? `<button class="btn-seed btn-load" data-entity="${e.name}">Load</button>` : ''}
-          <button class="btn-seed btn-clear" data-entity="${e.name}" ${e.rowCount === 0 ? 'disabled' : ''}>Clear</button>
-        </td>
-      </tr>
-    `).join('');
+    const rows = this.entities.map((e, idx) => {
+      const hasImported = e.importedCount !== null;
+      const hasGenerated = e.generatedCount !== null;
+      const hasActive = this.activeSource === 'imported' ? hasImported : hasGenerated;
+
+      return `
+        <tr>
+          <td class="level">${idx + 1}</td>
+          <td class="entity-name">${e.name}</td>
+          <td class="row-count">${e.rowCount}</td>
+          <td class="seed-count imported ${this.activeSource === 'imported' ? 'active' : ''}">${hasImported ? e.importedCount : '--'}</td>
+          <td class="seed-count generated ${this.activeSource === 'generated' ? 'active' : ''}">${hasGenerated ? e.generatedCount : '--'}</td>
+          <td class="actions">
+            ${hasActive ? `<button class="btn-seed btn-load" data-entity="${e.name}">Load</button>` : ''}
+            <button class="btn-seed btn-clear" data-entity="${e.name}" ${e.rowCount === 0 ? 'disabled' : ''}>Clear</button>
+            ${hasImported ? `<button class="btn-seed btn-copy" data-entity="${e.name}" title="Copy to Generated">→G</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const sourceOptions = this.sources.map(s =>
+      `<option value="${s}" ${s === this.activeSource ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
+    ).join('');
 
     this.container.innerHTML = `
       <div class="modal-overlay" data-action="close">
@@ -75,6 +92,11 @@ const SeedManager = {
           <div class="modal-header">
             <h2>Seed Data Manager</h2>
             <button class="modal-close" data-action="close">&times;</button>
+          </div>
+          <div class="modal-toolbar">
+            <label>Source: <select id="seed-source">${sourceOptions}</select></label>
+            <button class="btn-seed btn-upload">Upload JSON...</button>
+            <button class="btn-seed btn-copy-all">Copy All → Generated</button>
           </div>
           <div class="modal-body">
             <p class="order-hint">Entities sorted by dependency (load top-to-bottom, clear bottom-to-top)</p>
@@ -84,7 +106,8 @@ const SeedManager = {
                   <th>#</th>
                   <th>Entity</th>
                   <th>Rows</th>
-                  <th>Seed</th>
+                  <th class="${this.activeSource === 'imported' ? 'active' : ''}">Imported</th>
+                  <th class="${this.activeSource === 'generated' ? 'active' : ''}">Generated</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -100,6 +123,7 @@ const SeedManager = {
           </div>
         </div>
       </div>
+      <input type="file" id="seed-file-input" accept=".json" style="display: none">
     `;
 
     this.container.classList.add('active');
@@ -114,6 +138,19 @@ const SeedManager = {
     this.container.querySelectorAll('[data-action="close"]').forEach(el => {
       el.addEventListener('click', () => this.close());
     });
+
+    // Source selector
+    this.container.querySelector('#seed-source')?.addEventListener('change', async (e) => {
+      await this.setSource(e.target.value);
+    });
+
+    // Upload button
+    this.container.querySelector('.btn-upload')?.addEventListener('click', () => {
+      this.showUploadDialog();
+    });
+
+    // Copy all to generated
+    this.container.querySelector('.btn-copy-all')?.addEventListener('click', () => this.copyAllToGenerated());
 
     // Load single entity
     this.container.querySelectorAll('.btn-load').forEach(btn => {
@@ -131,10 +168,24 @@ const SeedManager = {
       });
     });
 
+    // Copy single entity to generated
+    this.container.querySelectorAll('.btn-copy').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const entity = e.target.dataset.entity;
+        await this.copyToGenerated(entity);
+      });
+    });
+
     // Bulk actions
     this.container.querySelector('.btn-load-all')?.addEventListener('click', () => this.loadAll());
     this.container.querySelector('.btn-clear-all')?.addEventListener('click', () => this.clearAll());
     this.container.querySelector('.btn-reset-all')?.addEventListener('click', () => this.resetAll());
+
+    // File input handler
+    const fileInput = this.container.querySelector('#seed-file-input');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+    }
   },
 
   /**
@@ -155,6 +206,122 @@ const SeedManager = {
 
     // Auto-remove after 3 seconds
     setTimeout(() => msg.remove(), 3000);
+  },
+
+  /**
+   * Set active source
+   */
+  async setSource(source) {
+    try {
+      const response = await fetch('/api/seed/source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source })
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        this.activeSource = data.activeSource;
+        this.showMessage(`Source set to: ${source}`);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Failed to set source', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Show upload dialog
+   */
+  showUploadDialog() {
+    // Create entity selector dialog
+    const entityNames = this.entities.map(e => e.name);
+    const selected = prompt(`Enter entity name to upload:\n\nAvailable: ${entityNames.join(', ')}`);
+
+    if (selected && entityNames.includes(selected)) {
+      this.uploadEntityName = selected;
+      this.container.querySelector('#seed-file-input')?.click();
+    } else if (selected) {
+      this.showMessage(`Unknown entity: ${selected}`, true);
+    }
+  },
+
+  /**
+   * Handle file upload
+   */
+  async handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file || !this.uploadEntityName) return;
+
+    try {
+      const text = await file.text();
+      const jsonData = JSON.parse(text);
+
+      const response = await fetch(`/api/seed/upload/${this.uploadEntityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jsonData)
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        this.showMessage(`Uploaded ${data.uploaded} records to ${this.uploadEntityName}`);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Upload failed', true);
+      }
+    } catch (err) {
+      this.showMessage(`Upload failed: ${err.message}`, true);
+    }
+
+    // Reset file input
+    event.target.value = '';
+    this.uploadEntityName = null;
+  },
+
+  /**
+   * Copy entity from imported to generated
+   */
+  async copyToGenerated(entityName) {
+    try {
+      const response = await fetch(`/api/seed/copy-to-generated/${entityName}`, { method: 'POST' });
+      const data = await response.json();
+
+      if (data.success) {
+        this.showMessage(`Copied ${data.copied} records to generated`);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Copy failed', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Copy all imported to generated
+   */
+  async copyAllToGenerated() {
+    try {
+      const response = await fetch('/api/seed/copy-all-to-generated', { method: 'POST' });
+      const data = await response.json();
+
+      if (data.success) {
+        const copied = Object.values(data.results).filter(r => r.copied > 0).length;
+        this.showMessage(`Copied ${copied} files to generated`);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Copy failed', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
   },
 
   /**
