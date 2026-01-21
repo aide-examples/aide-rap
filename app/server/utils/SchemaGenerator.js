@@ -10,14 +10,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
+const { TypeParser } = require('../../shared/types/TypeParser');
 
 /**
- * Type mapping from DataModel.md to SQLite and JS
+ * Built-in type mapping from DataModel.md to SQLite and JS
+ * Custom types from TypeRegistry take precedence
  */
 const TYPE_MAP = {
   int: { sqlType: 'INTEGER', jsType: 'number', validation: { type: 'number' } },
   string: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string' } },
-  date: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } }
+  date: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+  boolean: { sqlType: 'INTEGER', jsType: 'boolean', validation: { type: 'boolean' } }
 };
 
 /**
@@ -307,6 +311,48 @@ function parseEntityDescriptions(mdContent, mdPath) {
 }
 
 /**
+ * Get type info from TypeRegistry or fall back to TYPE_MAP
+ * @param {string} typeName - Type name from attribute definition
+ * @param {string} entityName - Entity name for local type resolution
+ * @returns {Object} - { sqlType, jsType, validation, isCustomType, typeDef }
+ */
+function getTypeInfo(typeName, entityName) {
+  const typeRegistry = getTypeRegistry();
+  const lowerType = typeName.toLowerCase();
+
+  // Check built-in types first (exact match)
+  if (TYPE_MAP[lowerType]) {
+    return {
+      ...TYPE_MAP[lowerType],
+      isCustomType: false,
+      typeDef: null
+    };
+  }
+
+  // Try to resolve from TypeRegistry (case-sensitive for custom types)
+  const typeDef = typeRegistry.resolve(typeName, entityName);
+  if (typeDef) {
+    const sqlType = typeRegistry.getSqlType(typeName, entityName);
+    const validation = typeRegistry.toValidationRules(typeName, entityName);
+
+    return {
+      sqlType,
+      jsType: typeDef.kind === 'enum' ? 'number' : 'string',
+      validation: validation || { type: 'string' },
+      isCustomType: true,
+      typeDef
+    };
+  }
+
+  // Fall back to string type
+  return {
+    ...TYPE_MAP.string,
+    isCustomType: false,
+    typeDef: null
+  };
+}
+
+/**
  * Generate schema for a single entity
  */
 function generateEntitySchema(className, classDef) {
@@ -316,10 +362,11 @@ function generateEntitySchema(className, classDef) {
   const uniqueKeys = {};  // UK1 -> [columns]
   const indexes = {};     // IX1 -> [columns]
   const foreignKeys = [];
+  const enumFields = {};  // Fields that are enums (for response enrichment)
 
   for (const attr of classDef.attributes || []) {
     const name = attr.name;
-    const baseType = attr.type.toLowerCase();
+    const attrType = attr.type;
     const desc = attr.description || '';
     const example = attr.example || '';
 
@@ -345,8 +392,16 @@ function generateEntitySchema(className, classDef) {
       });
     }
 
-    // Map type
-    const typeInfo = TYPE_MAP[baseType] || TYPE_MAP.string;
+    // Get type info (from TypeRegistry or TYPE_MAP)
+    const typeInfo = getTypeInfo(attrType, className);
+
+    // Track enum fields for response enrichment
+    if (typeInfo.isCustomType && typeInfo.typeDef?.kind === 'enum') {
+      enumFields[name] = {
+        typeName: attrType,
+        values: typeInfo.typeDef.values
+      };
+    }
 
     // Build SQL type
     let sqlType = typeInfo.sqlType;
@@ -364,7 +419,8 @@ function generateEntitySchema(className, classDef) {
       name,
       sqlType,
       jsType: typeInfo.jsType,
-      required: isRequired
+      required: isRequired,
+      customType: typeInfo.isCustomType ? attrType : null
     };
 
     if (foreignKey) {
@@ -421,7 +477,8 @@ function generateEntitySchema(className, classDef) {
     validationRules,
     uniqueKeys,
     indexes,
-    foreignKeys
+    foreignKeys,
+    enumFields
   };
 }
 
@@ -525,10 +582,26 @@ function generateCreateTableSQL(entity) {
 }
 
 /**
+ * Initialize TypeRegistry with global types from Types.md
+ */
+function initializeTypeRegistry(mdPath) {
+  const docsDir = path.dirname(mdPath);
+  const typesPath = path.join(docsDir, 'Types.md');
+
+  if (fs.existsSync(typesPath)) {
+    const typeParser = new TypeParser();
+    typeParser.parseGlobalTypes(typesPath);
+  }
+}
+
+/**
  * Main: Parse DataModel.md and generate complete schema
  */
 function generateSchema(mdPath, enabledEntities = null) {
   const mdContent = fs.readFileSync(mdPath, 'utf-8');
+
+  // Initialize type registry with global types
+  initializeTypeRegistry(mdPath);
 
   // Parse areas and classes
   const { areas, classToArea } = parseAreasFromTable(mdContent);
@@ -641,6 +714,8 @@ module.exports = {
   parseAreasFromTable,
   parseUIAnnotations,
   buildDependencyOrder,
+  initializeTypeRegistry,
+  getTypeInfo,
   toSnakeCase,
   TYPE_MAP
 };

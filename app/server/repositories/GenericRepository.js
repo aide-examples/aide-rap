@@ -9,6 +9,7 @@
 
 const { getDatabase, getSchema } = require('../config/database');
 const { ObjectValidator } = require('../../shared/validation');
+const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 const { ForeignKeyConstraintError, UniqueConstraintError } = require('../errors/ConflictError');
 const logger = require('../utils/logger');
@@ -47,6 +48,51 @@ function getEntityMeta(entityName) {
   }
 
   return entity;
+}
+
+/**
+ * Enrich a record with _display fields for enum types
+ * @param {string} entityName - Entity name
+ * @param {Object} record - Database record
+ * @returns {Object} - Enriched record with _display fields
+ */
+function enrichWithEnumDisplay(entityName, record) {
+  const entity = getEntityMeta(entityName);
+
+  // Skip if no enum fields
+  if (!entity.enumFields || Object.keys(entity.enumFields).length === 0) {
+    return record;
+  }
+
+  const typeRegistry = getTypeRegistry();
+  const enriched = { ...record };
+
+  for (const [fieldName, enumInfo] of Object.entries(entity.enumFields)) {
+    const value = record[fieldName];
+    if (value !== null && value !== undefined) {
+      const displayValue = typeRegistry.toExternal(enumInfo.typeName, value, entityName);
+      enriched[`${fieldName}_display`] = displayValue;
+    }
+  }
+
+  return enriched;
+}
+
+/**
+ * Enrich multiple records with _display fields
+ * @param {string} entityName - Entity name
+ * @param {Array} records - Array of database records
+ * @returns {Array} - Enriched records
+ */
+function enrichRecords(entityName, records) {
+  const entity = getEntityMeta(entityName);
+
+  // Skip if no enum fields
+  if (!entity.enumFields || Object.keys(entity.enumFields).length === 0) {
+    return records;
+  }
+
+  return records.map(record => enrichWithEnumDisplay(entityName, record));
 }
 
 /**
@@ -143,6 +189,9 @@ function findAll(entityName, options = {}) {
 
   const rows = db.prepare(sql).all(...params);
 
+  // Enrich with enum display values
+  const enrichedRows = enrichRecords(entityName, rows);
+
   // Get total count
   let countSql = `SELECT COUNT(*) as count FROM ${entity.tableName}`;
   if (options.filter) {
@@ -164,7 +213,7 @@ function findAll(entityName, options = {}) {
   const { count } = db.prepare(countSql).get(...countParams);
 
   return {
-    data: rows,
+    data: enrichedRows,
     total: count,
     limit: options.limit || null,
     offset: options.offset || 0
@@ -174,7 +223,7 @@ function findAll(entityName, options = {}) {
 /**
  * Find a single record by ID
  */
-function findById(entityName, id) {
+function findById(entityName, id, enrich = true) {
   const entity = getEntityMeta(entityName);
   const db = getDatabase();
 
@@ -184,7 +233,8 @@ function findById(entityName, id) {
     throw new EntityNotFoundError(entityName, id);
   }
 
-  return row;
+  // Enrich with enum display values (unless disabled for internal use)
+  return enrich ? enrichWithEnumDisplay(entityName, row) : row;
 }
 
 /**
@@ -226,8 +276,8 @@ function update(entityName, id, data) {
   const entity = ensureValidationRules(entityName);
   const db = getDatabase();
 
-  // First check if exists
-  findById(entityName, id); // Throws if not found
+  // First check if exists (without enrichment for internal use)
+  findById(entityName, id, false); // Throws if not found
 
   // Validate and transform
   const validated = validator.validate(entityName, data);
@@ -261,8 +311,8 @@ function remove(entityName, id) {
   const db = getDatabase();
   const schema = getSchema();
 
-  // First check if exists
-  const existing = findById(entityName, id); // Throws if not found
+  // First check if exists (without enrichment for internal use)
+  const existing = findById(entityName, id, false); // Throws if not found
 
   // Check for referencing records
   const inverseRels = schema.inverseRelationships[entityName] || [];
@@ -392,16 +442,30 @@ function getExtendedSchemaInfo(entityName) {
     entityName: entity.className,
     tableName: entity.tableName,
     description: entity.description,
-    columns: entity.columns.map(col => ({
-      name: col.name,
-      type: col.jsType,
-      required: col.required,
-      foreignKey: col.foreignKey ? {
-        entity: col.foreignKey.entity,
-        table: col.foreignKey.table
-      } : null,
-      ui: col.ui || null
-    })),
+    columns: entity.columns.map(col => {
+      const colInfo = {
+        name: col.name,
+        type: col.jsType,
+        required: col.required,
+        foreignKey: col.foreignKey ? {
+          entity: col.foreignKey.entity,
+          table: col.foreignKey.table
+        } : null,
+        ui: col.ui || null
+      };
+
+      // Add custom type info if present
+      if (col.customType) {
+        colInfo.customType = col.customType;
+      }
+
+      // Add enum values if this is an enum field
+      if (entity.enumFields && entity.enumFields[col.name]) {
+        colInfo.enumValues = entity.enumFields[col.name].values;
+      }
+
+      return colInfo;
+    }),
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
       detailFields: detailFields.length > 0 ? detailFields : null,
@@ -509,5 +573,7 @@ module.exports = {
   getBackReferences,
   getEntityMeta,
   getValidator,
-  ensureValidationRules
+  ensureValidationRules,
+  enrichWithEnumDisplay,
+  enrichRecords
 };

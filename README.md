@@ -1,6 +1,9 @@
 # AIDE IRMA
 
-Intelligent Repair and Maintenance in Aviation - A demo application built on the aide-frame framework.
+A demo application built on the aide-frame framework. This is a generic rapid prototyping tool which is driven by meta data deifned in the markdown docs of the app. It is the dream of what "CASE" tools in the 1990s wanted to be. You describe your class model in semi-formal notation and interactively design a graphical representation. At the same time SQL tables are generated and a generic three layer backend and a modern browser UI are generated. There is also a generic type system available which allows you to define enums, numeric ranges, regexp patterns for attributes of entities. Validation is identically performed in the backend for integrity reasins and in the formt end for ergonomic reasons. Sample data can be imported or generated
+based on sem-formal rules. 
+
+The example is taken from aviation industry, hence the acronym IRMA *Intelligent Repair and Maintenance in Aviation*.
 
 ## Prerequisites
 

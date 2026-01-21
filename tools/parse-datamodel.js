@@ -9,6 +9,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getTypeRegistry } = require('../app/shared/types/TypeRegistry');
+const { TypeParser } = require('../app/shared/types/TypeParser');
 
 /**
  * Parse the Areas from Entity Descriptions section.
@@ -62,9 +64,9 @@ function decodeHtmlEntities(text) {
 
 /**
  * Parse a single entity markdown file
- * Format: # EntityName\n\nDescription\n\n| Attribute | Type | Description | Example |
+ * Format: # EntityName\n\nDescription\n\n## Types (optional)\n\n| Attribute | Type | Description | Example |
  */
-function parseEntityFile(fileContent) {
+function parseEntityFile(fileContent, entityName = null) {
     const lines = fileContent.split('\n');
 
     // First line should be # EntityName
@@ -76,17 +78,25 @@ function parseEntityFile(fileContent) {
     const className = nameMatch[1];
     let description = '';
     const attributes = [];
+    let localTypes = {};
 
-    // Find description (text before the table)
+    // Parse ## Types section if present
+    const typeParser = new TypeParser();
+    localTypes = typeParser._parseTypesContent(
+        typeParser._extractTypesSection(fileContent) || '',
+        `entity:${className}`
+    );
+
+    // Find description (text before the table or ## section)
     let i = 1;
-    while (i < lines.length && !lines[i].startsWith('|')) {
+    while (i < lines.length && !lines[i].startsWith('|') && !lines[i].startsWith('## ')) {
         if (lines[i].trim()) {
             description = lines[i].trim();
         }
         i++;
     }
 
-    // Parse attribute table
+    // Find attribute table (may be after ## Types or ## Attributes section)
     let inTable = false;
     for (; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -99,9 +109,12 @@ function parseEntityFile(fileContent) {
                 // Parse table row: | name | type | description | example |
                 const parts = line.split('|').slice(1, -1).map(p => p.trim());
                 if (parts.length >= 3) {
+                    // Extract type name from markdown link if present
+                    const rawType = parts[1];
+                    const typeName = typeParser.extractTypeName(rawType);
                     attributes.push({
                         name: parts[0],
-                        type: parts[1],
+                        type: typeName,
                         description: parts[2]
                     });
                 }
@@ -112,7 +125,8 @@ function parseEntityFile(fileContent) {
     return {
         className,
         description,
-        attributes
+        attributes,
+        localTypes
     };
 }
 
@@ -122,6 +136,7 @@ function parseEntityFile(fileContent) {
  */
 function parseEntityDescriptions(mdContent, mdPath) {
     const classes = {};
+    const allLocalTypes = {};
 
     // Try to read from classes/ directory first
     if (mdPath) {
@@ -139,10 +154,17 @@ function parseEntityDescriptions(mdContent, mdPath) {
                         description: parsed.description,
                         attributes: parsed.attributes
                     };
+
+                    // Collect local types
+                    if (parsed.localTypes && Object.keys(parsed.localTypes).length > 0) {
+                        allLocalTypes[parsed.className] = parsed.localTypes;
+                    }
                 }
             }
 
             if (Object.keys(classes).length > 0) {
+                // Attach local types metadata
+                classes._localTypes = allLocalTypes;
                 return classes;
             }
         }
@@ -192,9 +214,13 @@ function parseEntityDescriptions(mdContent, mdPath) {
                     // Parse table row: | name | type | description |
                     const parts = line.split('|').slice(1, -1).map(p => p.trim());
                     if (parts.length >= 3) {
+                        // Extract type name from markdown link if present
+                        const typeParser = new TypeParser();
+                        const rawType = parts[1];
+                        const typeName = typeParser.extractTypeName(rawType);
                         attributes.push({
                             name: parts[0],
-                            type: parts[1],
+                            type: typeName,
                             description: parts[2]
                         });
                     }
@@ -255,10 +281,27 @@ function inferRelationships(classes) {
 }
 
 /**
+ * Parse global Types.md and register types
+ * @param {string} mdPath - Path to DataModel.md (Types.md is in same directory)
+ */
+function parseGlobalTypes(mdPath) {
+    const docsDir = path.dirname(mdPath);
+    const typesPath = path.join(docsDir, 'Types.md');
+
+    if (fs.existsSync(typesPath)) {
+        const typeParser = new TypeParser();
+        typeParser.parseGlobalTypes(typesPath);
+    }
+}
+
+/**
  * Parse DataModel.md and return structured data.
  */
 function parseDatamodel(mdPath) {
     const mdContent = fs.readFileSync(mdPath, 'utf-8');
+
+    // Parse global types first
+    parseGlobalTypes(mdPath);
 
     // Parse areas and class-to-area mapping
     const { areas, classToArea } = parseAreasFromTable(mdContent);
@@ -266,18 +309,31 @@ function parseDatamodel(mdPath) {
     // Parse entity descriptions (from classes/ directory or fallback to inline)
     const classes = parseEntityDescriptions(mdContent, mdPath);
 
+    // Extract local types metadata
+    const localTypes = classes._localTypes || {};
+    delete classes._localTypes;
+
     // Add area to each class
     for (const [className, classDef] of Object.entries(classes)) {
         classDef.area = classToArea[className] || 'unknown';
+
+        // Add local types if present
+        if (localTypes[className]) {
+            classDef.types = localTypes[className];
+        }
     }
 
     // Infer relationships
     const relationships = inferRelationships(classes);
 
+    // Get type registry for export
+    const typeRegistry = getTypeRegistry();
+
     return {
         areas: areas,
         classes: classes,
-        relationships: relationships
+        relationships: relationships,
+        globalTypes: typeRegistry.getGlobalTypes()
     };
 }
 
@@ -320,5 +376,6 @@ module.exports = {
     parseAreasFromTable,
     parseEntityDescriptions,
     parseEntityFile,
-    inferRelationships
+    inferRelationships,
+    parseGlobalTypes
 };
