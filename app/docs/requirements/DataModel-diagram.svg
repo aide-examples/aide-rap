@@ -90,12 +90,12 @@
     <text x="270" y="109" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Fleet</text>
   <rect x="420" y="560" width="140" height="30" fill="#FCE5CD" stroke="#333" stroke-width="1.5" rx="3"/>
     <text x="490" y="579" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">InspectionType</text>
+  <rect x="870" y="720" width="140" height="30" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
+    <text x="940" y="739" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MRO</text>
   <rect x="200" y="400" width="140" height="30" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
     <text x="270" y="419" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MaintenancePlan</text>
   <rect x="200" y="560" width="140" height="30" fill="#D6E4F0" stroke="#333" stroke-width="1.5" rx="3"/>
     <text x="270" y="579" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MaintenancePlanTask</text>
-  <rect x="870" y="720" width="140" height="30" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>
-    <text x="940" y="739" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MRO</text>
   <rect x="20" y="90" width="140" height="30" fill="#D9EAD3" stroke="#333" stroke-width="1.5" rx="3"/>
     <text x="90" y="109" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Operator</text>
   <rect x="870" y="400" width="140" height="30" fill="#E6D9F2" stroke="#333" stroke-width="1.5" rx="3"/>

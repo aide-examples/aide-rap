@@ -111,25 +111,21 @@ function decodeHtmlEntities(text) {
 }
 
 /**
- * Parse the Areas of Competence HTML table
+ * Parse the Areas from Entity Descriptions section
+ * Format: ### AreaName followed by <div style="background-color: #COLOR"> and entity table
  */
 function parseAreasFromTable(mdContent) {
   const areas = {};
   const classToArea = {};
 
-  const tableMatch = mdContent.match(/<table>[\s\S]*?<\/table>/);
-  if (!tableMatch) {
-    return { areas, classToArea };
-  }
-
-  const tableHtml = tableMatch[0];
-  const rowPattern = /<tr[^>]*style="background-color:\s*(#[0-9A-Fa-f]{6})[^"]*"[^>]*>[\s\S]*?<td><strong>([^<]+)<\/strong><\/td>\s*<td>([^<]+)<\/td>/g;
+  // Match ### AreaName followed by <div style="background-color: #COLOR"> and entity table
+  const areaPattern = /###\s+([^\n]+)\n<div[^>]*style="[^"]*background-color:\s*(#[0-9A-Fa-f]{6})[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
   let match;
 
-  while ((match = rowPattern.exec(tableHtml)) !== null) {
-    const color = match[1];
-    const areaName = decodeHtmlEntities(match[2].trim());
-    const classesStr = match[3].trim();
+  while ((match = areaPattern.exec(mdContent)) !== null) {
+    const areaName = match[1].trim();
+    const color = match[2];
+    const tableContent = match[3];
 
     const areaKey = areaName.toLowerCase().replace(/ /g, '_').replace(/&/g, 'and');
 
@@ -138,7 +134,11 @@ function parseAreasFromTable(mdContent) {
       color: color
     };
 
-    for (const className of classesStr.split(',').map(c => c.trim())) {
+    // Extract entity names from markdown links: [EntityName](classes/EntityName.md)
+    const entityPattern = /\[([^\]]+)\]\(classes\/[^)]+\.md\)/g;
+    let entityMatch;
+    while ((entityMatch = entityPattern.exec(tableContent)) !== null) {
+      const className = entityMatch[1].trim();
       classToArea[className] = areaKey;
     }
   }
@@ -147,12 +147,99 @@ function parseAreasFromTable(mdContent) {
 }
 
 /**
- * Extract classes and attributes from Entity Descriptions section
- * Now includes Example column for required detection
+ * Parse a single entity markdown file
+ * Format: # EntityName\n\nDescription\n\n| Attribute | Type | Description | Example |
  */
-function parseEntityDescriptions(mdContent) {
+function parseEntityFile(fileContent) {
+  const lines = fileContent.split('\n');
+
+  // First line should be # EntityName
+  const nameMatch = lines[0].match(/^#\s+(\w+)/);
+  if (!nameMatch) {
+    return null;
+  }
+
+  const className = nameMatch[1];
+  let description = '';
+  const attributes = [];
+
+  // Find description (text before the table)
+  let i = 1;
+  while (i < lines.length && !lines[i].startsWith('|')) {
+    if (lines[i].trim()) {
+      description = lines[i].trim();
+    }
+    i++;
+  }
+
+  // Parse attribute table (4 columns)
+  let inTable = false;
+  for (; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('|') && !line.includes('---')) {
+      if (line.includes('Attribute') && line.includes('Type')) {
+        inTable = true;
+        continue;
+      }
+      if (inTable) {
+        // Parse table row: | name | type | description | example |
+        const parts = line.split('|').slice(1, -1).map(p => p.trim());
+        if (parts.length >= 3) {
+          const attr = {
+            name: parts[0],
+            type: parts[1],
+            description: parts[2]
+          };
+          // Example column (4th) - null means optional
+          if (parts.length >= 4) {
+            attr.example = parts[3];
+          }
+          attributes.push(attr);
+        }
+      }
+    }
+  }
+
+  return {
+    className,
+    description,
+    attributes
+  };
+}
+
+/**
+ * Extract classes and attributes from classes/ directory
+ * Falls back to parsing Entity Descriptions section in DataModel.md for compatibility
+ */
+function parseEntityDescriptions(mdContent, mdPath) {
   const classes = {};
 
+  // Try to read from classes/ directory first
+  if (mdPath) {
+    const classesDir = path.join(path.dirname(mdPath), 'classes');
+    if (fs.existsSync(classesDir)) {
+      const entityFiles = fs.readdirSync(classesDir).filter(f => f.endsWith('.md'));
+
+      for (const file of entityFiles) {
+        const filePath = path.join(classesDir, file);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const parsed = parseEntityFile(content);
+
+        if (parsed) {
+          classes[parsed.className] = {
+            description: parsed.description,
+            attributes: parsed.attributes
+          };
+        }
+      }
+
+      if (Object.keys(classes).length > 0) {
+        return classes;
+      }
+    }
+  }
+
+  // Fallback: parse from Entity Descriptions section in DataModel.md
   const entityMatch = mdContent.match(/## Entity Descriptions\s*\n([\s\S]*?)(?=\n## |\Z|$)/);
   if (!entityMatch) {
     return {};
@@ -445,7 +532,7 @@ function generateSchema(mdPath, enabledEntities = null) {
 
   // Parse areas and classes
   const { areas, classToArea } = parseAreasFromTable(mdContent);
-  const classes = parseEntityDescriptions(mdContent);
+  const classes = parseEntityDescriptions(mdContent, mdPath);
 
   // Generate schema for each class
   const entities = {};
@@ -550,6 +637,7 @@ module.exports = {
   generateEntitySchema,
   generateExtendedSchema,
   parseEntityDescriptions,
+  parseEntityFile,
   parseAreasFromTable,
   parseUIAnnotations,
   buildDependencyOrder,

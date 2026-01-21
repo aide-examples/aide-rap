@@ -36,6 +36,13 @@
     await EntityExplorer.init();
     DetailPanel.init();
     ConfirmDialog.init();
+    SeedManager.init('modal-container');
+
+    // Tools menu opens Seed Manager
+    document.getElementById('menu-tools')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      SeedManager.open();
+    });
 
     console.log('AIDE IRMA initialized');
 

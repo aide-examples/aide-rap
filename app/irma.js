@@ -359,6 +359,78 @@ app.post('/api/regenerate-diagrams', async (req, res) => {
 });
 
 // =============================================================================
+// 7c. SEED DATA MANAGEMENT API
+// =============================================================================
+
+const SeedManager = require('./server/utils/SeedManager');
+
+// Get status of all entities (row counts, seed file availability)
+app.get('/api/seed/status', (req, res) => {
+    try {
+        const status = SeedManager.getStatus();
+        res.json(status);
+    } catch (e) {
+        console.error('Failed to get seed status:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Load seed data for a specific entity
+app.post('/api/seed/load/:entity', (req, res) => {
+    try {
+        const result = SeedManager.loadEntity(req.params.entity);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error(`Failed to load seed for ${req.params.entity}:`, e);
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// Clear data for a specific entity
+app.post('/api/seed/clear/:entity', (req, res) => {
+    try {
+        const result = SeedManager.clearEntity(req.params.entity);
+        res.json({ success: true, ...result });
+    } catch (e) {
+        console.error(`Failed to clear ${req.params.entity}:`, e);
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// Load all seed files
+app.post('/api/seed/load-all', (req, res) => {
+    try {
+        const results = SeedManager.loadAll();
+        res.json({ success: true, results });
+    } catch (e) {
+        console.error('Failed to load all seeds:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Clear all entity data
+app.post('/api/seed/clear-all', (req, res) => {
+    try {
+        const results = SeedManager.clearAll();
+        res.json({ success: true, results });
+    } catch (e) {
+        console.error('Failed to clear all:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Reset all: clear then load
+app.post('/api/seed/reset-all', (req, res) => {
+    try {
+        const results = SeedManager.resetAll();
+        res.json({ success: true, ...results });
+    } catch (e) {
+        console.error('Failed to reset all:', e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// =============================================================================
 // 8. START SERVER
 // =============================================================================
 
