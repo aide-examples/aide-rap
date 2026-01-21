@@ -55,13 +55,48 @@ const EntityTree = {
 
   /**
    * Load and display records for an entity type
+   * @param {string} entityName - Entity type name
+   * @param {Array} records - Array of records
+   * @param {Object} options - Optional settings
+   * @param {number} options.selectedId - ID of record to select and expand
+   * @param {boolean} options.expandOutboundFKs - Also expand outbound FK nodes (default: true when selectedId set)
    */
-  async loadEntity(entityName, records) {
+  async loadEntity(entityName, records, options = {}) {
     this.currentEntity = entityName;
     this.records = records;
     this.expandedNodes.clear();
     this.selectedNodeId = null;
+
+    // If a selectedId is provided, pre-expand the node and its outbound FKs
+    if (options.selectedId) {
+      const nodeId = `${entityName}-${options.selectedId}`;
+      this.selectedNodeId = nodeId;
+      this.expandedNodes.add(nodeId);
+
+      // Pre-calculate outbound FK node IDs to expand
+      if (options.expandOutboundFKs !== false) {
+        const record = records.find(r => r.id === options.selectedId);
+        if (record) {
+          const schema = await SchemaCache.getExtended(entityName);
+          for (const col of schema.columns) {
+            if (col.foreignKey && record[col.name]) {
+              const fkNodeId = `fk-${col.foreignKey.entity}-${record[col.name]}-from-${record.id}`;
+              this.expandedNodes.add(fkNodeId);
+            }
+          }
+        }
+      }
+    }
+
     await this.render();
+
+    // Scroll to selected node if exists
+    if (options.selectedId) {
+      const selectedNode = this.container.querySelector(`[data-node-id="${this.selectedNodeId}"]`);
+      if (selectedNode) {
+        selectedNode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
   },
 
   /**
@@ -95,13 +130,14 @@ const EntityTree = {
     const isExpanded = this.expandedNodes.has(nodeId);
     const isSelected = this.selectedNodeId === nodeId;
     const label = this.getRecordLabel(record, schema);
+    const areaColor = schema.areaColor || '#f5f5f5';
 
     let html = `
       <div class="tree-node root-node ${isExpanded ? 'expanded' : ''} ${isSelected ? 'selected' : ''}"
            data-node-id="${nodeId}"
            data-entity="${entityName}"
            data-record-id="${record.id}">
-        <div class="tree-node-header" data-action="toggle">
+        <div class="tree-node-header" data-action="toggle" style="background-color: ${areaColor};">
           <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
           <span class="tree-node-label">${this.escapeHtml(label.title)}</span>
           ${label.subtitle ? `<span class="tree-node-subtitle">${this.escapeHtml(label.subtitle)}</span>` : ''}
@@ -233,12 +269,14 @@ const EntityTree = {
     const nodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${parentRecord.id}`;
     const isExpanded = this.expandedNodes.has(nodeId);
 
-    // Get a label for the referenced record (title + subtitle)
+    // Get a label and area color for the referenced record
     let refLabel = `#${fkId}`;
+    let areaColor = '#f5f5f5';
     try {
       const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
       const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
       refLabel = this.getFullLabel(refRecord, refSchema);
+      areaColor = refSchema.areaColor || '#f5f5f5';
     } catch (e) {
       // Fall back to just the ID
     }
@@ -248,7 +286,7 @@ const EntityTree = {
            data-node-id="${nodeId}"
            data-entity="${col.foreignKey.entity}"
            data-record-id="${fkId}">
-        <div class="tree-fk-header" data-action="toggle-fk">
+        <div class="tree-fk-header" data-action="toggle-fk" style="background-color: ${areaColor};">
           <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
           <span class="attr-name">${col.name}:</span>
           <span class="fk-label">${this.escapeHtml(refLabel)}</span>
@@ -329,13 +367,17 @@ const EntityTree = {
       const nodeId = `backref-${ref.entity}-to-${entityName}-${recordId}`;
       const isExpanded = this.expandedNodes.has(nodeId);
 
-      // Get count of referencing records
+      // Get count of referencing records and area color
       let count = 0;
+      let areaColor = '#f5f5f5';
       try {
         const references = await ApiClient.getBackReferences(entityName, recordId);
         if (references[ref.entity]) {
           count = references[ref.entity].count;
         }
+        // Get area color from the referencing entity's schema
+        const refSchema = await SchemaCache.getExtended(ref.entity);
+        areaColor = refSchema.areaColor || '#f5f5f5';
       } catch (e) {
         // Ignore errors
       }
@@ -349,7 +391,7 @@ const EntityTree = {
              data-ref-column="${ref.column}"
              data-parent-entity="${entityName}"
              data-parent-id="${recordId}">
-          <div class="tree-backref-header" data-action="toggle-backref">
+          <div class="tree-backref-header" data-action="toggle-backref" style="background-color: ${areaColor};">
             <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
             <span class="backref-label">${ref.entity} [${count}]</span>
           </div>

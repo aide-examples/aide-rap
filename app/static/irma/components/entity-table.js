@@ -406,6 +406,10 @@ const EntityTable = {
   onRowClick(id) {
     const previousId = this.selectedId;
     this.selectedId = id;
+
+    // Sync with EntityExplorer so tree view knows which record is selected
+    EntityExplorer.selectedId = id;
+
     const record = this.records.find(r => r.id === id);
     if (record) {
       DetailPanel.showRecord(this.currentEntity, record);

@@ -270,7 +270,9 @@ const EntityExplorer = {
       return;
     }
 
-    await EntityTree.loadEntity(this.currentEntity, this.records);
+    // Pass selectedId to auto-expand the selected record and its outbound FKs
+    const options = this.selectedId ? { selectedId: this.selectedId } : {};
+    await EntityTree.loadEntity(this.currentEntity, this.records, options);
   },
 
   getLabelFields(schema) {

@@ -438,10 +438,17 @@ function getExtendedSchemaInfo(entityName) {
   // Get back-references (entities that reference this one)
   const inverseRels = schema.inverseRelationships[entityName] || [];
 
+  // Get area info with color
+  const areaKey = entity.area || 'unknown';
+  const areaInfo = schema.areas[areaKey] || { name: 'Unknown', color: '#f5f5f5' };
+
   return {
     entityName: entity.className,
     tableName: entity.tableName,
     description: entity.description,
+    area: areaKey,
+    areaName: areaInfo.name,
+    areaColor: areaInfo.color,
     columns: entity.columns.map(col => {
       const colInfo = {
         name: col.name,
