@@ -226,10 +226,18 @@ class TypeRegistry {
     }
 
     if (type.kind === 'pattern') {
-      return {
+      const rules = {
         type: 'string',
         pattern: type.pattern
       };
+      // Include description and example for better error messages
+      if (type.description) {
+        rules.patternDescription = type.description;
+      }
+      if (type.example) {
+        rules.patternExample = type.example;
+      }
+      return rules;
     }
 
     if (type.kind === 'enum') {

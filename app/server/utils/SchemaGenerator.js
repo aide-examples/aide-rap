@@ -13,6 +13,17 @@ const path = require('path');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const { TypeParser } = require('../../shared/types/TypeParser');
 
+// Shared TypeParser instance for extracting type names from markdown links
+const typeParserInstance = new TypeParser();
+
+/**
+ * Extract type name from potential markdown link
+ * e.g., "[TailSign](../Types.md#tailsign)" -> "TailSign"
+ */
+function extractTypeName(typeStr) {
+  return typeParserInstance.extractTypeName(typeStr);
+}
+
 /**
  * Built-in type mapping from DataModel.md to SQLite and JS
  * Custom types from TypeRegistry take precedence
@@ -191,7 +202,7 @@ function parseEntityFile(fileContent) {
         if (parts.length >= 3) {
           const attr = {
             name: parts[0],
-            type: parts[1],
+            type: extractTypeName(parts[1]),
             description: parts[2]
           };
           // Example column (4th) - null means optional
@@ -288,7 +299,7 @@ function parseEntityDescriptions(mdContent, mdPath) {
           if (parts.length >= 3) {
             const attr = {
               name: parts[0],
-              type: parts[1],
+              type: extractTypeName(parts[1]),
               description: parts[2]
             };
             // Example column (4th) - null means optional

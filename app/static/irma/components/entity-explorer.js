@@ -346,7 +346,11 @@ const EntityExplorer = {
   },
 
   updateSelection() {
-    this.list.querySelectorAll('.entity-row').forEach(row => {
+    // Update selection in both views
+    const container = this.viewMode === 'table' ? this.tableContainer : this.treeContainer;
+    if (!container) return;
+
+    container.querySelectorAll('.entity-row, .tree-item').forEach(row => {
       const rowId = parseInt(row.dataset.id);
       row.classList.toggle('selected', rowId === this.selectedId);
     });

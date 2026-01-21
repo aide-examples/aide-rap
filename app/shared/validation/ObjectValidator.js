@@ -214,14 +214,15 @@ class ObjectValidator {
     }
 
     // All other validations (with trimmed value)
-    const skipRules = ['required', 'default', 'trim', 'transform', 'message'];
+    const skipRules = ['required', 'default', 'trim', 'transform', 'message', 'patternDescription', 'patternExample'];
 
     for (const [ruleName, ruleValue] of Object.entries(fieldRules)) {
       if (skipRules.includes(ruleName)) continue;
 
       const validator = this.validators[ruleName];
       if (validator) {
-        const error = validator(fieldName, workingValue, ruleValue);
+        // Pass fieldRules as 4th parameter for validators that need additional context
+        const error = validator(fieldName, workingValue, ruleValue, fieldRules);
         if (error) errors.push(error);
       }
     }
@@ -325,16 +326,34 @@ class ObjectValidator {
     return null;
   }
 
-  _validatePattern(fieldName, value, pattern) {
+  _validatePattern(fieldName, value, pattern, fieldRules = {}) {
     if (typeof value !== 'string') return null;
 
     const regex = new RegExp(pattern);
     if (!regex.test(value)) {
+      // Build informative error message using pattern metadata if available
+      let message;
+      const description = fieldRules.patternDescription;
+      const example = fieldRules.patternExample;
+
+      if (description) {
+        // Description already includes example info, just use it
+        message = `${fieldName}: ${description}`;
+      } else if (example) {
+        message = `${fieldName} must match format: ${example}`;
+      } else {
+        message = `Field "${fieldName}" has an invalid format`;
+      }
+
       return {
         field: fieldName,
         code: 'PATTERN_MISMATCH',
-        message: `Field "${fieldName}" has an invalid format`,
-        value
+        message,
+        value,
+        // Include metadata for client-side formatting if needed
+        pattern,
+        example,
+        description
       };
     }
 
