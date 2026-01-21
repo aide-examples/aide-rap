@@ -162,8 +162,25 @@ function parseAreasFromTable(mdContent) {
 }
 
 /**
+ * Extract [DEFAULT=x] annotation from type string
+ * e.g., "MaintenanceCategory [DEFAULT=A]" -> { type: "MaintenanceCategory", default: "A" }
+ * e.g., "int" -> { type: "int", default: null }
+ */
+function extractDefaultAnnotation(typeStr) {
+  const defaultMatch = typeStr.match(/\[DEFAULT=([^\]]+)\]/i);
+  if (defaultMatch) {
+    const cleanType = typeStr.replace(/\s*\[DEFAULT=[^\]]+\]/i, '').trim();
+    return { type: cleanType, default: defaultMatch[1].trim() };
+  }
+  return { type: typeStr, default: null };
+}
+
+/**
  * Parse a single entity markdown file
- * Format: # EntityName\n\nDescription\n\n| Attribute | Type | Description | Example |
+ * Format: | Attribute | Type | Description | Example |
+ *
+ * The Type column can include a [DEFAULT=x] annotation:
+ *   | maintenance_category | MaintenanceCategory [DEFAULT=A] | Current category | B |
  */
 function parseEntityFile(fileContent) {
   const lines = fileContent.split('\n');
@@ -178,39 +195,69 @@ function parseEntityFile(fileContent) {
   let description = '';
   const attributes = [];
 
-  // Find description (text before the table)
+  // Parse entity-local types and register them
+  const typesSection = typeParserInstance._extractTypesSection(fileContent);
+  if (typesSection) {
+    const localTypes = typeParserInstance._parseTypesContent(typesSection, `entity:${className}`);
+    // Types are automatically registered in TypeRegistry by _parseTypesContent
+  }
+
+  // Find description (text before the first ## section or table)
   let i = 1;
-  while (i < lines.length && !lines[i].startsWith('|')) {
+  while (i < lines.length && !lines[i].startsWith('|') && !lines[i].startsWith('## ')) {
     if (lines[i].trim()) {
       description = lines[i].trim();
     }
     i++;
   }
 
-  // Parse attribute table (4 columns)
+  // Find the Attributes table - could be directly after description or after ## Attributes
+  let inAttributeSection = false;
   let inTable = false;
+
   for (; i < lines.length; i++) {
     const line = lines[i].trim();
-    if (line.startsWith('|') && !line.includes('---')) {
-      if (line.includes('Attribute') && line.includes('Type')) {
-        inTable = true;
-        continue;
-      }
-      if (inTable) {
-        // Parse table row: | name | type | description | example |
-        const parts = line.split('|').slice(1, -1).map(p => p.trim());
-        if (parts.length >= 3) {
-          const attr = {
-            name: parts[0],
-            type: extractTypeName(parts[1]),
-            description: parts[2]
-          };
-          // Example column (4th) - null means optional
-          if (parts.length >= 4) {
-            attr.example = parts[3];
-          }
-          attributes.push(attr);
+
+    // Track which section we're in
+    if (line === '## Attributes') {
+      inAttributeSection = true;
+      continue;
+    }
+    if (line.startsWith('## ') && line !== '## Attributes') {
+      // Another section - if we were in Attributes, we're done
+      if (inAttributeSection || inTable) break;
+      continue;
+    }
+
+    // Look for attribute table header
+    if (line.startsWith('|') && line.includes('Attribute') && line.includes('Type')) {
+      inTable = true;
+      continue;
+    }
+
+    // Skip separator line
+    if (line.startsWith('|') && line.includes('---')) {
+      continue;
+    }
+
+    // Parse data rows: | Attribute | Type | Description | Example |
+    if (inTable && line.startsWith('|')) {
+      const parts = line.split('|').slice(1, -1).map(p => p.trim());
+
+      if (parts.length >= 3) {
+        // Extract type name and [DEFAULT=x] annotation from Type column
+        const typeWithDefault = extractDefaultAnnotation(parts[1]);
+
+        const attr = {
+          name: parts[0],
+          type: extractTypeName(typeWithDefault.type),
+          explicitDefault: typeWithDefault.default,
+          description: parts[2]
+        };
+        if (parts.length >= 4) {
+          attr.example = parts[3];
         }
+        attributes.push(attr);
       }
     }
   }
@@ -322,6 +369,98 @@ function parseEntityDescriptions(mdContent, mdPath) {
 }
 
 /**
+ * Parse a default value string to the appropriate JS type
+ */
+function parseDefaultValue(value, jsType) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  switch (jsType) {
+    case 'number':
+      const num = parseInt(value, 10);
+      return isNaN(num) ? null : num;
+    case 'boolean':
+      return value === 'true' || value === '1' ? 1 : 0;
+    default:
+      return String(value);
+  }
+}
+
+/**
+ * Map external enum value to internal value
+ * e.g., "Line" -> "A", "Open" -> 1
+ */
+function mapExternalToInternal(externalValue, typeDef) {
+  if (!typeDef?.kind === 'enum' || !typeDef.values) {
+    return externalValue;
+  }
+
+  // Try to find matching external value (case-insensitive)
+  const match = typeDef.values.find(v =>
+    String(v.external).toLowerCase() === String(externalValue).toLowerCase()
+  );
+
+  if (match) {
+    return match.internal;
+  }
+
+  // If no match, check if it's already an internal value
+  const internalMatch = typeDef.values.find(v =>
+    String(v.internal).toLowerCase() === String(externalValue).toLowerCase()
+  );
+
+  return internalMatch ? internalMatch.internal : externalValue;
+}
+
+/**
+ * Get default value for a column based on:
+ * 1. Explicit default from markdown (highest priority) - uses EXTERNAL enum representation
+ * 2. Type-specific default (enum: first value, pattern: example)
+ * 3. Built-in type default (number: 0, string: '', date: CURRENT_DATE)
+ *
+ * @param {Object} attr - Attribute definition with explicitDefault
+ * @param {string} jsType - JavaScript type (number, string, boolean)
+ * @param {Object} typeDef - Type definition from TypeRegistry (or null)
+ * @returns {*} - Default value or null
+ */
+function getDefaultValue(attr, jsType, typeDef) {
+  // 1. Explicit default from markdown [DEFAULT=x] annotation
+  if (attr.explicitDefault !== null && attr.explicitDefault !== '') {
+    // For enums, map external value to internal
+    if (typeDef?.kind === 'enum') {
+      return mapExternalToInternal(attr.explicitDefault, typeDef);
+    }
+    return parseDefaultValue(attr.explicitDefault, jsType);
+  }
+
+  // 2. Type-specific defaults
+  if (typeDef?.kind === 'enum' && typeDef.values?.length > 0) {
+    return typeDef.values[0].internal; // First enum value
+  }
+
+  if (typeDef?.kind === 'pattern') {
+    return typeDef.example || ''; // Use type example or empty
+  }
+
+  // 3. Built-in type defaults
+  switch (jsType) {
+    case 'number':
+      return 0;
+    case 'boolean':
+      return 0;
+    case 'string':
+      // Date fields get SQLite's CURRENT_DATE function
+      if (attr.name && attr.name.toLowerCase().includes('date')) {
+        return 'CURRENT_DATE';
+      }
+      return '';
+    default:
+      return null;
+  }
+}
+
+/**
  * Get type info from TypeRegistry or fall back to TYPE_MAP
  * @param {string} typeName - Type name from attribute definition
  * @param {string} entityName - Entity name for local type resolution
@@ -425,13 +564,20 @@ function generateEntitySchema(className, classDef) {
     // Parse UI annotations
     const uiAnnotations = parseUIAnnotations(desc);
 
+    // Calculate default value (skip for id and foreign keys)
+    let defaultValue = null;
+    if (name !== 'id' && !foreignKey) {
+      defaultValue = getDefaultValue(attr, typeInfo.jsType, typeInfo.typeDef);
+    }
+
     // Build column definition
     const column = {
       name,
       sqlType,
       jsType: typeInfo.jsType,
       required: isRequired,
-      customType: typeInfo.isCustomType ? attrType : null
+      customType: typeInfo.isCustomType ? attrType : null,
+      defaultValue
     };
 
     if (foreignKey) {
@@ -727,6 +873,7 @@ module.exports = {
   buildDependencyOrder,
   initializeTypeRegistry,
   getTypeInfo,
+  getDefaultValue,
   toSnakeCase,
   TYPE_MAP
 };

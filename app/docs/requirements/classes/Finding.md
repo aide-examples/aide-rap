@@ -30,7 +30,7 @@ Discrepancy or defect discovered during task execution, requiring disposition.
 | task_id | int | Reference to Task | 8001 |
 | finding_number | string | Finding number [LABEL] | F-2024-0042 |
 | description | string | Finding description [LABEL2] | Crack in HPT blade |
-| severity | FindingSeverity | Severity level [DETAIL] | 2 |
-| status | FindingStatus | Finding status [DETAIL] | 1 |
+| severity | FindingSeverity [DEFAULT=Minor] | Severity level [DETAIL] | 2 |
+| status | FindingStatus [DEFAULT=Open] | Finding status [DETAIL] | 2 |
 | reported_date | date | Date reported | 2024-03-15 |
 | resolved_date | date | Date resolved | null |

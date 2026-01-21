@@ -13,7 +13,9 @@ const EntityForm = {
     this.currentRecord = record;
     this.isDirty = false;
 
-    const schema = await SchemaCache.get(entityName);
+    // Use extended schema to get enumValues
+    const schema = await SchemaCache.getExtended(entityName);
+    this.currentSchema = schema; // Store for getFormData
     const isEdit = record !== null;
 
     // Store original data for dirty checking
@@ -25,7 +27,18 @@ const EntityForm = {
       // Skip id field for create, show as readonly for edit
       if (col.name === 'id' && !isEdit) continue;
 
-      const value = record ? record[col.name] : '';
+      // For NEW: use defaultValue from schema (if available), otherwise empty
+      // For EDIT: use record value
+      let value;
+      if (record) {
+        value = record[col.name];
+      } else {
+        // NEW mode: use default value (skip CURRENT_DATE as it's SQL-specific)
+        value = (col.defaultValue !== undefined && col.defaultValue !== 'CURRENT_DATE')
+          ? col.defaultValue
+          : '';
+      }
+
       const isRequired = col.required;
       const isReadonly = col.name === 'id';
       const inputType = this.getInputType(col);
@@ -75,6 +88,26 @@ const EntityForm = {
   renderInput(col, value, isReadonly, inputType) {
     const disabled = isReadonly ? 'disabled' : '';
     const displayValue = value !== null && value !== undefined ? value : '';
+
+    // Enum fields: render as dropdown
+    if (col.enumValues && col.enumValues.length > 0) {
+      let options = '<option value="">-- Select --</option>';
+      for (const opt of col.enumValues) {
+        // Support both formats: { value, label } and { internal, external }
+        const value = opt.value !== undefined ? opt.value : opt.internal;
+        const label = opt.label !== undefined ? opt.label : opt.external;
+        const selected = String(value) === String(displayValue) ? 'selected' : '';
+        options += `<option value="${value}" ${selected}>${label}</option>`;
+      }
+      return `
+        <select class="form-input"
+                id="field-${col.name}"
+                name="${col.name}"
+                ${disabled}>
+          ${options}
+        </select>
+      `;
+    }
 
     if (col.foreignKey) {
       // For now, just use a number input for FK fields
@@ -131,15 +164,36 @@ const EntityForm = {
     const formData = new FormData(form);
     const data = {};
 
+    // Build a map of column info for type conversion
+    const colMap = {};
+    if (this.currentSchema) {
+      for (const col of this.currentSchema.columns) {
+        colMap[col.name] = col;
+      }
+    }
+
     formData.forEach((value, key) => {
       if (key === 'id') return; // Skip id
 
-      // Convert types
+      const col = colMap[key];
       const input = form.querySelector(`[name="${key}"]`);
-      if (input.type === 'number' && value !== '') {
-        data[key] = parseInt(value, 10);
-      } else if (value === '') {
+
+      if (value === '') {
         data[key] = null;
+      } else if (input.type === 'number') {
+        data[key] = parseInt(value, 10);
+      } else if (col && col.enumValues && col.enumValues.length > 0) {
+        // Enum field: check if values are numeric
+        // Support both formats: { value } and { internal }
+        const firstOpt = col.enumValues[0];
+        const firstValue = firstOpt.value !== undefined ? firstOpt.value : firstOpt.internal;
+        if (typeof firstValue === 'number') {
+          data[key] = parseInt(value, 10);
+        } else {
+          data[key] = value;
+        }
+      } else if (col && col.type === 'number') {
+        data[key] = parseInt(value, 10);
       } else {
         data[key] = value;
       }

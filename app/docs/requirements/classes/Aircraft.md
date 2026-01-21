@@ -2,6 +2,18 @@
 
 Individual aircraft identified by registration and serial number.
 
+## Types
+
+### MaintenanceCategory
+
+| Internal | External | Description |
+|----------|----------|-------------|
+| A | Line | Line maintenance (quick checks) |
+| B | Base | Base maintenance (hangar required) |
+| C | Heavy | Heavy maintenance (extended downtime) |
+
+## Attributes
+
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
 | id | int | Primary key [READONLY] | 1001 |
@@ -12,3 +24,4 @@ Individual aircraft identified by registration and serial number.
 | total_flight_hours | int | Accumulated flight hours | 45230 |
 | total_cycles | int | Accumulated cycles | 18500 |
 | status | [OperationalStatus](../Types.md#operationalstatus) | Operational status | 1 |
+| maintenance_category | MaintenanceCategory [DEFAULT=Line] | Current maintenance category | B |

@@ -192,8 +192,10 @@ const EntityTable = {
             <span class="fk-loading">#${value}</span>
           </td>`;
         } else {
-          // Regular value
-          const displayValue = value != null ? this.escapeHtml(String(value)) : '<em class="null-value">null</em>';
+          // Regular value - use ValueFormatter to convert enum internal->external
+          const displayValue = value != null
+            ? this.escapeHtml(ValueFormatter.format(value, col.name, this.schema))
+            : '<em class="null-value">null</em>';
           html += `<td>${displayValue}</td>`;
         }
       }

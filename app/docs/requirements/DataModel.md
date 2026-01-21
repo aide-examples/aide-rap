@@ -100,6 +100,35 @@ Attribute descriptions can include special tags in square brackets `[TAG]` to co
 | `[INDEX]` | Single field index | Creates index on column |
 | `[IX1]`, `[IX2]`, ... | Composite index | Fields with same IXn form a composite index |
 
+### Type Annotations
+
+Type annotations are placed in the **Type column** after the type name.
+
+| Tag | Description | Effect |
+|-----|-------------|--------|
+| `[DEFAULT=x]` | Explicit default value | Used for migration (ALTER TABLE) and NEW forms |
+
+**Hierarchical Default System:**
+
+1. **Explicit default** `[DEFAULT=x]` - highest priority
+2. **Type-specific default** - Enum: first value, Pattern: example from Types.md
+3. **Built-in type default** - `int`: 0, `string`: '', `date`: CURRENT_DATE, `boolean`: false
+
+**When to use `[DEFAULT=x]`:**
+
+Only specify `[DEFAULT=x]` if you need a value **different** from the automatic type default. For example:
+- An enum field where the default should NOT be the first value
+- A string field that should have a specific non-empty default
+
+**For Enum types, use the EXTERNAL representation:**
+
+```
+| maintenance_category | MaintenanceCategory [DEFAULT=Line] | Current category | B |
+| status | FindingStatus [DEFAULT=Open] | Finding status | 2 |
+```
+
+The external value (e.g., "Line", "Open") is automatically mapped to the internal value (e.g., "A", 1) during processing. This makes the markdown more readable.
+
 ### UI Display Annotations
 
 | Tag | Description | Tree View Behavior |

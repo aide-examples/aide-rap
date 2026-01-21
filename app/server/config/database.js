@@ -34,7 +34,34 @@ function tableExists(tableName) {
 }
 
 /**
+ * Format a default value for SQL
+ * @param {*} value - The default value
+ * @returns {string} - SQL-formatted default clause or empty string
+ */
+function formatDefaultClause(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  // SQLite function (e.g., CURRENT_DATE)
+  if (value === 'CURRENT_DATE' || value === 'CURRENT_TIMESTAMP') {
+    return ` DEFAULT ${value}`;
+  }
+
+  // String values need quotes
+  if (typeof value === 'string') {
+    // Escape single quotes
+    const escaped = value.replace(/'/g, "''");
+    return ` DEFAULT '${escaped}'`;
+  }
+
+  // Numbers and booleans
+  return ` DEFAULT ${value}`;
+}
+
+/**
  * Migrate schema - add new columns if needed
+ * Now includes default values for new columns
  */
 function migrateSchema(entity) {
   const tableName = entity.tableName;
@@ -55,9 +82,23 @@ function migrateSchema(entity) {
       let sqlType = col.sqlType.replace(' NOT NULL', '').replace(' PRIMARY KEY', '');
       if (col.name === 'id') continue; // Can't add id column
 
+      // Build default clause from column's defaultValue
+      const defaultClause = formatDefaultClause(col.defaultValue);
+
       try {
-        db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${col.name} ${sqlType}`).run();
-        logger.info(`Added column ${col.name} to ${tableName}`);
+        db.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${col.name} ${sqlType}${defaultClause}`).run();
+        logger.info(`Added column ${col.name} to ${tableName}${defaultClause ? ` with default` : ''}`);
+
+        // SQLite's ALTER TABLE ADD COLUMN with DEFAULT only affects NEW rows.
+        // We need to UPDATE existing rows to have the default value.
+        if (col.defaultValue !== null && col.defaultValue !== undefined && col.defaultValue !== 'CURRENT_DATE') {
+          const updateValue = typeof col.defaultValue === 'string'
+            ? `'${col.defaultValue.replace(/'/g, "''")}'`
+            : col.defaultValue;
+          db.prepare(`UPDATE ${tableName} SET ${col.name} = ${updateValue} WHERE ${col.name} IS NULL`).run();
+          logger.debug(`Set default value for existing rows in ${tableName}.${col.name}`);
+        }
+
         migrated = true;
       } catch (err) {
         logger.error(`Failed to add column ${col.name} to ${tableName}`, { error: err.message });

@@ -158,7 +158,7 @@ const EntityTree = {
         html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
       }
       for (const col of regularCols) {
-        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name));
+        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
       }
     } else if (this.referencePosition === 'inline') {
       // Mixed: regular attrs, then FKs inline, then back-refs at end
@@ -167,7 +167,7 @@ const EntityTree = {
         if (col.foreignKey) {
           html += await this.renderForeignKeyNode(col, value, record, isHoverField(col.name));
         } else {
-          html += this.renderAttribute(col.name, value, isHoverField(col.name));
+          html += this.renderAttribute(col.name, value, isHoverField(col.name), schema);
         }
       }
       if (hasBackRefs) {
@@ -176,7 +176,7 @@ const EntityTree = {
     } else {
       // 'end' (default): regular attributes first, then FKs, then back-refs
       for (const col of regularCols) {
-        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name));
+        html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
       }
       for (const col of fkCols) {
         html += await this.renderForeignKeyNode(col, record[col.name], record, isHoverField(col.name));
@@ -192,15 +192,25 @@ const EntityTree = {
 
   /**
    * Render a regular attribute
+   * Uses ValueFormatter to convert enum internal->external values
    */
-  renderAttribute(name, value, isHover = false) {
-    const displayValue = value !== null && value !== undefined ? value : '<em>null</em>';
+  renderAttribute(name, value, isHover = false, schema = null) {
+    let displayValue;
+    if (value === null || value === undefined) {
+      displayValue = '<em>null</em>';
+    } else if (schema) {
+      // Use ValueFormatter for enum conversion
+      displayValue = this.escapeHtml(ValueFormatter.format(value, name, schema));
+    } else {
+      displayValue = this.escapeHtml(String(value));
+    }
+
     const className = isHover ? 'tree-attribute hover-field' : 'tree-attribute';
 
     return `
       <div class="${className}">
         <span class="attr-name">${name}:</span>
-        <span class="attr-value">${this.escapeHtml(String(displayValue))}</span>
+        <span class="attr-value">${displayValue}</span>
       </div>
     `;
   },
@@ -274,7 +284,7 @@ const EntityTree = {
           html += await this.renderNestedForeignKey(col, value);
         } else {
           const isHover = schema.ui?.hoverFields?.includes(col.name);
-          html += this.renderAttribute(col.name, value, isHover);
+          html += this.renderAttribute(col.name, value, isHover, schema);
         }
       }
 

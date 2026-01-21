@@ -139,3 +139,75 @@ const SchemaCache = {
     this.extendedCache = {};
   },
 };
+
+/**
+ * ValueFormatter - Format values for UI display
+ * Handles enum internal->external conversion
+ */
+const ValueFormatter = {
+  /**
+   * Format a value for display based on column definition
+   * For enum fields, converts internal value to external representation
+   *
+   * @param {*} value - The raw value from the database
+   * @param {string} columnName - The column name
+   * @param {Object} schema - The entity schema (must have enumFields)
+   * @returns {string} - Formatted display value
+   */
+  format(value, columnName, schema) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    // Check if this is an enum field
+    const enumDef = schema.enumFields?.[columnName];
+    if (enumDef && enumDef.values) {
+      // Find matching enum value by internal value
+      const match = enumDef.values.find(v =>
+        String(v.internal) === String(value)
+      );
+      if (match) {
+        return match.external;
+      }
+    }
+
+    return String(value);
+  },
+
+  /**
+   * Format a value for display, returning null display text for null values
+   *
+   * @param {*} value - The raw value
+   * @param {string} columnName - The column name
+   * @param {Object} schema - The entity schema
+   * @returns {string} - Formatted display value or '<em>null</em>' for null
+   */
+  formatWithNull(value, columnName, schema) {
+    if (value === null || value === undefined) {
+      return '<em class="null-value">null</em>';
+    }
+    return this.format(value, columnName, schema);
+  },
+
+  /**
+   * Check if a column is an enum field
+   *
+   * @param {string} columnName - The column name
+   * @param {Object} schema - The entity schema
+   * @returns {boolean}
+   */
+  isEnumField(columnName, schema) {
+    return !!schema.enumFields?.[columnName];
+  },
+
+  /**
+   * Get enum values for a column (for dropdowns etc.)
+   *
+   * @param {string} columnName - The column name
+   * @param {Object} schema - The entity schema
+   * @returns {Array|null} - Array of {internal, external, description} or null
+   */
+  getEnumValues(columnName, schema) {
+    return schema.enumFields?.[columnName]?.values || null;
+  }
+};

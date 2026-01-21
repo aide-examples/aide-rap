@@ -67,18 +67,25 @@ const DetailPanel = {
   async showRecord(entityName, record) {
     this.setTitle(`${entityName} #${record.id}`);
 
-    const schema = await SchemaCache.get(entityName);
+    // Use extended schema for enum value formatting
+    const schema = await SchemaCache.getExtended(entityName);
 
     let html = '<div class="record-details">';
 
     for (const col of schema.columns) {
       const value = record[col.name];
-      const displayValue = value !== null && value !== undefined ? value : '<em>null</em>';
+      let displayValue;
+      if (value === null || value === undefined) {
+        displayValue = '<em>null</em>';
+      } else {
+        // Use ValueFormatter to convert enum internal->external
+        displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+      }
 
       html += `
         <div class="detail-row">
           <span class="detail-label">${col.name}</span>
-          <span class="detail-value">${this.escapeHtml(String(displayValue))}</span>
+          <span class="detail-value">${displayValue}</span>
         </div>
       `;
     }

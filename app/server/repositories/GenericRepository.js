@@ -477,7 +477,9 @@ function getExtendedSchemaInfo(entityName) {
       entity: rel.entity,
       column: rel.column
     })),
-    validationRules: entity.validationRules
+    validationRules: entity.validationRules,
+    // Include enumFields for client-side value formatting
+    enumFields: entity.enumFields || {}
   };
 }
 
