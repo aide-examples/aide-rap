@@ -74,6 +74,7 @@ const SeedManager = {
           <td class="seed-count imported ${this.activeSource === 'imported' ? 'active' : ''}">${hasImported ? e.importedCount : '--'}</td>
           <td class="seed-count generated ${this.activeSource === 'generated' ? 'active' : ''}">${hasGenerated ? e.generatedCount : '--'}</td>
           <td class="actions">
+            <button class="btn-seed btn-generate" data-entity="${e.name}" title="Generate with AI">AI</button>
             ${hasActive ? `<button class="btn-seed btn-load" data-entity="${e.name}">Load</button>` : ''}
             <button class="btn-seed btn-clear" data-entity="${e.name}" ${e.rowCount === 0 ? 'disabled' : ''}>Clear</button>
             ${hasImported ? `<button class="btn-seed btn-copy" data-entity="${e.name}" title="Copy to Generated">→G</button>` : ''}
@@ -151,6 +152,14 @@ const SeedManager = {
 
     // Copy all to generated
     this.container.querySelector('.btn-copy-all')?.addEventListener('click', () => this.copyAllToGenerated());
+
+    // Generate with AI
+    this.container.querySelectorAll('.btn-generate').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const entity = e.target.dataset.entity;
+        await this.openGenerator(entity);
+      });
+    });
 
     // Load single entity
     this.container.querySelectorAll('.btn-load').forEach(btn => {
@@ -426,6 +435,19 @@ const SeedManager = {
       }
     } catch (err) {
       this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Open the AI generator dialog for an entity
+   */
+  async openGenerator(entityName) {
+    // Initialize generator dialog if needed
+    if (typeof SeedGeneratorDialog !== 'undefined') {
+      SeedGeneratorDialog.init('modal-container');
+      await SeedGeneratorDialog.open(entityName);
+    } else {
+      this.showMessage('Generator dialog not loaded', true);
     }
   }
 };

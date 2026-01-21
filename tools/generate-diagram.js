@@ -25,6 +25,13 @@ function escapeXml(text) {
 }
 
 /**
+ * Remove type annotations like [DEFAULT=x] from type string for display.
+ */
+function cleanTypeForDisplay(typeStr) {
+    return typeStr.replace(/\s*\[[^\]]+\]/g, '').trim();
+}
+
+/**
  * Generates SVG class diagrams from YAML model and JSON layout.
  */
 class DiagramGenerator {
@@ -162,7 +169,8 @@ class DiagramGenerator {
             for (let i = 0; i < attrs.length; i++) {
                 const attr = attrs[i];
                 const attrY = sepY + (i + 1) * DiagramGenerator.ATTR_LINE_HEIGHT - 2;
-                const attrText = `${attr.name}: ${attr.type}`;
+                const cleanType = cleanTypeForDisplay(attr.type);
+                const attrText = `${attr.name}: ${cleanType}`;
                 svgParts.push(
                     `<text x="${x + 5}" y="${attrY}" ` +
                     `font-family="${DiagramGenerator.FONT_FAMILY}" font-size="${DiagramGenerator.FONT_SIZE_ATTR}">${escapeXml(attrText)}</text>`
