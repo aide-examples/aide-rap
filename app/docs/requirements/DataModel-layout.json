@@ -10,20 +10,20 @@
       "y": 30
     },
     "EngineManufacturer": {
-      "x": 60,
-      "y": 530
+      "x": 30,
+      "y": 450
     },
     "AircraftType": {
       "x": 220,
-      "y": 150
+      "y": 80
     },
     "EngineType": {
       "x": 220,
       "y": 410
     },
     "EngineMountPossible": {
-      "x": 50,
-      "y": 280
+      "x": 220,
+      "y": 270
     },
     "MaintenancePlan": {
       "x": 110,
@@ -46,8 +46,8 @@
       "y": 410
     },
     "EngineMount": {
-      "x": 420,
-      "y": 250
+      "x": 540,
+      "y": 260
     },
     "InspectionType": {
       "x": 420,
@@ -82,8 +82,8 @@
       "y": 890
     },
     "FleetMember": {
-      "x": 600,
-      "y": 150
+      "x": 660,
+      "y": 140
     }
   }
 }

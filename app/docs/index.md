@@ -1,4 +1,4 @@
-# AIDE Framework
+# AIDE IRMA - Development Docs
 
 **Rapid Application Development from Markdown**
 
@@ -119,9 +119,25 @@ One query returns everything the UI needs – no N+1 problems.
 ### Context Menu Actions
 
 Right-click any record (in table or tree) for quick actions:
+- **New** – Create a new record of this entity type
 - **Details** – Read-only view in side panel
 - **Edit** – Open form for modification
 - **Delete** – With confirmation and FK constraint checking
+- **Export PDF** – Download current table view as PDF
+
+### PDF Export
+
+Export the current table view to a professionally formatted PDF:
+
+- **A4 Landscape** layout for maximum column space
+- **Entity color** in title bar and column headers
+- **FK column colors** match their target entity's area color
+- **Dynamic column widths** based on content
+- **Filtered data** – exports only what's currently visible
+- **FK labels** instead of raw IDs
+- **Enum conversion** – shows external values, not internal codes
+- **Automatic page breaks** with header repetition
+- **Page numbers** on each page
 
 ---
 
@@ -283,6 +299,33 @@ Edit `app/config.json`:
   }
 }
 ```
+
+---
+
+## Feature Backlog
+
+Ideas for future development:
+
+### Export & Import
+- [ ] CSV Export
+- [ ] CSV/Excel Import
+- [ ] TreeView PDF Export
+- [ ] Detail Panel PDF Export
+
+### UI Enhancements
+- [ ] Keyboard shortcuts (arrow keys, Enter for details)
+- [ ] Column visibility toggle
+- [ ] Drag & Drop column reordering
+- [ ] Saved filter presets
+- [ ] Dark mode
+
+### Seed Data
+- [ ] `## Seed Context` section for cross-entity validation constraints
+- [ ] `engine_count` attribute on AircraftType for EngineMount generation
+
+### Visualization
+- [ ] Simple charts (count by status, by type)
+- [ ] Timeline view for date fields
 
 ---
 

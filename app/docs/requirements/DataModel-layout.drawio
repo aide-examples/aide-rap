@@ -8,10 +8,10 @@
                     <mxGeometry x="30" y="30" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="4" value="AircraftType" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="220" y="150" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="220" y="80" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="5" value="EngineManufacturer" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="60" y="530" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="30" y="450" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="6" value="EngineType" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
                     <mxGeometry x="220" y="410" width="140" height="30" as="geometry"/>
@@ -32,7 +32,7 @@
                     <mxGeometry x="420" y="410" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="13" value="EngineMount" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FCE5CD;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="420" y="250" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="540" y="260" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="14" value="InspectionType" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FCE5CD;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
                     <mxGeometry x="420" y="720" width="140" height="30" as="geometry"/>
@@ -59,10 +59,10 @@
                     <mxGeometry x="780" y="890" width="140" height="30" as="geometry"/>
                 </mxCell>
                             <mxCell id="22" value="FleetMember" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D9EAD3;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="600" y="150" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="660" y="140" width="140" height="30" as="geometry"/>
                 </mxCell>
-                            <mxCell id="23" value="EngineTypePossible" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="50" y="280" width="140" height="30" as="geometry"/>
+                                            <mxCell id="23" value="EngineMountPossible" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="220" y="270" width="140" height="30" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
