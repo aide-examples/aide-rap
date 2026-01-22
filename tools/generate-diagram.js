@@ -72,7 +72,11 @@ class DiagramGenerator {
 
         for (const [className, classDef] of Object.entries(this.classes)) {
             const attrs = classDef.attributes || [];
-            for (const attr of attrs) {
+            // Get visible attributes (same as getVisibleAttributes, excluding 'id')
+            const visibleAttrs = attrs.filter(a => a.name !== 'id');
+
+            for (let i = 0; i < visibleAttrs.length; i++) {
+                const attr = visibleAttrs[i];
                 // Extract base type (remove [DEFAULT=...] etc.)
                 const baseType = (attr.type || '').replace(/\s*\[[^\]]+\]/g, '').trim();
 
@@ -82,6 +86,7 @@ class DiagramGenerator {
                         from: className,
                         to: baseType,
                         attribute: attr.name,
+                        attrIndex: i,  // Index for Y positioning
                         from_cardinality: '*'
                     });
                 }
@@ -126,51 +131,104 @@ class DiagramGenerator {
         return { x: pos.x + DiagramGenerator.BOX_WIDTH / 2, y: pos.y + height / 2 };
     }
 
-    getConnectionPoint(fromClass, toClass, showAttributes) {
+    /**
+     * Calculate intersection of two line segments.
+     * Returns intersection point or null if no intersection.
+     */
+    lineSegmentIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
+        const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denom) < 0.0001) return null; // Parallel lines
+
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+        // Check if intersection is within both segments
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            return {
+                x: x1 + t * (x2 - x1),
+                y: y1 + t * (y2 - y1)
+            };
+        }
+        return null;
+    }
+
+    /**
+     * Calculate where a ray from (x1,y1) to (x2,y2) intersects a box.
+     * Returns the intersection point closest to (x1,y1).
+     */
+    rayBoxIntersection(x1, y1, x2, y2, boxX, boxY, boxW, boxH) {
+        // Define box edges
+        const edges = [
+            { x1: boxX, y1: boxY, x2: boxX + boxW, y2: boxY },                 // top
+            { x1: boxX, y1: boxY + boxH, x2: boxX + boxW, y2: boxY + boxH },   // bottom
+            { x1: boxX, y1: boxY, x2: boxX, y2: boxY + boxH },                 // left
+            { x1: boxX + boxW, y1: boxY, x2: boxX + boxW, y2: boxY + boxH }    // right
+        ];
+
+        let closestPoint = null;
+        let minDist = Infinity;
+
+        for (const edge of edges) {
+            const intersection = this.lineSegmentIntersection(
+                x1, y1, x2, y2,
+                edge.x1, edge.y1, edge.x2, edge.y2
+            );
+            if (intersection) {
+                const dist = Math.hypot(intersection.x - x1, intersection.y - y1);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closestPoint = intersection;
+                }
+            }
+        }
+
+        return closestPoint || { x: x2, y: y2 };
+    }
+
+    /**
+     * Get connection points for a relationship.
+     * In detailed mode, starts from the attribute row.
+     * Target point is calculated via ray-box intersection.
+     */
+    getConnectionPoint(fromClass, toClass, showAttributes, attrIndex = -1) {
         const fromPos = this.getPosition(fromClass);
         const toPos = this.getPosition(toClass);
 
         const fromHeight = this.getBoxHeight(fromClass, showAttributes);
         const toHeight = this.getBoxHeight(toClass, showAttributes);
 
-        // Calculate centers
-        const fromCx = fromPos.x + DiagramGenerator.BOX_WIDTH / 2;
-        const fromCy = fromPos.y + fromHeight / 2;
+        // Target center
         const toCx = toPos.x + DiagramGenerator.BOX_WIDTH / 2;
         const toCy = toPos.y + toHeight / 2;
 
-        // Determine connection points on box edges
-        const dx = toCx - fromCx;
-        const dy = toCy - fromCy;
-
-        let fromX, fromY, toX, toY;
-
-        // From box - determine which edge to connect from
-        if (Math.abs(dx) > Math.abs(dy)) {
-            // Horizontal connection
-            if (dx > 0) {
-                fromX = fromPos.x + DiagramGenerator.BOX_WIDTH;
-                toX = toPos.x;
-            } else {
-                fromX = fromPos.x;
-                toX = toPos.x + DiagramGenerator.BOX_WIDTH;
-            }
-            fromY = fromCy;
-            toY = toCy;
+        // Source Y: attribute row in detailed mode, or box center
+        let fromY;
+        if (showAttributes && attrIndex >= 0) {
+            // Y position at the center of the specific attribute row
+            fromY = fromPos.y + DiagramGenerator.HEADER_HEIGHT + (attrIndex + 0.5) * DiagramGenerator.ATTR_LINE_HEIGHT;
         } else {
-            // Vertical connection
-            if (dy > 0) {
-                fromY = fromPos.y + fromHeight;
-                toY = toPos.y;
-            } else {
-                fromY = fromPos.y;
-                toY = toPos.y + toHeight;
-            }
-            fromX = fromCx;
-            toX = toCx;
+            // Fallback to box center
+            fromY = fromPos.y + fromHeight / 2;
         }
 
-        return { fromX, fromY, toX, toY };
+        // Source X: left or right edge depending on target position
+        let fromX;
+        if (toCx > fromPos.x + DiagramGenerator.BOX_WIDTH / 2) {
+            // Target is to the right
+            fromX = fromPos.x + DiagramGenerator.BOX_WIDTH;
+        } else {
+            // Target is to the left
+            fromX = fromPos.x;
+        }
+
+        // Calculate where line from (fromX, fromY) to (toCx, toCy) intersects target box
+        const intersection = this.rayBoxIntersection(
+            fromX, fromY,
+            toCx, toCy,
+            toPos.x, toPos.y, DiagramGenerator.BOX_WIDTH, toHeight
+        );
+
+        return { fromX, fromY, toX: intersection.x, toY: intersection.y };
     }
 
     renderClassBox(className, showAttributes) {
@@ -223,32 +281,28 @@ class DiagramGenerator {
         const fromClass = rel.from;
         const toClass = rel.to;
         const attribute = rel.attribute || '';
+        const attrIndex = rel.attrIndex !== undefined ? rel.attrIndex : -1;
         const fromCard = rel.from_cardinality || '*';
         const toCard = rel.to_cardinality || '';
 
-        const { fromX, fromY, toX, toY } = this.getConnectionPoint(fromClass, toClass, showAttributes);
+        const { fromX, fromY, toX, toY } = this.getConnectionPoint(fromClass, toClass, showAttributes, attrIndex);
+
+        // Horizontal stub length before turning toward target
+        const STUB_LENGTH = 15;
+        const direction = fromX < toX ? 1 : -1;  // Right or left
+        const stubX = fromX + direction * STUB_LENGTH;
 
         const svgParts = [];
 
-        // Line
+        // Path: horizontal stub, then diagonal to target
         svgParts.push(
-            `<line x1="${fromX}" y1="${fromY}" x2="${toX}" y2="${toY}" ` +
-            `stroke="${DiagramGenerator.STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"/>`
+            `<path d="M ${fromX} ${fromY} L ${stubX} ${fromY} L ${toX} ${toY}" ` +
+            `fill="none" stroke="${DiagramGenerator.STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"/>`
         );
 
-        // Cardinality at from end
-        if (fromCard) {
-            const cardX = fromX + (toX - fromX) * 0.1;
-            const cardY = fromY + (toY - fromY) * 0.1 - 5;
-            svgParts.push(
-                `<text x="${cardX}" y="${cardY}" font-family="${DiagramGenerator.FONT_FAMILY}" ` +
-                `font-size="10" fill="#666">${escapeXml(fromCard)}</text>`
-            );
-        }
-
-        // Label in middle
+        // Label along the diagonal part (midpoint of stub-to-target segment)
         if (attribute) {
-            const midX = (fromX + toX) / 2;
+            const midX = (stubX + toX) / 2;
             const midY = (fromY + toY) / 2 - 5;
             svgParts.push(
                 `<text x="${midX}" y="${midY}" text-anchor="middle" ` +
@@ -259,7 +313,7 @@ class DiagramGenerator {
 
         // Cardinality at to end (for 1:1 relationships)
         if (toCard) {
-            const cardX = fromX + (toX - fromX) * 0.9;
+            const cardX = stubX + (toX - stubX) * 0.9;
             const cardY = fromY + (toY - fromY) * 0.9 - 5;
             svgParts.push(
                 `<text x="${cardX}" y="${cardY}" font-family="${DiagramGenerator.FONT_FAMILY}" ` +

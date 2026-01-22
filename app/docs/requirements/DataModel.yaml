@@ -23,7 +23,13 @@ classes:
         description: Manufacturer serial number [LABEL2]
       - name: type
         type: AircraftType
-        description: Reference       - name: manufacture_date
+        description: Reference
+      - name: current_operator
+        type: Operator
+        description: >-
+          [READONLY] [DAILY=FleetMember[exit_date=null OR
+          exit_date>TODAY].operator]
+      - name: manufacture_date
         type: date
         description: Date of manufacture
       - name: total_flight_hours
@@ -38,11 +44,6 @@ classes:
       - name: maintenance_category
         type: MaintenanceCategory [DEFAULT=Line]
         description: Current maintenance category
-      - name: current_operator
-        type: Operator
-        description: >-
-          [READONLY] [DAILY=FleetMember[exit_date=null OR
-          exit_date>TODAY].operator]
     area: operations
     types:
       MaintenanceCategory:
@@ -81,7 +82,8 @@ classes:
         description: Full name [LABEL2]
       - name: manufacturer
         type: AircraftManufacturer
-        description: Reference       - name: max_passengers
+        description: Reference
+      - name: max_passengers
         type: int
         description: Maximum passenger capacity
       - name: max_range_nm
@@ -96,7 +98,8 @@ classes:
         description: Engine serial number [LABEL]
       - name: type
         type: EngineType
-        description: Reference       - name: manufacture_date
+        description: Reference
+      - name: manufacture_date
         type: date
         description: Date of manufacture [LABEL2]
       - name: total_flight_hours
@@ -113,9 +116,11 @@ classes:
     attributes:
       - name: engine
         type: Engine
-        description: Reference       - name: aircraft
+        description: Reference
+      - name: aircraft
         type: Aircraft
-        description: Reference       - name: position
+        description: Reference
+      - name: position
         type: int
         description: Engine position (1, 2, 3, 4)
       - name: installed_date
@@ -149,7 +154,8 @@ classes:
         description: Full name [LABEL2]
       - name: manufacturer
         type: EngineManufacturer
-        description: Reference       - name: thrust_lbs
+        description: Reference
+      - name: thrust_lbs
         type: int
         description: Thrust in pounds
     area: oem
@@ -160,7 +166,8 @@ classes:
     attributes:
       - name: task
         type: Task
-        description: Reference       - name: finding_number
+        description: Reference
+      - name: finding_number
         type: string
         description: Finding number [LABEL]
       - name: description
@@ -168,9 +175,11 @@ classes:
         description: Finding description [LABEL2]
       - name: severity
         type: FindingSeverity [DEFAULT=Minor]
-        description: Severity level       - name: status
+        description: Severity level
+      - name: status
         type: FindingStatus [DEFAULT=Open]
-        description: Finding status       - name: reported_date
+        description: Finding status
+      - name: reported_date
         type: date
         description: Date reported
       - name: resolved_date
@@ -215,9 +224,11 @@ classes:
     attributes:
       - name: operator
         type: Operator
-        description: Reference       - name: aircraft
+        description: Reference
+      - name: aircraft
         type: Aircraft
-        description: Reference       - name: entry_date
+        description: Reference
+      - name: entry_date
         type: date
         description: Date aircraft joined operator [LABEL2]
       - name: exit_date
@@ -249,7 +260,8 @@ classes:
         description: Interval in calendar days
       - name: maintenance_plan
         type: MaintenancePlan
-        description: Reference     area: engine_management
+        description: Reference
+    area: engine_management
   MRO:
     description: Maintenance, Repair and Overhaul organization.
     attributes:
@@ -270,7 +282,8 @@ classes:
     attributes:
       - name: engine_type
         type: EngineType
-        description: Reference       - name: name
+        description: Reference
+      - name: name
         type: string
         description: Plan name [LABEL]
       - name: revision
@@ -287,9 +300,11 @@ classes:
     attributes:
       - name: maintenance_plan
         type: MaintenancePlan
-        description: Reference       - name: task_type
+        description: Reference
+      - name: task_type
         type: TaskType
-        description: Reference       - name: task_code
+        description: Reference
+      - name: task_code
         type: string
         description: OEM task code [LABEL]
       - name: description
@@ -325,9 +340,11 @@ classes:
     attributes:
       - name: workscope
         type: Workscope
-        description: Reference       - name: mro
-        type: MRO
-        description: Reference       - name: order_number
+        description: Reference
+      - name: repair_shop
+        type: RepairShop
+        description: Reference
+      - name: order_number
         type: string
         description: MRO order number [LABEL]
       - name: status
@@ -345,7 +362,8 @@ classes:
     attributes:
       - name: mro
         type: MRO
-        description: Reference       - name: name
+        description: Reference
+      - name: name
         type: string
         description: Shop name [LABEL]
       - name: specialization
@@ -357,9 +375,11 @@ classes:
     attributes:
       - name: repair_order
         type: RepairOrder
-        description: Reference       - name: task_type
+        description: Reference
+      - name: task_type
         type: TaskType
-        description: Reference       - name: task_number
+        description: Reference
+      - name: task_number
         type: string
         description: Task number [LABEL]
       - name: description
@@ -397,15 +417,18 @@ classes:
         description: Description [LABEL2]
       - name: engine
         type: Engine
-        description: Reference       - name: inspection_type
+        description: Reference
+      - name: inspection_type
         type: InspectionType
-        description: Reference       - name: planned_start
+        description: Reference
+      - name: planned_start
         type: date
         description: Planned start date
       - name: planned_end
         type: date
         description: Planned end date
     area: engine_management
+relationships: []
 globalTypes:
   TailSign:
     kind: pattern

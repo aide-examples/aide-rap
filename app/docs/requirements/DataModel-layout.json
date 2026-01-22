@@ -22,11 +22,11 @@
       "y": 530
     },
     "MaintenancePlan": {
-      "x": 230,
+      "x": 70,
       "y": 720
     },
     "MaintenancePlanTask": {
-      "x": 230,
+      "x": 200,
       "y": 870
     },
     "Operator": {
@@ -66,15 +66,15 @@
       "y": 540
     },
     "Task": {
-      "x": 730,
-      "y": 720
+      "x": 680,
+      "y": 730
     },
     "TaskType": {
       "x": 420,
       "y": 920
     },
     "Finding": {
-      "x": 720,
+      "x": 780,
       "y": 890
     },
     "FleetMember": {

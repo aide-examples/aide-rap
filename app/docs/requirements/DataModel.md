@@ -1,5 +1,7 @@
 # Data Model
 
+![Data Model Diagram](/docs-assets/requirements/DataModel-diagram.svg)
+
 ## Entity Descriptions
 
 Entity definitions are stored in separate files under [classes/](classes/).
@@ -56,10 +58,7 @@ Entity definitions are stored in separate files under [classes/](classes/).
 
 **Reading the diagram:** Arrows point from a class to its referenced type (read as "is of type" or "references"). The label shows the attribute name on the class where the arrow originates. Example: `AircraftType --manufacturer--> AircraftManufacturer` means AircraftType has an attribute `manufacturer` referencing AircraftManufacturer.
 
-### Generated SVG Diagrams
-
-- <a href="/docs-assets/requirements/DataModel-diagram.svg" target="_blank">Compact Diagram</a> - Only class names
-- <a href="/docs-assets/requirements/DataModel-diagram-detailed.svg" target="_blank">Detailed Diagram</a> - With attributes
+![Data Model Diagram (Detailed)](/docs-assets/requirements/DataModel-diagram-detailed.svg)
 
 **Source of Truth:** This Markdown file.
 
