@@ -10,7 +10,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const logger = require('../utils/logger');
-const { generateSchema, generateCreateTableSQL } = require('../utils/SchemaGenerator');
+const { generateSchema, generateCreateTableSQL, generateViewSQL } = require('../utils/SchemaGenerator');
 
 let db = null;
 let schema = null;
@@ -31,6 +31,33 @@ function tableExists(tableName) {
     "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
   ).get(tableName);
   return !!result;
+}
+
+/**
+ * Check if view exists
+ */
+function viewExists(viewName) {
+  const result = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='view' AND name=?"
+  ).get(viewName);
+  return !!result;
+}
+
+/**
+ * Create or recreate a view for an entity
+ * Views provide FK label columns for read operations
+ */
+function createOrReplaceView(entity) {
+  const viewName = entity.tableName + '_view';
+  const viewSQL = generateViewSQL(entity);
+
+  // Drop existing view (if schema changed)
+  if (viewExists(viewName)) {
+    db.exec(`DROP VIEW IF EXISTS ${viewName}`);
+  }
+
+  db.exec(viewSQL);
+  return viewName;
 }
 
 /**
@@ -106,9 +133,9 @@ function migrateSchema(entity) {
     }
   }
 
-  // Warn about columns in DB but not in schema
+  // Warn about columns in DB but not in schema (skip 'id' which is implicit)
   for (const dbCol of existingColumns) {
-    if (!schemaColumns.includes(dbCol)) {
+    if (dbCol !== 'id' && !schemaColumns.includes(dbCol)) {
       logger.warn(`Column ${dbCol} in ${tableName} is no longer in schema`);
     }
   }
@@ -167,6 +194,14 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
     }
   }
 
+  // Create views for all entities (after all tables exist for FK joins)
+  let viewCount = 0;
+  for (const entity of schema.orderedEntities) {
+    const viewName = createOrReplaceView(entity);
+    viewCount++;
+  }
+  logger.info(`Created ${viewCount} views for FK label resolution`);
+
   return { db, schema };
 }
 
@@ -212,6 +247,13 @@ function resetTable(entityName) {
   }
 
   const tableName = entity.tableName;
+  const viewName = tableName + '_view';
+
+  // Drop view first (depends on table)
+  if (viewExists(viewName)) {
+    db.exec(`DROP VIEW IF EXISTS ${viewName}`);
+    logger.debug(`Dropped view ${viewName}`);
+  }
 
   // Drop table (CASCADE will handle FK references)
   if (tableExists(tableName)) {
@@ -219,7 +261,7 @@ function resetTable(entityName) {
     logger.info(`Dropped table ${tableName}`);
   }
 
-  // Recreate
+  // Recreate table
   const { createTable, createIndexes } = generateCreateTableSQL(entity);
   db.exec(createTable);
   logger.info(`Recreated table ${tableName}`);
@@ -227,6 +269,10 @@ function resetTable(entityName) {
   for (const indexSql of createIndexes) {
     db.exec(indexSql);
   }
+
+  // Recreate view
+  createOrReplaceView(entity);
+  logger.debug(`Recreated view ${viewName}`);
 
   return true;
 }

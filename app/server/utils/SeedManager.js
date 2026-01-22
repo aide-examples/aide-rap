@@ -33,6 +33,91 @@ function getDbAndSchema() {
 }
 
 /**
+ * Build a lookup map for an entity: LABEL value -> id
+ * Used to resolve conceptual FK references (e.g., "manufacturer": "Airbus" -> manufacturer_id: 1)
+ *
+ * Supports multiple lookup keys:
+ * - Primary LABEL field (e.g., "designation" -> "A320neo")
+ * - Secondary LABEL2 field (e.g., "name" -> "Airbus A320neo")
+ * This allows AI-generated data to use either the short or full name.
+ */
+function buildLabelLookup(entityName) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) return {};
+
+  // Find the LABEL and LABEL2 columns
+  const labelCol = entity.columns.find(c => c.ui?.label);
+  const label2Col = entity.columns.find(c => c.ui?.label2);
+
+  if (!labelCol && !label2Col) return {};
+
+  // Build column list for SELECT
+  const selectCols = ['id'];
+  if (labelCol) selectCols.push(labelCol.name);
+  if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
+
+  const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName}`;
+  const rows = db.prepare(sql).all();
+
+  const lookup = {};
+  for (const row of rows) {
+    // Add primary label to lookup
+    if (labelCol && row[labelCol.name]) {
+      lookup[row[labelCol.name]] = row.id;
+    }
+    // Add secondary label to lookup (allows matching by full name)
+    if (label2Col && row[label2Col.name]) {
+      lookup[row[label2Col.name]] = row.id;
+    }
+  }
+
+  return lookup;
+}
+
+/**
+ * Resolve conceptual FK references in a record.
+ * Converts { "manufacturer": "Airbus" } to { "manufacturer_id": 1 }
+ *
+ * @param {string} entityName - The entity being seeded
+ * @param {object} record - The seed record (may have conceptual or technical FK names)
+ * @param {object} lookups - Pre-built lookup maps for all entities
+ * @returns {object} - Record with resolved FK IDs
+ */
+function resolveConceptualFKs(entityName, record, lookups) {
+  const { schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) return record;
+
+  const resolved = { ...record };
+
+  for (const fk of entity.foreignKeys) {
+    const conceptualName = fk.displayName;  // e.g., "manufacturer"
+    const technicalName = fk.column;        // e.g., "manufacturer_id"
+    const targetEntity = fk.references.entity; // e.g., "AircraftManufacturer"
+
+    // Check if record uses conceptual name (e.g., "manufacturer": "Airbus")
+    if (conceptualName && conceptualName in record && typeof record[conceptualName] === 'string') {
+      const labelValue = record[conceptualName];
+      const lookup = lookups[targetEntity] || {};
+      const resolvedId = lookup[labelValue];
+
+      if (resolvedId !== undefined) {
+        // Replace conceptual name with technical name and resolved ID
+        resolved[technicalName] = resolvedId;
+        delete resolved[conceptualName];
+      } else {
+        console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
+      }
+    }
+  }
+
+  return resolved;
+}
+
+/**
  * Count records in a seed file
  */
 function countSeedFile(filePath) {
@@ -105,8 +190,14 @@ function getSource() {
 
 /**
  * Load seed data for a specific entity from active source
+ * Supports both technical FK notation (type_id: 3) and conceptual notation (type: "A320neo")
+ *
+ * @param {string} entityName - Entity name
+ * @param {string} source - Source directory ('imported' or 'generated')
+ * @param {object} lookups - Pre-built label lookups for FK resolution (optional)
+ * @returns {object} - { loaded: count, source }
  */
-function loadEntity(entityName, source = activeSource) {
+function loadEntity(entityName, source = activeSource, lookups = null) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
 
@@ -124,6 +215,17 @@ function loadEntity(entityName, source = activeSource) {
     return { loaded: 0 };
   }
 
+  // Build lookups for FK resolution if not provided
+  if (!lookups) {
+    lookups = {};
+    // Build lookups for all referenced entities
+    for (const fk of entity.foreignKeys) {
+      if (!lookups[fk.references.entity]) {
+        lookups[fk.references.entity] = buildLabelLookup(fk.references.entity);
+      }
+    }
+  }
+
   // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
   const isComputedColumn = (col) => {
     if (col.computed) return true;  // Schema already parsed
@@ -138,7 +240,9 @@ function loadEntity(entityName, source = activeSource) {
 
   let count = 0;
   for (const record of records) {
-    const values = columns.map(col => record[col] ?? null);
+    // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
+    const resolved = resolveConceptualFKs(entityName, record, lookups);
+    const values = columns.map(col => resolved[col] ?? null);
     try {
       insert.run(...values);
       count++;
@@ -179,19 +283,26 @@ function clearEntity(entityName) {
 
 /**
  * Load all available seed files from active source
+ * Builds label lookups incrementally for FK resolution
  */
 function loadAll(source = activeSource) {
   const { schema } = getDbAndSchema();
   const results = {};
   const seedDir = getSeedDir(source);
 
+  // Build lookups incrementally as entities are loaded (for FK resolution)
+  const lookups = {};
+
   // Load in dependency order
   for (const entity of schema.orderedEntities) {
     const seedFile = path.join(seedDir, `${entity.className}.json`);
     if (fs.existsSync(seedFile)) {
       try {
-        const result = loadEntity(entity.className, source);
+        const result = loadEntity(entity.className, source, lookups);
         results[entity.className] = result;
+
+        // Update lookup for this entity (so subsequent entities can reference it)
+        lookups[entity.className] = buildLabelLookup(entity.className);
       } catch (err) {
         results[entity.className] = { error: err.message };
       }

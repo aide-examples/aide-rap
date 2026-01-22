@@ -161,14 +161,31 @@ const EntityTable = {
         : ' <span class="sort-hint">&#8645;</span>';
       const isFK = col.foreignKey ? ' fk-column' : '';
 
-      html += `<th class="sortable${isFK}" data-column="${col.name}">
-        ${this.escapeHtml(col.name)}${sortIcon}
+      // Use conceptual name for FKs (type instead of type_id)
+      const displayName = col.foreignKey
+        ? (col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name)
+        : col.name;
+
+      // Use area color for FK columns
+      const bgStyle = col.foreignKey?.areaColor
+        ? ` style="background-color: ${col.foreignKey.areaColor}"`
+        : '';
+
+      html += `<th class="sortable${isFK}" data-column="${col.name}"${bgStyle}>
+        ${this.escapeHtml(displayName)}${sortIcon}
       </th>`;
     }
     // Back-reference columns
     for (const ref of backRefs) {
-      html += `<th class="backref-column" title="Records in ${ref.entity} referencing this via ${ref.column}">
-        ${ref.entity} <span class="backref-field">(${ref.column})</span>
+      // Use conceptual name (without _id suffix)
+      const fieldName = ref.column.endsWith('_id')
+        ? ref.column.slice(0, -3)
+        : ref.column;
+      // Use area color of the referencing entity
+      const bgColor = ref.areaColor || '#fef3c7';
+      html += `<th class="backref-column" style="background-color: ${bgColor}" title="Records in ${ref.entity} referencing this via ${fieldName}">
+        <span class="backref-entity">${ref.entity}</span>
+        <span class="backref-field">${fieldName}</span>
       </th>`;
     }
     html += '<th class="actions-column"></th>';
@@ -187,10 +204,26 @@ const EntityTable = {
         const value = record[col.name];
 
         if (col.foreignKey && value) {
-          // FK - render as link with loading placeholder
-          html += `<td class="fk-cell" data-entity="${col.foreignKey.entity}" data-id="${value}">
-            <span class="fk-loading">#${value}</span>
-          </td>`;
+          // Check if _label field is already present from View (FK-Label-Enrichment)
+          const displayName = col.name.endsWith('_id')
+            ? col.name.slice(0, -3)  // type_id -> type
+            : col.name;
+          const labelField = displayName + '_label';
+          const preloadedLabel = record[labelField];
+
+          if (preloadedLabel) {
+            // Label already available from View - render directly
+            html += `<td class="fk-cell">
+              <span class="fk-value" data-action="navigate" data-entity="${col.foreignKey.entity}" data-id="${value}">
+                ${this.escapeHtml(preloadedLabel)}
+              </span>
+            </td>`;
+          } else {
+            // Fallback: render with loading placeholder (async load)
+            html += `<td class="fk-cell" data-entity="${col.foreignKey.entity}" data-id="${value}">
+              <span class="fk-loading">#${value}</span>
+            </td>`;
+          }
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const displayValue = value != null
@@ -234,14 +267,20 @@ const EntityTable = {
   },
 
   /**
-   * Load FK labels for all FK cells
+   * Load FK labels for cells that don't have preloaded labels
+   * Most cells should already have labels from the View (FK-Label-Enrichment)
+   * This is a fallback for edge cases
    */
   async loadForeignKeyLabels() {
-    const fkCells = this.container.querySelectorAll('.fk-cell');
+    // Only load for cells that still have loading placeholder (no preloaded label)
+    const fkCells = this.container.querySelectorAll('.fk-cell[data-entity]');
 
     for (const cell of fkCells) {
       const entityName = cell.dataset.entity;
       const id = parseInt(cell.dataset.id);
+
+      // Skip if already loaded (no data-entity means label was preloaded)
+      if (!entityName || !id) continue;
 
       try {
         const refSchema = await SchemaCache.getExtended(entityName);
@@ -253,14 +292,13 @@ const EntityTable = {
           <span class="fk-value" data-action="navigate" data-entity="${entityName}" data-id="${id}">
             ${this.escapeHtml(fullLabel)}
           </span>
-          <span class="fk-entity-badge">${entityName}</span>
         `;
       } catch {
         // Keep the ID fallback
       }
     }
 
-    // Re-attach navigation listeners for FK links
+    // Attach navigation listeners for ALL FK links (both preloaded and async-loaded)
     this.container.querySelectorAll('[data-action="navigate"]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();

@@ -40,7 +40,7 @@ const EntityForm = {
       }
 
       const isRequired = col.required;
-      const isReadonly = col.name === 'id';
+      const isReadonly = col.name === 'id' || col.ui?.readonly;
       const inputType = this.getInputType(col);
 
       html += `
@@ -76,6 +76,162 @@ const EntityForm = {
     form.querySelectorAll('.form-input').forEach(input => {
       input.addEventListener('change', () => this.checkDirty());
     });
+
+    // Load FK dropdown options asynchronously
+    await this.loadFKDropdowns();
+  },
+
+  // Threshold for switching from dropdown to searchable combobox
+  FK_DROPDOWN_THRESHOLD: 20,
+
+  /**
+   * Load FK dropdown options from API
+   * Uses _label fields from the View for display
+   * Automatically switches to searchable combobox for large datasets (>20 records)
+   */
+  async loadFKDropdowns() {
+    const fkSelects = document.querySelectorAll('.fk-select');
+
+    for (const select of fkSelects) {
+      const entityName = select.dataset.fkEntity;
+      const currentValue = select.dataset.fkValue;
+      const fieldName = select.name;
+
+      try {
+        // Fetch all records from the referenced entity
+        const result = await ApiClient.getAll(entityName);
+        const records = result.data || [];
+
+        // Get schema to find label field
+        const refSchema = await SchemaCache.getExtended(entityName);
+        const labelFields = refSchema.ui?.labelFields || [];
+
+        // Build options data
+        const options = records.map(rec => {
+          let label = `#${rec.id}`;
+          if (labelFields.length > 0 && rec[labelFields[0]]) {
+            label = rec[labelFields[0]];
+            if (labelFields.length > 1 && rec[labelFields[1]]) {
+              label += ` (${rec[labelFields[1]]})`;
+            }
+          }
+          return { id: rec.id, label };
+        });
+
+        // Choose rendering based on record count
+        if (records.length <= this.FK_DROPDOWN_THRESHOLD) {
+          // Small dataset: use dropdown
+          this.renderFKDropdown(select, options, currentValue);
+        } else {
+          // Large dataset: use searchable combobox
+          this.renderFKCombobox(select, options, currentValue, fieldName);
+        }
+      } catch (err) {
+        // On error, show a simple input fallback
+        select.innerHTML = `<option value="${currentValue}">${currentValue || '-- Error loading --'}</option>`;
+        console.error(`Failed to load FK options for ${entityName}:`, err);
+      }
+    }
+  },
+
+  /**
+   * Render FK field as a simple dropdown (for small datasets)
+   */
+  renderFKDropdown(select, options, currentValue) {
+    let optionsHtml = '<option value="">-- Select --</option>';
+
+    for (const opt of options) {
+      const selected = String(opt.id) === String(currentValue) ? 'selected' : '';
+      optionsHtml += `<option value="${opt.id}" ${selected}>${this.escapeHtml(opt.label)}</option>`;
+    }
+
+    select.innerHTML = optionsHtml;
+  },
+
+  /**
+   * Render FK field as a searchable combobox (for large datasets)
+   * Uses input + datalist for native browser autocomplete
+   */
+  renderFKCombobox(select, options, currentValue, fieldName) {
+    const container = select.parentElement;
+    const datalistId = `datalist-${fieldName}`;
+
+    // Find current label for display
+    const currentOption = options.find(opt => String(opt.id) === String(currentValue));
+    const displayValue = currentOption ? currentOption.label : '';
+
+    // Create datalist with options
+    let datalistHtml = '';
+    for (const opt of options) {
+      datalistHtml += `<option value="${this.escapeHtml(opt.label)}" data-id="${opt.id}">`;
+    }
+
+    // Create hidden input for actual ID value
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = fieldName;
+    hiddenInput.value = currentValue || '';
+    hiddenInput.className = 'fk-hidden-value';
+
+    // Create visible input with datalist
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'form-input fk-combobox';
+    searchInput.setAttribute('list', datalistId);
+    searchInput.placeholder = `Search (${options.length} options)...`;
+    searchInput.value = displayValue;
+    searchInput.autocomplete = 'off';
+
+    // Create datalist
+    const datalist = document.createElement('datalist');
+    datalist.id = datalistId;
+    datalist.innerHTML = datalistHtml;
+
+    // Store options for lookup
+    searchInput._fkOptions = options;
+    searchInput._hiddenInput = hiddenInput;
+
+    // Event: Update hidden value when selection changes
+    searchInput.addEventListener('input', () => {
+      const typed = searchInput.value;
+      const match = options.find(opt => opt.label === typed);
+
+      if (match) {
+        hiddenInput.value = match.id;
+      } else if (typed === '') {
+        hiddenInput.value = '';
+      }
+      // If no match and not empty, keep previous value (user still typing)
+    });
+
+    // Event: Validate on blur
+    searchInput.addEventListener('blur', () => {
+      const typed = searchInput.value;
+      const match = options.find(opt => opt.label === typed);
+
+      if (!match && typed !== '') {
+        // Invalid value - clear or show warning
+        searchInput.classList.add('error');
+      } else {
+        searchInput.classList.remove('error');
+        if (match) {
+          hiddenInput.value = match.id;
+        } else {
+          hiddenInput.value = '';
+        }
+      }
+    });
+
+    // Replace select with combobox
+    select.replaceWith(hiddenInput);
+    hiddenInput.after(searchInput);
+    searchInput.after(datalist);
+  },
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   },
 
   getInputType(col) {
@@ -110,16 +266,17 @@ const EntityForm = {
     }
 
     if (col.foreignKey) {
-      // For now, just use a number input for FK fields
-      // In Phase 4, we'll add dropdowns with related entities
+      // FK fields: render as dropdown with labels (loaded async)
+      // Initially show a loading state, then populate with options
       return `
-        <input type="number"
-               class="form-input"
-               id="field-${col.name}"
-               name="${col.name}"
-               value="${displayValue}"
-               ${disabled}
-               placeholder="ID of ${col.foreignKey.entity}">
+        <select class="form-input fk-select"
+                id="field-${col.name}"
+                name="${col.name}"
+                data-fk-entity="${col.foreignKey.entity}"
+                data-fk-value="${displayValue}"
+                ${disabled}>
+          <option value="">Loading...</option>
+        </select>
       `;
     }
 
@@ -180,7 +337,10 @@ const EntityForm = {
 
       if (value === '') {
         data[key] = null;
-      } else if (input.type === 'number') {
+      } else if (input && input.type === 'number') {
+        data[key] = parseInt(value, 10);
+      } else if (col && col.foreignKey) {
+        // FK field: always parse as integer (ID)
         data[key] = parseInt(value, 10);
       } else if (col && col.enumValues && col.enumValues.length > 0) {
         // Enum field: check if values are numeric

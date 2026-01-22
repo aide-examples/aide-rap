@@ -28,10 +28,11 @@
                 <option value="start">References first</option>
                 <option value="inline">References inline</option>
             </select>
-            <select id="attr-layout" class="menu-select" title="Attribute layout">
-                <option value="list">Vertical list</option>
-                <option value="row">Horizontal row</option>
-            </select>
+            <span class="menu-separator">|</span>
+            <label class="menu-checkbox" title="Show technical IDs in detail panel">
+                <input type="checkbox" id="show-ids-toggle">
+                <span>IDs</span>
+            </label>
             <span class="menu-separator">|</span>
             <a href="#" id="menu-tools" class="menu-item">Tools</a>
         </nav>
@@ -46,20 +47,31 @@
                 <section id="entity-explorer" class="entity-explorer">
                     <!-- Toolbar -->
                     <div class="explorer-toolbar">
-                        <!-- View mode toggle: Table / Tree -->
+                        <!-- View mode toggle: Table / Tree-H / Tree-V -->
                         <div class="view-mode-buttons">
                             <button id="btn-view-table" class="btn-view-mode" title="Table view">
+                                <!-- Grid/Table icon -->
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                                     <rect x="0" y="0" width="6" height="3"/><rect x="8" y="0" width="6" height="3"/>
                                     <rect x="0" y="5" width="6" height="3"/><rect x="8" y="5" width="6" height="3"/>
                                     <rect x="0" y="10" width="6" height="3"/><rect x="8" y="10" width="6" height="3"/>
                                 </svg>
                             </button>
-                            <button id="btn-view-tree" class="btn-view-mode active" title="Tree view">
+                            <button id="btn-view-tree-h" class="btn-view-mode" title="Tree view (horizontal attributes)">
+                                <!-- Tree with horizontal bars -->
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                                    <rect x="0" y="0" width="14" height="3"/>
-                                    <rect x="3" y="5" width="11" height="3"/>
-                                    <rect x="6" y="10" width="8" height="3"/>
+                                    <rect x="0" y="0" width="14" height="2"/>
+                                    <rect x="2" y="4" width="12" height="2"/>
+                                    <rect x="4" y="8" width="5" height="2"/><rect x="10" y="8" width="4" height="2"/>
+                                    <rect x="4" y="12" width="10" height="2"/>
+                                </svg>
+                            </button>
+                            <button id="btn-view-tree-v" class="btn-view-mode active" title="Tree view (vertical attributes)">
+                                <!-- Tree with vertical bar indicating stacked layout -->
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <rect x="0" y="0" width="14" height="2"/>
+                                    <rect x="2" y="4" width="2" height="10"/>
+                                    <rect x="6" y="12" width="8" height="2"/>
                                 </svg>
                             </button>
                         </div>

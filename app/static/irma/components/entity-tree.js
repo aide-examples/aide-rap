@@ -12,17 +12,28 @@ const EntityTree = {
   // Sort settings
   attributeOrder: 'schema', // 'schema' or 'alpha'
   referencePosition: 'end', // 'end', 'start', or 'inline'
-  attributeLayout: 'row', // 'row' (horizontal) or 'list' (vertical)
+  attributeLayout: 'list', // 'row' (horizontal) or 'list' (vertical) - controlled by view mode buttons
 
   init(containerId) {
     this.container = document.getElementById(containerId);
     this.initSortControls();
   },
 
+  /**
+   * Set attribute layout (called by EntityExplorer when view mode changes)
+   */
+  setAttributeLayout(layout) {
+    if (layout !== this.attributeLayout) {
+      this.attributeLayout = layout;
+      if (this.currentEntity && this.records.length > 0) {
+        this.render();
+      }
+    }
+  },
+
   initSortControls() {
     const attrSelect = document.getElementById('sort-attributes');
     const refSelect = document.getElementById('sort-references');
-    const layoutSelect = document.getElementById('attr-layout');
 
     if (attrSelect) {
       // Restore from sessionStorage
@@ -50,21 +61,6 @@ const EntityTree = {
       refSelect.addEventListener('change', (e) => {
         this.referencePosition = e.target.value;
         sessionStorage.setItem('tree-ref-position', e.target.value);
-        this.render();
-      });
-    }
-
-    if (layoutSelect) {
-      // Restore from sessionStorage
-      const savedLayout = sessionStorage.getItem('tree-attr-layout');
-      if (savedLayout) {
-        this.attributeLayout = savedLayout;
-        layoutSelect.value = savedLayout;
-      }
-
-      layoutSelect.addEventListener('change', (e) => {
-        this.attributeLayout = e.target.value;
-        sessionStorage.setItem('tree-attr-layout', e.target.value);
         this.render();
       });
     }
@@ -185,10 +181,6 @@ const EntityTree = {
 
   /**
    * Render the expanded content of a node (attributes + relationships)
-   *
-   * Field visibility:
-   * - detailFields (LABEL, LABEL2, DETAIL): always visible
-   * - All other fields: only visible on hover/focus
    */
   async renderNodeContent(entityName, record, schema) {
     const isRowLayout = this.attributeLayout === 'row';
@@ -206,29 +198,23 @@ const EntityTree = {
     const fkCols = columns.filter(col => col.foreignKey);
     const hasBackRefs = schema.backReferences && schema.backReferences.length > 0;
 
-    // Helper to determine if field is hover-only (not in detailFields)
-    const isHoverField = (colName) => {
-      const detailFields = schema.ui?.detailFields || [];
-      return !detailFields.includes(colName);
-    };
-
     // Render regular attributes (possibly as row)
     if (isRowLayout && regularCols.length > 0) {
-      html += this.renderAttributeRow(regularCols, record, schema, isHoverField);
+      html += this.renderAttributeRow(regularCols, record, schema);
     }
 
     // Render based on reference position setting
     if (this.referencePosition === 'start') {
       // FKs first, then back-refs, then regular attributes
       for (const col of fkCols) {
-        html += await this.renderForeignKeyNode(col, record[col.name], record, isHoverField(col.name));
+        html += await this.renderForeignKeyNode(col, record[col.name], record);
       }
       if (hasBackRefs) {
         html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
       }
       if (!isRowLayout) {
         for (const col of regularCols) {
-          html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
+          html += this.renderAttribute(col.name, record[col.name], schema);
         }
       }
     } else if (this.referencePosition === 'inline') {
@@ -236,9 +222,9 @@ const EntityTree = {
       for (const col of columns) {
         const value = record[col.name];
         if (col.foreignKey) {
-          html += await this.renderForeignKeyNode(col, value, record, isHoverField(col.name));
+          html += await this.renderForeignKeyNode(col, value, record);
         } else if (!isRowLayout) {
-          html += this.renderAttribute(col.name, value, isHoverField(col.name), schema);
+          html += this.renderAttribute(col.name, value, schema);
         }
       }
       if (hasBackRefs) {
@@ -248,11 +234,11 @@ const EntityTree = {
       // 'end' (default): regular attributes first, then FKs, then back-refs
       if (!isRowLayout) {
         for (const col of regularCols) {
-          html += this.renderAttribute(col.name, record[col.name], isHoverField(col.name), schema);
+          html += this.renderAttribute(col.name, record[col.name], schema);
         }
       }
       for (const col of fkCols) {
-        html += await this.renderForeignKeyNode(col, record[col.name], record, isHoverField(col.name));
+        html += await this.renderForeignKeyNode(col, record[col.name], record);
       }
       if (hasBackRefs) {
         html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
@@ -266,7 +252,7 @@ const EntityTree = {
   /**
    * Render attributes as a horizontal row (table-like)
    */
-  renderAttributeRow(columns, record, schema, isHoverField) {
+  renderAttributeRow(columns, record, schema) {
     const cells = columns.map(col => {
       const value = record[col.name];
       let displayValue;
@@ -275,8 +261,7 @@ const EntityTree = {
       } else {
         displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
       }
-      const isHover = isHoverField(col.name);
-      return `<td class="${isHover ? 'hover-field' : ''}" title="${col.name}">${displayValue}</td>`;
+      return `<td title="${col.name}">${displayValue}</td>`;
     }).join('');
 
     const headers = columns.map(col => `<th title="${col.name}">${col.name}</th>`).join('');
@@ -293,7 +278,7 @@ const EntityTree = {
    * Render a regular attribute
    * Uses ValueFormatter to convert enum internal->external values
    */
-  renderAttribute(name, value, isHover = false, schema = null) {
+  renderAttribute(name, value, schema = null) {
     let displayValue;
     if (value === null || value === undefined) {
       displayValue = '<em>null</em>';
@@ -304,10 +289,8 @@ const EntityTree = {
       displayValue = this.escapeHtml(String(value));
     }
 
-    const className = isHover ? 'tree-attribute hover-field' : 'tree-attribute';
-
     return `
-      <div class="${className}">
+      <div class="tree-attribute">
         <span class="attr-name">${name}:</span>
         <span class="attr-value">${displayValue}</span>
       </div>
@@ -317,12 +300,10 @@ const EntityTree = {
   /**
    * Render a foreign key as an expandable node
    */
-  async renderForeignKeyNode(col, fkId, parentRecord, isHover = false) {
-    const hoverClass = isHover ? ' hover-field' : '';
-
+  async renderForeignKeyNode(col, fkId, parentRecord) {
     if (!fkId) {
       return `
-        <div class="tree-attribute fk-field${hoverClass}">
+        <div class="tree-attribute fk-field">
           <span class="attr-name">${col.name}:</span>
           <span class="attr-value"><em>null</em></span>
         </div>
@@ -332,20 +313,30 @@ const EntityTree = {
     const nodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${parentRecord.id}`;
     const isExpanded = this.expandedNodes.has(nodeId);
 
+    // Check for preloaded label from View (FK-Label-Enrichment)
+    const displayName = col.name.endsWith('_id')
+      ? col.name.slice(0, -3)  // type_id -> type
+      : col.name;
+    const labelField = displayName + '_label';
+    const preloadedLabel = parentRecord[labelField];
+
     // Get a label and area color for the referenced record
-    let refLabel = `#${fkId}`;
+    let refLabel = preloadedLabel || `#${fkId}`;
     let areaColor = '#f5f5f5';
     try {
       const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
-      const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
-      refLabel = this.getFullLabel(refRecord, refSchema);
       areaColor = refSchema.areaColor || '#f5f5f5';
+      // Only fetch record if no preloaded label
+      if (!preloadedLabel) {
+        const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
+        refLabel = this.getFullLabel(refRecord, refSchema);
+      }
     } catch (e) {
-      // Fall back to just the ID
+      // Fall back to just the ID or preloaded label
     }
 
     let html = `
-      <div class="tree-fk-node${hoverClass} ${isExpanded ? 'expanded' : ''}"
+      <div class="tree-fk-node ${isExpanded ? 'expanded' : ''}"
            data-node-id="${nodeId}"
            data-entity="${col.foreignKey.entity}"
            data-record-id="${fkId}">
@@ -381,25 +372,18 @@ const EntityTree = {
       const regularCols = allCols.filter(col => !col.foreignKey);
       const fkCols = allCols.filter(col => col.foreignKey && record[col.name]);
 
-      // Helper for hover detection
-      const isHoverField = (colName) => {
-        const detailFields = schema.ui?.detailFields || [];
-        return !detailFields.includes(colName);
-      };
-
       // Render regular attributes (as row or list)
       if (isRowLayout && regularCols.length > 0) {
-        html += this.renderAttributeRow(regularCols, record, schema, isHoverField);
+        html += this.renderAttributeRow(regularCols, record, schema);
       } else {
         for (const col of regularCols) {
-          const isHover = isHoverField(col.name);
-          html += this.renderAttribute(col.name, record[col.name], isHover, schema);
+          html += this.renderAttribute(col.name, record[col.name], schema);
         }
       }
 
       // Render nested FKs as links (always as list)
       for (const col of fkCols) {
-        html += await this.renderNestedForeignKey(col, record[col.name]);
+        html += await this.renderNestedForeignKey(col, record[col.name], record);
       }
 
       html += '</div>';
@@ -412,16 +396,33 @@ const EntityTree = {
   /**
    * Render a nested FK (no further expansion to prevent deep nesting)
    * Always shows the label of the referenced entity
+   * Uses preloaded _label field from View when available
    */
-  async renderNestedForeignKey(col, fkId) {
-    // Get the label for the referenced record (title + subtitle)
+  async renderNestedForeignKey(col, fkId, parentRecord = null) {
+    // Check for preloaded label from View (FK-Label-Enrichment)
     let refLabel = `#${fkId}`;
-    try {
-      const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
-      const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
-      refLabel = this.getFullLabel(refRecord, refSchema);
-    } catch {
-      // Fall back to just the ID
+
+    if (parentRecord) {
+      const displayName = col.name.endsWith('_id')
+        ? col.name.slice(0, -3)
+        : col.name;
+      const labelField = displayName + '_label';
+      const preloadedLabel = parentRecord[labelField];
+
+      if (preloadedLabel) {
+        refLabel = preloadedLabel;
+      }
+    }
+
+    // Only fetch from API if no preloaded label
+    if (refLabel === `#${fkId}`) {
+      try {
+        const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
+        const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
+        refLabel = this.getFullLabel(refRecord, refSchema);
+      } catch {
+        // Fall back to just the ID
+      }
     }
 
     return `
@@ -443,20 +444,19 @@ const EntityTree = {
       const nodeId = `backref-${ref.entity}-to-${entityName}-${recordId}`;
       const isExpanded = this.expandedNodes.has(nodeId);
 
-      // Get count of referencing records and area color
+      // Get count of referencing records
       let count = 0;
-      let areaColor = '#f5f5f5';
       try {
         const references = await ApiClient.getBackReferences(entityName, recordId);
         if (references[ref.entity]) {
           count = references[ref.entity].count;
         }
-        // Get area color from the referencing entity's schema
-        const refSchema = await SchemaCache.getExtended(ref.entity);
-        areaColor = refSchema.areaColor || '#f5f5f5';
       } catch (e) {
         // Ignore errors
       }
+
+      // Use area color from back-reference metadata (already included in schema)
+      const areaColor = ref.areaColor || '#f5f5f5';
 
       if (count === 0) continue;
 

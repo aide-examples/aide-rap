@@ -2,6 +2,29 @@
 
 Projektweite Typdefinitionen für aide-irma.
 
+## Referenz-Notation (Fremdschlüssel)
+
+Fremdschlüssel werden **konzeptuell** notiert: Der Typ ist der Name der referenzierten Entity.
+
+**Beispiel:**
+```markdown
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| type | AircraftType | Reference | 5 |
+| manufacturer | AircraftManufacturer | Reference | 1 |
+```
+
+**Semantik:**
+- `type: AircraftType` → Datenbank-Spalte: `type_id` (automatisch)
+- Die ID-Spalte (`id`) wird implizit in jeder Entity angelegt und im Diagramm ausgeblendet
+- Im UI und Diagramm wird der konzeptuelle Name (`type`) verwendet
+- In der API und Datenbank wird der technische Name (`type_id`) verwendet
+
+**Vorteile:**
+- Das Datenmodell ist abstrakt und lesbarer
+- Keine "Reference to X"-Annotation mehr nötig
+- Der Typ selbst zeigt die Beziehung an
+
 ## Pattern Types
 
 ### TailSign

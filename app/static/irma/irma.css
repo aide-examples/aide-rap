@@ -101,6 +101,35 @@
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
+.irma-menu-bar .menu-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 0.8rem;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+}
+
+.irma-menu-bar .menu-checkbox:hover {
+    border-color: #2563eb;
+}
+
+.irma-menu-bar .menu-checkbox:has(input:checked) {
+    background: #dbeafe;
+    border-color: #2563eb;
+    color: #1d4ed8;
+}
+
+.irma-menu-bar .menu-checkbox input {
+    margin: 0;
+    cursor: pointer;
+}
+
 /* -----------------------------------------------------------------------------
    Main Content Split Layout
    ----------------------------------------------------------------------------- */
@@ -505,6 +534,16 @@
     color: #888;
 }
 
+/* FK Combobox (searchable input for large FK lists) */
+.form-input.fk-combobox {
+    width: 100%;
+}
+
+.form-input.fk-combobox::placeholder {
+    color: #9ca3af;
+    font-style: italic;
+}
+
 .field-error {
     font-size: 0.75rem;
     color: #dc2626;
@@ -792,23 +831,6 @@
     font-style: italic;
 }
 
-/* Hover-only fields: hidden by default, shown on node hover */
-.tree-attribute.hover-field,
-.tree-fk-node.hover-field {
-    display: none;
-}
-
-.tree-node:hover .tree-attribute.hover-field,
-.tree-node:hover .tree-fk-node.hover-field,
-.tree-fk-content .tree-attribute.hover-field {
-    display: flex;
-    opacity: 0.7;
-}
-
-.tree-node:hover .tree-fk-node.hover-field {
-    display: block;
-}
-
 /* Foreign key nodes */
 .tree-fk-node {
     margin: 4px 0;
@@ -995,14 +1017,6 @@
     font-style: italic;
 }
 
-.tree-attr-table td.hover-field {
-    opacity: 0.6;
-}
-
-.tree-node:hover .tree-attr-table td.hover-field {
-    opacity: 1;
-}
-
 /* -----------------------------------------------------------------------------
    Entity Table View
    ----------------------------------------------------------------------------- */
@@ -1113,17 +1127,6 @@
     color: #1d4ed8;
 }
 
-.entity-table .fk-entity-badge {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 5px;
-    background: #e0e7ff;
-    color: #4f46e5;
-    font-size: 0.65rem;
-    border-radius: 3px;
-    font-weight: 500;
-}
-
 /* Actions cell */
 .entity-table .actions-cell {
     text-align: center;
@@ -1196,16 +1199,20 @@
 
 /* Back-reference columns in table */
 .entity-table th.backref-column {
-    background: #fef3c7;
-    color: #92400e;
+    /* background-color set via inline style (area color) */
+    color: #333;
     font-weight: 500;
     text-align: center;
-    white-space: nowrap;
+}
+
+.entity-table th.backref-column .backref-entity {
+    display: block;
 }
 
 .entity-table th.backref-column .backref-field {
+    display: block;
     font-size: 0.7rem;
-    color: #b45309;
+    color: #555;
     font-weight: 400;
 }
 
@@ -1716,14 +1723,15 @@
 
 /* Result Table */
 .result-table-wrapper {
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: auto;
     max-height: 300px;
 }
 
 .seed-preview-table {
-    width: 100%;
     border-collapse: collapse;
     font-size: 0.8rem;
+    white-space: nowrap;
 }
 
 .seed-preview-table th {

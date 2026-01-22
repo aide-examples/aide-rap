@@ -66,9 +66,79 @@ function loadSeedData(entityName) {
 }
 
 /**
- * Insert seed records
+ * Build a lookup map for an entity: LABEL value -> id
+ * Used to resolve conceptual FK references (e.g., "manufacturer": "Airbus" -> manufacturer_id: 1)
  */
-function insertRecords(entityName, records) {
+function buildLabelLookup(entityName) {
+  const db = getDatabase();
+  const schema = getSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) return {};
+
+  // Find the LABEL column (primary display field)
+  const labelCol = entity.columns.find(c => c.ui?.label);
+  if (!labelCol) return {};
+
+  const sql = `SELECT id, ${labelCol.name} FROM ${entity.tableName}`;
+  const rows = db.prepare(sql).all();
+
+  const lookup = {};
+  for (const row of rows) {
+    lookup[row[labelCol.name]] = row.id;
+  }
+
+  return lookup;
+}
+
+/**
+ * Resolve conceptual FK references in a record.
+ * Converts { "manufacturer": "Airbus" } to { "manufacturer_id": 1 }
+ *
+ * @param {string} entityName - The entity being seeded
+ * @param {object} record - The seed record (may have conceptual or technical FK names)
+ * @param {object} lookups - Pre-built lookup maps for all entities
+ * @returns {object} - Record with resolved FK IDs
+ */
+function resolveConceptualFKs(entityName, record, lookups) {
+  const schema = getSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) return record;
+
+  const resolved = { ...record };
+
+  for (const fk of entity.foreignKeys) {
+    const conceptualName = fk.displayName;  // e.g., "manufacturer"
+    const technicalName = fk.column;        // e.g., "manufacturer_id"
+    const targetEntity = fk.references.entity; // e.g., "AircraftManufacturer"
+
+    // Check if record uses conceptual name (e.g., "manufacturer": "Airbus")
+    if (conceptualName && conceptualName in record && typeof record[conceptualName] === 'string') {
+      const labelValue = record[conceptualName];
+      const lookup = lookups[targetEntity] || {};
+      const resolvedId = lookup[labelValue];
+
+      if (resolvedId !== undefined) {
+        // Replace conceptual name with technical name and resolved ID
+        resolved[technicalName] = resolvedId;
+        delete resolved[conceptualName];
+      } else {
+        console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
+      }
+    }
+  }
+
+  return resolved;
+}
+
+/**
+ * Insert seed records
+ * @param {string} entityName - Entity name
+ * @param {Array} records - Seed records (may use conceptual FK names)
+ * @param {object} lookups - Pre-built lookup maps for FK resolution
+ */
+function insertRecords(entityName, records, lookups = {}) {
   const db = getDatabase();
   const schema = getSchema();
   const entity = schema.entities[entityName];
@@ -86,7 +156,9 @@ function insertRecords(entityName, records) {
 
   let count = 0;
   for (const record of records) {
-    const values = columns.map(col => record[col] ?? null);
+    // Resolve conceptual FK references (e.g., "manufacturer": "Airbus" -> "manufacturer_id": 1)
+    const resolved = resolveConceptualFKs(entityName, record, lookups);
+    const values = columns.map(col => resolved[col] ?? null);
     try {
       insert.run(...values);
       count++;
@@ -162,13 +234,19 @@ async function main() {
   }
 
   // Load and insert seed data
+  // Build lookup maps incrementally as entities are seeded (for FK resolution)
   console.log('\nLoading seed data...');
+
+  const lookups = {};
 
   for (const name of toSeed) {
     const records = loadSeedData(name);
     if (records.length > 0) {
-      const count = insertRecords(name, records);
+      const count = insertRecords(name, records, lookups);
       console.log(`  ${name}: ${count} records`);
+
+      // Update lookup for this entity (so subsequent entities can reference it)
+      lookups[name] = buildLabelLookup(name);
     }
   }
 

@@ -221,10 +221,12 @@ ${Object.keys(fkSummary).length > 0 ? JSON.stringify(fkSummary, null, 2) : 'None
 - Respect all type constraints:
   - Pattern types: values must match the regex pattern
   - Enum types: use the INTERNAL value (first in mapping)
-- IMPORTANT: For foreign keys, use ONLY the IDs listed above. Do NOT invent new entities!
-  - The "Available Foreign Key References" section shows ALL existing records
-  - Use the "label" field to understand what each ID represents
-  - Only create records that reference existing IDs
+- IMPORTANT: For foreign keys, use the LABEL value (not the ID)!
+  - The "Available Foreign Key References" section shows all existing records
+  - Use the conceptual field name without "_id" suffix (e.g., use "type" instead of "type_id")
+  - Example: Instead of "type_id": 3, write "type": "A320neo"
+  - The system will automatically resolve labels to IDs
+  - Only create records that reference existing labels from the list above
 - Generate realistic, consistent data
 - Do NOT include the "id" field if it's auto-generated (READONLY)
 - Keep field values concise to fit within response limits

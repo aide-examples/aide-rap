@@ -1,3 +1,13 @@
 #!/bin/bash
 cd "$(dirname "$0")/app"
+
+# Load nvm and use correct Node version (for Claude Code compatibility)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# Use Node 24 if available (matches better-sqlite3 build)
+if command -v nvm &> /dev/null && nvm ls 24 &> /dev/null; then
+    nvm use 24 --silent
+fi
+
 node irma.js "$@"

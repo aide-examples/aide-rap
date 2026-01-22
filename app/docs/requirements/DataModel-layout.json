@@ -1,21 +1,21 @@
 {
   "_comment": "Layout positions for DataModel diagram. Edit x/y values to reposition classes.",
   "canvas": {
-    "width": 1000,
+    "width": 1200,
     "height": 1200
   },
   "classes": {
     "AircraftManufacturer": {
-      "x": 630,
-      "y": 30
+      "x": 820,
+      "y": 70
     },
     "EngineManufacturer": {
       "x": 30,
       "y": 530
     },
     "AircraftType": {
-      "x": 420,
-      "y": 30
+      "x": 630,
+      "y": 60
     },
     "EngineType": {
       "x": 220,
@@ -30,16 +30,12 @@
       "y": 870
     },
     "Operator": {
-      "x": 20,
-      "y": 30
-    },
-    "Fleet": {
-      "x": 200,
-      "y": 30
+      "x": 40,
+      "y": 70
     },
     "Aircraft": {
       "x": 420,
-      "y": 170
+      "y": 30
     },
     "Engine": {
       "x": 420,
@@ -58,15 +54,15 @@
       "y": 540
     },
     "MRO": {
-      "x": 850,
+      "x": 810,
       "y": 250
     },
     "RepairShop": {
-      "x": 850,
+      "x": 810,
       "y": 390
     },
     "RepairOrder": {
-      "x": 850,
+      "x": 810,
       "y": 540
     },
     "Task": {
@@ -82,8 +78,8 @@
       "y": 890
     },
     "FleetMember": {
-      "x": 220,
-      "y": 170
+      "x": 230,
+      "y": 190
     }
   }
 }

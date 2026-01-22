@@ -12,12 +12,13 @@ const EntityExplorer = {
   filterInput: null,
   btnNew: null,
   btnViewTable: null,
-  btnViewTree: null,
+  btnViewTreeH: null,
+  btnViewTreeV: null,
   currentEntity: null,
   records: [],
   selectedId: null,
   filterTimeout: null,
-  viewMode: 'tree', // 'table' or 'tree'
+  viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
 
   async init() {
     this.selector = document.getElementById('entity-selector');
@@ -28,7 +29,8 @@ const EntityExplorer = {
     this.filterInput = document.getElementById('filter-input');
     this.btnNew = document.getElementById('btn-new');
     this.btnViewTable = document.getElementById('btn-view-table');
-    this.btnViewTree = document.getElementById('btn-view-tree');
+    this.btnViewTreeH = document.getElementById('btn-view-tree-h');
+    this.btnViewTreeV = document.getElementById('btn-view-tree-v');
 
     // Initialize components
     EntityTree.init('entity-tree-container');
@@ -36,8 +38,11 @@ const EntityExplorer = {
 
     // Restore view mode from session
     const savedViewMode = sessionStorage.getItem('viewMode');
-    if (savedViewMode && (savedViewMode === 'table' || savedViewMode === 'tree')) {
+    if (savedViewMode && ['table', 'tree-h', 'tree-v'].includes(savedViewMode)) {
       this.viewMode = savedViewMode;
+    } else if (savedViewMode === 'tree') {
+      // Migration from old 2-mode system
+      this.viewMode = 'tree-v';
     }
     this.updateViewToggle();
 
@@ -55,7 +60,8 @@ const EntityExplorer = {
     this.filterInput.addEventListener('input', () => this.onFilterChange());
     this.btnNew.addEventListener('click', () => this.onNewClick());
     this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
-    this.btnViewTree.addEventListener('click', () => this.setViewMode('tree'));
+    this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
+    this.btnViewTreeV.addEventListener('click', () => this.setViewMode('tree-v'));
 
     // Initially disable new button
     this.btnNew.disabled = true;
@@ -192,26 +198,48 @@ const EntityExplorer = {
   },
 
   setViewMode(mode) {
+    const oldMode = this.viewMode;
+    const wasTree = oldMode === 'tree-h' || oldMode === 'tree-v';
+    const isTree = mode === 'tree-h' || mode === 'tree-v';
+
     this.viewMode = mode;
     sessionStorage.setItem('viewMode', this.viewMode);
     this.updateViewToggle();
-    this.renderCurrentView();
+
+    // Only re-render if switching between table and tree
+    // Tree-to-tree switches are handled by setAttributeLayout() which preserves expanded nodes
+    if (wasTree && isTree) {
+      // Layout change already triggered re-render via setAttributeLayout()
+      // No need to call renderCurrentView()
+    } else {
+      this.renderCurrentView();
+    }
   },
 
   updateViewToggle() {
+    const isTree = this.viewMode === 'tree-h' || this.viewMode === 'tree-v';
+
     // Update button states
     this.btnViewTable.classList.toggle('active', this.viewMode === 'table');
-    this.btnViewTree.classList.toggle('active', this.viewMode === 'tree');
+    this.btnViewTreeH.classList.toggle('active', this.viewMode === 'tree-h');
+    this.btnViewTreeV.classList.toggle('active', this.viewMode === 'tree-v');
 
     // Show/hide containers
     this.tableContainer.classList.toggle('hidden', this.viewMode !== 'table');
-    this.treeContainer.classList.toggle('hidden', this.viewMode !== 'tree');
+    this.treeContainer.classList.toggle('hidden', !isTree);
+
+    // Update EntityTree attribute layout based on view mode
+    // This will re-render the tree if layout changed, preserving expanded nodes
+    if (isTree) {
+      EntityTree.setAttributeLayout(this.viewMode === 'tree-h' ? 'row' : 'list');
+    }
   },
 
   renderCurrentView() {
     if (this.viewMode === 'table') {
       this.renderTable();
     } else {
+      // Both tree-h and tree-v use the tree renderer
       this.renderTree();
     }
   },

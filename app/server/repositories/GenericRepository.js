@@ -124,6 +124,7 @@ function handleSqliteError(err, entityName, operation, data = {}) {
 
 /**
  * Find all records of an entity
+ * Uses the View (with FK labels) for reading
  * @param {string} entityName - Entity name (e.g., 'Aircraft')
  * @param {Object} options - { sort, order, filter, limit, offset }
  */
@@ -131,7 +132,9 @@ function findAll(entityName, options = {}) {
   const entity = getEntityMeta(entityName);
   const db = getDatabase();
 
-  let sql = `SELECT * FROM ${entity.tableName}`;
+  // Read from View (includes _label fields for FKs)
+  const viewName = entity.tableName + '_view';
+  let sql = `SELECT * FROM ${viewName}`;
   const params = [];
 
   // Filter: supports two formats:
@@ -222,12 +225,15 @@ function findAll(entityName, options = {}) {
 
 /**
  * Find a single record by ID
+ * Uses the View (with FK labels) for reading unless enrich=false (internal use)
  */
 function findById(entityName, id, enrich = true) {
   const entity = getEntityMeta(entityName);
   const db = getDatabase();
 
-  const row = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id = ?`).get(id);
+  // Read from View (includes _label fields for FKs) unless enrich=false
+  const source = enrich ? entity.tableName + '_view' : entity.tableName;
+  const row = db.prepare(`SELECT * FROM ${source} WHERE id = ?`).get(id);
 
   if (!row) {
     throw new EntityNotFoundError(entityName, id);
@@ -392,16 +398,9 @@ function getSchemaInfo(entityName) {
  * Get extended schema info with UI metadata
  *
  * Tag meanings:
- * - [LABEL], [LABEL2]: Fields used for display label AND basic view (Grundansicht)
- * - [DETAIL]: Additional fields to show in basic view (Grundansicht)
- * - [HOVER]: (legacy) Explicit hover-only
- * - [HIDDEN]: Never visible
+ * - [LABEL], [LABEL2]: Fields used for display label (title/subtitle)
+ * - [HIDDEN]: Never visible in UI
  * - [READONLY]: Not editable
- *
- * Field visibility logic:
- * - detailFields: Fields marked [LABEL], [LABEL2], or [DETAIL] - always visible when expanded
- * - hoverFields: All other fields (except hidden) - only visible on hover/focus
- * - hiddenFields: Fields marked [HIDDEN] - never visible
  */
 function getExtendedSchemaInfo(entityName) {
   const entity = getEntityMeta(entityName);
@@ -409,30 +408,15 @@ function getExtendedSchemaInfo(entityName) {
 
   // Collect UI annotation fields
   const labelFields = [];
-  const detailFields = [];
-  const hoverFields = [];
   const readonlyFields = ['id']; // id is always readonly
   const hiddenFields = [];
 
   for (const col of entity.columns) {
-    const isLabel = col.ui?.label || col.ui?.label2;
-    const isDetail = col.ui?.detail;
-    const isHidden = col.ui?.hidden;
-
     // labelFields are for display purposes (title/subtitle)
     if (col.ui?.label) labelFields.push(col.name);
     if (col.ui?.label2) labelFields.push(col.name);
     if (col.ui?.readonly && col.name !== 'id') readonlyFields.push(col.name);
-
-    if (isHidden) {
-      hiddenFields.push(col.name);
-    } else if (isLabel || isDetail) {
-      // LABEL, LABEL2, DETAIL fields are always visible in Grundansicht
-      detailFields.push(col.name);
-    } else {
-      // All other fields are hover-only
-      hoverFields.push(col.name);
-    }
+    if (col.ui?.hidden) hiddenFields.push(col.name);
   }
 
   // Get back-references (entities that reference this one)
@@ -450,14 +434,24 @@ function getExtendedSchemaInfo(entityName) {
     areaName: areaInfo.name,
     areaColor: areaInfo.color,
     columns: entity.columns.map(col => {
+      // For FK columns, get the area color of the target entity
+      let fkInfo = null;
+      if (col.foreignKey) {
+        const targetEntity = schema.entities[col.foreignKey.entity];
+        const targetAreaKey = targetEntity?.area || 'unknown';
+        const targetAreaInfo = schema.areas[targetAreaKey] || { name: 'Unknown', color: '#f5f5f5' };
+        fkInfo = {
+          entity: col.foreignKey.entity,
+          table: col.foreignKey.table,
+          areaColor: targetAreaInfo.color
+        };
+      }
+
       const colInfo = {
         name: col.name,
         type: col.jsType,
         required: col.required,
-        foreignKey: col.foreignKey ? {
-          entity: col.foreignKey.entity,
-          table: col.foreignKey.table
-        } : null,
+        foreignKey: fkInfo,
         ui: col.ui || null
       };
 
@@ -475,15 +469,20 @@ function getExtendedSchemaInfo(entityName) {
     }),
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
-      detailFields: detailFields.length > 0 ? detailFields : null,
-      hoverFields: hoverFields.length > 0 ? hoverFields : null,
       readonlyFields,
       hiddenFields: hiddenFields.length > 0 ? hiddenFields : null
     },
-    backReferences: inverseRels.map(rel => ({
-      entity: rel.entity,
-      column: rel.column
-    })),
+    backReferences: inverseRels.map(rel => {
+      // Get area color of the referencing entity
+      const refEntity = schema.entities[rel.entity];
+      const refAreaKey = refEntity?.area || 'unknown';
+      const refAreaInfo = schema.areas[refAreaKey] || { name: 'Unknown', color: '#f5f5f5' };
+      return {
+        entity: rel.entity,
+        column: rel.column,
+        areaColor: refAreaInfo.color
+      };
+    }),
     validationRules: entity.validationRules,
     // Include enumFields for client-side value formatting
     enumFields: entity.enumFields || {}
@@ -500,12 +499,19 @@ function getEnabledEntities() {
 
 /**
  * Get list of all enabled entities with area info
+ * Preserves the order from config.json enabledEntities
  */
 function getEnabledEntitiesWithAreas() {
   const schema = getSchema();
   const entities = [];
 
-  for (const [name, entity] of Object.entries(schema.entities)) {
+  // Use enabledEntities order from config (preserves user-defined order)
+  const orderedNames = schema.enabledEntities || Object.keys(schema.entities);
+
+  for (const name of orderedNames) {
+    const entity = schema.entities[name];
+    if (!entity) continue;
+
     const areaKey = entity.area || 'unknown';
     const areaInfo = schema.areas[areaKey] || { name: 'Unknown', color: '#f5f5f5' };
 
@@ -516,14 +522,6 @@ function getEnabledEntitiesWithAreas() {
       areaColor: areaInfo.color
     });
   }
-
-  // Sort by area, then by name
-  entities.sort((a, b) => {
-    if (a.areaName !== b.areaName) {
-      return a.areaName.localeCompare(b.areaName);
-    }
-    return a.name.localeCompare(b.name);
-  });
 
   return { entities, areas: schema.areas };
 }
@@ -545,15 +543,18 @@ function getBackReferences(entityName, id) {
     const refEntity = schema.entities[rel.entity];
     if (!refEntity) continue;
 
-    // Get referencing records
-    const sql = `SELECT * FROM ${refEntity.tableName} WHERE ${rel.column} = ? ORDER BY id ASC`;
+    // Get referencing records from View (includes _label fields)
+    const viewName = refEntity.tableName + '_view';
+    const sql = `SELECT * FROM ${viewName} WHERE ${rel.column} = ? ORDER BY id ASC`;
     const rows = db.prepare(sql).all(id);
 
     if (rows.length > 0) {
+      // Enrich with enum display values
+      const enrichedRows = enrichRecords(rel.entity, rows);
       references[rel.entity] = {
         column: rel.column,
         count: rows.length,
-        records: rows
+        records: enrichedRows
       };
     }
   }

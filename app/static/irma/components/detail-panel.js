@@ -8,7 +8,13 @@ const DetailPanel = {
   content: null,
   toggleBtn: null,
   expandBtn: null,
+  showIdsToggle: null,
   isCollapsed: false,
+  showIds: false,
+
+  // Current record state (for re-rendering when toggle changes)
+  currentEntity: null,
+  currentRecord: null,
 
   init() {
     this.panel = document.getElementById('detail-panel');
@@ -16,11 +22,26 @@ const DetailPanel = {
     this.content = document.getElementById('panel-content');
     this.toggleBtn = document.getElementById('panel-toggle');
     this.expandBtn = document.getElementById('panel-expand');
+    this.showIdsToggle = document.getElementById('show-ids-toggle');
 
     // Restore collapsed state from session
     this.isCollapsed = sessionStorage.getItem('panelCollapsed') === 'true';
     if (this.isCollapsed) {
       this.collapse();
+    }
+
+    // Restore show IDs state from session
+    this.showIds = sessionStorage.getItem('showIds') === 'true';
+    if (this.showIdsToggle) {
+      this.showIdsToggle.checked = this.showIds;
+      this.showIdsToggle.addEventListener('change', () => {
+        this.showIds = this.showIdsToggle.checked;
+        sessionStorage.setItem('showIds', this.showIds);
+        // Re-render current record if any
+        if (this.currentEntity && this.currentRecord) {
+          this.showRecord(this.currentEntity, this.currentRecord);
+        }
+      });
     }
 
     // Event listeners
@@ -65,12 +86,26 @@ const DetailPanel = {
   },
 
   async showRecord(entityName, record) {
+    // Store for re-rendering when toggle changes
+    this.currentEntity = entityName;
+    this.currentRecord = record;
+
     this.setTitle(`${entityName} #${record.id}`);
 
     // Use extended schema for enum value formatting
     const schema = await SchemaCache.getExtended(entityName);
 
     let html = '<div class="record-details">';
+
+    // Show record's own ID if showIds is enabled
+    if (this.showIds) {
+      html += `
+        <div class="detail-row detail-row-id">
+          <span class="detail-label">id</span>
+          <span class="detail-value detail-value-id">${record.id}</span>
+        </div>
+      `;
+    }
 
     for (const col of schema.columns) {
       const value = record[col.name];
@@ -80,6 +115,21 @@ const DetailPanel = {
       } else {
         // Use ValueFormatter to convert enum internal->external
         displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+      }
+
+      // For FK columns, show both label and ID when showIds is enabled
+      const isFK = col.foreignKey && value != null;
+      let idSuffix = '';
+      if (this.showIds && isFK) {
+        idSuffix = ` <span class="detail-fk-id">[id:${value}]</span>`;
+        // Use _label field if available
+        const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
+        const labelField = displayName + '_label';
+        if (record[labelField]) {
+          displayValue = this.escapeHtml(record[labelField]) + idSuffix;
+        } else {
+          displayValue = displayValue + idSuffix;
+        }
       }
 
       html += `
@@ -166,6 +216,22 @@ detailStyle.textContent = `
   .detail-value em {
     color: #aaa;
     font-style: italic;
+  }
+  .detail-row-id {
+    background-color: #f8f9fa;
+    margin: -8px -12px 8px -12px;
+    padding: 8px 12px;
+    border-radius: 4px;
+  }
+  .detail-value-id {
+    font-family: monospace;
+    color: #666;
+  }
+  .detail-fk-id {
+    font-family: monospace;
+    font-size: 0.8em;
+    color: #888;
+    margin-left: 4px;
   }
 `;
 document.head.appendChild(detailStyle);

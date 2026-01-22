@@ -55,9 +55,40 @@ class DiagramGenerator {
 
         this.areas = this.model.areas || {};
         this.classes = this.model.classes || {};
-        this.relationships = this.model.relationships || [];
         this.positions = this.layout.classes || {};
         this.canvas = this.layout.canvas || { width: 1200, height: 900 };
+
+        // Derive relationships from FK attributes (conceptual notation)
+        this.relationships = this.deriveRelationshipsFromFKs();
+    }
+
+    /**
+     * Derive relationships from FK attributes.
+     * In conceptual notation, an attribute with type = EntityName is a FK.
+     */
+    deriveRelationshipsFromFKs() {
+        const relationships = [];
+        const entityNames = Object.keys(this.classes);
+
+        for (const [className, classDef] of Object.entries(this.classes)) {
+            const attrs = classDef.attributes || [];
+            for (const attr of attrs) {
+                // Extract base type (remove [DEFAULT=...] etc.)
+                const baseType = (attr.type || '').replace(/\s*\[[^\]]+\]/g, '').trim();
+
+                // Check if type is an entity name (FK reference)
+                if (entityNames.includes(baseType)) {
+                    relationships.push({
+                        from: className,
+                        to: baseType,
+                        attribute: attr.name,
+                        from_cardinality: '*'
+                    });
+                }
+            }
+        }
+
+        return relationships;
     }
 
     getPosition(className) {
@@ -71,14 +102,22 @@ class DiagramGenerator {
         return areaDef.color || '#FFFFFF';
     }
 
+    /**
+     * Get visible attributes (filter out 'id' - it's implicit)
+     */
+    getVisibleAttributes(className) {
+        const classDef = this.classes[className] || {};
+        const attrs = classDef.attributes || [];
+        return attrs.filter(a => a.name !== 'id');
+    }
+
     getBoxHeight(className, showAttributes) {
         if (!showAttributes) {
             return DiagramGenerator.BOX_HEIGHT_COMPACT;
         }
 
-        const classDef = this.classes[className] || {};
-        const attrs = classDef.attributes || [];
-        return DiagramGenerator.HEADER_HEIGHT + attrs.length * DiagramGenerator.ATTR_LINE_HEIGHT + DiagramGenerator.BOX_PADDING;
+        const visibleAttrs = this.getVisibleAttributes(className);
+        return DiagramGenerator.HEADER_HEIGHT + visibleAttrs.length * DiagramGenerator.ATTR_LINE_HEIGHT + DiagramGenerator.BOX_PADDING;
     }
 
     getBoxCenter(className, showAttributes) {
@@ -164,10 +203,9 @@ class DiagramGenerator {
                 `stroke="${DiagramGenerator.STROKE_COLOR}" stroke-width="1"/>`
             );
 
-            const classDef = this.classes[className] || {};
-            const attrs = classDef.attributes || [];
-            for (let i = 0; i < attrs.length; i++) {
-                const attr = attrs[i];
+            const visibleAttrs = this.getVisibleAttributes(className);
+            for (let i = 0; i < visibleAttrs.length; i++) {
+                const attr = visibleAttrs[i];
                 const attrY = sepY + (i + 1) * DiagramGenerator.ATTR_LINE_HEIGHT - 2;
                 const cleanType = cleanTypeForDisplay(attr.type);
                 const attrText = `${attr.name}: ${cleanType}`;
@@ -332,7 +370,7 @@ if (require.main === module) {
     // Find paths relative to script location
     const scriptDir = path.join(__dirname, '..', 'app', 'docs', 'requirements');
     modelPath = modelPath || path.join(scriptDir, 'DataModel.yaml');
-    layoutPath = layoutPath || path.join(scriptDir, 'layout.json');
+    layoutPath = layoutPath || path.join(scriptDir, 'DataModel-layout.json');
 
     const generator = new DiagramGenerator(modelPath, layoutPath);
     const svg = generator.generate({

@@ -11,7 +11,7 @@ Algorithmisch berechnete FK-Beziehungen, die:
 
 **Beispiel: Aircraft.current_operator_id**
 - Finde FleetMember wo `aircraft_id = Aircraft.id` UND `exit_date IS NULL OR exit_date > TODAY`
-- Von dort: `fleet_id` → Fleet → `operator_id` → Operator
+- Von dort: `operator_id` → Operator
 - Es darf nur einen aktiven FleetMember geben
 
 **Wichtig:** Der Wechsel wird oft **vordatiert** eingegeben (exit_date in der Zukunft).
@@ -31,7 +31,7 @@ Das berechnete Attribut wird **in der Attribut-Tabelle** mit einer Annotation de
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
 | ... | ... | ... | ... |
-| current_operator_id | int | Reference to Operator [READONLY] [DAILY=FleetMember[exit_date=null OR exit_date>TODAY].fleet.operator] | 5 |
+| current_operator_id | int | Reference to Operator [READONLY] [DAILY=FleetMember[exit_date=null OR exit_date>TODAY].operator] | 5 |
 ```
 
 ### Annotation-Syntax
@@ -54,9 +54,8 @@ Das berechnete Attribut wird **in der Attribut-Tabelle** mit einer Annotation de
 ## Regel-Syntax (Rule)
 
 ```
-FleetMember[exit_date=null OR exit_date>TODAY].fleet.operator
-│          │                                  │     └── FK: operator_id → Operator
-│          │                                  └── FK: fleet_id → Fleet
+FleetMember[exit_date=null OR exit_date>TODAY].operator
+│          │                                  └── FK: operator_id → Operator
 │          └── Filter: WHERE exit_date IS NULL OR exit_date > CURRENT_DATE
 └── Start-Entity: WHERE aircraft_id = self.id (Konvention)
 ```
@@ -75,10 +74,9 @@ FleetMember[exit_date=null OR exit_date>TODAY].fleet.operator
 ### Pfad-Navigation
 
 Nach dem Filter folgt ein Pfad durch FK-Beziehungen:
-- `.fleet` → navigiert über `fleet_id` zur Fleet-Entity
 - `.operator` → navigiert über `operator_id` zur Operator-Entity
 
-Die FK-Spalte wird automatisch aus dem Entity-Namen abgeleitet (`fleet` → `fleet_id`).
+Die FK-Spalte wird automatisch aus dem Entity-Namen abgeleitet (`operator` → `operator_id`).
 
 ---
 
@@ -110,7 +108,7 @@ Neben der ID kann auch das **Display-Label** des Ziel-Records gespeichert werden
 
 ---
 
-## Beispiel: Ablauf bei vordatiertem Fleet-Wechsel
+## Beispiel: Ablauf bei vordatiertem Operator-Wechsel
 
 ```
 Szenario: Aircraft D-AIUA wechselt am 2024-02-01 von Lufthansa zu Eurowings

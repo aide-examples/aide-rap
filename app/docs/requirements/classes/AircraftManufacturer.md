@@ -4,7 +4,6 @@ Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
 
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| id | int | Primary key [READONLY] | 1 |
 | name | string | Company name [LABEL] | Airbus |
 | country | string | Country of origin [LABEL2] | France |
 | icao_code | string | ICAO identifier | AIB |

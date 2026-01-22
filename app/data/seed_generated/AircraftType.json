@@ -1,24 +1,17 @@
 [
   {
     "designation": "A319-100",
-    "name": "Airbus A319",
+    "name": "Airbus A319-100",
     "manufacturer_id": 1,
     "max_passengers": 138,
     "max_range_nm": 3700
   },
   {
     "designation": "A320-200",
-    "name": "Airbus A320",
+    "name": "Airbus A320-200",
     "manufacturer_id": 1,
-    "max_passengers": 180,
+    "max_passengers": 168,
     "max_range_nm": 3300
-  },
-  {
-    "designation": "A321-200",
-    "name": "Airbus A321",
-    "manufacturer_id": 1,
-    "max_passengers": 220,
-    "max_range_nm": 3200
   },
   {
     "designation": "A320neo",
@@ -28,94 +21,122 @@
     "max_range_nm": 3500
   },
   {
+    "designation": "A321-100",
+    "name": "Airbus A321-100",
+    "manufacturer_id": 1,
+    "max_passengers": 200,
+    "max_range_nm": 3200
+  },
+  {
+    "designation": "A321-200",
+    "name": "Airbus A321-200",
+    "manufacturer_id": 1,
+    "max_passengers": 200,
+    "max_range_nm": 3200
+  },
+  {
     "designation": "A321neo",
     "name": "Airbus A321neo",
     "manufacturer_id": 1,
-    "max_passengers": 220,
-    "max_range_nm": 4000
+    "max_passengers": 215,
+    "max_range_nm": 3500
+  },
+  {
+    "designation": "A321F",
+    "name": "Airbus A321 Freighter",
+    "manufacturer_id": 1,
+    "max_passengers": 0,
+    "max_range_nm": 1900
+  },
+  {
+    "designation": "A330-200",
+    "name": "Airbus A330-200",
+    "manufacturer_id": 1,
+    "max_passengers": 270,
+    "max_range_nm": 7250
   },
   {
     "designation": "A330-300",
     "name": "Airbus A330-300",
     "manufacturer_id": 1,
-    "max_passengers": 250,
+    "max_passengers": 255,
     "max_range_nm": 6350
   },
   {
     "designation": "A340-300",
     "name": "Airbus A340-300",
     "manufacturer_id": 1,
-    "max_passengers": 250,
-    "max_range_nm": 7200
+    "max_passengers": 279,
+    "max_range_nm": 7300
   },
   {
     "designation": "A340-600",
     "name": "Airbus A340-600",
     "manufacturer_id": 1,
-    "max_passengers": 300,
-    "max_range_nm": 7500
+    "max_passengers": 297,
+    "max_range_nm": 7900
   },
   {
     "designation": "A350-900",
     "name": "Airbus A350-900",
     "manufacturer_id": 1,
-    "max_passengers": 300,
+    "max_passengers": 293,
     "max_range_nm": 8100
   },
   {
     "designation": "A380-800",
     "name": "Airbus A380-800",
     "manufacturer_id": 1,
-    "max_passengers": 500,
-    "max_range_nm": 8200
+    "max_passengers": 509,
+    "max_range_nm": 8000
   },
   {
     "designation": "747-400",
     "name": "Boeing 747-400",
     "manufacturer_id": 2,
-    "max_passengers": 416,
+    "max_passengers": 371,
     "max_range_nm": 7260
   },
   {
-    "designation": "747-8I",
+    "designation": "747-8",
     "name": "Boeing 747-8 Intercontinental",
     "manufacturer_id": 2,
-    "max_passengers": 467,
+    "max_passengers": 364,
     "max_range_nm": 7730
   },
   {
     "designation": "767-300ER",
     "name": "Boeing 767-300ER",
     "manufacturer_id": 2,
-    "max_passengers": 218,
-    "max_range_nm": 5600
+    "max_passengers": 211,
+    "max_range_nm": 5900
   },
   {
     "designation": "777-200ER",
     "name": "Boeing 777-200ER",
     "manufacturer_id": 2,
-    "max_passengers": 305,
-    "max_range_nm": 7700
+    "max_passengers": 306,
+    "max_range_nm": 7000
   },
   {
     "designation": "777-300ER",
     "name": "Boeing 777-300ER",
     "manufacturer_id": 2,
-    "max_passengers": 396,
+    "max_passengers": 340,
     "max_range_nm": 7370
+  },
+  {
+    "designation": "777F",
+    "name": "Boeing 777 Freighter",
+    "manufacturer_id": 2,
+    "max_passengers": 0,
+    "max_range_nm": 4970
   },
   {
     "designation": "787-9",
     "name": "Boeing 787-9 Dreamliner",
     "manufacturer_id": 2,
-    "max_passengers": 290,
+    "max_passengers": 294,
     "max_range_nm": 7635
-  },
-  {
-    "designation": "777-9",
-    "name": "Boeing 777-9",
-    "manufacturer_id": 2,
-    "max_passengers": 426,
-    "max_range_nm": 7600
   }
 ]

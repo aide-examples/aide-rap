@@ -15,19 +15,15 @@ classes:
   Aircraft:
     description: Individual aircraft identified by registration and serial number.
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: registration
         type: TailSign
         description: Aircraft registration [LABEL]
       - name: serial_number
         type: MSN
         description: Manufacturer serial number [LABEL2]
-      - name: type_id
-        type: int
-        description: Reference to AircraftType [DETAIL]
-      - name: manufacture_date
+      - name: type
+        type: AircraftType
+        description: Reference       - name: manufacture_date
         type: date
         description: Date of manufacture
       - name: total_flight_hours
@@ -42,11 +38,11 @@ classes:
       - name: maintenance_category
         type: MaintenanceCategory [DEFAULT=Line]
         description: Current maintenance category
-      - name: current_operator_id
-        type: int
+      - name: current_operator
+        type: Operator
         description: >-
-          Reference to Operator [READONLY] [DAILY=FleetMember[exit_date=null OR
-          exit_date>TODAY].fleet.operator]
+          [READONLY] [DAILY=FleetMember[exit_date=null OR
+          exit_date>TODAY].operator]
     area: operations
     types:
       MaintenanceCategory:
@@ -64,9 +60,6 @@ classes:
   AircraftManufacturer:
     description: Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: name
         type: string
         description: Company name [LABEL]
@@ -80,19 +73,15 @@ classes:
   AircraftType:
     description: Specific aircraft models (e.g., A320-200, B737-800, E190).
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: designation
         type: string
         description: Type designation [LABEL]
       - name: name
         type: string
         description: Full name [LABEL2]
-      - name: manufacturer_id
-        type: int
-        description: Reference to AircraftManufacturer [DETAIL]
-      - name: max_passengers
+      - name: manufacturer
+        type: AircraftManufacturer
+        description: Reference       - name: max_passengers
         type: int
         description: Maximum passenger capacity
       - name: max_range_nm
@@ -102,16 +91,12 @@ classes:
   Engine:
     description: Individual engine identified by serial number.
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: serial_number
         type: string
         description: Engine serial number [LABEL]
-      - name: type_id
-        type: int
-        description: Reference to EngineType [DETAIL]
-      - name: manufacture_date
+      - name: type
+        type: EngineType
+        description: Reference       - name: manufacture_date
         type: date
         description: Date of manufacture [LABEL2]
       - name: total_flight_hours
@@ -126,16 +111,11 @@ classes:
       Tracks which engine is installed on which aircraft at which position over
       time.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: engine_id
-        type: int
-        description: Reference to Engine
-      - name: aircraft_id
-        type: int
-        description: Reference to Aircraft
-      - name: position
+      - name: engine
+        type: Engine
+        description: Reference       - name: aircraft
+        type: Aircraft
+        description: Reference       - name: position
         type: int
         description: Engine position (1, 2, 3, 4)
       - name: installed_date
@@ -148,9 +128,6 @@ classes:
   EngineManufacturer:
     description: Manufacturers of engines (e.g., CFM, Pratt & Whitney, Rolls-Royce).
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: name
         type: string
         description: Company name [LABEL]
@@ -164,19 +141,15 @@ classes:
   EngineType:
     description: Specific engine models (e.g., CFM56-5B, PW1100G).
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: designation
         type: string
         description: Type designation [LABEL]
       - name: name
         type: string
         description: Full name [LABEL2]
-      - name: manufacturer_id
-        type: int
-        description: Reference to EngineManufacturer [DETAIL]
-      - name: thrust_lbs
+      - name: manufacturer
+        type: EngineManufacturer
+        description: Reference       - name: thrust_lbs
         type: int
         description: Thrust in pounds
     area: oem
@@ -185,13 +158,9 @@ classes:
       Discrepancy or defect discovered during task execution, requiring
       disposition.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: task_id
-        type: int
-        description: Reference to Task
-      - name: finding_number
+      - name: task
+        type: Task
+        description: Reference       - name: finding_number
         type: string
         description: Finding number [LABEL]
       - name: description
@@ -199,11 +168,9 @@ classes:
         description: Finding description [LABEL2]
       - name: severity
         type: FindingSeverity [DEFAULT=Minor]
-        description: Severity level [DETAIL]
-      - name: status
+        description: Severity level       - name: status
         type: FindingStatus [DEFAULT=Open]
-        description: Finding status [DETAIL]
-      - name: reported_date
+        description: Finding status       - name: reported_date
         type: date
         description: Date reported
       - name: resolved_date
@@ -241,62 +208,33 @@ classes:
           - internal: 5
             external: Closed
             description: Verified and closed
-  Fleet:
-    description: >-
-      A fleet represents the collection of aircraft of a specific type operated
-      by an operator.
-    attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
-      - name: name
-        type: string
-        description: Fleet name [LABEL] [READONLY]
-      - name: operator_id
-        type: int
-        description: Reference to Operator [DETAIL]
-      - name: type_id
-        type: int
-        description: Reference to AircraftType [DETAIL]
-      - name: base_location
-        type: string
-        description: Home base airport [LABEL2]
-    area: operations
   FleetMember:
     description: >-
-      An aircraft can move between fleets over time (e.g., wet lease, operator
-      change).
+      An aircraft can move between operators over time (e.g., wet lease,
+      operator change).
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
-      - name: fleet_id
-        type: int
-        description: Reference to Fleet [DETAIL]
-      - name: aircraft_id
-        type: int
-        description: Reference to Aircraft [DETAIL]
-      - name: entry_date
+      - name: operator
+        type: Operator
+        description: Reference       - name: aircraft
+        type: Aircraft
+        description: Reference       - name: entry_date
         type: date
-        description: Date aircraft joined fleet [LABEL2]
+        description: Date aircraft joined operator [LABEL2]
       - name: exit_date
         type: date
-        description: Date aircraft left fleet (null if active)
+        description: Date aircraft left operator (null if active)
     area: operations
   InspectionType:
     description: >-
       Scheduled inspection intervals (e.g., A-Check, C-Check, D-Check) with
       time/cycle limits.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
       - name: code
         type: string
-        description: Inspection code
+        description: Inspection code [LABEL]
       - name: name
         type: string
-        description: Inspection name
+        description: Inspection name [LABEL2]
       - name: description
         type: string
         description: Description
@@ -309,16 +247,12 @@ classes:
       - name: interval_days
         type: int
         description: Interval in calendar days
-      - name: maintenance_plan_id
-        type: int
-        description: Reference to MaintenancePlan
-    area: engine_management
+      - name: maintenance_plan
+        type: MaintenancePlan
+        description: Reference     area: engine_management
   MRO:
     description: Maintenance, Repair and Overhaul organization.
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: name
         type: string
         description: MRO name [LABEL]
@@ -334,15 +268,11 @@ classes:
       OEM-defined maintenance program for an engine type. Contains the scheduled
       maintenance tasks.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: engine_type_id
-        type: int
-        description: Reference to EngineType
-      - name: name
+      - name: engine_type
+        type: EngineType
+        description: Reference       - name: name
         type: string
-        description: Plan name
+        description: Plan name [LABEL]
       - name: revision
         type: string
         description: Revision number
@@ -355,18 +285,13 @@ classes:
       Individual task defined in the OEM maintenance plan, referencing a
       TaskType with specific intervals.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: maintenance_plan_id
-        type: int
-        description: Reference to MaintenancePlan
-      - name: task_type_id
-        type: int
-        description: Reference to TaskType
-      - name: task_code
+      - name: maintenance_plan
+        type: MaintenancePlan
+        description: Reference       - name: task_type
+        type: TaskType
+        description: Reference       - name: task_code
         type: string
-        description: OEM task code
+        description: OEM task code [LABEL]
       - name: description
         type: string
         description: Task description
@@ -380,9 +305,6 @@ classes:
   Operator:
     description: Airlines or aircraft operators (e.g., Lufthansa, Delta).
     attributes:
-      - name: id
-        type: int
-        description: Primary key [READONLY]
       - name: name
         type: string
         description: Operator name [LABEL]
@@ -401,18 +323,13 @@ classes:
       MRO's execution document corresponding 1:1 to a Workscope. Contains the
       actual tasks performed.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: workscope_id
-        type: int
-        description: Reference to Workscope
-      - name: mro_id
-        type: int
-        description: Reference to MRO
-      - name: order_number
+      - name: workscope
+        type: Workscope
+        description: Reference       - name: mro
+        type: MRO
+        description: Reference       - name: order_number
         type: string
-        description: MRO order number
+        description: MRO order number [LABEL]
       - name: status
         type: string
         description: Order status
@@ -426,15 +343,11 @@ classes:
   RepairShop:
     description: Specialized workshop within an MRO (e.g., engine shop, avionics shop).
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: mro_id
-        type: int
-        description: Reference to MRO
-      - name: name
+      - name: mro
+        type: MRO
+        description: Reference       - name: name
         type: string
-        description: Shop name
+        description: Shop name [LABEL]
       - name: specialization
         type: string
         description: Area of specialization
@@ -442,18 +355,13 @@ classes:
   Task:
     description: Individual maintenance task within a repair order.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
-      - name: repair_order_id
-        type: int
-        description: Reference to RepairOrder
-      - name: task_type_id
-        type: int
-        description: Reference to TaskType
-      - name: task_number
+      - name: repair_order
+        type: RepairOrder
+        description: Reference       - name: task_type
+        type: TaskType
+        description: Reference       - name: task_number
         type: string
-        description: Task number
+        description: Task number [LABEL]
       - name: description
         type: string
         description: Task description
@@ -466,15 +374,12 @@ classes:
       Classification of tasks (e.g., inspection, repair, replacement,
       modification).
     attributes:
-      - name: id
-        type: int
-        description: Primary key
       - name: code
         type: string
-        description: Task type code
+        description: Task type code [LABEL]
       - name: name
         type: string
-        description: Task type name
+        description: Task type name [LABEL2]
       - name: description
         type: string
         description: Description
@@ -484,122 +389,23 @@ classes:
       Planning document defining maintenance work to be performed on an engine.
       Created by Engine Management.
     attributes:
-      - name: id
-        type: int
-        description: Primary key
       - name: name
         type: string
-        description: Workscope name
+        description: Workscope name [LABEL]
       - name: description
         type: string
-        description: Description
-      - name: engine_id
-        type: int
-        description: Reference to Engine
-      - name: inspection_type_id
-        type: int
-        description: Reference to InspectionType
-      - name: planned_start
+        description: Description [LABEL2]
+      - name: engine
+        type: Engine
+        description: Reference       - name: inspection_type
+        type: InspectionType
+        description: Reference       - name: planned_start
         type: date
         description: Planned start date
       - name: planned_end
         type: date
         description: Planned end date
     area: engine_management
-relationships:
-  - from: Aircraft
-    to: AircraftType
-    attribute: type
-    from_cardinality: '*'
-  - from: Aircraft
-    to: Operator
-    attribute: current_operator
-    from_cardinality: '*'
-  - from: AircraftType
-    to: AircraftManufacturer
-    attribute: manufacturer
-    from_cardinality: '*'
-  - from: Engine
-    to: EngineType
-    attribute: type
-    from_cardinality: '*'
-  - from: EngineAssignment
-    to: Engine
-    attribute: engine
-    from_cardinality: '*'
-  - from: EngineAssignment
-    to: Aircraft
-    attribute: aircraft
-    from_cardinality: '*'
-  - from: EngineType
-    to: EngineManufacturer
-    attribute: manufacturer
-    from_cardinality: '*'
-  - from: Finding
-    to: Task
-    attribute: task
-    from_cardinality: '*'
-  - from: Fleet
-    to: Operator
-    attribute: operator
-    from_cardinality: '*'
-  - from: Fleet
-    to: AircraftType
-    attribute: type
-    from_cardinality: '*'
-  - from: FleetMember
-    to: Fleet
-    attribute: fleet
-    from_cardinality: '*'
-  - from: FleetMember
-    to: Aircraft
-    attribute: aircraft
-    from_cardinality: '*'
-  - from: InspectionType
-    to: MaintenancePlan
-    attribute: maintenance_plan
-    from_cardinality: '*'
-  - from: MaintenancePlan
-    to: EngineType
-    attribute: engine_type
-    from_cardinality: '*'
-  - from: MaintenancePlanTask
-    to: MaintenancePlan
-    attribute: maintenance_plan
-    from_cardinality: '*'
-  - from: MaintenancePlanTask
-    to: TaskType
-    attribute: task_type
-    from_cardinality: '*'
-  - from: RepairOrder
-    to: Workscope
-    attribute: workscope
-    from_cardinality: '1'
-    to_cardinality: '1'
-  - from: RepairOrder
-    to: MRO
-    attribute: mro
-    from_cardinality: '*'
-  - from: RepairShop
-    to: MRO
-    attribute: mro
-    from_cardinality: '*'
-  - from: Task
-    to: RepairOrder
-    attribute: repair_order
-    from_cardinality: '*'
-  - from: Task
-    to: TaskType
-    attribute: task_type
-    from_cardinality: '*'
-  - from: Workscope
-    to: Engine
-    attribute: engine
-    from_cardinality: '*'
-  - from: Workscope
-    to: InspectionType
-    attribute: inspection_type
-    from_cardinality: '*'
 globalTypes:
   TailSign:
     kind: pattern

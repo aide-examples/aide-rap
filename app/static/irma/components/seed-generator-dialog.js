@@ -169,18 +169,23 @@ const SeedGeneratorDialog = {
   renderResultTable() {
     if (!this.generatedData || !this.schema) return '';
 
-    // Get column names from schema (exclude id and internal columns)
-    const columns = this.schema.columns
-      .filter(c => !c.name.startsWith('_') && c.name !== 'id')
-      .map(c => c.name);
+    // Collect columns from actual data (shows what AI generated, including conceptual FK names)
+    const dataKeys = new Set();
+    for (const record of this.generatedData) {
+      Object.keys(record).forEach(k => {
+        // Exclude id (auto-generated) and internal columns
+        if (k !== 'id' && !k.startsWith('_')) dataKeys.add(k);
+      });
+    }
 
+    const columns = [...dataKeys];
     const headerCells = columns.map(c => `<th>${c}</th>`).join('');
 
     const rows = this.generatedData.map(record => {
       const cells = columns.map(col => {
         let value = record[col];
         if (value === null || value === undefined) {
-          return '<td class="null-value">null</td>';
+          return '<td class="null-value">-</td>';
         }
         // Truncate long values
         const strValue = String(value);

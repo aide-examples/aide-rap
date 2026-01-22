@@ -132,24 +132,17 @@ The external value (e.g., "Line", "Open") is automatically mapped to the interna
 
 ### UI Display Annotations
 
-| Tag | Description | Tree View Behavior |
-|-----|-------------|-------------------|
-| `[LABEL]` | Primary display label | Used as node title, **always visible** in expanded view |
-| `[LABEL2]` | Secondary display label | Used as node subtitle, **always visible** in expanded view |
-| `[DETAIL]` | Basic view field | **Always visible** when node is expanded ("Grundansicht") |
+| Tag | Description | Usage |
+|-----|-------------|-------|
+| `[LABEL]` | Primary display label | Used as node title in tree view, dropdown labels |
+| `[LABEL2]` | Secondary display label | Used as node subtitle, shown in parentheses |
 | `[READONLY]` | Non-editable field | Displayed but cannot be modified in forms |
 | `[HIDDEN]` | Never displayed | Field exists in DB but not shown in UI |
-
-**Visibility Logic:**
-- Fields marked with `[LABEL]`, `[LABEL2]`, or `[DETAIL]` are always visible when a tree node is expanded
-- All other fields are **hover-only** - they appear only when the cursor hovers over the node
-- `[HIDDEN]` fields are never displayed in the UI
 
 **Example:**
 ```
 | name | string | Company name [LABEL] | Airbus |
 | country | string | Country [LABEL2] | France |
-| type_id | int | Reference to AircraftType [DETAIL] | 5 |
 | internal_code | string | Internal system code | ABC123 |
 ```
-In this example: `name` and `country` are always visible (and used as title/subtitle), `type_id` is always visible (basic view), and `internal_code` only appears on hover.
+In this example: `name` is used as the primary label (tree node title), `country` as secondary label (subtitle).

@@ -430,6 +430,55 @@ app.post('/api/seed/reset-all', (req, res) => {
     }
 });
 
+// DEBUG: Test FK label lookup for an entity
+app.get('/api/seed/debug-lookup/:entity', (req, res) => {
+    try {
+        const { getSchema, getDatabase } = require('./server/config/database');
+        const schema = getSchema();
+        const db = getDatabase();
+        const entityName = req.params.entity;
+        const entity = schema.entities[entityName];
+
+        if (!entity) {
+            return res.status(404).json({ error: `Entity ${entityName} not found` });
+        }
+
+        // Find LABEL and LABEL2 columns
+        const labelCol = entity.columns.find(c => c.ui?.label);
+        const label2Col = entity.columns.find(c => c.ui?.label2);
+
+        // Build lookup
+        const selectCols = ['id'];
+        if (labelCol) selectCols.push(labelCol.name);
+        if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
+
+        const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName}`;
+        const rows = db.prepare(sql).all();
+
+        const lookup = {};
+        for (const row of rows) {
+            if (labelCol && row[labelCol.name]) {
+                lookup[row[labelCol.name]] = row.id;
+            }
+            if (label2Col && row[label2Col.name]) {
+                lookup[row[label2Col.name]] = row.id;
+            }
+        }
+
+        res.json({
+            entity: entityName,
+            labelCol: labelCol?.name || null,
+            label2Col: label2Col?.name || null,
+            rowCount: rows.length,
+            lookupKeys: Object.keys(lookup),
+            lookup
+        });
+    } catch (e) {
+        console.error(`Debug lookup error:`, e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Set active seed source (imported or generated)
 app.post('/api/seed/source', (req, res) => {
     try {

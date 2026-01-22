@@ -81,12 +81,7 @@ function parseConstraints(description) {
 
 /**
  * Parse UI annotations from description
- * Supported: [LABEL], [LABEL2], [DETAIL], [HOVER], [READONLY], [HIDDEN]
- *
- * Display logic:
- * - LABEL/LABEL2/DETAIL: Always visible in tree view ("Grundansicht")
- * - No tag: Only visible on hover/focus
- * - HIDDEN: Never visible
+ * Supported: [LABEL], [LABEL2], [READONLY], [HIDDEN]
  */
 function parseUIAnnotations(description) {
   const ui = {};
@@ -96,12 +91,6 @@ function parseUIAnnotations(description) {
   }
   if (/\[LABEL2\]/i.test(description)) {
     ui.label2 = true;
-  }
-  if (/\[DETAIL\]/i.test(description)) {
-    ui.detail = true;
-  }
-  if (/\[HOVER\]/i.test(description)) {
-    ui.hover = true;
   }
   if (/\[READONLY\]/i.test(description)) {
     ui.readonly = true;
@@ -504,8 +493,11 @@ function getTypeInfo(typeName, entityName) {
 
 /**
  * Generate schema for a single entity
+ * @param {string} className - Entity name
+ * @param {object} classDef - Class definition from markdown
+ * @param {string[]} allEntityNames - All known entity names (for FK detection via type)
  */
-function generateEntitySchema(className, classDef) {
+function generateEntitySchema(className, classDef, allEntityNames = []) {
   const tableName = toSnakeCase(className);
   const columns = [];
   const validationRules = {};
@@ -515,7 +507,7 @@ function generateEntitySchema(className, classDef) {
   const enumFields = {};  // Fields that are enums (for response enrichment)
 
   for (const attr of classDef.attributes || []) {
-    const name = attr.name;
+    let name = attr.name;
     const attrType = attr.type;
     const desc = attr.description || '';
     const example = attr.example || '';
@@ -526,24 +518,33 @@ function generateEntitySchema(className, classDef) {
     // Parse constraints from description
     const constraints = parseConstraints(desc);
 
-    // Detect foreign key from description
+    // Detect foreign key: Check if type is an entity name (conceptual notation)
+    // e.g., "type: AircraftType" means FK to AircraftType
     let foreignKey = null;
-    const fkMatch = desc.match(/Reference to (\w+)/);
-    if (fkMatch) {
-      const targetEntity = fkMatch[1];
+    let displayName = null;  // Conceptual name for UI/diagrams
+
+    const cleanType = extractTypeName(attrType);
+    if (allEntityNames.includes(cleanType)) {
+      // Conceptual FK notation: type is entity name
+      // e.g., "type: AircraftType" -> column: type_id, displayName: type
+      displayName = name;  // Keep conceptual name for display
+      name = name + '_id';  // DB column name with _id suffix
       foreignKey = {
-        table: toSnakeCase(targetEntity),
+        table: toSnakeCase(cleanType),
         column: 'id',
-        entity: targetEntity
+        entity: cleanType
       };
       foreignKeys.push({
         column: name,
+        displayName: displayName,
         references: foreignKey
       });
     }
 
     // Get type info (from TypeRegistry or TYPE_MAP)
-    const typeInfo = getTypeInfo(attrType, className);
+    // For conceptual FKs (type is entity name), use int type
+    const effectiveType = displayName ? 'int' : attrType;
+    const typeInfo = getTypeInfo(effectiveType, className);
 
     // Track enum fields for response enrichment
     if (typeInfo.isCustomType && typeInfo.typeDef?.kind === 'enum') {
@@ -579,6 +580,11 @@ function generateEntitySchema(className, classDef) {
       customType: typeInfo.isCustomType ? attrType : null,
       defaultValue
     };
+
+    // Add displayName for conceptual FK notation (for UI/diagrams)
+    if (displayName) {
+      column.displayName = displayName;
+    }
 
     if (foreignKey) {
       column.foreignKey = foreignKey;
@@ -640,6 +646,30 @@ function generateEntitySchema(className, classDef) {
 }
 
 /**
+ * Enrich FK metadata with labelFields from target entity
+ * This enables Views to generate label columns for FK references
+ *
+ * @param {Object} entities - All parsed entity schemas
+ */
+function enrichFKsWithLabelFields(entities) {
+  for (const entity of Object.values(entities)) {
+    for (const fk of entity.foreignKeys) {
+      const targetEntity = entities[fk.references.entity];
+      if (targetEntity) {
+        // Find LABEL and LABEL2 columns in target entity
+        const labelCol = targetEntity.columns.find(c => c.ui?.label);
+        const label2Col = targetEntity.columns.find(c => c.ui?.label2);
+
+        fk.labelFields = {
+          primary: labelCol?.name || null,
+          secondary: label2Col?.name || null
+        };
+      }
+    }
+  }
+}
+
+/**
  * Build dependency graph for topological sort (FK ordering)
  */
 function buildDependencyOrder(entities) {
@@ -694,6 +724,50 @@ function buildDependencyOrder(entities) {
 
   // Return in dependency order
   return sorted.map(name => entityMap[name]).filter(Boolean);
+}
+
+/**
+ * Generate SQL for creating a View with FK label columns
+ * The View joins the base table with FK target tables to include readable labels
+ *
+ * @param {Object} entity - Entity schema with foreignKeys and labelFields
+ * @returns {string|null} - SQL CREATE VIEW statement or null if no FKs with labels
+ */
+function generateViewSQL(entity) {
+  const baseTable = entity.tableName;
+  // Use first letter as alias, but ensure uniqueness by appending number if needed
+  const baseAlias = 'b';
+
+  const selects = [`${baseAlias}.*`];
+  const joins = [];
+  let joinAliasCounter = 0;
+
+  for (const fk of entity.foreignKeys) {
+    // Skip FKs without labelFields
+    if (!fk.labelFields?.primary) continue;
+
+    const joinAlias = `fk${joinAliasCounter++}`;
+    const targetTable = fk.references.table;
+    const labelFieldName = fk.displayName + '_label';
+
+    // Build label expression: primary or "primary (secondary)"
+    const { primary, secondary } = fk.labelFields;
+    const labelExpr = secondary
+      ? `${joinAlias}.${primary} || ' (' || ${joinAlias}.${secondary} || ')'`
+      : `${joinAlias}.${primary}`;
+
+    selects.push(`${labelExpr} AS ${labelFieldName}`);
+    joins.push(`LEFT JOIN ${targetTable} ${joinAlias} ON ${baseAlias}.${fk.column} = ${joinAlias}.id`);
+  }
+
+  // If no FK labels to add, still create view for consistency
+  // This ensures all entities can be queried via {table}_view
+
+  const joinClause = joins.length > 0 ? '\n' + joins.join('\n') : '';
+
+  return `CREATE VIEW IF NOT EXISTS ${baseTable}_view AS
+SELECT ${selects.join(',\n       ')}
+FROM ${baseTable} ${baseAlias}${joinClause}`;
 }
 
 /**
@@ -764,6 +838,9 @@ function generateSchema(mdPath, enabledEntities = null) {
   const { areas, classToArea } = parseAreasFromTable(mdContent);
   const classes = parseEntityDescriptions(mdContent, mdPath);
 
+  // Get all entity names for FK detection (conceptual notation)
+  const allEntityNames = Object.keys(classes);
+
   // Generate schema for each class
   const entities = {};
   for (const [className, classDef] of Object.entries(classes)) {
@@ -773,8 +850,11 @@ function generateSchema(mdPath, enabledEntities = null) {
     }
 
     classDef.area = classToArea[className] || 'unknown';
-    entities[className] = generateEntitySchema(className, classDef);
+    entities[className] = generateEntitySchema(className, classDef, allEntityNames);
   }
+
+  // Enrich FK metadata with labelFields from target entities (for View generation)
+  enrichFKsWithLabelFields(entities);
 
   // Get dependency-ordered list
   const orderedEntities = buildDependencyOrder(entities);
@@ -798,7 +878,8 @@ function generateSchema(mdPath, enabledEntities = null) {
     areas,
     entities,
     orderedEntities,
-    inverseRelationships
+    inverseRelationships,
+    enabledEntities: enabledEntities || Object.keys(entities)  // Preserve config order
   };
 }
 
@@ -806,43 +887,21 @@ function generateSchema(mdPath, enabledEntities = null) {
  * Generate extended schema with UI metadata for frontend
  *
  * Tag meanings:
- * - [LABEL], [LABEL2]: Fields used for display label AND basic view (Grundansicht)
- * - [DETAIL]: Additional fields to show in basic view (Grundansicht)
- * - [HOVER]: (legacy) Explicit hover-only
- * - [HIDDEN]: Never visible
+ * - [LABEL], [LABEL2]: Fields used for display label (title/subtitle)
+ * - [HIDDEN]: Never visible in UI
  * - [READONLY]: Not editable
- *
- * Field visibility logic:
- * - detailFields: Fields marked [LABEL], [LABEL2], or [DETAIL] - always visible when expanded
- * - hoverFields: All other fields (except hidden) - only visible on hover/focus
- * - hiddenFields: Fields marked [HIDDEN] - never visible
  */
 function generateExtendedSchema(entity, inverseRelationships) {
   const labelFields = [];
-  const detailFields = [];
-  const hoverFields = [];
   const readonlyFields = ['id']; // id is always readonly
   const hiddenFields = [];
 
   for (const col of entity.columns) {
-    const isLabel = col.ui?.label || col.ui?.label2;
-    const isDetail = col.ui?.detail;
-    const isHidden = col.ui?.hidden;
-
     // labelFields are for display purposes (title/subtitle)
     if (col.ui?.label) labelFields.push(col.name);
     if (col.ui?.label2) labelFields.push(col.name);
     if (col.ui?.readonly) readonlyFields.push(col.name);
-
-    if (isHidden) {
-      hiddenFields.push(col.name);
-    } else if (isLabel || isDetail) {
-      // LABEL, LABEL2, DETAIL fields are always visible in Grundansicht
-      detailFields.push(col.name);
-    } else {
-      // All other fields are hover-only
-      hoverFields.push(col.name);
-    }
+    if (col.ui?.hidden) hiddenFields.push(col.name);
   }
 
   // Get back-references (entities that reference this one)
@@ -852,8 +911,6 @@ function generateExtendedSchema(entity, inverseRelationships) {
     ...entity,
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
-      detailFields: detailFields.length > 0 ? detailFields : null,
-      hoverFields: hoverFields.length > 0 ? hoverFields : null,
       readonlyFields,
       hiddenFields: hiddenFields.length > 0 ? hiddenFields : null
     },
@@ -864,6 +921,7 @@ function generateExtendedSchema(entity, inverseRelationships) {
 module.exports = {
   generateSchema,
   generateCreateTableSQL,
+  generateViewSQL,
   generateEntitySchema,
   generateExtendedSchema,
   parseEntityDescriptions,
@@ -871,6 +929,7 @@ module.exports = {
   parseAreasFromTable,
   parseUIAnnotations,
   buildDependencyOrder,
+  enrichFKsWithLabelFields,
   initializeTypeRegistry,
   getTypeInfo,
   getDefaultValue,
