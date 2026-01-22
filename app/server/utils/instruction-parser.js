@@ -34,6 +34,45 @@ function extractGeneratorInstruction(markdownContent) {
 }
 
 /**
+ * Parse Seed Context section from markdown content
+ * Extracts entities and their selected attributes for seed generation context
+ *
+ * Syntax:
+ *   - EntityName: attr1, attr2   → only these attributes
+ *   - EntityName                 → all attributes (attributes = null)
+ *
+ * @param {string} markdownContent - Full markdown content
+ * @returns {Array<{entity: string, attributes: string[]|null}>}
+ */
+function parseSeedContext(markdownContent) {
+  // Match ## Seed Context section until next ## or end of file
+  const match = markdownContent.match(/## Seed Context\s*\n([\s\S]*?)(?=\n## |\n#+ |$)/);
+  if (!match) return [];
+
+  const lines = match[1].split('\n');
+  return lines
+    .map(line => line.trim())
+    .filter(line => line.startsWith('-') || line.startsWith('*'))
+    .map(line => {
+      const content = line.replace(/^[-*]\s*/, '').trim();
+
+      // Parse "EntityName: attr1, attr2" or "EntityName"
+      const colonIndex = content.indexOf(':');
+      if (colonIndex > 0) {
+        const entity = content.substring(0, colonIndex).trim();
+        const attrs = content.substring(colonIndex + 1)
+          .split(',')
+          .map(a => a.trim())
+          .filter(Boolean);
+        return { entity, attributes: attrs };
+      }
+
+      return { entity: content, attributes: null };
+    })
+    .filter(item => item.entity);
+}
+
+/**
  * Update or add the Data Generator instruction in markdown content
  * @param {string} markdownContent - Full markdown content
  * @param {string} newInstruction - New instruction text
@@ -123,5 +162,6 @@ module.exports = {
   extractGeneratorInstruction,
   updateGeneratorInstruction,
   readEntityInstruction,
-  writeEntityInstruction
+  writeEntityInstruction,
+  parseSeedContext
 };

@@ -6,44 +6,48 @@
   },
   "classes": {
     "AircraftManufacturer": {
-      "x": 820,
-      "y": 70
+      "x": 30,
+      "y": 30
     },
     "EngineManufacturer": {
-      "x": 30,
+      "x": 60,
       "y": 530
     },
     "AircraftType": {
-      "x": 630,
-      "y": 60
+      "x": 220,
+      "y": 150
     },
     "EngineType": {
       "x": 220,
-      "y": 530
+      "y": 410
+    },
+    "EngineMountPossible": {
+      "x": 50,
+      "y": 280
     },
     "MaintenancePlan": {
-      "x": 70,
-      "y": 720
+      "x": 110,
+      "y": 670
     },
     "MaintenancePlanTask": {
       "x": 200,
       "y": 870
     },
     "Operator": {
-      "x": 40,
-      "y": 70
+      "x": 770,
+      "y": 20
     },
     "Aircraft": {
-      "x": 420,
+      "x": 410,
       "y": 30
     },
     "Engine": {
       "x": 420,
-      "y": 550
+      "y": 410
     },
-    "EngineAssignment": {
+    "EngineMount": {
       "x": 420,
-      "y": 380
+      "y": 250
     },
     "InspectionType": {
       "x": 420,
@@ -51,7 +55,7 @@
     },
     "Workscope": {
       "x": 630,
-      "y": 540
+      "y": 500
     },
     "MRO": {
       "x": 810,
@@ -63,7 +67,7 @@
     },
     "RepairOrder": {
       "x": 810,
-      "y": 540
+      "y": 500
     },
     "Task": {
       "x": 680,
@@ -78,8 +82,8 @@
       "y": 890
     },
     "FleetMember": {
-      "x": 230,
-      "y": 190
+      "x": 600,
+      "y": 150
     }
   }
 }

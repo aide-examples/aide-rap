@@ -10,6 +10,7 @@ const express = require('express');
 const { initDatabase, closeDatabase } = require('./config/database');
 const { correlationId, requestLogger, errorHandler } = require('./middleware');
 const GenericCrudRouter = require('./routers/GenericCrudRouter');
+const ComputedFieldService = require('./services/ComputedFieldService');
 const logger = require('./utils/logger');
 
 /**
@@ -48,14 +49,29 @@ function init(app, config) {
     dataModelPath
   });
 
+  // Run computed field updates (DAILY fields) at startup
+  try {
+    const result = ComputedFieldService.runAll();
+    if (result.processed > 0) {
+      logger.info('Computed fields updated at startup', result);
+    }
+  } catch (err) {
+    logger.error('Failed to run computed field updates', { error: err.message });
+  }
+
+  // Schedule daily computation at midnight
+  ComputedFieldService.scheduleDailyRun();
+
   // Graceful shutdown
   process.on('SIGTERM', () => {
     logger.info('SIGTERM received, closing database');
+    ComputedFieldService.stopScheduler();
     closeDatabase();
   });
 
   process.on('SIGINT', () => {
     logger.info('SIGINT received, closing database');
+    ComputedFieldService.stopScheduler();
     closeDatabase();
   });
 

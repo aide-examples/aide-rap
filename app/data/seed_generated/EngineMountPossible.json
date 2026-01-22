@@ -1,0 +1,122 @@
+[
+  {
+    "aircraft_type": "Airbus A319-100",
+    "engine_type": "CFM56"
+  },
+  {
+    "aircraft_type": "Airbus A319-100",
+    "engine_type": "V2500"
+  },
+  {
+    "aircraft_type": "Airbus A320-200",
+    "engine_type": "CFM56"
+  },
+  {
+    "aircraft_type": "Airbus A320-200",
+    "engine_type": "V2500"
+  },
+  {
+    "aircraft_type": "Airbus A320neo",
+    "engine_type": "PW1000G"
+  },
+  {
+    "aircraft_type": "Airbus A320neo",
+    "engine_type": "LEAP"
+  },
+  {
+    "aircraft_type": "Airbus A321-100",
+    "engine_type": "CFM56"
+  },
+  {
+    "aircraft_type": "Airbus A321-100",
+    "engine_type": "V2500"
+  },
+  {
+    "aircraft_type": "Airbus A321-200",
+    "engine_type": "CFM56"
+  },
+  {
+    "aircraft_type": "Airbus A321-200",
+    "engine_type": "V2500"
+  },
+  {
+    "aircraft_type": "Airbus A321neo",
+    "engine_type": "PW1000G"
+  },
+  {
+    "aircraft_type": "Airbus A321neo",
+    "engine_type": "LEAP"
+  },
+  {
+    "aircraft_type": "Airbus A321 Freighter",
+    "engine_type": "CFM56"
+  },
+  {
+    "aircraft_type": "Airbus A321 Freighter",
+    "engine_type": "V2500"
+  },
+  {
+    "aircraft_type": "Airbus A330-200",
+    "engine_type": "PW4000"
+  },
+  {
+    "aircraft_type": "Airbus A330-200",
+    "engine_type": "Trent 700"
+  },
+  {
+    "aircraft_type": "Airbus A330-300",
+    "engine_type": "PW4000"
+  },
+  {
+    "aircraft_type": "Airbus A330-300",
+    "engine_type": "Trent 700"
+  },
+  {
+    "aircraft_type": "Airbus A340-300",
+    "engine_type": "CFM56"
+  },
+  {
+    "aircraft_type": "Airbus A350-900",
+    "engine_type": "Trent XWB"
+  },
+  {
+    "aircraft_type": "Airbus A380-800",
+    "engine_type": "GP7000"
+  },
+  {
+    "aircraft_type": "Boeing 747-400",
+    "engine_type": "PW4000"
+  },
+  {
+    "aircraft_type": "Boeing 747-8 Intercontinental",
+    "engine_type": "GEnx"
+  },
+  {
+    "aircraft_type": "Boeing 767-300ER",
+    "engine_type": "PW4000"
+  },
+  {
+    "aircraft_type": "Boeing 777-200ER",
+    "engine_type": "GE90"
+  },
+  {
+    "aircraft_type": "Boeing 777-200ER",
+    "engine_type": "PW4000"
+  },
+  {
+    "aircraft_type": "Boeing 777-300ER",
+    "engine_type": "GE90"
+  },
+  {
+    "aircraft_type": "Boeing 777 Freighter",
+    "engine_type": "GE90"
+  },
+  {
+    "aircraft_type": "Boeing 787-9 Dreamliner",
+    "engine_type": "GEnx"
+  },
+  {
+    "aircraft_type": "Boeing 787-9 Dreamliner",
+    "engine_type": "Trent 1000"
+  }
+]

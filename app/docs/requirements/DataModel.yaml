@@ -109,7 +109,20 @@ classes:
         type: int
         description: Accumulated cycles
     area: engine_management
-  EngineAssignment:
+  EngineManufacturer:
+    description: Manufacturers of engines (e.g., CFM, Pratt & Whitney, Rolls-Royce).
+    attributes:
+      - name: name
+        type: string
+        description: Company name [LABEL]
+      - name: country
+        type: string
+        description: Country of origin [LABEL2]
+      - name: icao_code
+        type: string
+        description: ICAO identifier
+    area: oem
+  EngineMount:
     description: >-
       Tracks which engine is installed on which aircraft at which position over
       time.
@@ -130,19 +143,6 @@ classes:
         type: date
         description: Removal date (null if current)
     area: engine_management
-  EngineManufacturer:
-    description: Manufacturers of engines (e.g., CFM, Pratt & Whitney, Rolls-Royce).
-    attributes:
-      - name: name
-        type: string
-        description: Company name [LABEL]
-      - name: country
-        type: string
-        description: Country of origin [LABEL2]
-      - name: icao_code
-        type: string
-        description: ICAO identifier
-    area: oem
   EngineType:
     description: Specific engine models (e.g., CFM56-5B, PW1100G).
     attributes:
@@ -158,6 +158,16 @@ classes:
       - name: thrust_lbs
         type: int
         description: Thrust in pounds
+    area: oem
+  EngineMountPossible:
+    description: Maps which engine types can be installed on which aircraft types.
+    attributes:
+      - name: aircraft_type
+        type: AircraftType
+        description: Reference [UK1]
+      - name: engine_type
+        type: EngineType
+        description: Reference [UK1]
     area: oem
   Finding:
     description: >-

@@ -15,6 +15,7 @@ Entity definitions are stored in separate files under [classes/](classes/).
 | [AircraftType](classes/AircraftType.md) | Specific aircraft models |
 | [EngineManufacturer](classes/EngineManufacturer.md) | Manufacturers of engines |
 | [EngineType](classes/EngineType.md) | Specific engine models |
+| [EngineMountPossible](classes/EngineMountPossible.md) | Aircraft-engine type compatibility |
 | [MaintenancePlan](classes/MaintenancePlan.md) | OEM-defined maintenance program |
 | [MaintenancePlanTask](classes/MaintenancePlanTask.md) | Task in maintenance plan |
 </div>
@@ -36,7 +37,7 @@ Entity definitions are stored in separate files under [classes/](classes/).
 | Entity | Description |
 |--------|-------------|
 | [Engine](classes/Engine.md) | Individual engine |
-| [EngineAssignment](classes/EngineAssignment.md) | Engine-aircraft assignment history |
+| [EngineMount](classes/EngineMount.md) | Engine-aircraft mount history |
 | [Workscope](classes/Workscope.md) | Maintenance planning document |
 | [InspectionType](classes/InspectionType.md) | Scheduled inspection intervals |
 </div>

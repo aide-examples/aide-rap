@@ -489,18 +489,16 @@ const EntityTree = {
       const schema = await SchemaCache.getExtended(refEntity);
       const areaColor = schema.areaColor || '#f5f5f5';
 
-      // Get columns to display (exclude hidden fields and the FK that points back)
-      const displayCols = schema.columns.filter(col => {
-        if (schema.ui?.hiddenFields?.includes(col.name)) return false;
-        // Exclude FK columns for cleaner display
-        if (col.foreignKey) return false;
-        return true;
-      });
+      // Get visible columns and build display columns with FK labels using shared ColumnUtils
+      const visibleCols = ColumnUtils.getVisibleColumns(schema);
+      const displayCols = ColumnUtils.buildDisplayColumnsWithLabels(visibleCols);
 
       // Build table header with expand column
-      const headers = `<th class="expand-col"></th>` + displayCols.map(col =>
-        `<th title="${col.name}">${col.name.replace(/_/g, ' ')}</th>`
-      ).join('');
+      // Use displayName for virtual label columns, otherwise format the column name
+      const headers = `<th class="expand-col"></th>` + displayCols.map(col => {
+        const headerText = col.displayName || col.name.replace(/_/g, ' ');
+        return `<th title="${col.name}">${headerText}</th>`;
+      }).join('');
 
       // Build table rows with expand triangles and cycle detection
       let rowsHtml = '';
@@ -610,46 +608,18 @@ const EntityTree = {
 
   /**
    * Get display label for a record using schema UI metadata
+   * Delegates to shared ColumnUtils
    */
   getRecordLabel(record, schema) {
-    let title = `#${record.id}`;
-    let subtitle = null;
-
-    if (schema.ui?.labelFields && schema.ui.labelFields.length > 0) {
-      const primaryLabel = record[schema.ui.labelFields[0]];
-      if (primaryLabel) {
-        title = String(primaryLabel);
-      }
-
-      if (schema.ui.labelFields.length > 1) {
-        const secondaryLabel = record[schema.ui.labelFields[1]];
-        if (secondaryLabel) {
-          subtitle = String(secondaryLabel);
-        }
-      }
-    } else {
-      // Fallback: use heuristics
-      const candidates = ['name', 'title', 'registration', 'designation', 'code'];
-      for (const name of candidates) {
-        if (record[name]) {
-          title = String(record[name]);
-          break;
-        }
-      }
-    }
-
-    return { title, subtitle };
+    return ColumnUtils.getRecordLabel(record, schema);
   },
 
   /**
    * Get combined label string for FK display (title + subtitle if available)
+   * Delegates to shared ColumnUtils
    */
   getFullLabel(record, schema) {
-    const { title, subtitle } = this.getRecordLabel(record, schema);
-    if (subtitle) {
-      return `${title} · ${subtitle}`;
-    }
-    return title;
+    return ColumnUtils.getFullLabel(record, schema);
   },
 
   /**

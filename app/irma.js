@@ -530,7 +530,7 @@ app.post('/api/seed/copy-all-to-generated', (req, res) => {
 
 const express = require('express');
 const { getGenerator, resetGenerator } = require('./server/services/llm-generator');
-const { readEntityInstruction, writeEntityInstruction } = require('./server/utils/instruction-parser');
+const { readEntityInstruction, writeEntityInstruction, parseSeedContext, getEntityMdPath } = require('./server/utils/instruction-parser');
 const { getSchema, getDatabase } = require('./server/config/database');
 
 // JSON body parser for LLM API routes
@@ -616,11 +616,20 @@ app.post('/api/seed/prompt/:entity', (req, res) => {
             types: schema.types || {}
         };
 
-        // Load existing FK data from database
-        const existingData = generator.loadExistingDataForFKs(schemaInfo, getDatabase);
+        // Load existing FK data from database (pass full schema for labelFields lookup)
+        const existingData = generator.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
+
+        // Load seed context data (validation/constraint entities)
+        const mdPath = getEntityMdPath(entityName);
+        let contextData = {};
+        if (fs.existsSync(mdPath)) {
+            const mdContent = fs.readFileSync(mdPath, 'utf-8');
+            const contextSpecs = parseSeedContext(mdContent);
+            contextData = generator.loadSeedContext(contextSpecs, getDatabase, schema);
+        }
 
         // Build the prompt (without calling API)
-        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData);
+        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData, contextData);
 
         res.json({
             success: true,
@@ -678,14 +687,23 @@ app.post('/api/seed/generate/:entity', async (req, res) => {
             types: schema.types || {}
         };
 
-        // Load existing FK data from database
-        const existingData = generator.loadExistingDataForFKs(schemaInfo, getDatabase);
+        // Load existing FK data from database (pass full schema for labelFields lookup)
+        const existingData = generator.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
+
+        // Load seed context data (validation/constraint entities)
+        const mdPath = getEntityMdPath(entityName);
+        let contextData = {};
+        if (fs.existsSync(mdPath)) {
+            const mdContent = fs.readFileSync(mdPath, 'utf-8');
+            const contextSpecs = parseSeedContext(mdContent);
+            contextData = generator.loadSeedContext(contextSpecs, getDatabase, schema);
+        }
 
         // Build the prompt (for display)
-        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData);
+        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData, contextData);
 
         // Generate data
-        const data = await generator.generateSeedData(entityName, schemaInfo, instruction, existingData);
+        const data = await generator.generateSeedData(entityName, schemaInfo, instruction, existingData, contextData);
 
         res.json({
             success: true,

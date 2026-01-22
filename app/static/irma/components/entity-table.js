@@ -360,33 +360,7 @@ const EntityTable = {
    * Get display label for a record
    */
   getRecordLabel(record, schema) {
-    let title = `#${record.id}`;
-    let subtitle = null;
-
-    if (schema.ui?.labelFields && schema.ui.labelFields.length > 0) {
-      const primaryLabel = record[schema.ui.labelFields[0]];
-      if (primaryLabel) {
-        title = String(primaryLabel);
-      }
-
-      if (schema.ui.labelFields.length > 1) {
-        const secondaryLabel = record[schema.ui.labelFields[1]];
-        if (secondaryLabel) {
-          subtitle = String(secondaryLabel);
-        }
-      }
-    } else {
-      // Fallback: use heuristics
-      const candidates = ['name', 'title', 'registration', 'designation', 'code'];
-      for (const name of candidates) {
-        if (record[name]) {
-          title = String(record[name]);
-          break;
-        }
-      }
-    }
-
-    return { title, subtitle };
+    return ColumnUtils.getRecordLabel(record, schema);
   },
 
   /**

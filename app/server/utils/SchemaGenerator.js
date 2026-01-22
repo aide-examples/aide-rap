@@ -103,6 +103,27 @@ function parseUIAnnotations(description) {
 }
 
 /**
+ * Parse computed field annotation from description
+ * Supported: [DAILY=Entity[condition].field], [IMMEDIATE=...], [HOURLY=...], [ON_DEMAND=...]
+ * Example: [DAILY=EngineMount[removed_date=null OR removed_date>TODAY].aircraft]
+ * Returns: { schedule: 'DAILY', sourceEntity: 'EngineMount', condition: '...', targetField: 'aircraft' }
+ */
+function parseComputedAnnotation(description) {
+  // Match [SCHEDULE=Entity[condition].field]
+  const match = description.match(/\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=(\w+)\[([^\]]+)\]\.(\w+)\]/i);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    schedule: match[1].toUpperCase(),
+    sourceEntity: match[2],
+    condition: match[3],
+    targetField: match[4]
+  };
+}
+
+/**
  * Decode HTML entities
  */
 function decodeHtmlEntities(text) {
@@ -565,6 +586,9 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     // Parse UI annotations
     const uiAnnotations = parseUIAnnotations(desc);
 
+    // Parse computed field annotation (DAILY, IMMEDIATE, etc.)
+    const computedRule = parseComputedAnnotation(desc);
+
     // Calculate default value (skip for id and foreign keys)
     let defaultValue = null;
     if (name !== 'id' && !foreignKey) {
@@ -596,6 +620,10 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
 
     if (uiAnnotations) {
       column.ui = uiAnnotations;
+    }
+
+    if (computedRule) {
+      column.computed = computedRule;
     }
 
     columns.push(column);
@@ -778,6 +806,12 @@ function generateCreateTableSQL(entity) {
   const columnDefs = [];
   const constraints = [];
 
+  // Always add implicit id column first (if not explicitly defined)
+  const hasExplicitId = entity.columns.some(c => c.name === 'id');
+  if (!hasExplicitId) {
+    columnDefs.push('  id INTEGER PRIMARY KEY');
+  }
+
   for (const col of entity.columns) {
     let def = `  ${col.name} ${col.sqlType}`;
     if (col.unique) {
@@ -883,47 +917,16 @@ function generateSchema(mdPath, enabledEntities = null) {
   };
 }
 
-/**
- * Generate extended schema with UI metadata for frontend
- *
- * Tag meanings:
- * - [LABEL], [LABEL2]: Fields used for display label (title/subtitle)
- * - [HIDDEN]: Never visible in UI
- * - [READONLY]: Not editable
- */
-function generateExtendedSchema(entity, inverseRelationships) {
-  const labelFields = [];
-  const readonlyFields = ['id']; // id is always readonly
-  const hiddenFields = [];
-
-  for (const col of entity.columns) {
-    // labelFields are for display purposes (title/subtitle)
-    if (col.ui?.label) labelFields.push(col.name);
-    if (col.ui?.label2) labelFields.push(col.name);
-    if (col.ui?.readonly) readonlyFields.push(col.name);
-    if (col.ui?.hidden) hiddenFields.push(col.name);
-  }
-
-  // Get back-references (entities that reference this one)
-  const backReferences = inverseRelationships[entity.className] || [];
-
-  return {
-    ...entity,
-    ui: {
-      labelFields: labelFields.length > 0 ? labelFields : null,
-      readonlyFields,
-      hiddenFields: hiddenFields.length > 0 ? hiddenFields : null
-    },
-    backReferences
-  };
-}
+// Note: Extended schema generation (UI annotations, labelFields, etc.) is handled by
+// GenericRepository.getExtendedSchemaInfo() which is used by the API.
+// This keeps schema generation focused on DB structure, while the repository
+// handles runtime schema enrichment for the frontend.
 
 module.exports = {
   generateSchema,
   generateCreateTableSQL,
   generateViewSQL,
   generateEntitySchema,
-  generateExtendedSchema,
   parseEntityDescriptions,
   parseEntityFile,
   parseAreasFromTable,

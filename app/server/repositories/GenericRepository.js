@@ -10,6 +10,7 @@
 const { getDatabase, getSchema } = require('../config/database');
 const { ObjectValidator } = require('../../shared/validation');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
+const ColumnUtils = require('../../static/irma/utils/ColumnUtils');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 const { ForeignKeyConstraintError, UniqueConstraintError } = require('../errors/ConflictError');
 const logger = require('../utils/logger');
@@ -406,15 +407,12 @@ function getExtendedSchemaInfo(entityName) {
   const entity = getEntityMeta(entityName);
   const schema = getSchema();
 
-  // Collect UI annotation fields
-  const labelFields = [];
+  // Collect UI annotation fields using shared ColumnUtils
+  const labelFields = ColumnUtils.buildLabelFields(entity.columns);
   const readonlyFields = ['id']; // id is always readonly
   const hiddenFields = [];
 
   for (const col of entity.columns) {
-    // labelFields are for display purposes (title/subtitle)
-    if (col.ui?.label) labelFields.push(col.name);
-    if (col.ui?.label2) labelFields.push(col.name);
     if (col.ui?.readonly && col.name !== 'id') readonlyFields.push(col.name);
     if (col.ui?.hidden) hiddenFields.push(col.name);
   }
