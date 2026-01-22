@@ -746,6 +746,33 @@ app.post('/api/seed/save/:entity', (req, res) => {
 });
 
 // =============================================================================
+// 7d. PDF EXPORT API
+// =============================================================================
+
+const PrintService = require('./server/services/PrintService');
+
+// Export entity table to PDF
+app.post('/api/entities/:entity/export-pdf', (req, res) => {
+  try {
+    const { title, columns, records, entityColor } = req.body;
+
+    if (!columns || !Array.isArray(columns) || !records || !Array.isArray(records)) {
+      return res.status(400).json({ error: 'columns and records arrays are required' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}.pdf"`);
+
+    const printService = new PrintService();
+    printService.generatePdf({ title, columns, records, entityColor }, res);
+
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    res.status(500).json({ error: 'PDF generation failed' });
+  }
+});
+
+// =============================================================================
 // 8. START SERVER
 // =============================================================================
 

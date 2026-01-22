@@ -602,4 +602,90 @@ const EntityTable = {
     div.textContent = text;
     return div.innerHTML;
   },
+
+  /**
+   * Export current table view to PDF
+   */
+  async exportPdf() {
+    if (!this.currentEntity || !this.schema) {
+      return;
+    }
+
+    const records = this.getFilteredRecords();
+    if (records.length === 0) {
+      alert('No records to export.');
+      return;
+    }
+
+    // Build columns (exclude id, use display names, include colors for FK columns)
+    const columns = this.getVisibleColumns()
+      .filter(col => col.name !== 'id')
+      .map(col => {
+        // Use conceptual name for FKs (type instead of type_id)
+        const displayName = col.foreignKey && col.name.endsWith('_id')
+          ? col.name.slice(0, -3)
+          : col.name;
+
+        return {
+          key: col.name,
+          label: displayName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          color: col.foreignKey?.areaColor || null  // FK columns get target entity color
+        };
+      });
+
+    // Format records (use labels for FKs, format enums)
+    const formattedRecords = records.map(record => {
+      const formatted = {};
+      for (const col of columns) {
+        const colDef = this.schema.columns.find(c => c.name === col.key);
+
+        if (colDef?.foreignKey) {
+          // Use preloaded label from view
+          const displayName = col.key.endsWith('_id') ? col.key.slice(0, -3) : col.key;
+          const labelField = displayName + '_label';
+          formatted[col.key] = record[labelField] || record[col.key] || '';
+        } else {
+          // Use ValueFormatter for enum conversion
+          const value = record[col.key];
+          formatted[col.key] = value != null
+            ? ValueFormatter.format(value, col.key, this.schema)
+            : '';
+        }
+      }
+      return formatted;
+    });
+
+    // Get entity area color
+    const entityColor = this.schema.areaColor || '#1a365d';
+
+    try {
+      const response = await fetch(`/api/entities/${this.currentEntity}/export-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: this.currentEntity,
+          columns,
+          records: formattedRecords,
+          entityColor
+        })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.currentEntity}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const error = await response.json();
+        alert(`PDF export failed: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`PDF export failed: ${err.message}`);
+    }
+  },
 };

@@ -2,21 +2,21 @@
 
 Lines of code statistics for the AIDE-IRMA project and the AIDE Framework.
 
-*Generated: 2026-01-22 21:53*
+*Generated: 2026-01-22 22:21*
 
 ## AIDE-IRMA
 
 | Category | LOC |
 |----------|----:|
 | Documentation (MD) | 1845 |
-| Server (JS) | 4043 |
+| Server (JS) | 4288 |
 | Shared (JS) | 1632 |
-| Frontend (JS/CSS/HTML) | 6891 |
+| Frontend (JS/CSS/HTML) | 6984 |
 | Tools (JS/Shell) | 1772 |
-| Config (JSON/YAML) | 727 |
-| **Own Code Subtotal** | **16910** |
-| External (node_modules) | 14588 |
-| **Total** | **31498** |
+| Config (JSON/YAML) | 728 |
+| **Own Code Subtotal** | **17249** |
+| External (node_modules) | 97318 |
+| **Total** | **114567** |
 
 ## AIDE-FRAME
 
@@ -36,8 +36,8 @@ Lines of code statistics for the AIDE-IRMA project and the AIDE Framework.
 
 | Project | Own Code | Dependencies | Total |
 |---------|----------|--------------|-------|
-| AIDE-IRMA | 16910 | 14588 | 31498 |
+| AIDE-IRMA | 17249 | 97318 | 114567 |
 | AIDE-FRAME | 12763 | 61786 | 74549 |
-| **Combined Own Code** | **29673** | | |
+| **Combined Own Code** | **30012** | | |
 
 *Note: node_modules contains third-party dependencies and is excluded from own code counts.*

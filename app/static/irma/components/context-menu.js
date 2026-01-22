@@ -32,6 +32,11 @@ const ContextMenu = {
         <span class="context-menu-icon">&#128465;</span>
         Delete
       </div>
+      <div class="context-menu-separator"></div>
+      <div class="context-menu-item" data-action="export-pdf">
+        <span class="context-menu-icon">&#128462;</span>
+        Export PDF
+      </div>
     `;
     document.body.appendChild(menu);
     this.menu = menu;
@@ -104,6 +109,8 @@ const ContextMenu = {
       } else {
         EntityTree.onDelete(entity, recordId);
       }
+    } else if (action === 'export-pdf') {
+      EntityTable.exportPdf();
     }
 
     this.hide();
