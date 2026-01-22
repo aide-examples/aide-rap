@@ -17,7 +17,7 @@
         showHelp: true,
         showLanguage: true,
         aboutLink: '/about',
-        helpLink: '/about?doc=help/index.md'
+        helpLink: '/help'
       });
     }
 

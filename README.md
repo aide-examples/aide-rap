@@ -1,60 +1,86 @@
 # AIDE IRMA
 
-A demo application built on the aide-frame framework. This is a generic rapid prototyping tool which is driven by meta data defined in the markdown docs of the app. It is the dream of what "CASE" tools in the 1990s wanted to be. You describe your class model in semi-formal notation and interactively design a graphical representation. At the same time SQL tables are generated and a generic three layer backend and a modern browser UI are generated. There is also a generic type system available which allows you to define enums, numeric ranges, regexp patterns for attributes of entities. Validation is identically performed in the backend for integrity reasins and in the formt end for ergonomic reasons. Sample data can be imported or generated
-based on semi-formal rules. 
+A **Rapid Application Development** demonstration built on the AIDE Framework.
 
-The example is taken from aviation industry, hence the acronym IRMA *Intelligent Repair and Maintenance in Aviation*.
+---
 
-## Prerequisites
+## What Is This?
 
-- Node.js 18+
-- npm
+This repository contains two things:
 
-## Setup
+### 1. The AIDE Framework
 
-This project requires the [aide-frame](https://github.com/aide-examples/aide-frame) framework.
+A rapid application development platform that generates complete applications from Markdown-based data models. No code generation wizards, no XML schemas – just describe your entities in Markdown tables and get:
+
+- SQLite database with constraints and relationships
+- REST API with CRUD, filtering, and validation
+- Modern browser UI with table and tree views
+- AI-powered seed data generation
+- Visual diagram editor for data model design
+
+**[Read the Framework Documentation →](app/docs/index.md)**
+
+### 2. IRMA – A Demo Application
+
+*Intelligent Repair and Maintenance in Aviation* – a demonstration application for managing aircraft fleet data, operators, and maintenance records.
+
+**[Read the User Guide →](app/help/index.md)**
+
+---
+
+## Quick Start
 
 ```bash
-# 1. Clone both repositories
+# Clone both repositories
 git clone https://github.com/aide-examples/aide-irma.git
 git clone https://github.com/aide-examples/aide-frame.git
 
-# 2. Create symlink from aide-irma to aide-frame
+# Create symlink
 cd aide-irma
 ln -s ../aide-frame aide-frame
 
-# 3. Install dependencies
+# Install and run
 npm install
-
-# 4. Start the server
 npm start
 ```
 
-The application will be available at http://localhost:18354
+Open http://localhost:18354
+
+---
+
+## In the Application
+
+| Menu Item | Description |
+|-----------|-------------|
+| **About** (`/about`) | Framework documentation – how the RAD system works |
+| **Help** (`/help`) | User guide – how to use the IRMA application |
+
+---
 
 ## Project Structure
 
 ```
 aide-irma/
-├── app/                    # Application code
-│   ├── data/              # SQLite database and seed data
-│   ├── docs/              # Documentation and data model
-│   ├── server/            # Backend modules
-│   └── static/irma/       # Frontend (HTML, CSS, JS)
-├── tools/                  # CLI utilities
-└── aide-frame -> ../aide-frame  # Framework (symlink)
+├── app/
+│   ├── docs/                 # Framework documentation
+│   │   ├── index.md          # ← RAD system overview
+│   │   └── requirements/     # Data model definitions
+│   ├── help/
+│   │   └── index.md          # ← Application user guide
+│   ├── server/               # Backend (Node.js)
+│   ├── shared/               # Isomorphic code (validation, types)
+│   ├── static/irma/          # Frontend (HTML, CSS, JS)
+│   └── data/                 # Database and seed data
+├── tools/                    # CLI utilities
+└── aide-frame/               # Framework (symlink)
 ```
 
-## Development
-
-```bash
-# Run with auto-reload
-npm run dev
-
-# Regenerate data model diagrams
-npm run regenerate-diagrams
-```
+---
 
 ## License
 
 MIT
+
+---
+
+*Built with [aide-frame](https://github.com/aide-examples/aide-frame)*
