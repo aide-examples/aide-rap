@@ -11,6 +11,7 @@ const DetailPanel = {
   showIdsToggle: null,
   isCollapsed: false,
   showIds: false,
+  mode: null, // 'view', 'edit', 'create', or null
 
   // Current record state (for re-rendering when toggle changes)
   currentEntity: null,
@@ -73,6 +74,7 @@ const DetailPanel = {
   clear() {
     this.currentEntity = null;
     this.currentRecord = null;
+    this.mode = null;
     this.setTitle('Details');
     this.content.innerHTML = '<p class="empty-message">Select a record to view details.</p>';
   },
@@ -83,6 +85,7 @@ const DetailPanel = {
   hide() {
     this.currentEntity = null;
     this.currentRecord = null;
+    this.mode = null;
     this.collapse();
   },
 
@@ -104,6 +107,7 @@ const DetailPanel = {
     // Store for re-rendering when toggle changes
     this.currentEntity = entityName;
     this.currentRecord = record;
+    this.mode = 'view';
 
     // Ensure panel is visible when showing a record
     this.show();
@@ -178,6 +182,10 @@ const DetailPanel = {
   },
 
   async showCreateForm(entityName) {
+    this.mode = 'create';
+    this.currentEntity = entityName;
+    this.currentRecord = null;
+
     this.setTitle(`New ${entityName}`);
     await EntityForm.render(this.content, entityName, null);
 
@@ -187,6 +195,7 @@ const DetailPanel = {
   },
 
   async showEditForm(entityName, record) {
+    this.mode = 'edit';
     this.currentEntity = entityName;
     this.currentRecord = record;
 
@@ -208,26 +217,26 @@ detailStyle.textContent = `
   .record-details {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 2px;
   }
   .detail-row {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 8px 0;
+    gap: 1px;
+    padding: 4px 0;
     border-bottom: 1px solid #e5e7eb;
   }
   .detail-row:last-of-type {
     border-bottom: none;
   }
   .detail-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 500;
     color: #888;
     text-transform: uppercase;
   }
   .detail-value {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: #333;
     word-break: break-word;
   }
@@ -237,8 +246,8 @@ detailStyle.textContent = `
   }
   .detail-row-id {
     background-color: #f8f9fa;
-    margin: -8px -12px 8px -12px;
-    padding: 8px 12px;
+    margin: -4px -12px 4px -12px;
+    padding: 4px 12px;
     border-radius: 4px;
   }
   .detail-value-id {

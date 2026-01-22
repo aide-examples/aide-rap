@@ -15,6 +15,11 @@ const ContextMenu = {
     const menu = document.createElement('div');
     menu.className = 'context-menu';
     menu.innerHTML = `
+      <div class="context-menu-item" data-action="new">
+        <span class="context-menu-icon">&#10133;</span>
+        New...
+      </div>
+      <div class="context-menu-separator"></div>
       <div class="context-menu-item" data-action="details">
         <span class="context-menu-icon">&#128269;</span>
         Details
@@ -79,7 +84,9 @@ const ContextMenu = {
     if (!this.currentContext) return;
     const { entity, recordId, source } = this.currentContext;
 
-    if (action === 'details') {
+    if (action === 'new') {
+      DetailPanel.showCreateForm(entity);
+    } else if (action === 'details') {
       if (source === 'table') {
         EntityTable.onDetails(recordId);
       } else {

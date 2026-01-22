@@ -10,6 +10,7 @@ const EntityTable = {
   selectedId: null,
   sortColumn: null,
   sortDirection: 'asc', // 'asc' or 'desc'
+  columnFilters: {}, // { columnName: filterValue }
 
   // Sort settings (shared with EntityTree)
   attributeOrder: 'schema', // 'schema' or 'alpha'
@@ -62,6 +63,7 @@ const EntityTable = {
     this.selectedId = null;
     this.sortColumn = null;
     this.sortDirection = 'asc';
+    this.columnFilters = {}; // Reset filters on entity change
 
     // Get schema
     this.schema = await SchemaCache.getExtended(entityName);
@@ -104,14 +106,46 @@ const EntityTable = {
   },
 
   /**
-   * Get sorted records
+   * Get filtered records (client-side filtering)
    */
-  getSortedRecords() {
-    if (!this.sortColumn) {
+  getFilteredRecords() {
+    const activeFilters = Object.entries(this.columnFilters)
+      .filter(([_, value]) => value && value.trim() !== '');
+
+    if (activeFilters.length === 0) {
       return this.records;
     }
 
-    return [...this.records].sort((a, b) => {
+    return this.records.filter(record => {
+      return activeFilters.every(([column, filterValue]) => {
+        const filter = filterValue.toLowerCase().trim();
+        let cellValue = record[column];
+
+        // For FK columns, also check the _label field
+        if (cellValue == null) {
+          // Try label field for FK
+          const labelField = column.replace(/_id$/, '') + '_label';
+          cellValue = record[labelField];
+        }
+
+        if (cellValue == null) return false;
+
+        return String(cellValue).toLowerCase().includes(filter);
+      });
+    });
+  },
+
+  /**
+   * Get sorted records
+   */
+  getSortedRecords() {
+    const filtered = this.getFilteredRecords();
+
+    if (!this.sortColumn) {
+      return filtered;
+    }
+
+    return [...filtered].sort((a, b) => {
       let valA = a[this.sortColumn];
       let valB = b[this.sortColumn];
 
@@ -190,6 +224,21 @@ const EntityTable = {
         <span class="backref-entity">${ref.entity}</span>
         <span class="backref-field">${fieldName}</span>
       </th>`;
+    }
+    html += '</tr>';
+
+    // Filter row
+    html += '<tr class="filter-row">';
+    for (const col of columns) {
+      const filterValue = this.columnFilters[col.name] || '';
+      html += `<th class="filter-cell">
+        <input type="text" class="column-filter" data-column="${col.name}"
+               value="${this.escapeHtml(filterValue)}" placeholder="Filter...">
+      </th>`;
+    }
+    // Empty cells for back-reference columns (no filtering)
+    for (const ref of backRefs) {
+      html += '<th class="filter-cell"></th>';
     }
     html += '</tr></thead>';
 
@@ -375,6 +424,24 @@ const EntityTable = {
       });
     });
 
+    // Column filter inputs
+    this.container.querySelectorAll('.column-filter').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const column = input.dataset.column;
+        const cursorPos = e.target.selectionStart;
+        this.columnFilters[column] = e.target.value;
+        this.render();
+        // Restore focus and cursor position after render
+        const newInput = this.container.querySelector(`.column-filter[data-column="${column}"]`);
+        if (newInput) {
+          newInput.focus();
+          newInput.setSelectionRange(cursorPos, cursorPos);
+        }
+      });
+      // Prevent click from triggering row selection
+      input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
     // Row click for selection
     this.container.querySelectorAll('tbody tr').forEach(row => {
       row.addEventListener('click', (e) => {
@@ -393,6 +460,14 @@ const EntityTable = {
           recordId: id,
           source: 'table'
         });
+      });
+
+      // Double-click: open in horizontal tree view with 2 levels expanded
+      row.addEventListener('dblclick', (e) => {
+        if (!e.target.closest('[data-action]') && !e.target.closest('.column-filter')) {
+          const id = parseInt(row.dataset.id);
+          EntityExplorer.showInTreeView(id, 2);
+        }
       });
     });
   },
@@ -428,6 +503,14 @@ const EntityTable = {
 
       // Load back-reference counts for the newly selected row
       this.loadBackReferenceCountsForRow(id);
+
+      // If detail panel is in view mode, update it with the new record
+      if (DetailPanel.mode === 'view') {
+        const record = this.records.find(r => r.id === id);
+        if (record) {
+          DetailPanel.showRecord(this.currentEntity, record);
+        }
+      }
     }
 
     // Update selection visually without full re-render

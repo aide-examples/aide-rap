@@ -44,6 +44,9 @@ classes:
       - name: maintenance_category
         type: MaintenanceCategory [DEFAULT=Line]
         description: Current maintenance category
+      - name: severity_factor
+        type: int [DEFAULT=100]
+        description: Effect of flight profile on engine degradation in %
     area: operations
     types:
       MaintenanceCategory:
@@ -89,6 +92,9 @@ classes:
       - name: max_range_nm
         type: int
         description: Maximum range in nautical miles
+      - name: number_of_engines
+        type: int [DEFAULT=2]
+        description: Number of engines (2 or 4)
     area: oem
   Engine:
     description: Individual engine identified by serial number.
@@ -99,6 +105,11 @@ classes:
       - name: type
         type: EngineType
         description: Reference
+      - name: current_aircraft
+        type: Aircraft
+        description: >-
+          [READONLY] [DAILY=EngineMount[removed_date=null OR
+          removed_date>TODAY].aircraft]
       - name: manufacture_date
         type: date
         description: Date of manufacture [LABEL2]
@@ -127,12 +138,12 @@ classes:
       Tracks which engine is installed on which aircraft at which position over
       time.
     attributes:
-      - name: engine
-        type: Engine
-        description: Reference
       - name: aircraft
         type: Aircraft
-        description: Reference
+        description: Reference [LABEL]
+      - name: engine
+        type: Engine
+        description: Reference [LABEL2]
       - name: position
         type: int
         description: Engine position (1, 2, 3, 4)
@@ -143,6 +154,18 @@ classes:
         type: date
         description: Removal date (null if current)
     area: engine_management
+  EngineMountPossible:
+    description: >-
+      Maps which engine types can be installed on which aircraft types. Could
+      also be named *EngineCompatibility*.
+    attributes:
+      - name: aircraft_type
+        type: AircraftType
+        description: Reference [UK1] [LABEL]
+      - name: engine_type
+        type: EngineType
+        description: Reference [UK1] [LABEL2]
+    area: oem
   EngineType:
     description: Specific engine models (e.g., CFM56-5B, PW1100G).
     attributes:
@@ -158,16 +181,6 @@ classes:
       - name: thrust_lbs
         type: int
         description: Thrust in pounds
-    area: oem
-  EngineMountPossible:
-    description: Maps which engine types can be installed on which aircraft types.
-    attributes:
-      - name: aircraft_type
-        type: AircraftType
-        description: Reference [UK1]
-      - name: engine_type
-        type: EngineType
-        description: Reference [UK1]
     area: oem
   Finding:
     description: >-

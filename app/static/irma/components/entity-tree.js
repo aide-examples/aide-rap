@@ -87,16 +87,11 @@ const EntityTree = {
       this.expandedNodes.add(nodeId);
 
       // Pre-calculate outbound FK node IDs to expand
-      if (options.expandOutboundFKs !== false) {
+      const expandLevels = options.expandLevels || 1;
+      if (expandLevels >= 1) {
         const record = records.find(r => r.id === options.selectedId);
         if (record) {
-          const schema = await SchemaCache.getExtended(entityName);
-          for (const col of schema.columns) {
-            if (col.foreignKey && record[col.name]) {
-              const fkNodeId = `fk-${col.foreignKey.entity}-${record[col.name]}-from-${record.id}`;
-              this.expandedNodes.add(fkNodeId);
-            }
-          }
+          await this.expandFKLevels(entityName, record, expandLevels);
         }
       }
     }
@@ -108,6 +103,36 @@ const EntityTree = {
       const selectedNode = this.container.querySelector(`[data-node-id="${this.selectedNodeId}"]`);
       if (selectedNode) {
         selectedNode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  },
+
+  /**
+   * Recursively expand FK nodes to a given depth
+   */
+  async expandFKLevels(entityName, record, levelsRemaining, parentRecordId = null) {
+    if (levelsRemaining <= 0) return;
+
+    const schema = await SchemaCache.getExtended(entityName);
+
+    for (const col of schema.columns) {
+      if (col.foreignKey && record[col.name]) {
+        const fkId = record[col.name];
+        const fromId = parentRecordId || record.id;
+        const fkNodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${fromId}`;
+        this.expandedNodes.add(fkNodeId);
+
+        // If more levels to expand, load the FK record and recurse
+        if (levelsRemaining > 1) {
+          try {
+            const fkRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
+            if (fkRecord) {
+              await this.expandFKLevels(col.foreignKey.entity, fkRecord, levelsRemaining - 1, fkId);
+            }
+          } catch (e) {
+            // Ignore errors loading FK records
+          }
+        }
       }
     }
   },

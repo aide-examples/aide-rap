@@ -9,15 +9,12 @@ const EntityExplorer = {
   selectorValue: '',
   tableContainer: null,
   treeContainer: null,
-  filterInput: null,
-  btnNew: null,
   btnViewTable: null,
   btnViewTreeH: null,
   btnViewTreeV: null,
   currentEntity: null,
   records: [],
   selectedId: null,
-  filterTimeout: null,
   viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
 
   async init() {
@@ -26,8 +23,6 @@ const EntityExplorer = {
     this.selectorMenu = this.selector.querySelector('.entity-selector-menu');
     this.tableContainer = document.getElementById('entity-table-container');
     this.treeContainer = document.getElementById('entity-tree-container');
-    this.filterInput = document.getElementById('filter-input');
-    this.btnNew = document.getElementById('btn-new');
     this.btnViewTable = document.getElementById('btn-view-table');
     this.btnViewTreeH = document.getElementById('btn-view-tree-h');
     this.btnViewTreeV = document.getElementById('btn-view-tree-v');
@@ -57,14 +52,9 @@ const EntityExplorer = {
       }
     });
 
-    this.filterInput.addEventListener('input', () => this.onFilterChange());
-    this.btnNew.addEventListener('click', () => this.onNewClick());
     this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
     this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
     this.btnViewTreeV.addEventListener('click', () => this.setViewMode('tree-v'));
-
-    // Initially disable new button
-    this.btnNew.disabled = true;
 
     // Open dropdown on start
     this.openDropdown();
@@ -147,15 +137,12 @@ const EntityExplorer = {
     if (!entityName) {
       this.currentEntity = null;
       this.records = [];
-      this.btnNew.disabled = true;
       this.renderCurrentView();
       DetailPanel.clear();
       return;
     }
 
     this.currentEntity = entityName;
-    this.btnNew.disabled = false;
-    this.filterInput.value = '';
     this.selectedId = null;
 
     await this.loadRecords();
@@ -180,21 +167,6 @@ const EntityExplorer = {
         this.treeContainer.innerHTML = message;
       }
     }
-  },
-
-  onFilterChange() {
-    // Debounce filter input
-    clearTimeout(this.filterTimeout);
-    this.filterTimeout = setTimeout(() => {
-      this.loadRecords(this.filterInput.value);
-    }, 300);
-  },
-
-  onNewClick() {
-    if (!this.currentEntity) return;
-    this.selectedId = null;
-    this.clearSelection();
-    DetailPanel.showCreateForm(this.currentEntity);
   },
 
   setViewMode(mode) {
@@ -397,7 +369,7 @@ const EntityExplorer = {
     if (confirmed) {
       try {
         await ApiClient.delete(this.currentEntity, id);
-        await this.loadRecords(this.filterInput.value);
+        await this.loadRecords();
         if (this.selectedId === id) {
           this.selectedId = null;
           DetailPanel.clear();
@@ -425,7 +397,26 @@ const EntityExplorer = {
   },
 
   async refresh() {
-    await this.loadRecords(this.filterInput.value);
+    await this.loadRecords();
+  },
+
+  /**
+   * Show a record in horizontal tree view with specified expansion depth
+   */
+  async showInTreeView(recordId, expandLevels = 2) {
+    this.selectedId = recordId;
+
+    // Switch to tree-h mode
+    this.viewMode = 'tree-h';
+    sessionStorage.setItem('viewMode', this.viewMode);
+    this.updateViewToggle();
+
+    // Render tree with expanded levels
+    const options = {
+      selectedId: recordId,
+      expandLevels: expandLevels
+    };
+    await EntityTree.loadEntity(this.currentEntity, this.records, options);
   },
 
   escapeHtml(text) {
