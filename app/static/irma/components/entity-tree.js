@@ -164,15 +164,13 @@ const EntityTree = {
           <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
           <span class="tree-node-label">${this.escapeHtml(label.title)}</span>
           ${label.subtitle ? `<span class="tree-node-subtitle">${this.escapeHtml(label.subtitle)}</span>` : ''}
-          <span class="tree-node-actions">
-            <button class="btn-tree-action btn-edit" data-action="edit" title="Edit">&#9998;</button>
-            <button class="btn-tree-action btn-delete" data-action="delete" title="Delete">&#128465;</button>
-          </span>
         </div>
     `;
 
     if (isExpanded) {
-      html += await this.renderNodeContent(entityName, record, schema);
+      // Initialize visited path with root entity for cycle detection
+      const visitedPath = new Set([`${entityName}-${record.id}`]);
+      html += await this.renderNodeContent(entityName, record, schema, visitedPath);
     }
 
     html += '</div>';
@@ -181,8 +179,9 @@ const EntityTree = {
 
   /**
    * Render the expanded content of a node (attributes + relationships)
+   * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
    */
-  async renderNodeContent(entityName, record, schema) {
+  async renderNodeContent(entityName, record, schema, visitedPath = new Set()) {
     const isRowLayout = this.attributeLayout === 'row';
     let html = `<div class="tree-node-content ${isRowLayout ? 'layout-row' : 'layout-list'}">`;
 
@@ -207,10 +206,10 @@ const EntityTree = {
     if (this.referencePosition === 'start') {
       // FKs first, then back-refs, then regular attributes
       for (const col of fkCols) {
-        html += await this.renderForeignKeyNode(col, record[col.name], record);
+        html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath);
       }
       if (hasBackRefs) {
-        html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+        html += await this.renderBackReferences(entityName, record.id, schema.backReferences, visitedPath);
       }
       if (!isRowLayout) {
         for (const col of regularCols) {
@@ -222,13 +221,13 @@ const EntityTree = {
       for (const col of columns) {
         const value = record[col.name];
         if (col.foreignKey) {
-          html += await this.renderForeignKeyNode(col, value, record);
+          html += await this.renderForeignKeyNode(col, value, record, visitedPath);
         } else if (!isRowLayout) {
           html += this.renderAttribute(col.name, value, schema);
         }
       }
       if (hasBackRefs) {
-        html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+        html += await this.renderBackReferences(entityName, record.id, schema.backReferences, visitedPath);
       }
     } else {
       // 'end' (default): regular attributes first, then FKs, then back-refs
@@ -238,10 +237,10 @@ const EntityTree = {
         }
       }
       for (const col of fkCols) {
-        html += await this.renderForeignKeyNode(col, record[col.name], record);
+        html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath);
       }
       if (hasBackRefs) {
-        html += await this.renderBackReferences(entityName, record.id, schema.backReferences);
+        html += await this.renderBackReferences(entityName, record.id, schema.backReferences, visitedPath);
       }
     }
 
@@ -264,7 +263,7 @@ const EntityTree = {
       return `<td title="${col.name}">${displayValue}</td>`;
     }).join('');
 
-    const headers = columns.map(col => `<th title="${col.name}">${col.name}</th>`).join('');
+    const headers = columns.map(col => `<th title="${col.name}">${col.name.replace(/_/g, ' ')}</th>`).join('');
 
     return `
       <table class="tree-attr-table">
@@ -291,16 +290,17 @@ const EntityTree = {
 
     return `
       <div class="tree-attribute">
-        <span class="attr-name">${name}:</span>
+        <span class="attr-name">${name.replace(/_/g, ' ')}:</span>
         <span class="attr-value">${displayValue}</span>
       </div>
     `;
   },
 
   /**
-   * Render a foreign key as an expandable node
+   * Render a foreign key as an expandable node with cycle detection
+   * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
    */
-  async renderForeignKeyNode(col, fkId, parentRecord) {
+  async renderForeignKeyNode(col, fkId, parentRecord, visitedPath = new Set()) {
     if (!fkId) {
       return `
         <div class="tree-attribute fk-field">
@@ -310,8 +310,12 @@ const EntityTree = {
       `;
     }
 
-    const nodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${parentRecord.id}`;
-    const isExpanded = this.expandedNodes.has(nodeId);
+    const targetEntity = col.foreignKey.entity;
+    const pairKey = `${targetEntity}-${fkId}`;
+    const isCycle = visitedPath.has(pairKey);
+
+    const nodeId = `fk-${targetEntity}-${fkId}-from-${parentRecord.id}`;
+    const isExpanded = !isCycle && this.expandedNodes.has(nodeId);
 
     // Check for preloaded label from View (FK-Label-Enrichment)
     const displayName = col.name.endsWith('_id')
@@ -324,32 +328,51 @@ const EntityTree = {
     let refLabel = preloadedLabel || `#${fkId}`;
     let areaColor = '#f5f5f5';
     try {
-      const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
+      const refSchema = await SchemaCache.getExtended(targetEntity);
       areaColor = refSchema.areaColor || '#f5f5f5';
       // Only fetch record if no preloaded label
       if (!preloadedLabel) {
-        const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
+        const refRecord = await ApiClient.getById(targetEntity, fkId);
         refLabel = this.getFullLabel(refRecord, refSchema);
       }
     } catch (e) {
       // Fall back to just the ID or preloaded label
     }
 
+    // Cycle detected: render as non-expandable link with visual marker
+    if (isCycle) {
+      return `
+        <div class="tree-fk-node cycle-detected"
+             data-entity="${targetEntity}"
+             data-record-id="${fkId}">
+          <div class="tree-fk-header disabled" style="background-color: ${areaColor};">
+            <span class="cycle-icon" title="Cycle detected - already visited">&#8635;</span>
+            <span class="attr-name">${col.name}:</span>
+            <span class="fk-label">${this.escapeHtml(refLabel)}</span>
+            <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // No cycle: render as expandable node
     let html = `
       <div class="tree-fk-node ${isExpanded ? 'expanded' : ''}"
            data-node-id="${nodeId}"
-           data-entity="${col.foreignKey.entity}"
+           data-entity="${targetEntity}"
            data-record-id="${fkId}">
         <div class="tree-fk-header" data-action="toggle-fk" style="background-color: ${areaColor};">
           <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
           <span class="attr-name">${col.name}:</span>
           <span class="fk-label">${this.escapeHtml(refLabel)}</span>
-          <span class="fk-entity-link" data-action="navigate-entity" data-entity="${col.foreignKey.entity}" data-id="${fkId}">(${col.foreignKey.entity})</span>
+          <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
         </div>
     `;
 
     if (isExpanded) {
-      html += await this.renderExpandedForeignKey(col.foreignKey.entity, fkId);
+      // Extend path with current entity-id pair
+      const newPath = new Set([...visitedPath, pairKey]);
+      html += await this.renderExpandedForeignKey(targetEntity, fkId, newPath);
     }
 
     html += '</div>';
@@ -358,8 +381,10 @@ const EntityTree = {
 
   /**
    * Render the expanded content of a foreign key reference
+   * Now supports recursive expansion and back-references at any depth
+   * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
    */
-  async renderExpandedForeignKey(entityName, id) {
+  async renderExpandedForeignKey(entityName, id, visitedPath = new Set()) {
     try {
       const schema = await SchemaCache.getExtended(entityName);
       const record = await ApiClient.getById(entityName, id);
@@ -381,9 +406,14 @@ const EntityTree = {
         }
       }
 
-      // Render nested FKs as links (always as list)
+      // Render FKs RECURSIVELY (expandable, with cycle detection)
       for (const col of fkCols) {
-        html += await this.renderNestedForeignKey(col, record[col.name], record);
+        html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath);
+      }
+
+      // Back-references also at this level
+      if (schema.backReferences && schema.backReferences.length > 0) {
+        html += await this.renderBackReferences(entityName, id, schema.backReferences, visitedPath);
       }
 
       html += '</div>';
@@ -394,50 +424,10 @@ const EntityTree = {
   },
 
   /**
-   * Render a nested FK (no further expansion to prevent deep nesting)
-   * Always shows the label of the referenced entity
-   * Uses preloaded _label field from View when available
-   */
-  async renderNestedForeignKey(col, fkId, parentRecord = null) {
-    // Check for preloaded label from View (FK-Label-Enrichment)
-    let refLabel = `#${fkId}`;
-
-    if (parentRecord) {
-      const displayName = col.name.endsWith('_id')
-        ? col.name.slice(0, -3)
-        : col.name;
-      const labelField = displayName + '_label';
-      const preloadedLabel = parentRecord[labelField];
-
-      if (preloadedLabel) {
-        refLabel = preloadedLabel;
-      }
-    }
-
-    // Only fetch from API if no preloaded label
-    if (refLabel === `#${fkId}`) {
-      try {
-        const refSchema = await SchemaCache.getExtended(col.foreignKey.entity);
-        const refRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
-        refLabel = this.getFullLabel(refRecord, refSchema);
-      } catch {
-        // Fall back to just the ID
-      }
-    }
-
-    return `
-      <div class="tree-attribute fk-link">
-        <span class="attr-name">${col.name}:</span>
-        <span class="fk-label">${this.escapeHtml(refLabel)}</span>
-        <span class="fk-entity-link" data-action="navigate-entity" data-entity="${col.foreignKey.entity}" data-id="${fkId}">(${col.foreignKey.entity})</span>
-      </div>
-    `;
-  },
-
-  /**
    * Render back-references (entities that point to this record)
+   * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
    */
-  async renderBackReferences(entityName, recordId, backRefs) {
+  async renderBackReferences(entityName, recordId, backRefs, visitedPath = new Set()) {
     let html = '';
 
     for (const ref of backRefs) {
@@ -474,7 +464,7 @@ const EntityTree = {
       `;
 
       if (isExpanded) {
-        html += await this.renderExpandedBackReferences(entityName, recordId, ref.entity);
+        html += await this.renderExpandedBackReferences(entityName, recordId, ref.entity, visitedPath);
       }
 
       html += '</div>';
@@ -485,8 +475,9 @@ const EntityTree = {
 
   /**
    * Render expanded back-reference list as a table
+   * @param {Set} visitedPath - Set of visited entity-id pairs (for future use)
    */
-  async renderExpandedBackReferences(entityName, recordId, refEntity) {
+  async renderExpandedBackReferences(entityName, recordId, refEntity, visitedPath = new Set()) {
     try {
       const references = await ApiClient.getBackReferences(entityName, recordId);
       const refData = references[refEntity];
@@ -496,6 +487,7 @@ const EntityTree = {
       }
 
       const schema = await SchemaCache.getExtended(refEntity);
+      const areaColor = schema.areaColor || '#f5f5f5';
 
       // Get columns to display (exclude hidden fields and the FK that points back)
       const displayCols = schema.columns.filter(col => {
@@ -505,13 +497,19 @@ const EntityTree = {
         return true;
       });
 
-      // Build table header
-      const headers = displayCols.map(col =>
-        `<th title="${col.name}">${col.name}</th>`
+      // Build table header with expand column
+      const headers = `<th class="expand-col"></th>` + displayCols.map(col =>
+        `<th title="${col.name}">${col.name.replace(/_/g, ' ')}</th>`
       ).join('');
 
-      // Build table rows
-      const rows = refData.records.map(record => {
+      // Build table rows with expand triangles and cycle detection
+      let rowsHtml = '';
+      for (const record of refData.records) {
+        const rowNodeId = `backref-row-${refEntity}-${record.id}-in-${entityName}-${recordId}`;
+        const rowPairKey = `${refEntity}-${record.id}`;
+        const isCycle = visitedPath.has(rowPairKey);
+        const isRowExpanded = !isCycle && this.expandedNodes.has(rowNodeId);
+
         const cells = displayCols.map(col => {
           const value = record[col.name];
           let displayValue;
@@ -523,20 +521,91 @@ const EntityTree = {
           return `<td title="${col.name}">${displayValue}</td>`;
         }).join('');
 
-        return `<tr class="backref-table-row" data-entity="${refEntity}" data-id="${record.id}" data-action="navigate">${cells}</tr>`;
-      }).join('');
+        // Render expand cell: cycle icon if cycle, otherwise triangle
+        let expandCell;
+        if (isCycle) {
+          expandCell = `
+            <td class="expand-cell cycle-cell" title="Cycle detected - already visited">
+              <span class="cycle-icon">&#8635;</span>
+            </td>
+          `;
+        } else {
+          expandCell = `
+            <td class="expand-cell" data-action="toggle-backref-row">
+              <span class="tree-expand-icon">${isRowExpanded ? '&#9660;' : '&#9654;'}</span>
+            </td>
+          `;
+        }
+
+        rowsHtml += `
+          <tr class="backref-table-row ${isRowExpanded ? 'expanded' : ''} ${isCycle ? 'cycle-row' : ''}"
+              data-node-id="${rowNodeId}"
+              data-entity="${refEntity}"
+              data-id="${record.id}">
+            ${expandCell}
+            ${cells}
+          </tr>
+        `;
+
+        // If row is expanded (and not a cycle), render inline content
+        if (isRowExpanded) {
+          const colSpan = displayCols.length + 1;
+          const newPath = new Set([...visitedPath, rowPairKey]);
+          const expandedContent = await this.renderBackRefRowContent(refEntity, record, schema, newPath);
+          rowsHtml += `
+            <tr class="backref-row-content">
+              <td colspan="${colSpan}" style="background-color: ${areaColor};">
+                ${expandedContent}
+              </td>
+            </tr>
+          `;
+        }
+      }
 
       return `
         <div class="tree-backref-content">
           <table class="tree-backref-table">
             <thead><tr>${headers}</tr></thead>
-            <tbody>${rows}</tbody>
+            <tbody>${rowsHtml}</tbody>
           </table>
         </div>
       `;
     } catch (e) {
       return `<div class="tree-error">Failed to load references: ${e.message}</div>`;
     }
+  },
+
+  /**
+   * Render content for an expanded back-reference row
+   * Shows FKs and back-references of the referenced record
+   * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
+   */
+  async renderBackRefRowContent(entityName, record, schema, visitedPath = new Set()) {
+    const isRowLayout = this.attributeLayout === 'row';
+    let html = '<div class="backref-row-expanded">';
+
+    // Get FK columns that have values
+    const fkCols = schema.columns.filter(col =>
+      col.foreignKey && record[col.name] && !schema.ui?.hiddenFields?.includes(col.name)
+    );
+
+    // Render FKs recursively
+    for (const col of fkCols) {
+      html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath);
+    }
+
+    // Back-references of this record
+    if (schema.backReferences && schema.backReferences.length > 0) {
+      html += await this.renderBackReferences(entityName, record.id, schema.backReferences, visitedPath);
+    }
+
+    // If no FKs and no back-refs, show a message
+    if (fkCols.length === 0 && (!schema.backReferences || schema.backReferences.length === 0)) {
+      html += '<em class="no-relations">No relations</em>';
+    }
+
+    html += '</div>';
+    return html;
   },
 
   /**
@@ -617,25 +686,28 @@ const EntityTree = {
       });
     });
 
-    // Edit button
-    this.container.querySelectorAll('[data-action="edit"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    // Toggle back-reference table row expand/collapse
+    this.container.querySelectorAll('[data-action="toggle-backref-row"]').forEach(el => {
+      el.addEventListener('click', (e) => {
         e.stopPropagation();
-        const node = btn.closest('.tree-node');
-        const entityName = node.dataset.entity;
-        const recordId = parseInt(node.dataset.recordId);
-        this.onEdit(entityName, recordId);
+        const row = el.closest('tr');
+        const nodeId = row.dataset.nodeId;
+        this.toggleNode(nodeId);
       });
     });
 
-    // Delete button
-    this.container.querySelectorAll('[data-action="delete"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const node = btn.closest('.tree-node');
+    // Context menu on root node headers (right-click for Edit/Delete)
+    this.container.querySelectorAll('.root-node > .tree-node-header').forEach(header => {
+      header.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const node = header.closest('.tree-node');
         const entityName = node.dataset.entity;
         const recordId = parseInt(node.dataset.recordId);
-        this.onDelete(entityName, recordId);
+        ContextMenu.show(e.clientX, e.clientY, {
+          entity: entityName,
+          recordId: recordId,
+          source: 'tree'
+        });
       });
     });
 
@@ -683,27 +755,68 @@ const EntityTree = {
   },
 
   /**
-   * Toggle node expansion
+   * Toggle node expansion with focused navigation
+   * When closing a node, also close all child nodes (deeper levels)
    */
   toggleNode(nodeId) {
     if (this.expandedNodes.has(nodeId)) {
-      this.expandedNodes.delete(nodeId);
+      // Closing: Remove this node and all descendants
+      this.closeNodeAndDescendants(nodeId);
     } else {
+      // Opening: Just add this node
       this.expandedNodes.add(nodeId);
     }
     this.render();
   },
 
   /**
-   * Select a node
+   * Close a node and all its descendants (child expansions)
+   * Uses expansion order tracking to determine hierarchy
+   */
+  closeNodeAndDescendants(nodeId) {
+    // Remove the node itself
+    this.expandedNodes.delete(nodeId);
+
+    // For FK nodes: Close all FK/backref nodes that were opened "below" this one
+    // Strategy: FK nodes have format "fk-Entity-ID-from-ParentID"
+    // When closing an FK node, close all other FK nodes (they're deeper by definition)
+    if (nodeId.startsWith('fk-') || nodeId.startsWith('backref-')) {
+      // Close all other FK and backref nodes (except root nodes)
+      const toRemove = [];
+      for (const id of this.expandedNodes) {
+        if (id.startsWith('fk-') || id.startsWith('backref-')) {
+          toRemove.push(id);
+        }
+      }
+      toRemove.forEach(id => this.expandedNodes.delete(id));
+    }
+  },
+
+  /**
+   * Select a node (toggle selection, no detail panel in tree view)
    */
   selectNode(nodeId, entityName, recordId) {
-    this.selectedNodeId = nodeId;
+    // Toggle: clicking same node deselects it
+    if (this.selectedNodeId === nodeId) {
+      this.selectedNodeId = null;
+      EntityExplorer.selectedId = null;
+    } else {
+      this.selectedNodeId = nodeId;
+      EntityExplorer.selectedId = recordId;
+    }
+    // Hide detail panel when selecting in tree view (use edit button for details)
+    DetailPanel.hide();
+    this.render();
+  },
+
+  /**
+   * Handle details action (read-only view)
+   */
+  onDetails(entityName, recordId) {
     const record = this.records.find(r => r.id === recordId);
     if (record) {
       DetailPanel.showRecord(entityName, record);
     }
-    this.render();
   },
 
   /**

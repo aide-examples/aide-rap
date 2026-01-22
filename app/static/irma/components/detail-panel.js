@@ -24,11 +24,8 @@ const DetailPanel = {
     this.expandBtn = document.getElementById('panel-expand');
     this.showIdsToggle = document.getElementById('show-ids-toggle');
 
-    // Restore collapsed state from session
-    this.isCollapsed = sessionStorage.getItem('panelCollapsed') === 'true';
-    if (this.isCollapsed) {
-      this.collapse();
-    }
+    // Start with panel collapsed (no record selected initially)
+    this.collapse();
 
     // Restore show IDs state from session
     this.showIds = sessionStorage.getItem('showIds') === 'true';
@@ -61,14 +58,12 @@ const DetailPanel = {
     this.isCollapsed = true;
     this.panel.classList.add('collapsed');
     this.expandBtn.classList.remove('hidden');
-    sessionStorage.setItem('panelCollapsed', 'true');
   },
 
   expand() {
     this.isCollapsed = false;
     this.panel.classList.remove('collapsed');
     this.expandBtn.classList.add('hidden');
-    sessionStorage.setItem('panelCollapsed', 'false');
   },
 
   setTitle(text) {
@@ -76,8 +71,28 @@ const DetailPanel = {
   },
 
   clear() {
+    this.currentEntity = null;
+    this.currentRecord = null;
     this.setTitle('Details');
     this.content.innerHTML = '<p class="empty-message">Select a record to view details.</p>';
+  },
+
+  /**
+   * Hide the panel completely (used when deselecting a record)
+   */
+  hide() {
+    this.currentEntity = null;
+    this.currentRecord = null;
+    this.collapse();
+  },
+
+  /**
+   * Show the panel (used when selecting a record)
+   */
+  show() {
+    if (this.isCollapsed) {
+      this.expand();
+    }
   },
 
   showMessage(message, type = 'info') {
@@ -89,6 +104,9 @@ const DetailPanel = {
     // Store for re-rendering when toggle changes
     this.currentEntity = entityName;
     this.currentRecord = record;
+
+    // Ensure panel is visible when showing a record
+    this.show();
 
     this.setTitle(`${entityName} #${record.id}`);
 
@@ -169,12 +187,12 @@ const DetailPanel = {
   },
 
   async showEditForm(entityName, record) {
+    this.currentEntity = entityName;
+    this.currentRecord = record;
+
+    this.show();
     this.setTitle(`Edit ${entityName} #${record.id}`);
     await EntityForm.render(this.content, entityName, record);
-
-    if (this.isCollapsed) {
-      this.expand();
-    }
   },
 
   escapeHtml(text) {

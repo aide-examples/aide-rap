@@ -321,8 +321,15 @@
 .entity-list {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;  /* Let child (entity-table-wrapper) handle scrolling */
     padding: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tree container needs its own scrolling (no wrapper) */
+#entity-tree-container {
+    overflow: auto;
 }
 
 .empty-message {
@@ -947,7 +954,8 @@
     color: #92400e;
     font-size: 0.7rem;
     border-bottom: 1px solid #fcd34d;
-    white-space: nowrap;
+    white-space: normal;  /* Allow line breaks */
+    min-width: 50px;
 }
 
 .tree-backref-table td {
@@ -972,6 +980,72 @@
 
 .backref-table-row:hover td {
     background: #fef3c7;
+}
+
+/* Expand column in back-reference table */
+.tree-backref-table th.expand-col,
+.tree-backref-table td.expand-cell {
+    width: 24px;
+    min-width: 24px;
+    max-width: 24px;
+    padding: 4px;
+    text-align: center;
+}
+
+.tree-backref-table td.expand-cell {
+    cursor: pointer;
+}
+
+.tree-backref-table td.expand-cell:hover {
+    background: #fde68a;
+}
+
+.tree-backref-table td.expand-cell .tree-expand-icon {
+    font-size: 0.7rem;
+    color: #92400e;
+}
+
+/* Expanded back-reference row */
+.backref-table-row.expanded > td {
+    background: #fef3c7;
+}
+
+.backref-row-content > td {
+    padding: 8px 12px !important;
+    max-width: none;
+    white-space: normal;
+}
+
+.backref-row-expanded {
+    padding: 4px 0;
+}
+
+.backref-row-expanded .tree-fk-node,
+.backref-row-expanded .tree-backref-node {
+    margin: 4px 0;
+}
+
+.backref-row-expanded .no-relations {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+/* Cycle detection in back-reference table rows */
+.backref-table-row.cycle-row {
+    opacity: 0.7;
+}
+
+.backref-table-row.cycle-row td {
+    cursor: not-allowed;
+}
+
+.tree-backref-table td.cycle-cell {
+    cursor: not-allowed;
+}
+
+.tree-backref-table td.cycle-cell .cycle-icon {
+    color: #f59e0b;
+    font-size: 0.8rem;
 }
 
 /* Error message in tree */
@@ -999,7 +1073,8 @@
     color: #64748b;
     font-size: 0.7rem;
     border-bottom: 1px solid #e2e8f0;
-    white-space: nowrap;
+    white-space: normal;  /* Allow line breaks */
+    min-width: 50px;
 }
 
 .tree-attr-table td {
@@ -1021,16 +1096,15 @@
    Entity Table View
    ----------------------------------------------------------------------------- */
 .entity-table-wrapper {
-    overflow: auto;
+    overflow-x: scroll;  /* Always show horizontal scrollbar */
+    overflow-y: auto;
     flex: 1;
     min-height: 0;
 }
 
 .entity-table {
-    width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
-    min-width: max-content;
 }
 
 .entity-table thead {
@@ -1042,12 +1116,12 @@
 .entity-table th {
     background: #f1f5f9;
     border-bottom: 2px solid #e2e8f0;
-    padding: 10px 12px;
+    padding: 8px 10px;
     text-align: left;
     font-weight: 600;
     color: #475569;
-    white-space: nowrap;
     user-select: none;
+    white-space: nowrap;
 }
 
 .entity-table th.sortable {
@@ -1074,11 +1148,12 @@
 }
 
 .entity-table td {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-bottom: 1px solid #e5e7eb;
-    max-width: 300px;
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .entity-table tbody tr {
@@ -1784,4 +1859,82 @@
 
 .btn-seed.primary:hover:not(:disabled) {
     background: #0e7490;
+}
+
+/* ========================================
+   Context Menu
+   ======================================== */
+
+.context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 140px;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.95);
+    transition: opacity 0.1s, transform 0.1s, visibility 0.1s;
+}
+
+.context-menu.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.context-menu-item:first-child {
+    border-radius: 6px 6px 0 0;
+}
+
+.context-menu-item:last-child {
+    border-radius: 0 0 6px 6px;
+}
+
+.context-menu-item:hover {
+    background: #f1f5f9;
+}
+
+.context-menu-item-danger:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.context-menu-icon {
+    width: 16px;
+    text-align: center;
+}
+
+/* ========================================
+   Cycle Detection (Tree View)
+   ======================================== */
+
+.tree-fk-node.cycle-detected .tree-fk-header {
+    opacity: 0.7;
+}
+
+.tree-fk-header.disabled {
+    cursor: not-allowed;
+}
+
+.tree-fk-header.disabled:hover {
+    filter: none;
+}
+
+.cycle-icon {
+    color: #f59e0b;
+    margin-right: 4px;
+    font-size: 0.9rem;
 }

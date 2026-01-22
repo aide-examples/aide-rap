@@ -162,9 +162,11 @@ const EntityTable = {
       const isFK = col.foreignKey ? ' fk-column' : '';
 
       // Use conceptual name for FKs (type instead of type_id)
-      const displayName = col.foreignKey
+      // Replace underscores with <br> for line breaks in headers
+      const displayName = (col.foreignKey
         ? (col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name)
-        : col.name;
+        : col.name
+      ).replace(/_/g, '<br>');
 
       // Use area color for FK columns
       const bgStyle = col.foreignKey?.areaColor
@@ -172,15 +174,16 @@ const EntityTable = {
         : '';
 
       html += `<th class="sortable${isFK}" data-column="${col.name}"${bgStyle}>
-        ${this.escapeHtml(displayName)}${sortIcon}
+        ${displayName}${sortIcon}
       </th>`;
     }
     // Back-reference columns
     for (const ref of backRefs) {
-      // Use conceptual name (without _id suffix)
-      const fieldName = ref.column.endsWith('_id')
+      // Use conceptual name (without _id suffix), replace underscores with <br> for line breaks
+      const fieldName = (ref.column.endsWith('_id')
         ? ref.column.slice(0, -3)
-        : ref.column;
+        : ref.column
+      ).replace(/_/g, '<br>');
       // Use area color of the referencing entity
       const bgColor = ref.areaColor || '#fef3c7';
       html += `<th class="backref-column" style="background-color: ${bgColor}" title="Records in ${ref.entity} referencing this via ${fieldName}">
@@ -188,7 +191,6 @@ const EntityTable = {
         <span class="backref-field">${fieldName}</span>
       </th>`;
     }
-    html += '<th class="actions-column"></th>';
     html += '</tr></thead>';
 
     // Body rows
@@ -242,11 +244,6 @@ const EntityTable = {
           <span class="backref-placeholder">-</span>
         </td>`;
       }
-
-      // Actions (only delete - edit is in detail panel)
-      html += `<td class="actions-cell">
-        <button class="btn-table-action btn-delete" data-id="${record.id}" title="Delete">&#128465;</button>
-      </td>`;
 
       html += '</tr>';
     }
@@ -407,19 +404,21 @@ const EntityTable = {
     // Row click for selection
     this.container.querySelectorAll('tbody tr').forEach(row => {
       row.addEventListener('click', (e) => {
-        if (!e.target.closest('.btn-table-action') && !e.target.closest('[data-action]')) {
+        if (!e.target.closest('[data-action]')) {
           const id = parseInt(row.dataset.id);
           this.onRowClick(id);
         }
       });
-    });
 
-    // Delete button
-    this.container.querySelectorAll('.btn-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = parseInt(btn.dataset.id);
-        this.onDelete(id);
+      // Context menu (right-click)
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const id = parseInt(row.dataset.id);
+        ContextMenu.show(e.clientX, e.clientY, {
+          entity: this.currentEntity,
+          recordId: id,
+          source: 'table'
+        });
       });
     });
   },
@@ -439,31 +438,42 @@ const EntityTable = {
   },
 
   /**
-   * Handle row click
+   * Handle row click (selection only, no detail panel)
+   * Detail panel is opened via context menu (Edit/Details)
    */
   onRowClick(id) {
     const previousId = this.selectedId;
-    this.selectedId = id;
 
-    // Sync with EntityExplorer so tree view knows which record is selected
-    EntityExplorer.selectedId = id;
+    // Toggle: clicking same row deselects it
+    if (previousId === id) {
+      this.selectedId = null;
+      EntityExplorer.selectedId = null;
+    } else {
+      this.selectedId = id;
+      EntityExplorer.selectedId = id;
 
-    const record = this.records.find(r => r.id === id);
-    if (record) {
-      DetailPanel.showRecord(this.currentEntity, record);
+      // Load back-reference counts for the newly selected row
+      this.loadBackReferenceCountsForRow(id);
     }
 
     // Update selection visually without full re-render
     this.container.querySelectorAll('tbody tr').forEach(row => {
       const rowId = parseInt(row.dataset.id);
-      row.classList.toggle('selected', rowId === id);
-      row.classList.toggle('zebra', rowId !== id && this.records.findIndex(r => r.id === rowId) % 2 === 1);
+      row.classList.toggle('selected', rowId === this.selectedId);
+      row.classList.toggle('zebra', rowId !== this.selectedId && this.records.findIndex(r => r.id === rowId) % 2 === 1);
     });
+  },
 
-    // Load back-reference counts for the newly selected row
-    if (id !== previousId) {
-      this.loadBackReferenceCountsForRow(id);
+  /**
+   * Handle details action (read-only view)
+   */
+  onDetails(id) {
+    this.selectedId = id;
+    const record = this.records.find(r => r.id === id);
+    if (record) {
+      DetailPanel.showRecord(this.currentEntity, record);
     }
+    this.render();
   },
 
   /**

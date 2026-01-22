@@ -36,6 +36,7 @@
     await EntityExplorer.init();
     DetailPanel.init();
     ConfirmDialog.init();
+    ContextMenu.init();
     SeedManager.init('modal-container');
 
     // Tools menu opens Seed Manager
