@@ -140,6 +140,14 @@ Export the current table view to a professionally formatted PDF:
 - **Automatic page breaks** with header repetition
 - **Page numbers** on each page
 
+**TreeView PDF Export:**
+
+When in Tree View mode, PDF export captures the currently expanded structure:
+- Exports only what's visible (expanded nodes)
+- Uses indentation to show hierarchy depth
+- Includes symbols for relationships: `▸` root, `→` FK, `←` back-reference, `↻` cycle
+- Respects current sort settings (attribute order, reference position)
+
 ### Admin Seed Manager
 
 The Admin menu opens a dedicated interface for managing seed data across all entities:
@@ -337,7 +345,7 @@ Ideas for future development:
 ### Export & Import
 - [x] **CSV Export** – Table View context menu "Export CSV"
 - [x] **PDF Export** – Table View context menu "Export PDF"
-- [ ] TreeView PDF Export
+- [x] **TreeView PDF Export** – Exports currently expanded tree structure
 - [ ] Detail Panel PDF Export
 
 ### Admin / Seed Data Manager

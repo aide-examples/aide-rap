@@ -13,6 +13,7 @@ const EntityTree = {
   attributeOrder: 'schema', // 'schema' or 'alpha'
   referencePosition: 'end', // 'end', 'start', or 'inline'
   attributeLayout: 'list', // 'row' (horizontal) or 'list' (vertical) - controlled by view mode buttons
+  showCycles: false, // false = hide cycle nodes completely, true = show with cycle indicator (not expandable)
 
   init(containerId) {
     this.container = document.getElementById(containerId);
@@ -61,6 +62,23 @@ const EntityTree = {
       refSelect.addEventListener('change', (e) => {
         this.referencePosition = e.target.value;
         sessionStorage.setItem('tree-ref-position', e.target.value);
+        this.render();
+      });
+    }
+
+    // Cycle visibility toggle
+    const cyclesToggle = document.getElementById('show-cycles-toggle');
+    if (cyclesToggle) {
+      // Restore from sessionStorage
+      const savedCycles = sessionStorage.getItem('tree-show-cycles');
+      if (savedCycles === 'true') {
+        this.showCycles = true;
+        cyclesToggle.checked = true;
+      }
+
+      cyclesToggle.addEventListener('change', (e) => {
+        this.showCycles = e.target.checked;
+        sessionStorage.setItem('tree-show-cycles', e.target.checked ? 'true' : 'false');
         this.render();
       });
     }
@@ -364,8 +382,11 @@ const EntityTree = {
       // Fall back to just the ID or preloaded label
     }
 
-    // Cycle detected: render as non-expandable link with visual marker
+    // Cycle detected: hide completely or render as non-expandable link with visual marker
     if (isCycle) {
+      if (!this.showCycles) {
+        return ''; // Hide cycle nodes when showCycles is false
+      }
       return `
         <div class="tree-fk-node cycle-detected"
              data-entity="${targetEntity}"
@@ -532,6 +553,11 @@ const EntityTree = {
         const rowPairKey = `${refEntity}-${record.id}`;
         const isCycle = visitedPath.has(rowPairKey);
         const isRowExpanded = !isCycle && this.expandedNodes.has(rowNodeId);
+
+        // Skip cycle rows when showCycles is false
+        if (isCycle && !this.showCycles) {
+          continue;
+        }
 
         const cells = displayCols.map(col => {
           const value = record[col.name];
@@ -766,25 +792,96 @@ const EntityTree = {
 
   /**
    * Close a node and all its descendants (child expansions)
-   * Uses expansion order tracking to determine hierarchy
+   * Descendants are identified by tracking which nodes were expanded within this node's context
    */
   closeNodeAndDescendants(nodeId) {
     // Remove the node itself
     this.expandedNodes.delete(nodeId);
 
-    // For FK nodes: Close all FK/backref nodes that were opened "below" this one
-    // Strategy: FK nodes have format "fk-Entity-ID-from-ParentID"
-    // When closing an FK node, close all other FK nodes (they're deeper by definition)
-    if (nodeId.startsWith('fk-') || nodeId.startsWith('backref-')) {
-      // Close all other FK and backref nodes (except root nodes)
-      const toRemove = [];
-      for (const id of this.expandedNodes) {
-        if (id.startsWith('fk-') || id.startsWith('backref-')) {
-          toRemove.push(id);
+    // Find descendants based on node ID structure
+    // FK nodes: fk-{Entity}-{targetId}-from-{parentRecordId}
+    // Backref nodes: backref-{Entity}-to-{ParentEntity}-{parentRecordId}
+    // Backref row nodes: backref-row-{Entity}-{recordId}-in-{ParentEntity}-{parentRecordId}
+
+    // Parse the closed node to find its target entity-id pair
+    let targetEntity = null;
+    let targetId = null;
+
+    if (nodeId.startsWith('fk-')) {
+      // fk-Entity-ID-from-X → target is Entity-ID
+      const match = nodeId.match(/^fk-([^-]+)-(\d+)-from-/);
+      if (match) {
+        targetEntity = match[1];
+        targetId = match[2];
+      }
+    } else if (nodeId.startsWith('backref-row-')) {
+      // backref-row-Entity-ID-in-X-Y → target is Entity-ID
+      const match = nodeId.match(/^backref-row-([^-]+)-(\d+)-in-/);
+      if (match) {
+        targetEntity = match[1];
+        targetId = match[2];
+      }
+    } else if (nodeId.match(/^[A-Z][a-zA-Z]+-\d+$/)) {
+      // Root node: Entity-ID
+      const match = nodeId.match(/^([A-Za-z]+)-(\d+)$/);
+      if (match) {
+        targetEntity = match[1];
+        targetId = match[2];
+      }
+    }
+
+    if (!targetEntity || !targetId) {
+      return; // Can't determine descendants
+    }
+
+    // Close all nodes that were opened from within this entity-id context
+    // These have "-from-{targetId}" or "-in-{Entity}-{targetId}" in their ID
+    const toRemove = [];
+    for (const id of this.expandedNodes) {
+      // Check if this node was opened from the target record
+      if (id.includes(`-from-${targetId}`) || id.includes(`-in-${targetEntity}-${targetId}`)) {
+        toRemove.push(id);
+      }
+    }
+
+    // Recursively find descendants of the removed nodes
+    const allToRemove = new Set(toRemove);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const removedId of [...allToRemove]) {
+        // Parse this removed node to find its target
+        let childTarget = null;
+        let childId = null;
+
+        if (removedId.startsWith('fk-')) {
+          const match = removedId.match(/^fk-([^-]+)-(\d+)-from-/);
+          if (match) {
+            childTarget = match[1];
+            childId = match[2];
+          }
+        } else if (removedId.startsWith('backref-row-')) {
+          const match = removedId.match(/^backref-row-([^-]+)-(\d+)-in-/);
+          if (match) {
+            childTarget = match[1];
+            childId = match[2];
+          }
+        }
+
+        if (childTarget && childId) {
+          for (const id of this.expandedNodes) {
+            if (!allToRemove.has(id)) {
+              if (id.includes(`-from-${childId}`) || id.includes(`-in-${childTarget}-${childId}`)) {
+                allToRemove.add(id);
+                changed = true;
+              }
+            }
+          }
         }
       }
-      toRemove.forEach(id => this.expandedNodes.delete(id));
     }
+
+    allToRemove.forEach(id => this.expandedNodes.delete(id));
   },
 
   /**
@@ -893,5 +990,344 @@ const EntityTree = {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  },
+
+  /**
+   * Export currently visible/expanded tree to PDF (hierarchical format)
+   * Uses typed nodes with colors for visual hierarchy
+   */
+  async exportPdf() {
+    if (!this.currentEntity || !this.records.length) {
+      return;
+    }
+
+    const schema = await SchemaCache.getExtended(this.currentEntity);
+    const nodes = [];
+
+    // Collect visible data as typed nodes
+    await this.collectTreeNodes(nodes, schema);
+
+    if (nodes.length === 0) {
+      alert('No data to export. Expand some nodes first.');
+      return;
+    }
+
+    const entityColor = schema.areaColor || '#1a365d';
+
+    try {
+      const response = await fetch(`/api/entities/${this.currentEntity}/export-tree-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${this.currentEntity} (Tree View)`,
+          nodes,
+          entityColor,
+          layout: this.attributeLayout  // 'row' or 'list'
+        })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.currentEntity}_tree.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const error = await response.json();
+        alert(`PDF export failed: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`PDF export failed: ${err.message}`);
+    }
+  },
+
+  /**
+   * Collect tree nodes with types and colors for hierarchical PDF
+   */
+  async collectTreeNodes(nodes, schema, depth = 0) {
+    let recordsToProcess = [];
+    if (this.selectedNodeId) {
+      const selectedRecordId = parseInt(this.selectedNodeId.split('-').pop());
+      const selectedRecord = this.records.find(r => r.id === selectedRecordId);
+      if (selectedRecord) {
+        recordsToProcess = [selectedRecord];
+      }
+    } else {
+      recordsToProcess = this.records;
+    }
+
+    for (const record of recordsToProcess) {
+      const nodeId = `${this.currentEntity}-${record.id}`;
+      const isExpanded = this.expandedNodes.has(nodeId);
+      const label = this.getRecordLabel(record, schema);
+      const labelText = label.subtitle ? `${label.title} (${label.subtitle})` : label.title;
+
+      // Root node
+      nodes.push({
+        type: 'root',
+        depth,
+        label: this.currentEntity,
+        value: labelText,
+        color: schema.areaColor || '#e2e8f0'
+      });
+
+      if (isExpanded) {
+        const visitedPath = new Set([`${this.currentEntity}-${record.id}`]);
+        await this.collectNodeContent(nodes, this.currentEntity, record, schema, depth + 1, visitedPath);
+      }
+    }
+  },
+
+  /**
+   * Collect content nodes (attributes, FKs, back-refs) with proper types
+   */
+  async collectNodeContent(nodes, entityName, record, schema, depth, visitedPath) {
+    let columns = schema.columns.filter(col => !schema.ui?.hiddenFields?.includes(col.name));
+    if (this.attributeOrder === 'alpha') {
+      columns = [...columns].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const regularCols = columns.filter(col => !col.foreignKey);
+    const fkCols = columns.filter(col => col.foreignKey);
+    const hasBackRefs = schema.backReferences && schema.backReferences.length > 0;
+
+    if (this.referencePosition === 'start') {
+      await this.collectFkNodes(nodes, fkCols, record, depth, visitedPath);
+      if (hasBackRefs) {
+        await this.collectBackRefNodes(nodes, entityName, record.id, schema.backReferences, depth, visitedPath);
+      }
+      this.collectAttributeNodes(nodes, regularCols, record, schema, depth);
+    } else if (this.referencePosition === 'inline') {
+      if (this.attributeLayout === 'row') {
+        // Row layout: Attributes first (one row), then FKs, then back-refs
+        this.collectAttributeNodes(nodes, regularCols, record, schema, depth);
+        await this.collectFkNodes(nodes, fkCols, record, depth, visitedPath);
+        if (hasBackRefs) {
+          await this.collectBackRefNodes(nodes, entityName, record.id, schema.backReferences, depth, visitedPath);
+        }
+      } else {
+        // List layout: original inline behavior (FKs interspersed with attributes)
+        for (const col of columns) {
+          if (col.foreignKey) {
+            await this.collectFkNodes(nodes, [col], record, depth, visitedPath);
+          } else {
+            this.collectAttributeNodes(nodes, [col], record, schema, depth);
+          }
+        }
+        if (hasBackRefs) {
+          await this.collectBackRefNodes(nodes, entityName, record.id, schema.backReferences, depth, visitedPath);
+        }
+      }
+    } else {
+      this.collectAttributeNodes(nodes, regularCols, record, schema, depth);
+      await this.collectFkNodes(nodes, fkCols, record, depth, visitedPath);
+      if (hasBackRefs) {
+        await this.collectBackRefNodes(nodes, entityName, record.id, schema.backReferences, depth, visitedPath);
+      }
+    }
+  },
+
+  /**
+   * Collect attribute nodes
+   * In 'row' layout: creates single 'attribute-row' node with all columns
+   * In 'list' layout: creates individual 'attribute' nodes
+   */
+  collectAttributeNodes(nodes, columns, record, schema, depth) {
+    if (columns.length === 0) return;
+
+    if (this.attributeLayout === 'row') {
+      // Horizontal layout: single row with all attributes
+      const tableColumns = [];
+      const tableValues = [];
+
+      for (const col of columns) {
+        const value = record[col.name];
+        let displayValue;
+        if (value === null || value === undefined) {
+          displayValue = '—';
+        } else {
+          displayValue = ValueFormatter.format(value, col.name, schema);
+        }
+        tableColumns.push(col.name.replace(/_/g, ' '));
+        tableValues.push(displayValue);
+      }
+
+      nodes.push({
+        type: 'attribute-row',
+        depth,
+        columns: tableColumns,
+        values: tableValues
+      });
+    } else {
+      // Vertical layout: individual attribute nodes
+      for (const col of columns) {
+        const value = record[col.name];
+        let displayValue;
+        if (value === null || value === undefined) {
+          displayValue = '—';
+        } else {
+          displayValue = ValueFormatter.format(value, col.name, schema);
+        }
+        nodes.push({
+          type: 'attribute',
+          depth,
+          label: col.name.replace(/_/g, ' '),
+          value: displayValue
+        });
+      }
+    }
+  },
+
+  /**
+   * Collect FK nodes with target entity color
+   */
+  async collectFkNodes(nodes, fkCols, parentRecord, depth, visitedPath) {
+    for (const col of fkCols) {
+      const fkId = parentRecord[col.name];
+      const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
+
+      if (!fkId) {
+        nodes.push({
+          type: 'attribute',
+          depth,
+          label: displayName.replace(/_/g, ' '),
+          value: '—'
+        });
+        continue;
+      }
+
+      const targetEntity = col.foreignKey.entity;
+      const pairKey = `${targetEntity}-${fkId}`;
+      const isCycle = visitedPath.has(pairKey);
+      const nodeId = `fk-${targetEntity}-${fkId}-from-${parentRecord.id}`;
+      const isExpanded = !isCycle && this.expandedNodes.has(nodeId);
+
+      // Get label and color
+      const labelField = displayName + '_label';
+      let refLabel = parentRecord[labelField] || `#${fkId}`;
+      let fkColor = col.foreignKey.areaColor || '#e2e8f0';
+
+      if (isCycle) {
+        // Skip cycle nodes in PDF when showCycles is false
+        if (!this.showCycles) {
+          continue;
+        }
+        nodes.push({
+          type: 'fk',
+          depth,
+          label: `${displayName.replace(/_/g, ' ')} (cycle)`,
+          value: refLabel,
+          color: fkColor
+        });
+      } else {
+        nodes.push({
+          type: 'fk',
+          depth,
+          label: displayName.replace(/_/g, ' '),
+          value: refLabel,
+          color: fkColor
+        });
+
+        if (isExpanded) {
+          try {
+            const refSchema = await SchemaCache.getExtended(targetEntity);
+            const refRecord = await ApiClient.getById(targetEntity, fkId);
+            const newPath = new Set([...visitedPath, pairKey]);
+
+            // Add section header for expanded FK
+            nodes.push({
+              type: 'section',
+              depth: depth + 1,
+              label: targetEntity,
+              value: refLabel,
+              color: refSchema.areaColor || '#e2e8f0'
+            });
+
+            await this.collectNodeContent(nodes, targetEntity, refRecord, refSchema, depth + 2, newPath);
+          } catch (e) {
+            // Ignore
+          }
+        }
+      }
+    }
+  },
+
+  /**
+   * Collect back-reference nodes with entity color
+   */
+  async collectBackRefNodes(nodes, entityName, recordId, backRefs, depth, visitedPath) {
+    for (const ref of backRefs) {
+      const nodeId = `backref-${ref.entity}-to-${entityName}-${recordId}`;
+      const isExpanded = this.expandedNodes.has(nodeId);
+
+      let count = 0;
+      let refRecords = [];
+      try {
+        const references = await ApiClient.getBackReferences(entityName, recordId);
+        if (references[ref.entity]) {
+          count = references[ref.entity].count;
+          refRecords = references[ref.entity].records || [];
+        }
+      } catch (e) {
+        // Ignore
+      }
+
+      if (count === 0) continue;
+
+      const refColor = ref.areaColor || '#e2e8f0';
+
+      nodes.push({
+        type: 'backref',
+        depth,
+        label: ref.entity,
+        value: `${count} record${count !== 1 ? 's' : ''}`,
+        color: refColor
+      });
+
+      if (isExpanded && refRecords.length > 0) {
+        const refSchema = await SchemaCache.getExtended(ref.entity);
+
+        for (const refRecord of refRecords) {
+          const rowNodeId = `backref-row-${ref.entity}-${refRecord.id}-in-${entityName}-${recordId}`;
+          const rowPairKey = `${ref.entity}-${refRecord.id}`;
+          const isCycle = visitedPath.has(rowPairKey);
+          const isRowExpanded = !isCycle && this.expandedNodes.has(rowNodeId);
+
+          const label = this.getRecordLabel(refRecord, refSchema);
+          const labelText = label.subtitle ? `${label.title} (${label.subtitle})` : label.title;
+
+          if (isCycle) {
+            // Skip cycle rows in PDF when showCycles is false
+            if (!this.showCycles) {
+              continue;
+            }
+            nodes.push({
+              type: 'backref-item',
+              depth: depth + 1,
+              label: `${ref.entity} (cycle)`,
+              value: labelText,
+              color: refColor
+            });
+          } else {
+            nodes.push({
+              type: 'backref-item',
+              depth: depth + 1,
+              label: ref.entity,
+              value: labelText,
+              color: refColor
+            });
+
+            if (isRowExpanded) {
+              const newPath = new Set([...visitedPath, rowPairKey]);
+              await this.collectNodeContent(nodes, ref.entity, refRecord, refSchema, depth + 2, newPath);
+            }
+          }
+        }
+      }
+    }
   },
 };

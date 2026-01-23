@@ -781,6 +781,27 @@ app.post('/api/entities/:entity/export-pdf', (req, res) => {
   }
 });
 
+// Export tree view to PDF (hierarchical format)
+app.post('/api/entities/:entity/export-tree-pdf', (req, res) => {
+  try {
+    const { title, nodes, entityColor } = req.body;
+
+    if (!nodes || !Array.isArray(nodes)) {
+      return res.status(400).json({ error: 'nodes array is required' });
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}_tree.pdf"`);
+
+    const printService = new PrintService();
+    printService.generateTreePdf({ title, nodes, entityColor }, res);
+
+  } catch (error) {
+    console.error('Tree PDF generation error:', error);
+    res.status(500).json({ error: 'PDF generation failed' });
+  }
+});
+
 // Export entity table to CSV
 app.post('/api/entities/:entity/export-csv', (req, res) => {
   try {

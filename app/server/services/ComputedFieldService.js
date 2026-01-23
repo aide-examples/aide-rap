@@ -215,11 +215,94 @@ function getStatus() {
   };
 }
 
+/**
+ * Collect columns with explicit DEFAULT values from schema
+ * Only includes columns with [DEFAULT=x] annotation, not type-level defaults
+ * @returns {Array} Array of { entity, column, defaultValue }
+ */
+function collectDefaultColumns() {
+  const schema = getSchema();
+  const columns = [];
+
+  for (const entity of schema.orderedEntities) {
+    for (const col of entity.columns) {
+      // Only EXPLICIT defaults from [DEFAULT=x] annotation
+      // NOT type-level defaults (like CURRENT_DATE for date fields)
+      // Skip computed columns (they have their own update logic)
+      if (col.explicitDefault !== null && col.explicitDefault !== undefined && !col.computed) {
+        columns.push({
+          entity,
+          column: col,
+          defaultValue: col.defaultValue // Use resolved defaultValue (handles enum mapping)
+        });
+      }
+    }
+  }
+
+  return columns;
+}
+
+/**
+ * Apply DEFAULT values to NULL fields at startup
+ * Only updates rows where the column is NULL and a default is defined
+ * @returns {Object} Result with counts
+ */
+function applyDefaults() {
+  const db = getDatabase();
+  const columns = collectDefaultColumns();
+
+  if (columns.length === 0) {
+    logger.debug('No columns with DEFAULT values');
+    return { processed: 0, updated: 0 };
+  }
+
+  logger.info(`Checking DEFAULT values for ${columns.length} columns`);
+
+  let totalUpdated = 0;
+
+  for (const { entity, column, defaultValue } of columns) {
+    try {
+      // Format the default value for SQL
+      let sqlValue;
+      if (typeof defaultValue === 'string') {
+        sqlValue = `'${defaultValue.replace(/'/g, "''")}'`;
+      } else if (typeof defaultValue === 'boolean') {
+        sqlValue = defaultValue ? '1' : '0';
+      } else {
+        sqlValue = String(defaultValue);
+      }
+
+      const sql = `UPDATE ${entity.tableName} SET ${column.name} = ${sqlValue} WHERE ${column.name} IS NULL`;
+      const result = db.prepare(sql).run();
+
+      if (result.changes > 0) {
+        totalUpdated += result.changes;
+        logger.info(`Applied DEFAULT for ${entity.className}.${column.name}`, {
+          defaultValue,
+          rowsUpdated: result.changes
+        });
+      }
+    } catch (err) {
+      logger.error(`Failed to apply DEFAULT for ${entity.className}.${column.name}`, {
+        error: err.message,
+        defaultValue
+      });
+    }
+  }
+
+  return {
+    processed: columns.length,
+    updated: totalUpdated
+  };
+}
+
 module.exports = {
   runAll,
+  applyDefaults,
   scheduleDailyRun,
   stopScheduler,
   getStatus,
   collectComputedFields,
+  collectDefaultColumns,
   buildUpdateSQL
 };

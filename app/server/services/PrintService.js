@@ -17,6 +17,59 @@ class PrintService {
   }
 
   /**
+   * Draw a small right-pointing triangle (for FK references)
+   * @param {PDFDocument} doc
+   * @param {number} x - Left position
+   * @param {number} y - Center Y position
+   * @param {number} size - Triangle size (default 5)
+   * @param {string} color - Fill color
+   */
+  drawRightTriangle(doc, x, y, size = 5, color = '#666666') {
+    doc.save();
+    doc.fillColor(color);
+    doc.moveTo(x, y - size / 2)
+       .lineTo(x + size, y)
+       .lineTo(x, y + size / 2)
+       .closePath()
+       .fill();
+    doc.restore();
+  }
+
+  /**
+   * Draw a small left-pointing triangle (for back-references)
+   * @param {PDFDocument} doc
+   * @param {number} x - Right position of triangle
+   * @param {number} y - Center Y position
+   * @param {number} size - Triangle size (default 5)
+   * @param {string} color - Fill color
+   */
+  drawLeftTriangle(doc, x, y, size = 5, color = '#666666') {
+    doc.save();
+    doc.fillColor(color);
+    doc.moveTo(x, y - size / 2)
+       .lineTo(x - size, y)
+       .lineTo(x, y + size / 2)
+       .closePath()
+       .fill();
+    doc.restore();
+  }
+
+  /**
+   * Draw a small bullet/circle (for list items)
+   * @param {PDFDocument} doc
+   * @param {number} x - Center X position
+   * @param {number} y - Center Y position
+   * @param {number} radius - Circle radius (default 2)
+   * @param {string} color - Fill color
+   */
+  drawBullet(doc, x, y, radius = 2, color = '#666666') {
+    doc.save();
+    doc.fillColor(color);
+    doc.circle(x, y, radius).fill();
+    doc.restore();
+  }
+
+  /**
    * Generate PDF and pipe to response
    * @param {Object} data - { title, columns, records, entityColor }
    * @param {Response} res - Express response object
@@ -238,6 +291,258 @@ class PrintService {
       const centerX = this.margin + (this.pageWidth - 2 * this.margin - pageTextWidth) / 2;
 
       doc.text(pageText, centerX, footerY, { lineBreak: false });
+    }
+  }
+
+  /**
+   * Generate hierarchical tree PDF
+   * @param {Object} data - { title, nodes, entityColor }
+   *   nodes: [{ type, depth, label, value, color }]
+   *   type: 'root' | 'section' | 'attribute' | 'fk' | 'backref' | 'backref-item'
+   * @param {Response} res - Express response object
+   */
+  generateTreePdf(data, res) {
+    const { title, nodes, entityColor } = data;
+    const color = entityColor || this.defaultColor;
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      layout: 'landscape',
+      margin: this.margin,
+      bufferPages: true
+    });
+
+    doc.pipe(res);
+
+    // Draw title
+    this.drawTitle(doc, title, color);
+
+    // Draw tree nodes
+    this.drawTreeNodes(doc, nodes);
+
+    // Add page numbers
+    this.addPageNumbers(doc);
+
+    doc.end();
+  }
+
+  /**
+   * Draw tree nodes with hierarchical structure
+   */
+  drawTreeNodes(doc, nodes) {
+    const tableWidth = this.pageWidth - 2 * this.margin;
+    const indentSize = 20;
+    const sectionHeight = 22;
+    const attrHeight = 16;
+
+    let y = doc.y;
+
+    for (const node of nodes) {
+      const indent = node.depth * indentSize;
+      const contentWidth = tableWidth - indent;
+
+      // Check for page break
+      const nodeHeight = (node.type === 'attribute' || node.type === 'backref-item') ? attrHeight : sectionHeight;
+      if (y + nodeHeight > this.pageHeight - this.margin - 20) {
+        doc.addPage();
+        y = this.margin;
+      }
+
+      const x = this.margin + indent;
+
+      if (node.type === 'root' || node.type === 'section') {
+        // Section header with colored background
+        const bgColor = node.color || '#e2e8f0';
+        doc.rect(x, y, contentWidth, sectionHeight).fill(bgColor);
+
+        // Section text
+        doc.fontSize(10).fillColor('#000000');
+        doc.text(node.label, x + 8, y + 5, {
+          width: contentWidth * 0.35 - 10,
+          height: sectionHeight - 4,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        // Section value (bold)
+        doc.font('Helvetica-Bold');
+        doc.text(node.value || '', x + contentWidth * 0.35, y + 5, {
+          width: contentWidth * 0.65 - 10,
+          height: sectionHeight - 4,
+          ellipsis: true,
+          lineBreak: false
+        });
+        doc.font('Helvetica');
+
+        y += sectionHeight + 2;
+
+      } else if (node.type === 'fk') {
+        // FK reference with colored left border
+        const bgColor = node.color || '#e2e8f0';
+        const borderWidth = 4;
+
+        // Left color border
+        doc.rect(x, y, borderWidth, sectionHeight).fill(bgColor);
+        // Light background
+        doc.rect(x + borderWidth, y, contentWidth - borderWidth, sectionHeight).fill('#f8fafc');
+
+        // FK icon (right-pointing triangle)
+        const iconX = x + borderWidth + 6;
+        const iconY = y + sectionHeight / 2;
+        this.drawRightTriangle(doc, iconX, iconY, 5, '#666666');
+
+        // FK label (offset for icon)
+        doc.fontSize(9).fillColor('#666666');
+        doc.text(node.label, x + borderWidth + 14, y + 5, {
+          width: contentWidth * 0.35 - borderWidth - 18,
+          height: sectionHeight - 4,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        // FK value
+        doc.fillColor('#000000');
+        doc.text(node.value || '', x + contentWidth * 0.35, y + 5, {
+          width: contentWidth * 0.65 - 10,
+          height: sectionHeight - 4,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        y += sectionHeight + 1;
+
+      } else if (node.type === 'backref') {
+        // Back-reference header
+        const bgColor = node.color || '#e2e8f0';
+        const borderWidth = 4;
+
+        // Left color border
+        doc.rect(x, y, borderWidth, sectionHeight).fill(bgColor);
+        // Light background
+        doc.rect(x + borderWidth, y, contentWidth - borderWidth, sectionHeight).fill('#f0f4f8');
+
+        // Backref icon (left-pointing triangle)
+        const iconX = x + borderWidth + 11;
+        const iconY = y + sectionHeight / 2;
+        this.drawLeftTriangle(doc, iconX, iconY, 5, '#666666');
+
+        // Backref label (offset for icon)
+        doc.fontSize(9).fillColor('#666666');
+        doc.text(node.label, x + borderWidth + 14, y + 5, {
+          width: contentWidth * 0.35 - borderWidth - 18,
+          height: sectionHeight - 4,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        // Count
+        doc.fillColor('#000000');
+        doc.text(node.value || '', x + contentWidth * 0.35, y + 5, {
+          width: contentWidth * 0.65 - 10,
+          height: sectionHeight - 4,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        y += sectionHeight + 1;
+
+      } else if (node.type === 'backref-item') {
+        // Back-reference item (record in list)
+        doc.rect(x, y, contentWidth, attrHeight).fill('#fafafa');
+
+        // Bullet point
+        this.drawBullet(doc, x + 8, y + attrHeight / 2, 2, '#666666');
+
+        // Label (offset for bullet)
+        doc.fontSize(8).fillColor('#666666');
+        doc.text(node.label, x + 14, y + 3, {
+          width: contentWidth * 0.35 - 18,
+          height: attrHeight - 2,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        doc.fillColor('#000000');
+        doc.text(node.value || '', x + contentWidth * 0.35, y + 3, {
+          width: contentWidth * 0.65 - 10,
+          height: attrHeight - 2,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        y += attrHeight;
+
+      } else if (node.type === 'attribute-row') {
+        // Horizontal attribute table (row layout)
+        const cols = node.columns || [];
+        const vals = node.values || [];
+        if (cols.length === 0) continue;
+
+        const headerHeight = 14;
+        const rowHeight = 16;
+        const tableHeight = headerHeight + rowHeight;
+
+        // Check for page break
+        if (y + tableHeight > this.pageHeight - this.margin - 20) {
+          doc.addPage();
+          y = this.margin;
+        }
+
+        // Calculate column widths (equal distribution)
+        const colWidth = contentWidth / cols.length;
+
+        // Draw header row with column names
+        doc.rect(x, y, contentWidth, headerHeight).fill('#f1f5f9');
+        doc.fontSize(7).fillColor('#666666');
+        for (let i = 0; i < cols.length; i++) {
+          doc.text(cols[i], x + i * colWidth + 3, y + 3, {
+            width: colWidth - 6,
+            height: headerHeight - 4,
+            ellipsis: true,
+            lineBreak: false
+          });
+        }
+        y += headerHeight;
+
+        // Draw value row
+        doc.rect(x, y, contentWidth, rowHeight).fill('#ffffff');
+        doc.fontSize(8).fillColor('#000000');
+        for (let i = 0; i < vals.length; i++) {
+          doc.text(vals[i] || '', x + i * colWidth + 3, y + 3, {
+            width: colWidth - 6,
+            height: rowHeight - 4,
+            ellipsis: true,
+            lineBreak: false
+          });
+        }
+        y += rowHeight + 2;
+
+      } else {
+        // Regular attribute (list layout)
+        // Light alternating background
+        const bgColor = (node.depth % 2 === 0) ? '#ffffff' : '#f9fafb';
+        doc.rect(x, y, contentWidth, attrHeight).fill(bgColor);
+
+        // Attribute label
+        doc.fontSize(8).fillColor('#666666');
+        doc.text(node.label, x + 6, y + 3, {
+          width: contentWidth * 0.35 - 10,
+          height: attrHeight - 2,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        // Attribute value
+        doc.fillColor('#000000');
+        doc.text(node.value || '', x + contentWidth * 0.35, y + 3, {
+          width: contentWidth * 0.65 - 10,
+          height: attrHeight - 2,
+          ellipsis: true,
+          lineBreak: false
+        });
+
+        y += attrHeight;
+      }
     }
   }
 }

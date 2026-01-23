@@ -602,7 +602,9 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
       jsType: typeInfo.jsType,
       required: isRequired,
       customType: typeInfo.isCustomType ? attrType : null,
-      defaultValue
+      defaultValue,
+      // Explicit default from [DEFAULT=x] annotation (vs type-level defaults)
+      explicitDefault: attr.explicitDefault || null
     };
 
     // Add displayName for conceptual FK notation (for UI/diagrams)

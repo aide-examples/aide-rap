@@ -49,6 +49,16 @@ function init(app, config) {
     dataModelPath
   });
 
+  // Apply DEFAULT values to NULL fields at startup
+  try {
+    const defaultResult = ComputedFieldService.applyDefaults();
+    if (defaultResult.updated > 0) {
+      logger.info('DEFAULT values applied at startup', defaultResult);
+    }
+  } catch (err) {
+    logger.error('Failed to apply DEFAULT values', { error: err.message });
+  }
+
   // Run computed field updates (DAILY fields) at startup
   try {
     const result = ComputedFieldService.runAll();

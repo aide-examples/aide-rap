@@ -114,7 +114,11 @@ const ContextMenu = {
         EntityTree.onDelete(entity, recordId);
       }
     } else if (action === 'export-pdf') {
-      EntityTable.exportPdf();
+      if (source === 'tree') {
+        EntityTree.exportPdf();
+      } else {
+        EntityTable.exportPdf();
+      }
     } else if (action === 'export-csv') {
       EntityTable.exportCsv();
     }
