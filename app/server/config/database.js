@@ -10,10 +10,13 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const logger = require('../utils/logger');
-const { generateSchema, generateCreateTableSQL, generateViewSQL } = require('../utils/SchemaGenerator');
+const { generateSchema, generateCreateTableSQL, generateViewSQL, toSnakeCase } = require('../utils/SchemaGenerator');
+const SchemaMetadata = require('../utils/SchemaMetadata');
+const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 
 let db = null;
 let schema = null;
+let schemaMetadata = null;
 
 /**
  * Get existing columns for a table
@@ -164,6 +167,9 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
 
   logger.info('Database opened', { path: dbPath });
 
+  // Initialize schema metadata tracking
+  schemaMetadata = new SchemaMetadata(db);
+
   // Generate schema from DataModel.md
   schema = generateSchema(dataModelPath, enabledEntities);
 
@@ -174,6 +180,85 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
 
   // Create/migrate tables in dependency order
   for (const entity of schema.orderedEntities) {
+    // Compare with stored schema metadata
+    const comparison = schemaMetadata.compareSchemas(entity.className, entity);
+
+    if (comparison.isNew) {
+      logger.info(`Schema: New entity ${entity.className}`);
+    } else if (comparison.changes.length > 0) {
+      // Process column renames first (before removes, so we don't delete renamed columns)
+      const renames = comparison.changes.filter(c => c.type === 'POSSIBLE_RENAME');
+      const removes = comparison.changes.filter(c => c.type === 'REMOVE_COLUMN');
+      const handledRemoves = new Set();
+
+      for (const rename of renames) {
+        // Check if it's a simple attribute (not FK)
+        const newCol = entity.columns.find(c => c.name === rename.newName);
+        const isFK = newCol && newCol.foreignKey;
+
+        // Only auto-rename on high confidence (description match)
+        if (rename.confidence === 'high' && !isFK && tableExists(entity.tableName)) {
+          try {
+            db.exec(`ALTER TABLE ${entity.tableName} RENAME COLUMN ${rename.oldName} TO ${rename.newName}`);
+            logger.info(`Schema: RENAME ${entity.className}.${rename.oldName} -> ${rename.newName} (${rename.reason})`);
+            handledRemoves.add(rename.oldName);
+          } catch (err) {
+            logger.error(`Failed to rename column ${rename.oldName}`, { error: err.message });
+          }
+        } else if (rename.confidence === 'high' && isFK) {
+          logger.warn(`Schema: POSSIBLE RENAME ${entity.className}.${rename.oldName} -> ${rename.newName} (FK - manual action needed)`);
+        } else {
+          // Low confidence - just warn
+          logger.warn(`Schema: POSSIBLE RENAME ${entity.className}.${rename.oldName} -> ${rename.newName} (${rename.reason} - manual verification needed)`);
+        }
+      }
+
+      for (const change of comparison.changes) {
+        switch (change.type) {
+          case 'ADD_COLUMN':
+            logger.info(`Schema: ADD ${entity.className}.${change.column.name}`);
+            break;
+          case 'REMOVE_COLUMN':
+            if (handledRemoves.has(change.column.name)) break; // Was renamed
+            // Actually drop the column
+            if (tableExists(entity.tableName)) {
+              try {
+                db.exec(`ALTER TABLE ${entity.tableName} DROP COLUMN ${change.column.name}`);
+                logger.info(`Schema: DROP ${entity.className}.${change.column.name}`);
+              } catch (err) {
+                logger.warn(`Schema: REMOVE ${entity.className}.${change.column.name} (drop failed: ${err.message})`);
+              }
+            }
+            break;
+          case 'TYPE_CHANGE':
+            logger.warn(`Schema: TYPE ${entity.className}.${change.column.name} ${change.oldType} -> ${change.column.type} (manual migration needed)`);
+            break;
+          case 'DEFAULT_CHANGE':
+            logger.info(`Schema: DEFAULT ${entity.className}.${change.column.name} changed`);
+            break;
+          case 'REQUIRED_CHANGE':
+            if (change.isRequired) {
+              logger.warn(`Schema: REQUIRED ${entity.className}.${change.column.name} now required (SQLite cannot add NOT NULL - check for NULL values)`);
+            } else {
+              logger.info(`Schema: OPTIONAL ${entity.className}.${change.column.name} now optional`);
+            }
+            break;
+          case 'FK_CHANGE':
+            if (!change.oldFK && change.newFK) {
+              logger.warn(`Schema: FK_ADD ${entity.className}.${change.column.name} -> ${change.newFK} (manual migration needed)`);
+            } else if (change.oldFK && !change.newFK) {
+              logger.warn(`Schema: FK_REMOVE ${entity.className}.${change.column.name} was -> ${change.oldFK} (manual migration needed)`);
+            } else {
+              logger.warn(`Schema: FK_CHANGE ${entity.className}.${change.column.name} ${change.oldFK} -> ${change.newFK} (manual migration needed)`);
+            }
+            break;
+          case 'POSSIBLE_RENAME':
+            // Already handled above
+            break;
+        }
+      }
+    }
+
     // Try migration first
     const wasMigrated = migrateSchema(entity);
 
@@ -192,6 +277,98 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
         logger.debug(`Created ${createIndexes.length} indexes for ${entity.tableName}`);
       }
     }
+
+    // Save current schema to metadata
+    schemaMetadata.save(entity.className, entity);
+  }
+
+  // Check for removed/renamed entities
+  const currentEntityNames = new Set(schema.orderedEntities.map(e => e.className));
+  const storedEntityNames = schemaMetadata.getAllStoredEntities();
+  const seedDir = path.join(dataDir, 'seed');
+
+  // Find removed and new entities
+  const removedEntities = storedEntityNames.filter(name => !currentEntityNames.has(name));
+  const newEntities = schema.orderedEntities.filter(e => !storedEntityNames.includes(e.className));
+
+  // Try to detect renames: removed + new with same schema hash
+  const renamedEntities = new Map(); // oldName -> newEntity
+
+  for (const oldName of removedEntities) {
+    const oldStored = schemaMetadata.getStored(oldName);
+    if (!oldStored) continue;
+
+    for (const newEntity of newEntities) {
+      const newHash = schemaMetadata.computeHash(newEntity);
+      if (oldStored.schema_hash === newHash) {
+        renamedEntities.set(oldName, newEntity);
+        break;
+      }
+    }
+  }
+
+  // Process renames
+  for (const [oldName, newEntity] of renamedEntities) {
+    const oldTableName = toSnakeCase(oldName);
+    const newTableName = newEntity.tableName;
+    const oldViewName = oldTableName + '_view';
+
+    logger.info(`Schema: Entity renamed ${oldName} -> ${newEntity.className}`);
+
+    // Drop old view (will be recreated with new name)
+    if (viewExists(oldViewName)) {
+      db.exec(`DROP VIEW IF EXISTS ${oldViewName}`);
+    }
+
+    // Rename table
+    if (tableExists(oldTableName)) {
+      db.exec(`ALTER TABLE ${oldTableName} RENAME TO ${newTableName}`);
+      logger.info(`Renamed table ${oldTableName} -> ${newTableName}`);
+    }
+
+    // Rename seed file
+    const oldSeedFile = path.join(seedDir, `${oldName}.json`);
+    const newSeedFile = path.join(seedDir, `${newEntity.className}.json`);
+    if (fs.existsSync(oldSeedFile) && !fs.existsSync(newSeedFile)) {
+      fs.renameSync(oldSeedFile, newSeedFile);
+      logger.info(`Renamed seed file ${oldName}.json -> ${newEntity.className}.json`);
+    }
+
+    // Update metadata (delete old, save new)
+    schemaMetadata.delete(oldName);
+    schemaMetadata.save(newEntity.className, newEntity);
+  }
+
+  // Process actual removals (not renames)
+  for (const storedName of removedEntities) {
+    if (renamedEntities.has(storedName)) continue; // Skip, was renamed
+
+    const tableName = toSnakeCase(storedName);
+    const viewName = tableName + '_view';
+
+    logger.warn(`Schema: Entity ${storedName} removed - cleaning up`);
+
+    // Drop view first
+    if (viewExists(viewName)) {
+      db.exec(`DROP VIEW IF EXISTS ${viewName}`);
+      logger.info(`Dropped view ${viewName}`);
+    }
+
+    // Drop table
+    if (tableExists(tableName)) {
+      db.exec(`DROP TABLE IF EXISTS ${tableName}`);
+      logger.info(`Dropped table ${tableName}`);
+    }
+
+    // Delete seed file
+    const seedFile = path.join(seedDir, `${storedName}.json`);
+    if (fs.existsSync(seedFile)) {
+      fs.unlinkSync(seedFile);
+      logger.info(`Deleted seed file ${storedName}.json`);
+    }
+
+    // Remove from metadata
+    schemaMetadata.delete(storedName);
   }
 
   // Create views for all entities (after all tables exist for FK joins)
@@ -201,6 +378,39 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
     viewCount++;
   }
   logger.info(`Created ${viewCount} views for FK label resolution`);
+
+  // Track global types from Types.md
+  const allTypes = getTypeRegistry().getAllTypes();
+  const typesComparison = schemaMetadata.compareTypes(allTypes);
+
+  if (typesComparison.isNew) {
+    logger.info('Types: Initial registration from Types.md');
+  } else if (typesComparison.changes.length > 0) {
+    for (const change of typesComparison.changes) {
+      switch (change.type) {
+        case 'ADD_PATTERN':
+          logger.info(`Types: ADD ${change.name} (pattern)`);
+          break;
+        case 'CHANGE_PATTERN':
+          logger.warn(`Types: PATTERN ${change.name} changed`);
+          break;
+        case 'REMOVE_PATTERN':
+          logger.warn(`Types: REMOVE ${change.name} (pattern)`);
+          break;
+        case 'ADD_ENUM':
+          logger.info(`Types: ADD ${change.name} (enum)`);
+          break;
+        case 'CHANGE_ENUM':
+          logger.warn(`Types: ENUM ${change.name} values changed`);
+          break;
+        case 'REMOVE_ENUM':
+          logger.warn(`Types: REMOVE ${change.name} (enum)`);
+          break;
+      }
+    }
+  }
+
+  schemaMetadata.saveTypes(allTypes);
 
   return { db, schema };
 }
