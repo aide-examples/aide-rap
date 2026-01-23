@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Lufthansa",
+    "icao_code": "DLH",
+    "iata_code": "LH",
+    "country": "Germany"
+  },
+  {
+    "name": "Lufthansa CityLine",
+    "icao_code": "CLH",
+    "iata_code": "CL",
+    "country": "Germany"
+  },
+  {
+    "name": "Lufthansa City Airlines",
+    "icao_code": "VLH",
+    "iata_code": "VL",
+    "country": "Germany"
+  },
+  {
+    "name": "Lufthansa Cargo",
+    "icao_code": "GEC",
+    "iata_code": "LH",
+    "country": "Germany"
+  },
+  {
+    "name": "Swiss International Air Lines",
+    "icao_code": "SWR",
+    "iata_code": "LX",
+    "country": "Switzerland"
+  },
+  {
+    "name": "Edelweiss Air",
+    "icao_code": "EDW",
+    "iata_code": "WK",
+    "country": "Switzerland"
+  },
+  {
+    "name": "Austrian Airlines",
+    "icao_code": "AUA",
+    "iata_code": "OS",
+    "country": "Austria"
+  },
+  {
+    "name": "Brussels Airlines",
+    "icao_code": "BEL",
+    "iata_code": "SN",
+    "country": "Belgium"
+  },
+  {
+    "name": "Eurowings",
+    "icao_code": "EWG",
+    "iata_code": "EW",
+    "country": "Germany"
+  },
+  {
+    "name": "Eurowings Europe",
+    "icao_code": "EWE",
+    "iata_code": "E6",
+    "country": "Malta"
+  },
+  {
+    "name": "Air Dolomiti",
+    "icao_code": "DLA",
+    "iata_code": "EN",
+    "country": "Italy"
+  },
+  {
+    "name": "Discover Airlines",
+    "icao_code": "OCN",
+    "iata_code": "4Y",
+    "country": "Germany"
+  }
+]

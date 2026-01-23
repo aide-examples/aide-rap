@@ -375,10 +375,37 @@ app.get('/api/seed/status', (req, res) => {
     }
 });
 
+// Get seed file content for preview/export
+app.get('/api/seed/content/:entity', (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const seedFile = path.join(SeedManager.SEED_DIR, `${req.params.entity}.json`);
+
+        if (!fs.existsSync(seedFile)) {
+            return res.status(404).json({ error: 'No seed file found', records: [] });
+        }
+
+        const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+        res.json({ records: Array.isArray(records) ? records : [] });
+    } catch (e) {
+        console.error(`Failed to read seed file for ${req.params.entity}:`, e);
+        res.status(500).json({ error: e.message, records: [] });
+    }
+});
+
 // Load seed data for a specific entity
+// Options: { skipInvalid: boolean, mode: 'replace'|'merge'|'skip_conflicts' }
+// - replace: INSERT OR REPLACE (default, may break FK refs if id changes)
+// - merge: UPDATE existing records (preserve id), INSERT new ones
+// - skip_conflicts: Skip records that conflict with existing ones
 app.post('/api/seed/load/:entity', (req, res) => {
     try {
-        const result = SeedManager.loadEntity(req.params.entity);
+        const options = {
+            skipInvalid: req.body?.skipInvalid === true,
+            mode: req.body?.mode || 'replace'
+        };
+        const result = SeedManager.loadEntity(req.params.entity, null, options);
         res.json({ success: true, ...result });
     } catch (e) {
         console.error(`Failed to load seed for ${req.params.entity}:`, e);
@@ -479,19 +506,22 @@ app.get('/api/seed/debug-lookup/:entity', (req, res) => {
     }
 });
 
-// Set active seed source (imported or generated)
-app.post('/api/seed/source', (req, res) => {
+// Validate import data (check FK references)
+app.post('/api/seed/validate/:entity', (req, res) => {
     try {
-        const { source } = req.body;
-        const result = SeedManager.setSource(source);
-        res.json({ success: true, ...result });
+        const { records } = req.body;
+        if (!Array.isArray(records)) {
+            return res.status(400).json({ valid: false, warnings: [{ message: 'records must be an array' }] });
+        }
+        const result = SeedManager.validateImport(req.params.entity, records);
+        res.json(result);
     } catch (e) {
-        console.error('Failed to set source:', e);
-        res.status(400).json({ success: false, error: e.message });
+        console.error(`Failed to validate ${req.params.entity}:`, e);
+        res.status(500).json({ valid: false, warnings: [{ message: e.message }] });
     }
 });
 
-// Upload JSON data for an entity (saves to seed_imported/)
+// Upload/save data for an entity (saves to seed/)
 app.post('/api/seed/upload/:entity', (req, res) => {
     try {
         const result = SeedManager.uploadEntity(req.params.entity, req.body);
@@ -499,28 +529,6 @@ app.post('/api/seed/upload/:entity', (req, res) => {
     } catch (e) {
         console.error(`Failed to upload ${req.params.entity}:`, e);
         res.status(400).json({ success: false, error: e.message });
-    }
-});
-
-// Copy imported file to generated
-app.post('/api/seed/copy-to-generated/:entity', (req, res) => {
-    try {
-        const result = SeedManager.copyToGenerated(req.params.entity);
-        res.json({ success: true, ...result });
-    } catch (e) {
-        console.error(`Failed to copy ${req.params.entity}:`, e);
-        res.status(400).json({ success: false, error: e.message });
-    }
-});
-
-// Copy all imported files to generated
-app.post('/api/seed/copy-all-to-generated', (req, res) => {
-    try {
-        const results = SeedManager.copyAllToGenerated();
-        res.json({ success: true, results });
-    } catch (e) {
-        console.error('Failed to copy all:', e);
-        res.status(500).json({ success: false, error: e.message });
     }
 });
 
@@ -750,6 +758,7 @@ app.post('/api/seed/save/:entity', (req, res) => {
 // =============================================================================
 
 const PrintService = require('./server/services/PrintService');
+const CsvService = require('./server/services/CsvService');
 
 // Export entity table to PDF
 app.post('/api/entities/:entity/export-pdf', (req, res) => {
@@ -769,6 +778,27 @@ app.post('/api/entities/:entity/export-pdf', (req, res) => {
   } catch (error) {
     console.error('PDF generation error:', error);
     res.status(500).json({ error: 'PDF generation failed' });
+  }
+});
+
+// Export entity table to CSV
+app.post('/api/entities/:entity/export-csv', (req, res) => {
+  try {
+    const { columns, records } = req.body;
+
+    if (!columns || !Array.isArray(columns) || !records || !Array.isArray(records)) {
+      return res.status(400).json({ error: 'columns and records arrays are required' });
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}.csv"`);
+
+    const csvService = new CsvService();
+    csvService.generateCsv({ columns, records }, res);
+
+  } catch (error) {
+    console.error('CSV generation error:', error);
+    res.status(500).json({ error: 'CSV generation failed' });
   }
 });
 

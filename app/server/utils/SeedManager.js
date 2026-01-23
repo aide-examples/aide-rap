@@ -1,9 +1,8 @@
 /**
  * SeedManager - Manages seed data loading and clearing for entities
  *
- * Supports two data sources:
- * - seed_imported/  - Manually uploaded JSON files
- * - seed_generated/ - Synthetically generated data
+ * Single data source: seed/ directory
+ * Supports import from JSON and CSV (both saved as JSON)
  */
 
 const fs = require('fs');
@@ -11,17 +10,11 @@ const path = require('path');
 
 // Paths are relative to app directory
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const SEED_IMPORTED_DIR = path.join(DATA_DIR, 'seed_imported');
-const SEED_GENERATED_DIR = path.join(DATA_DIR, 'seed_generated');
+const SEED_DIR = path.join(DATA_DIR, 'seed');
 
-// Current active source (default: generated)
-let activeSource = 'generated';
-
-/**
- * Get the seed directory for the active source
- */
-function getSeedDir(source = activeSource) {
-  return source === 'imported' ? SEED_IMPORTED_DIR : SEED_GENERATED_DIR;
+// Ensure seed directory exists
+if (!fs.existsSync(SEED_DIR)) {
+  fs.mkdirSync(SEED_DIR, { recursive: true });
 }
 
 /**
@@ -39,7 +32,8 @@ function getDbAndSchema() {
  * Supports multiple lookup keys:
  * - Primary LABEL field (e.g., "designation" -> "A320neo")
  * - Secondary LABEL2 field (e.g., "name" -> "Airbus A320neo")
- * This allows AI-generated data to use either the short or full name.
+ * - Combined format: "LABEL (LABEL2)" (e.g., "Airbus (France)")
+ *   This matches the display format used in Views and exports.
  */
 function buildLabelLookup(entityName) {
   const { db, schema } = getDbAndSchema();
@@ -63,13 +57,20 @@ function buildLabelLookup(entityName) {
 
   const lookup = {};
   for (const row of rows) {
+    const primaryVal = labelCol ? row[labelCol.name] : null;
+    const secondaryVal = label2Col ? row[label2Col.name] : null;
+
     // Add primary label to lookup
-    if (labelCol && row[labelCol.name]) {
-      lookup[row[labelCol.name]] = row.id;
+    if (primaryVal) {
+      lookup[primaryVal] = row.id;
     }
     // Add secondary label to lookup (allows matching by full name)
-    if (label2Col && row[label2Col.name]) {
-      lookup[row[label2Col.name]] = row.id;
+    if (secondaryVal) {
+      lookup[secondaryVal] = row.id;
+    }
+    // Add combined format: "primary (secondary)" - matches View display format
+    if (primaryVal && secondaryVal) {
+      lookup[`${primaryVal} (${secondaryVal})`] = row.id;
     }
   }
 
@@ -134,7 +135,7 @@ function countSeedFile(filePath) {
 
 /**
  * Get status of all enabled entities
- * Returns row counts and seed file information for both sources
+ * Returns row counts, seed file availability, and valid record counts
  */
 function getStatus() {
   const { db, schema } = getDbAndSchema();
@@ -143,76 +144,291 @@ function getStatus() {
   for (const entity of schema.orderedEntities) {
     const rowCount = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get().count;
     const seedFile = `${entity.className}.json`;
+    const seedPath = path.join(SEED_DIR, seedFile);
+    const seedTotal = countSeedFile(seedPath);
 
-    // Check both sources
-    const importedPath = path.join(SEED_IMPORTED_DIR, seedFile);
-    const generatedPath = path.join(SEED_GENERATED_DIR, seedFile);
-
-    const importedCount = countSeedFile(importedPath);
-    const generatedCount = countSeedFile(generatedPath);
+    // Calculate valid count if seed file exists
+    let seedValid = null;
+    if (seedTotal !== null && seedTotal > 0) {
+      try {
+        const records = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+        const validation = validateImport(entity.className, records);
+        seedValid = validation.validCount;
+      } catch {
+        seedValid = 0;
+      }
+    }
 
     entities.push({
       name: entity.className,
       tableName: entity.tableName,
       rowCount,
-      importedCount,
-      generatedCount,
-      // Legacy compatibility
-      seedFile: generatedCount !== null ? seedFile : (importedCount !== null ? seedFile : null),
-      seedCount: activeSource === 'imported' ? importedCount : generatedCount
+      seedTotal,      // Total records in seed file
+      seedValid       // Valid records (can be loaded)
     });
   }
 
+  return { entities };
+}
+
+/**
+ * Build lookup for unique columns: value -> existing record id
+ * Used to detect import conflicts
+ */
+function buildUniqueLookup(entityName) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) return {};
+
+  // Find unique columns (single-column constraints)
+  const uniqueCols = entity.columns.filter(c => c.unique).map(c => c.name);
+
+  // Find composite unique keys
+  const compositeKeys = Object.values(entity.uniqueKeys || {});
+
+  if (uniqueCols.length === 0 && compositeKeys.length === 0) return {};
+
+  const lookup = {};
+  const rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+
+  for (const row of rows) {
+    // Single-column unique constraints
+    for (const col of uniqueCols) {
+      if (row[col] !== null && row[col] !== undefined) {
+        const key = `${col}:${row[col]}`;
+        lookup[key] = row.id;
+      }
+    }
+
+    // Composite unique keys
+    for (const keyCols of compositeKeys) {
+      const values = keyCols.map(c => row[c]);
+      if (values.every(v => v !== null && v !== undefined)) {
+        const key = keyCols.map((c, i) => `${c}:${values[i]}`).join('|');
+        lookup[key] = row.id;
+      }
+    }
+  }
+
+  return lookup;
+}
+
+/**
+ * Check if an existing record has back-references from other entities
+ * Returns count of referencing records
+ */
+function countBackReferences(entityName, recordId) {
+  const { db, schema } = getDbAndSchema();
+  const inverseRels = schema.inverseRelationships[entityName] || [];
+
+  let totalRefs = 0;
+  const referencingEntities = [];
+
+  for (const rel of inverseRels) {
+    const refEntity = schema.entities[rel.entity];
+    if (!refEntity) continue;
+
+    const countSql = `SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${rel.column} = ?`;
+    const { count } = db.prepare(countSql).get(recordId);
+
+    if (count > 0) {
+      totalRefs += count;
+      referencingEntities.push({ entity: rel.entity, count });
+    }
+  }
+
+  return { totalRefs, referencingEntities };
+}
+
+/**
+ * Validate import data and check FK references
+ * Returns warnings for unresolved FKs, identifies valid/invalid records,
+ * and detects conflicts with existing records that have back-references
+ *
+ * @param {string} entityName - Entity name
+ * @param {array} records - Array of records to validate
+ * @returns {object} - { valid, warnings, recordCount, validCount, invalidRows, conflicts }
+ */
+function validateImport(entityName, records) {
+  const { schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) {
+    return { valid: false, warnings: [{ message: `Entity ${entityName} not found` }], recordCount: 0, validCount: 0, invalidRows: [], conflicts: [] };
+  }
+
+  if (!Array.isArray(records)) {
+    return { valid: false, warnings: [{ message: 'Data must be an array of records' }], recordCount: 0, validCount: 0, invalidRows: [], conflicts: [] };
+  }
+
+  const warnings = [];
+  const invalidRows = new Set();
+  const conflicts = [];
+
+  // Build lookups for FK validation
+  const lookups = {};
+  for (const fk of entity.foreignKeys) {
+    if (!lookups[fk.references.entity]) {
+      lookups[fk.references.entity] = buildLabelLookup(fk.references.entity);
+    }
+  }
+
+  // Build unique lookup for conflict detection
+  const uniqueLookup = buildUniqueLookup(entityName);
+  const uniqueCols = entity.columns.filter(c => c.unique).map(c => c.name);
+  const compositeKeys = Object.entries(entity.uniqueKeys || {});
+
+  // Validate each record
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+
+    // Check FK references
+    for (const fk of entity.foreignKeys) {
+      const conceptualName = fk.displayName;
+      const targetEntity = fk.references.entity;
+
+      // Check conceptual name (e.g., "manufacturer": "Airbus")
+      if (conceptualName && record[conceptualName]) {
+        const labelValue = record[conceptualName];
+        const lookup = lookups[targetEntity] || {};
+
+        if (!lookup[labelValue]) {
+          warnings.push({
+            row: i + 1,
+            field: conceptualName,
+            value: labelValue,
+            targetEntity,
+            message: `"${labelValue}" not found in ${targetEntity}`
+          });
+          invalidRows.add(i + 1);
+        }
+      }
+    }
+
+    // Check for unique constraint conflicts
+    for (const col of uniqueCols) {
+      if (record[col] !== null && record[col] !== undefined) {
+        const key = `${col}:${record[col]}`;
+        const existingId = uniqueLookup[key];
+
+        if (existingId) {
+          const { totalRefs, referencingEntities } = countBackReferences(entityName, existingId);
+          if (totalRefs > 0) {
+            conflicts.push({
+              row: i + 1,
+              field: col,
+              value: record[col],
+              existingId,
+              backRefs: totalRefs,
+              referencingEntities,
+              message: `"${record[col]}" exists (id=${existingId}) with ${totalRefs} back-references`
+            });
+          }
+        }
+      }
+    }
+
+    // Check composite unique key conflicts
+    for (const [keyName, keyCols] of compositeKeys) {
+      const values = keyCols.map(c => record[c]);
+      if (values.every(v => v !== null && v !== undefined)) {
+        const key = keyCols.map((c, i) => `${c}:${values[i]}`).join('|');
+        const existingId = uniqueLookup[key];
+
+        if (existingId) {
+          const { totalRefs, referencingEntities } = countBackReferences(entityName, existingId);
+          if (totalRefs > 0) {
+            conflicts.push({
+              row: i + 1,
+              field: keyName,
+              value: keyCols.map((c, i) => `${c}=${values[i]}`).join(', '),
+              existingId,
+              backRefs: totalRefs,
+              referencingEntities,
+              message: `Composite key ${keyName} exists (id=${existingId}) with ${totalRefs} back-references`
+            });
+          }
+        }
+      }
+    }
+  }
+
+  const invalidRowsArray = Array.from(invalidRows).sort((a, b) => a - b);
+
   return {
-    entities,
-    activeSource,
-    sources: ['imported', 'generated']
+    valid: warnings.length === 0,
+    warnings,
+    recordCount: records.length,
+    validCount: records.length - invalidRows.size,
+    invalidRows: invalidRowsArray,
+    conflicts,
+    hasConflicts: conflicts.length > 0
   };
 }
 
 /**
- * Set the active seed source
+ * Find existing record by unique constraint
+ * Returns the id if a matching record exists, null otherwise
  */
-function setSource(source) {
-  if (source !== 'imported' && source !== 'generated') {
-    throw new Error(`Invalid source: ${source}. Must be 'imported' or 'generated'`);
+function findExistingByUnique(entityName, record) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  // Check single-column unique constraints
+  const uniqueCols = entity.columns.filter(c => c.unique);
+  for (const col of uniqueCols) {
+    const value = record[col.name];
+    if (value !== null && value !== undefined) {
+      const sql = `SELECT id FROM ${entity.tableName} WHERE ${col.name} = ?`;
+      const existing = db.prepare(sql).get(value);
+      if (existing) return existing.id;
+    }
   }
-  activeSource = source;
-  return { activeSource };
+
+  // Check composite unique keys
+  for (const [, keyCols] of Object.entries(entity.uniqueKeys || {})) {
+    const values = keyCols.map(c => record[c]);
+    if (values.every(v => v !== null && v !== undefined)) {
+      const conditions = keyCols.map(c => `${c} = ?`).join(' AND ');
+      const sql = `SELECT id FROM ${entity.tableName} WHERE ${conditions}`;
+      const existing = db.prepare(sql).get(...values);
+      if (existing) return existing.id;
+    }
+  }
+
+  return null;
 }
 
 /**
- * Get the current active source
- */
-function getSource() {
-  return activeSource;
-}
-
-/**
- * Load seed data for a specific entity from active source
+ * Load seed data for a specific entity
  * Supports both technical FK notation (type_id: 3) and conceptual notation (type: "A320neo")
  *
  * @param {string} entityName - Entity name
- * @param {string} source - Source directory ('imported' or 'generated')
  * @param {object} lookups - Pre-built label lookups for FK resolution (optional)
- * @returns {object} - { loaded: count, source }
+ * @param {object} options - { skipInvalid, mode: 'replace'|'merge'|'skip_conflicts' }
+ *   - replace: INSERT OR REPLACE (default, may break FK refs)
+ *   - merge: UPDATE existing records (preserve id), INSERT new ones
+ *   - skip_conflicts: Skip records that would conflict with existing ones
+ * @returns {object} - { loaded, updated, skipped }
  */
-function loadEntity(entityName, source = activeSource, lookups = null) {
+function loadEntity(entityName, lookups = null, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
+  const { skipInvalid = false, mode = 'replace' } = options;
 
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
 
-  const seedFile = path.join(getSeedDir(source), `${entityName}.json`);
+  const seedFile = path.join(SEED_DIR, `${entityName}.json`);
   if (!fs.existsSync(seedFile)) {
-    throw new Error(`No seed file found for ${entityName} in ${source}`);
+    throw new Error(`No seed file found for ${entityName}`);
   }
 
   const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
   if (!Array.isArray(records) || records.length === 0) {
-    return { loaded: 0 };
+    return { loaded: 0, updated: 0, skipped: 0 };
   }
 
   // Build lookups for FK resolution if not provided
@@ -226,6 +442,13 @@ function loadEntity(entityName, source = activeSource, lookups = null) {
     }
   }
 
+  // If skipInvalid is true, validate first and get invalid row indices
+  let invalidRows = new Set();
+  if (skipInvalid) {
+    const validation = validateImport(entityName, records);
+    invalidRows = new Set(validation.invalidRows.map(r => r - 1)); // Convert to 0-based
+  }
+
   // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
   const isComputedColumn = (col) => {
     if (col.computed) return true;  // Schema already parsed
@@ -234,24 +457,71 @@ function loadEntity(entityName, source = activeSource, lookups = null) {
   };
 
   const columns = entity.columns.filter(c => !isComputedColumn(c)).map(c => c.name);
+  const columnsWithoutId = columns.filter(c => c !== 'id');
   const placeholders = columns.map(() => '?').join(', ');
-  const insertSql = `INSERT OR REPLACE INTO ${entity.tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-  const insert = db.prepare(insertSql);
 
-  let count = 0;
-  for (const record of records) {
+  // Prepare statements based on mode
+  const insertReplaceSql = `INSERT OR REPLACE INTO ${entity.tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
+  const insertSql = `INSERT INTO ${entity.tableName} (${columnsWithoutId.join(', ')}) VALUES (${columnsWithoutId.map(() => '?').join(', ')})`;
+  const updateSetClause = columnsWithoutId.map(c => `${c} = ?`).join(', ');
+  const updateSql = `UPDATE ${entity.tableName} SET ${updateSetClause} WHERE id = ?`;
+
+  const insertReplace = db.prepare(insertReplaceSql);
+  const insert = db.prepare(insertSql);
+  const update = db.prepare(updateSql);
+
+  let loaded = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (let i = 0; i < records.length; i++) {
+    // Skip invalid records if requested
+    if (skipInvalid && invalidRows.has(i)) {
+      skipped++;
+      continue;
+    }
+
+    const record = records[i];
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
     const resolved = resolveConceptualFKs(entityName, record, lookups);
-    const values = columns.map(col => resolved[col] ?? null);
+
     try {
-      insert.run(...values);
-      count++;
+      if (mode === 'replace') {
+        // Original behavior: INSERT OR REPLACE (may change id)
+        const values = columns.map(col => resolved[col] ?? null);
+        insertReplace.run(...values);
+        loaded++;
+      } else if (mode === 'merge') {
+        // MERGE: Update existing (preserve id), insert new
+        const existingId = findExistingByUnique(entityName, resolved);
+        if (existingId) {
+          const values = columnsWithoutId.map(col => resolved[col] ?? null);
+          values.push(existingId); // WHERE id = ?
+          update.run(...values);
+          updated++;
+        } else {
+          const values = columnsWithoutId.map(col => resolved[col] ?? null);
+          insert.run(...values);
+          loaded++;
+        }
+      } else if (mode === 'skip_conflicts') {
+        // Skip records that conflict with existing ones
+        const existingId = findExistingByUnique(entityName, resolved);
+        if (existingId) {
+          skipped++;
+        } else {
+          const values = columnsWithoutId.map(col => resolved[col] ?? null);
+          insert.run(...values);
+          loaded++;
+        }
+      }
     } catch (err) {
-      console.error(`Error inserting into ${entityName}:`, err.message);
+      console.error(`Error loading ${entityName}:`, err.message);
+      skipped++;
     }
   }
 
-  return { loaded: count, source };
+  return { loaded, updated, skipped };
 }
 
 /**
@@ -282,23 +552,22 @@ function clearEntity(entityName) {
 }
 
 /**
- * Load all available seed files from active source
+ * Load all available seed files
  * Builds label lookups incrementally for FK resolution
  */
-function loadAll(source = activeSource) {
+function loadAll() {
   const { schema } = getDbAndSchema();
   const results = {};
-  const seedDir = getSeedDir(source);
 
   // Build lookups incrementally as entities are loaded (for FK resolution)
   const lookups = {};
 
   // Load in dependency order
   for (const entity of schema.orderedEntities) {
-    const seedFile = path.join(seedDir, `${entity.className}.json`);
+    const seedFile = path.join(SEED_DIR, `${entity.className}.json`);
     if (fs.existsSync(seedFile)) {
       try {
-        const result = loadEntity(entity.className, source, lookups);
+        const result = loadEntity(entity.className, lookups);
         results[entity.className] = result;
 
         // Update lookup for this entity (so subsequent entities can reference it)
@@ -338,21 +607,21 @@ function clearAll() {
 }
 
 /**
- * Reset all: clear then load from active source
+ * Reset all: clear then load
  */
-function resetAll(source = activeSource) {
+function resetAll() {
   const clearResults = clearAll();
-  const loadResults = loadAll(source);
+  const loadResults = loadAll();
 
   return {
     cleared: clearResults,
-    loaded: loadResults,
-    source
+    loaded: loadResults
   };
 }
 
 /**
- * Upload JSON data for an entity (saves to seed_imported/)
+ * Upload/save data for an entity (saves to seed/)
+ * Data is always saved as JSON, regardless of original format
  */
 function uploadEntity(entityName, jsonData) {
   const { schema } = getDbAndSchema();
@@ -371,79 +640,25 @@ function uploadEntity(entityName, jsonData) {
   }
 
   if (!Array.isArray(records)) {
-    throw new Error('JSON data must be an array of records');
+    throw new Error('Data must be an array of records');
   }
 
-  // Ensure directory exists
-  if (!fs.existsSync(SEED_IMPORTED_DIR)) {
-    fs.mkdirSync(SEED_IMPORTED_DIR, { recursive: true });
-  }
-
-  const filePath = path.join(SEED_IMPORTED_DIR, `${entityName}.json`);
+  const filePath = path.join(SEED_DIR, `${entityName}.json`);
   fs.writeFileSync(filePath, JSON.stringify(records, null, 2));
 
   return { uploaded: records.length, file: `${entityName}.json` };
 }
 
-/**
- * Copy a seed file from imported to generated
- */
-function copyToGenerated(entityName) {
-  const sourcePath = path.join(SEED_IMPORTED_DIR, `${entityName}.json`);
-  const destPath = path.join(SEED_GENERATED_DIR, `${entityName}.json`);
-
-  if (!fs.existsSync(sourcePath)) {
-    throw new Error(`No imported file found for ${entityName}`);
-  }
-
-  // Ensure directory exists
-  if (!fs.existsSync(SEED_GENERATED_DIR)) {
-    fs.mkdirSync(SEED_GENERATED_DIR, { recursive: true });
-  }
-
-  fs.copyFileSync(sourcePath, destPath);
-
-  const count = countSeedFile(destPath);
-  return { copied: count, from: 'imported', to: 'generated' };
-}
-
-/**
- * Copy all imported files to generated
- */
-function copyAllToGenerated() {
-  const results = {};
-
-  if (!fs.existsSync(SEED_IMPORTED_DIR)) {
-    return results;
-  }
-
-  const files = fs.readdirSync(SEED_IMPORTED_DIR).filter(f => f.endsWith('.json'));
-
-  for (const file of files) {
-    const entityName = file.replace('.json', '');
-    try {
-      results[entityName] = copyToGenerated(entityName);
-    } catch (err) {
-      results[entityName] = { error: err.message };
-    }
-  }
-
-  return results;
-}
-
 module.exports = {
   getStatus,
-  getSource,
-  setSource,
+  validateImport,
   loadEntity,
   clearEntity,
   loadAll,
   clearAll,
   resetAll,
   uploadEntity,
-  copyToGenerated,
-  copyAllToGenerated,
-  // Export paths for testing
-  SEED_IMPORTED_DIR,
-  SEED_GENERATED_DIR
+  buildLabelLookup,
+  // Export path for testing
+  SEED_DIR
 };

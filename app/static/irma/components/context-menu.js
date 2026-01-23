@@ -37,6 +37,10 @@ const ContextMenu = {
         <span class="context-menu-icon">&#128462;</span>
         Export PDF
       </div>
+      <div class="context-menu-item" data-action="export-csv">
+        <span class="context-menu-icon">&#128196;</span>
+        Export CSV
+      </div>
     `;
     document.body.appendChild(menu);
     this.menu = menu;
@@ -111,6 +115,8 @@ const ContextMenu = {
       }
     } else if (action === 'export-pdf') {
       EntityTable.exportPdf();
+    } else if (action === 'export-csv') {
+      EntityTable.exportCsv();
     }
 
     this.hide();

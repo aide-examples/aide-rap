@@ -123,6 +123,7 @@ Right-click any record (in table or tree) for quick actions:
 - **Details** – Read-only view in side panel
 - **Edit** – Open form for modification
 - **Delete** – With confirmation and FK constraint checking
+- **Export CSV** – Download current table view as CSV (semicolon-separated, UTF-8)
 - **Export PDF** – Download current table view as PDF
 
 ### PDF Export
@@ -138,6 +139,34 @@ Export the current table view to a professionally formatted PDF:
 - **Enum conversion** – shows external values, not internal codes
 - **Automatic page breaks** with header repetition
 - **Page numbers** on each page
+
+### Admin Seed Manager
+
+The Admin menu opens a dedicated interface for managing seed data across all entities:
+
+**Entity Overview Table:**
+- Shows all entities in dependency order
+- **DB Rows** – Current record count in database
+- **Seed Available** – Record count in seed file (or `--` if none)
+
+**Context Menu Actions** (right-click on entity row):
+- **Import...** – Open import dialog (paste or drag & drop JSON/CSV)
+- **Export...** – Download seed file as JSON or CSV
+- **Generate...** – Open AI generator dialog
+- **Load...** – Preview seed data, then load into database
+- **Clear** – Delete all records from database
+
+**Import Dialog Features:**
+- **Auto-detect format** – JSON or CSV (semicolon, comma, or tab separated)
+- **Drag & drop** – Drop `.json` or `.csv` files directly
+- **Paste support** – Paste text from clipboard
+- **Preview table** – Shows parsed records before saving
+- **FK validation** – Warns about unresolved foreign key references
+
+**Bulk Operations:**
+- **Load All** – Load all available seed files
+- **Clear All** – Clear all database tables
+- **Reset All** – Clear then reload all seed data
 
 ---
 
@@ -222,8 +251,7 @@ aide-irma/
 │   │   └── irma.css              # Styling
 │   └── data/
 │       ├── irma.sqlite           # Database
-│       ├── seed_imported/        # Manual seed data
-│       └── seed_generated/       # AI-generated seed data
+│       └── seed/                 # Seed data (imported or AI-generated)
 ├── tools/                        # CLI utilities
 └── aide-frame/                   # Framework (symlink)
 ```
@@ -307,10 +335,18 @@ Edit `app/config.json`:
 Ideas for future development:
 
 ### Export & Import
-- [ ] CSV Export
-- [ ] CSV/Excel Import
+- [x] **CSV Export** – Table View context menu "Export CSV"
+- [x] **PDF Export** – Table View context menu "Export PDF"
 - [ ] TreeView PDF Export
 - [ ] Detail Panel PDF Export
+
+### Admin / Seed Data Manager
+- [x] **Import Dialog** – Paste or drag & drop JSON/CSV, auto-detect format, FK validation preview
+- [x] **Export Dialog** – Export seed file as JSON or CSV
+- [x] **Load Preview** – Preview seed data before loading into database
+- [x] **AI Generate** – LLM-powered seed data generation from entity descriptions
+- [x] **Seed Context** – `## Seed Context` section for cross-entity validation constraints
+- [x] **Context Menu** – Right-click on entity rows: Import, Export, Generate, Load, Clear
 
 ### UI Enhancements
 - [ ] Keyboard shortcuts (arrow keys, Enter for details)
@@ -318,10 +354,6 @@ Ideas for future development:
 - [ ] Drag & Drop column reordering
 - [ ] Saved filter presets
 - [ ] Dark mode
-
-### Seed Data
-- [ ] `## Seed Context` section for cross-entity validation constraints
-- [ ] `engine_count` attribute on AircraftType for EngineMount generation
 
 ### Visualization
 - [ ] Simple charts (count by status, by type)

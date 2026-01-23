@@ -38,8 +38,10 @@
     ConfirmDialog.init();
     ContextMenu.init();
     SeedManager.init('modal-container');
+    SeedImportDialog.init('modal-container');
+    SeedPreviewDialog.init('modal-container');
 
-    // Tools menu opens Seed Manager
+    // Admin menu opens Seed Manager
     document.getElementById('menu-tools')?.addEventListener('click', (e) => {
       e.preventDefault();
       SeedManager.open();

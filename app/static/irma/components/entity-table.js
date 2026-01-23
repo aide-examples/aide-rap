@@ -688,4 +688,81 @@ const EntityTable = {
       alert(`PDF export failed: ${err.message}`);
     }
   },
+
+  /**
+   * Export current table view to CSV
+   */
+  async exportCsv() {
+    if (!this.currentEntity || !this.schema) {
+      return;
+    }
+
+    const records = this.getFilteredRecords();
+    if (records.length === 0) {
+      alert('No records to export.');
+      return;
+    }
+
+    // Build columns (exclude id, use display names)
+    const columns = this.getVisibleColumns()
+      .filter(col => col.name !== 'id')
+      .map(col => {
+        // Use conceptual name for FKs (type instead of type_id)
+        const displayName = col.foreignKey && col.name.endsWith('_id')
+          ? col.name.slice(0, -3)
+          : col.name;
+
+        return {
+          key: col.name,
+          label: displayName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        };
+      });
+
+    // Format records (use labels for FKs, format enums)
+    const formattedRecords = records.map(record => {
+      const formatted = {};
+      for (const col of columns) {
+        const colDef = this.schema.columns.find(c => c.name === col.key);
+
+        if (colDef?.foreignKey) {
+          // Use preloaded label from view
+          const displayName = col.key.endsWith('_id') ? col.key.slice(0, -3) : col.key;
+          const labelField = displayName + '_label';
+          formatted[col.key] = record[labelField] || record[col.key] || '';
+        } else {
+          // Use ValueFormatter for enum conversion
+          const value = record[col.key];
+          formatted[col.key] = value != null
+            ? ValueFormatter.format(value, col.key, this.schema)
+            : '';
+        }
+      }
+      return formatted;
+    });
+
+    try {
+      const response = await fetch(`/api/entities/${this.currentEntity}/export-csv`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columns, records: formattedRecords })
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.currentEntity}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const error = await response.json();
+        alert(`CSV export failed: ${error.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      alert(`CSV export failed: ${err.message}`);
+    }
+  },
 };
