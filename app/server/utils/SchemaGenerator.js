@@ -598,11 +598,13 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     // Build column definition
     const column = {
       name,
+      type: attrType,  // Original type from markdown (e.g., 'string', 'int', 'AircraftOEM')
       sqlType,
       jsType: typeInfo.jsType,
       required: isRequired,
       customType: typeInfo.isCustomType ? attrType : null,
       defaultValue,
+      description: desc || null,  // Store description for schema tracking
       // Explicit default from [DEFAULT=x] annotation (vs type-level defaults)
       explicitDefault: attr.explicitDefault || null
     };
@@ -709,11 +711,14 @@ function buildDependencyOrder(entities) {
   }
 
   // Build adjacency list (entity -> dependencies)
+  // Skip self-references (e.g., super_type -> same entity) to avoid deadlock
   const deps = {};
   for (const entity of Object.values(entities)) {
     deps[entity.className] = [];
     for (const fk of entity.foreignKeys) {
-      deps[entity.className].push(fk.references.entity);
+      if (fk.references.entity !== entity.className) {
+        deps[entity.className].push(fk.references.entity);
+      }
     }
   }
 

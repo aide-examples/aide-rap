@@ -215,7 +215,6 @@
     position: absolute;
     top: 100%;
     left: 0;
-    right: 0;
     background: #fff;
     border: 1px solid #d1d5db;
     border-radius: 6px;
@@ -224,31 +223,43 @@
     overflow-y: auto;
     z-index: 100;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    /* Multi-column layout for areas */
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0;
 }
 
 .entity-selector-dropdown.open .entity-selector-menu {
-    display: block;
+    display: flex;
 }
 
 .entity-selector-group {
-    padding: 2px 0;
+    padding: 4px 0;
+    min-width: 140px;
+    border-right: 1px solid #e5e7eb;
+}
+
+.entity-selector-group:last-child {
+    border-right: none;
 }
 
 .entity-selector-group-label {
-    padding: 3px 10px;
-    font-size: 0.7rem;
+    padding: 4px 10px;
+    font-size: 0.65rem;
     font-weight: 600;
-    color: #666;
+    color: #444;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    white-space: nowrap;
 }
 
 .entity-selector-item {
-    padding: 4px 10px;
+    padding: 3px 10px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     border-left: 3px solid transparent;
     line-height: 1.2;
+    white-space: nowrap;
 }
 
 .entity-selector-item:hover {
@@ -2089,188 +2100,177 @@
 }
 
 /* =============================================================================
-   SEED GENERATOR DIALOG
+   SEED GENERATOR DIALOG - Tabbed Workflow
    ============================================================================= */
 
 .seed-generator-dialog {
     width: 90%;
-    max-width: 900px;
-    max-height: 85vh;
+    max-width: 800px;
+    max-height: 80vh;
     display: flex;
     flex-direction: column;
 }
 
+/* Tab Bar */
+.generator-tabs {
+    display: flex;
+    border-bottom: 1px solid #d1d5db;
+    background: #f9fafb;
+    padding: 0 12px;
+}
+
+.generator-tab {
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    font-size: 0.85rem;
+    color: #6b7280;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+}
+
+.generator-tab:hover:not(:disabled) {
+    color: #374151;
+    background: #f3f4f6;
+}
+
+.generator-tab:disabled {
+    color: #d1d5db;
+    cursor: not-allowed;
+}
+
+.generator-tab.active {
+    color: #0891b2;
+    border-bottom-color: #0891b2;
+    background: white;
+    font-weight: 500;
+}
+
+.generator-tab.has-data {
+    color: #059669;
+}
+
+.generator-tab.has-data.active {
+    color: #059669;
+    border-bottom-color: #059669;
+}
+
+/* Paste tab - special styling to look like drop zone */
+.generator-tab.tab-paste {
+    border: 1px dashed #d1d5db;
+    border-bottom: 2px solid transparent;
+    border-radius: 4px 4px 0 0;
+    margin: 4px 4px -1px 4px;
+    background: #fefce8;
+}
+
+.generator-tab.tab-paste:hover:not(:disabled) {
+    background: #fef3c7;
+    border-color: #fbbf24;
+}
+
+.generator-tab.tab-paste.active {
+    background: #fef3c7;
+    border-color: #fbbf24;
+    border-bottom-color: #fbbf24;
+}
+
+/* Tab Content Area */
 .seed-generator-dialog .modal-body {
     flex: 1;
     overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+    padding: 16px;
+    min-height: 250px;
 }
 
-/* Instruction Section */
-.generator-instruction-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.generator-instruction-section label {
-    font-weight: 600;
-    color: #374151;
-}
-
-.generator-instruction-section textarea {
+/* Instruction Tab Content */
+.tab-content-instruction textarea {
     width: 100%;
-    padding: 10px;
+    height: 100%;
+    min-height: 180px;
+    padding: 12px;
     border: 1px solid #d1d5db;
     border-radius: 4px;
     font-family: inherit;
     font-size: 0.9rem;
     resize: vertical;
-    min-height: 60px;
 }
 
-.generator-instruction-section textarea:focus {
+.tab-content-instruction textarea:focus {
     outline: none;
     border-color: #0891b2;
     box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.1);
 }
 
-.instruction-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    align-items: center;
+/* Prompt Tab Content */
+.tab-content-prompt textarea {
+    width: 100%;
+    height: 100%;
+    min-height: 280px;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    background: #f9fafb;
+    resize: vertical;
 }
 
-.instruction-actions .no-llm-hint {
-    color: #9ca3af;
-    font-size: 0.85rem;
-    font-style: italic;
-}
-
-/* Result Section */
-.generator-result-section {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+/* Paste Tab Content - Drop Zone */
+.tab-content-paste {
+    position: relative;
+    border: 2px dashed #fbbf24;
+    border-radius: 8px;
+    background: #fefce8;
     min-height: 200px;
+    transition: all 0.2s;
 }
 
-.result-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+.tab-content-paste.drag-over {
+    border-color: #f59e0b;
+    background: #fef3c7;
+    box-shadow: inset 0 0 20px rgba(251, 191, 36, 0.2);
 }
 
-.result-header label {
-    font-weight: 600;
-    color: #374151;
-}
-
-.result-header .record-count {
-    font-size: 0.85rem;
-    color: #059669;
+.tab-content-paste .paste-hint {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 0.75rem;
+    color: #92400e;
     font-weight: 500;
 }
 
-.result-header .btn-small {
-    padding: 4px 8px;
-    font-size: 0.75rem;
-}
-
-/* Prompt Section */
-.prompt-section {
-    margin-bottom: 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    background: #f3f4f6;
-}
-
-.prompt-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    border-bottom: 1px solid #d1d5db;
-    background: #e5e7eb;
-}
-
-.prompt-header label {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #374151;
-}
-
-.prompt-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.prompt-section textarea {
+.tab-content-paste textarea {
     width: 100%;
-    padding: 10px;
+    min-height: 180px;
+    padding: 32px 12px 12px 12px;
     border: none;
     background: transparent;
     font-family: monospace;
     font-size: 0.8rem;
-    line-height: 1.4;
+    line-height: 1.5;
     resize: vertical;
-    color: #1f2937;
 }
 
-.prompt-section textarea:focus {
+.tab-content-paste textarea:focus {
     outline: none;
 }
 
-/* Paste Response Section */
-.paste-response-section {
-    margin-bottom: 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    background: #fefce8;
+/* Result Tab Content */
+.tab-content-result {
+    height: 100%;
 }
 
-.paste-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    border-bottom: 1px solid #d1d5db;
-    background: #fef3c7;
-}
-
-.paste-header label {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #92400e;
-}
-
-.paste-response-section textarea {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    background: transparent;
-    font-family: monospace;
-    font-size: 0.8rem;
-    line-height: 1.4;
-    resize: vertical;
-    color: #1f2937;
-}
-
-.paste-response-section textarea:focus {
-    outline: none;
-}
-
-.result-content {
-    flex: 1;
+.tab-content-result .result-content {
     border: 1px solid #e5e7eb;
     border-radius: 4px;
     background: #f9fafb;
     overflow: auto;
-    min-height: 150px;
+    max-height: 300px;
 }
 
 .result-content .empty-result {
@@ -2302,7 +2302,7 @@
 .result-table-wrapper {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: 300px;
+    max-height: 280px;
 }
 
 .seed-preview-table {

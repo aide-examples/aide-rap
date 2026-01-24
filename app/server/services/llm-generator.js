@@ -254,7 +254,7 @@ ${this.buildSeedContextSection(contextData)}
 - Do NOT include the "id" field if it's auto-generated (READONLY)
 - Do NOT add extra columns like "#", "row", "index" or any fields not in the schema
 - Keep field values concise to fit within response limits
-${this.provider.getMaxRecords() ? `- IMPORTANT: Generate at most ${this.provider.getMaxRecords()} records to avoid response truncation` : ''}
+${this.provider?.getMaxRecords() ? `- IMPORTANT: Generate at most ${this.provider.getMaxRecords()} records to avoid response truncation` : ''}
 
 ## Output Format
 Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (no pretty-printing).`;

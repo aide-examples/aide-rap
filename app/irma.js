@@ -28,7 +28,6 @@ paths.init(SCRIPT_DIR);
 // =============================================================================
 
 const parseDatamodel = require(path.join(TOOLS_DIR, 'parse-datamodel'));
-const generateDiagram = require(path.join(TOOLS_DIR, 'generate-diagram'));
 const extractLayout = require(path.join(TOOLS_DIR, 'extract-layout'));
 const backend = require('./server');
 
@@ -119,7 +118,7 @@ app.get('/index.html', (req, res) => {
 
 // Layout Editor page
 app.get('/layout-editor', (req, res) => {
-    res.sendFile(path.join(SCRIPT_DIR, 'static', 'irma', 'layout-editor.html'));
+    res.sendFile(path.join(SCRIPT_DIR, 'static', 'irma', 'diagram', 'layout-editor.html'));
 });
 
 // API: List available data model documents
@@ -236,126 +235,23 @@ app.post('/api/layout-editor/save', (req, res) => {
             fs.writeFileSync(drawioPath, drawioContent);
         }
 
+        // Save SVG diagrams if provided (client-side generation)
+        const svgCompact = req.body.svgCompact;
+        const svgDetailed = req.body.svgDetailed;
+
+        if (svgCompact) {
+            const svgPath = path.join(docsDir, `${docName}-diagram.svg`);
+            fs.writeFileSync(svgPath, svgCompact);
+        }
+
+        if (svgDetailed) {
+            const svgDetailedPath = path.join(docsDir, `${docName}-diagram-detailed.svg`);
+            fs.writeFileSync(svgDetailedPath, svgDetailed);
+        }
+
         res.json({ success: true });
     } catch (e) {
         console.error('Failed to save layout:', e);
-        res.status(500).json({ success: false, error: e.message });
-    }
-});
-
-// API: Regenerate diagrams from a DataModel markdown file
-// Query param: ?doc=MiniModel (defaults to DataModel)
-app.post('/api/regenerate-diagrams', async (req, res) => {
-    try {
-        // Get document name from query parameter (without .md extension)
-        let docName = req.query.doc || 'DataModel';
-
-        // Security: prevent path traversal
-        docName = path.basename(docName).replace(/\.md$/i, '');
-
-        const docsDir = path.join(SCRIPT_DIR, 'docs', 'requirements');
-        const mdPath = path.join(docsDir, `${docName}.md`);
-
-        // Check if source document exists
-        if (!fs.existsSync(mdPath)) {
-            return res.status(404).json({
-                success: false,
-                error: `Document not found: ${docName}.md`
-            });
-        }
-
-        // Artifacts use document name as prefix
-        const yamlPath = path.join(docsDir, `${docName}.yaml`);
-        const layoutPath = path.join(docsDir, `${docName}-layout.json`);
-        const drawioPath = path.join(docsDir, `${docName}-layout.drawio`);
-        const diagramPath = path.join(docsDir, `${docName}-diagram.svg`);
-        const diagramDetailedPath = path.join(docsDir, `${docName}-diagram-detailed.svg`);
-
-        // Step 1: Parse Markdown to YAML
-        const model = parseDatamodel.parseDatamodel(mdPath);
-        const yaml = require('js-yaml');
-        fs.writeFileSync(yamlPath, yaml.dump(model, { noRefs: true, sortKeys: false }));
-
-        // Build class-to-area mapping for colors
-        const classToArea = {};
-        for (const [className, classDef] of Object.entries(model.classes)) {
-            classToArea[className] = classDef.area || 'unknown';
-        }
-        const classNames = Object.keys(model.classes);
-
-        // Step 2: Handle draw.io file
-        if (fs.existsSync(drawioPath)) {
-            // Remove classes that no longer exist in the model
-            const removedClasses = extractLayout.removeClassesFromDrawio(drawioPath, classNames);
-            if (removedClasses.length > 0) {
-                console.log(`Removed ${removedClasses.length} classes from ${docName}-layout.drawio: ${removedClasses.join(', ')}`);
-            }
-
-            // Add any new classes to the existing draw.io file
-            const addedClasses = extractLayout.addClassesToDrawio(
-                drawioPath,
-                classNames,
-                model.areas,
-                classToArea
-            );
-            if (addedClasses.length > 0) {
-                console.log(`Added ${addedClasses.length} new classes to ${docName}-layout.drawio: ${addedClasses.join(', ')}`);
-            }
-
-            // Extract positions from draw.io and sync layout.json
-            const positions = extractLayout.extractPositions(drawioPath);
-            if (Object.keys(positions).length > 0) {
-                extractLayout.updateLayoutJson(layoutPath, positions, classNames);
-            }
-        } else {
-            // Create new draw.io file with all classes
-            extractLayout.createDrawioFile(drawioPath, classNames, model.areas, classToArea);
-            console.log(`Created ${docName}-layout.drawio with ${classNames.length} classes`);
-
-            // Extract positions to create layout.json
-            const positions = extractLayout.extractPositions(drawioPath);
-            extractLayout.updateLayoutJson(layoutPath, positions, classNames);
-        }
-
-        // Step 3: Ensure layout.json exists (fallback if draw.io extraction failed)
-        if (!fs.existsSync(layoutPath)) {
-            const defaultLayout = {
-                canvas: { width: 1200, height: 900 },
-                classes: {}
-            };
-            const cols = Math.ceil(Math.sqrt(classNames.length));
-            classNames.forEach((name, i) => {
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                defaultLayout.classes[name] = {
-                    x: 50 + col * 180,
-                    y: 50 + row * 120
-                };
-            });
-            fs.writeFileSync(layoutPath, JSON.stringify(defaultLayout, null, 2));
-        }
-
-        // Step 4: Generate compact diagram
-        const generator = new generateDiagram.DiagramGenerator(yamlPath, layoutPath);
-        const svgCompact = generator.generate({ showAttributes: false, showLegend: true });
-        fs.writeFileSync(diagramPath, svgCompact);
-
-        // Step 5: Generate detailed diagram
-        const svgDetailed = generator.generate({ showAttributes: true, showLegend: true });
-        fs.writeFileSync(diagramDetailedPath, svgDetailed);
-
-        res.json({
-            success: true,
-            message: `Diagrams for ${docName} regenerated successfully`,
-            doc: docName,
-            files: [
-                path.relative(PROJECT_DIR, yamlPath),
-                path.relative(PROJECT_DIR, diagramPath),
-                path.relative(PROJECT_DIR, diagramDetailedPath)
-            ]
-        });
-    } catch (e) {
-        console.error('Failed to regenerate diagrams:', e);
         res.status(500).json({ success: false, error: e.message });
     }
 });

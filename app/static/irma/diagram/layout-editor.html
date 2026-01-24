@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Editor - AIDE IRMA</title>
+    <link rel="stylesheet" href="/static/irma/diagram/layout-editor.css">
+</head>
+<body>
+    <div class="toolbar">
+        <h1>Layout Editor</h1>
+        <label>Document:
+            <select id="docSelect">
+                <option value="">Loading...</option>
+            </select>
+        </label>
+        <button id="viewLayout" class="secondary active">Layout</button>
+        <div class="spacer"></div>
+        <span class="help-text">Drag boxes to reposition</span>
+        <a id="linkCompact" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Compact</a>
+        <a id="linkDetailed" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Detailed</a>
+        <button id="saveBtn">Save</button>
+        <span class="status" id="status"></span>
+    </div>
+    <div class="canvas-container">
+        <div class="canvas" id="canvas">
+            <div class="loading">Select a document to edit its layout</div>
+        </div>
+    </div>
+
+    <!-- Diagram modules -->
+    <script src="/static/irma/diagram/DiagramConstants.js"></script>
+    <script src="/static/irma/diagram/ConnectionCalculator.js"></script>
+
+    <script>
+        // Create local references to shared modules (loaded via <script> tags above)
+        const DiagramConstants = window.DiagramConstants;
+        const ConnectionCalculator = window.ConnectionCalculator;
+
+        // Import constants from shared module
+        const { BOX_WIDTH, BOX_HEIGHT_COMPACT, ATTR_LINE_HEIGHT, HEADER_HEIGHT, BOX_PADDING,
+                STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_LABEL } = DiagramConstants;
+
+        /**
+         * Escape text for use in XML/SVG.
+         */
+        function escapeXml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        let currentDoc = null;
+        let model = null;
+        let layout = null;
+        let showDetailed = true;
+        let isDirty = false;
+
+        // DOM elements
+        const docSelect = document.getElementById('docSelect');
+        const canvas = document.getElementById('canvas');
+        const saveBtn = document.getElementById('saveBtn');
+        const statusEl = document.getElementById('status');
+        const viewLayoutBtn = document.getElementById('viewLayout');
+        const linkCompact = document.getElementById('linkCompact');
+        const linkDetailed = document.getElementById('linkDetailed');
+
+        // Calculate box height based on visible attributes
+        function getBoxHeight(className) {
+            if (!showDetailed) {
+                return BOX_HEIGHT_COMPACT;
+            }
+            const attrs = getVisibleAttributes(className);
+            return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+        }
+
+        // Get area color for a class
+        function getColor(className) {
+            const classDef = model.classes[className] || {};
+            const area = classDef.area || '';
+            const areaDef = model.areas[area] || {};
+            return areaDef.color || '#FFFFFF';
+        }
+
+        // Get visible attributes, reordered with self-references first
+        function getVisibleAttributes(className) {
+            const classDef = model.classes[className] || {};
+            return ConnectionCalculator.getVisibleAttributes(classDef.attributes, className);
+        }
+
+        // Load available documents
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/api/layout-editor/documents');
+                const docs = await response.json();
+                docSelect.innerHTML = '<option value="">-- Select --</option>';
+                docs.forEach(doc => {
+                    const option = document.createElement('option');
+                    option.value = doc;
+                    option.textContent = doc;
+                    docSelect.appendChild(option);
+                });
+
+                // Check URL parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const docParam = urlParams.get('doc');
+                if (docParam && docs.includes(docParam)) {
+                    docSelect.value = docParam;
+                    loadDocument(docParam);
+                }
+            } catch (e) {
+                console.error('Failed to load documents:', e);
+                docSelect.innerHTML = '<option value="">Error loading</option>';
+            }
+        }
+
+        // Load document model and layout
+        async function loadDocument(docName) {
+            if (!docName) {
+                canvas.innerHTML = '<div class="loading">Select a document to edit its layout</div>';
+                return;
+            }
+
+            canvas.innerHTML = '<div class="loading">Loading...</div>';
+            statusEl.textContent = '';
+
+            try {
+                const response = await fetch(`/api/layout-editor/load?doc=${encodeURIComponent(docName)}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load');
+                }
+
+                currentDoc = docName;
+                model = data.model;
+                layout = data.layout;
+                isDirty = false;
+
+
+                // Update diagram links
+                linkCompact.href = `/docs-assets/requirements/${docName}-diagram.svg`;
+                linkDetailed.href = `/docs-assets/requirements/${docName}-diagram-detailed.svg`;
+                linkCompact.style.display = 'inline';
+                linkDetailed.style.display = 'inline';
+
+                renderCanvas();
+            } catch (e) {
+                console.error('Failed to load document:', e);
+                canvas.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+            }
+        }
+
+        // Render all class boxes on canvas
+        function renderCanvas() {
+            if (!model || !layout) return;
+
+            const positions = layout.classes || {};
+
+            // Calculate canvas size to fit all entities
+            let maxX = 400;
+            let maxY = 300;
+
+            for (const className of Object.keys(model.classes)) {
+                const pos = positions[className] || { x: 50, y: 50 };
+                const height = getBoxHeight(className);
+                maxX = Math.max(maxX, pos.x + BOX_WIDTH + 50);
+                maxY = Math.max(maxY, pos.y + height + 50);
+            }
+
+            // Update layout canvas size
+            if (!layout.canvas) layout.canvas = {};
+            layout.canvas.width = maxX;
+            layout.canvas.height = maxY;
+
+            canvas.style.width = maxX + 'px';
+            canvas.style.height = maxY + 'px';
+            canvas.innerHTML = '';
+
+            // Create SVG layer for connections
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.classList.add('connections-layer');
+            svg.setAttribute('width', maxX);
+            svg.setAttribute('height', maxY);
+            canvas.appendChild(svg);
+
+            // Create class boxes
+            for (const [className, classDef] of Object.entries(model.classes)) {
+                const pos = positions[className] || { x: 50, y: 50 };
+                const box = createClassBox(className, classDef, pos);
+                canvas.appendChild(box);
+            }
+
+            // Draw connection lines
+            drawConnections(svg, positions);
+        }
+
+        // Get connection points for a relationship (using shared module)
+        function getConnectionPoint(fromClass, toClass, attrIndex, positions) {
+            const fromPos = positions[fromClass] || { x: 50, y: 50 };
+            const toPos = positions[toClass] || { x: 50, y: 50 };
+            const fromHeight = getBoxHeight(fromClass);
+            const toHeight = getBoxHeight(toClass);
+
+            return ConnectionCalculator.getConnectionPoint(
+                fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed
+            );
+        }
+
+        // Draw lines between related entities
+        function drawConnections(svg, positions) {
+            if (!model || !model.classes) return;
+
+            // Add arrowhead marker
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+                </marker>
+            `;
+            svg.appendChild(defs);
+
+            const entityNames = Object.keys(model.classes);
+
+            for (const className of Object.keys(model.classes)) {
+                const attrs = getVisibleAttributes(className);
+
+                for (let i = 0; i < attrs.length; i++) {
+                    const attr = attrs[i];
+                    const baseType = ConnectionCalculator.extractBaseType(attr.type);
+
+                    if (entityNames.includes(baseType)) {
+                        const fromPos = positions[className] || { x: 50, y: 50 };
+                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        path.setAttribute('fill', 'none');
+                        path.setAttribute('stroke', DiagramConstants.STROKE_COLOR);
+                        path.setAttribute('stroke-width', '1');
+                        path.setAttribute('marker-end', 'url(#arrowhead)');
+
+                        let pathD, labelPos, textAnchor;
+
+                        if (className === baseType) {
+                            // Self-reference: arc from first attribute to header center
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos);
+                            pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
+                            labelPos = ConnectionCalculator.getSelfReferenceLabelPosition(arc);
+                            textAnchor = 'start';
+                        } else {
+                            // Normal connection
+                            const conn = getConnectionPoint(className, baseType, i, positions);
+                            pathD = ConnectionCalculator.getNormalConnectionPath(conn);
+                            labelPos = ConnectionCalculator.getNormalLabelPosition(conn);
+                            textAnchor = 'middle';
+                        }
+
+                        path.setAttribute('d', pathD);
+                        svg.appendChild(path);
+
+                        // Draw attribute label
+                        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        label.setAttribute('x', labelPos.x);
+                        label.setAttribute('y', labelPos.y);
+                        label.setAttribute('text-anchor', textAnchor);
+                        label.setAttribute('font-family', DiagramConstants.FONT_FAMILY);
+                        label.setAttribute('font-size', DiagramConstants.FONT_SIZE_LABEL);
+                        label.setAttribute('fill', '#666');
+                        label.setAttribute('font-style', 'italic');
+                        label.textContent = attr.name;
+                        svg.appendChild(label);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Generate complete SVG string for export.
+         * @param {boolean} detailed - Whether to show attributes
+         * @returns {string} Complete SVG document
+         */
+        function generateSVG(detailed) {
+            if (!model || !layout) return '';
+
+            const positions = layout.classes || {};
+            const entityNames = Object.keys(model.classes);
+
+            // Helper to get box height for a class
+            function boxHeight(className) {
+                if (!detailed) return BOX_HEIGHT_COMPACT;
+                const attrs = ConnectionCalculator.getVisibleAttributes(
+                    (model.classes[className] || {}).attributes, className
+                );
+                return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+            }
+
+            // Calculate canvas dimensions
+            let maxX = 400, maxY = 300;
+            for (const className of entityNames) {
+                const pos = positions[className] || { x: 50, y: 50 };
+                maxX = Math.max(maxX, pos.x + BOX_WIDTH + 50);
+                maxY = Math.max(maxY, pos.y + boxHeight(className) + 50);
+            }
+
+            const width = maxX;
+            const height = maxY;
+
+            const parts = [
+                `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
+                '  <defs>',
+                '    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">',
+                '      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>',
+                '    </marker>',
+                '  </defs>',
+                `  <rect width="${width}" height="${height}" fill="white"/>`,
+                '',
+                '  <!-- Relationships -->'
+            ];
+
+            // Render relationships
+            for (const className of entityNames) {
+                const attrs = ConnectionCalculator.getVisibleAttributes(
+                    (model.classes[className] || {}).attributes, className
+                );
+                const fromPos = positions[className] || { x: 50, y: 50 };
+
+                for (let i = 0; i < attrs.length; i++) {
+                    const attr = attrs[i];
+                    const baseType = ConnectionCalculator.extractBaseType(attr.type);
+
+                    if (entityNames.includes(baseType)) {
+                        if (className === baseType) {
+                            // Self-reference arc
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos);
+                            const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
+                            const labelPos = ConnectionCalculator.getSelfReferenceLabelPosition(arc);
+
+                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"/>`);
+                            parts.push(`  <text x="${labelPos.x}" y="${labelPos.y}" text-anchor="start" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_LABEL}" fill="#666" font-style="italic">${escapeXml(attr.name)}</text>`);
+                        } else {
+                            // Normal connection
+                            const toPos = positions[baseType] || { x: 50, y: 50 };
+                            const fromHeight = boxHeight(className);
+                            const toHeight = boxHeight(baseType);
+                            const conn = ConnectionCalculator.getConnectionPoint(fromPos, toPos, fromHeight, toHeight, i, detailed);
+                            const pathD = ConnectionCalculator.getNormalConnectionPath(conn);
+                            const labelPos = ConnectionCalculator.getNormalLabelPosition(conn);
+
+                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"/>`);
+                            parts.push(`  <text x="${labelPos.x}" y="${labelPos.y}" text-anchor="middle" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_LABEL}" fill="#666" font-style="italic">${escapeXml(attr.name)}</text>`);
+                        }
+                    }
+                }
+            }
+
+            parts.push('');
+            parts.push('  <!-- Class boxes -->');
+
+            // Render class boxes
+            for (const className of entityNames) {
+                if (!(className in positions)) continue;
+
+                const pos = positions[className];
+                const classDef = model.classes[className] || {};
+                const color = getColor(className);
+                const h = boxHeight(className);
+
+                // Box rectangle
+                parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${BOX_WIDTH}" height="${h}" fill="${color}" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
+
+                // Class name
+                const textY = pos.y + (detailed ? HEADER_HEIGHT : BOX_HEIGHT_COMPACT) / 2 + 4;
+                parts.push(`  <text x="${pos.x + BOX_WIDTH / 2}" y="${textY}" text-anchor="middle" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_CLASS}" font-weight="bold">${escapeXml(className)}</text>`);
+
+                // Separator and attributes (detailed mode only)
+                if (detailed) {
+                    const sepY = pos.y + HEADER_HEIGHT;
+                    parts.push(`  <line x1="${pos.x}" y1="${sepY}" x2="${pos.x + BOX_WIDTH}" y2="${sepY}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+
+                    const visibleAttrs = ConnectionCalculator.getVisibleAttributes(classDef.attributes, className);
+                    for (let i = 0; i < visibleAttrs.length; i++) {
+                        const attr = visibleAttrs[i];
+                        const attrY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
+                        const cleanType = ConnectionCalculator.extractBaseType(attr.type);
+                        parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}">${escapeXml(attr.name)}: ${escapeXml(cleanType)}</text>`);
+                    }
+                }
+            }
+
+            // Legend
+            parts.push('');
+            parts.push('  <!-- Legend -->');
+            let legendX = 20;
+            let legendY = height - 120;
+            parts.push(`  <text x="${legendX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Areas:</text>`);
+            legendY += 20;
+            for (const [areaId, areaDef] of Object.entries(model.areas || {})) {
+                const areaColor = areaDef.color || '#FFFFFF';
+                const areaName = areaDef.name || areaId;
+                parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+                parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
+                legendY += 20;
+            }
+
+            parts.push('</svg>');
+            return parts.join('\n');
+        }
+
+        // Create a draggable class box element
+        function createClassBox(className, classDef, pos) {
+            const box = document.createElement('div');
+            box.className = 'class-box' + (showDetailed ? '' : ' compact');
+            box.dataset.className = className;
+            box.style.left = pos.x + 'px';
+            box.style.top = pos.y + 'px';
+            box.style.backgroundColor = getColor(className);
+            box.style.height = getBoxHeight(className) + 'px';
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'header';
+            header.textContent = className;
+            box.appendChild(header);
+
+            // Attributes (in detailed view, sorted with self-refs first)
+            if (showDetailed) {
+                const attrs = getVisibleAttributes(className);
+                if (attrs.length > 0) {
+                    const attrsDiv = document.createElement('div');
+                    attrsDiv.className = 'attributes';
+                    attrs.forEach(attr => {
+                        const line = document.createElement('div');
+                        line.className = 'attr-line';
+                        line.textContent = `${attr.name}: ${attr.type}`;
+                        attrsDiv.appendChild(line);
+                    });
+                    box.appendChild(attrsDiv);
+                }
+            }
+
+            // Drag handling
+            makeDraggable(box);
+
+            return box;
+        }
+
+        // Make an element draggable
+        function makeDraggable(el) {
+            let startX, startY, startLeft, startTop;
+
+            el.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Only left click
+
+                e.preventDefault();
+                startX = e.clientX;
+                startY = e.clientY;
+                startLeft = parseInt(el.style.left) || 0;
+                startTop = parseInt(el.style.top) || 0;
+
+                el.classList.add('dragging');
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            function onMouseMove(e) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                let newLeft = Math.max(0, startLeft + dx);
+                let newTop = Math.max(0, startTop + dy);
+
+                // Snap to grid (10px)
+                newLeft = Math.round(newLeft / 10) * 10;
+                newTop = Math.round(newTop / 10) * 10;
+
+                el.style.left = newLeft + 'px';
+                el.style.top = newTop + 'px';
+            }
+
+            function onMouseUp() {
+                el.classList.remove('dragging');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                // Update layout
+                const className = el.dataset.className;
+                const newX = parseInt(el.style.left) || 0;
+                const newY = parseInt(el.style.top) || 0;
+
+                if (!layout.classes) layout.classes = {};
+                const oldPos = layout.classes[className] || {};
+
+                if (oldPos.x !== newX || oldPos.y !== newY) {
+                    layout.classes[className] = { x: newX, y: newY };
+                    isDirty = true;
+                    statusEl.textContent = 'Unsaved changes';
+
+                    // Re-render to update connections and auto-size canvas
+                    renderCanvas();
+                }
+            }
+        }
+
+        // Save layout and diagrams
+        async function saveLayout() {
+            if (!currentDoc || !layout) return;
+
+            statusEl.textContent = 'Saving...';
+            try {
+                // Generate both SVGs client-side
+                const svgCompact = generateSVG(false);
+                const svgDetailed = generateSVG(true);
+
+                // Save everything in one request
+                const response = await fetch('/api/layout-editor/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        doc: currentDoc,
+                        layout: layout,
+                        svgCompact: svgCompact,
+                        svgDetailed: svgDetailed
+                    })
+                });
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Save failed');
+                }
+
+                isDirty = false;
+                statusEl.textContent = 'Saved!';
+                setTimeout(() => {
+                    if (!isDirty) statusEl.textContent = '';
+                }, 2000);
+            } catch (e) {
+                console.error('Save failed:', e);
+                statusEl.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        // Toggle detailed view mode
+        function toggleDetailedView() {
+            showDetailed = !showDetailed;
+            viewLayoutBtn.classList.toggle('active', showDetailed);
+            renderCanvas();
+        }
+
+        // Event listeners
+        docSelect.addEventListener('change', () => loadDocument(docSelect.value));
+        saveBtn.addEventListener('click', saveLayout);
+        viewLayoutBtn.addEventListener('click', toggleDetailedView);
+
+        // Warn on unsaved changes
+        window.addEventListener('beforeunload', (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Initialize
+        loadDocuments();
+    </script>
+</body>
+</html>

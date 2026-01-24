@@ -2,141 +2,113 @@
   {
     "designation": "A319-100",
     "name": "Airbus A319-100",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 138,
-    "max_range_nm": 3700
+    "max_range_nm": 3750,
+    "number_of_engines": 2
   },
   {
     "designation": "A320-200",
     "name": "Airbus A320-200",
-    "manufacturer_id": 1,
-    "max_passengers": 168,
-    "max_range_nm": 3300
+    "manufacturer": "Airbus",
+    "max_passengers": 180,
+    "max_range_nm": 3300,
+    "number_of_engines": 2
   },
   {
     "designation": "A320neo",
     "name": "Airbus A320neo",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 180,
-    "max_range_nm": 3500
-  },
-  {
-    "designation": "A321-100",
-    "name": "Airbus A321-100",
-    "manufacturer_id": 1,
-    "max_passengers": 200,
-    "max_range_nm": 3200
+    "max_range_nm": 3500,
+    "number_of_engines": 2
   },
   {
     "designation": "A321-200",
     "name": "Airbus A321-200",
-    "manufacturer_id": 1,
-    "max_passengers": 200,
-    "max_range_nm": 3200
+    "manufacturer": "Airbus",
+    "max_passengers": 215,
+    "max_range_nm": 3200,
+    "number_of_engines": 2
   },
   {
     "designation": "A321neo",
     "name": "Airbus A321neo",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 215,
-    "max_range_nm": 3500
-  },
-  {
-    "designation": "A321F",
-    "name": "Airbus A321 Freighter",
-    "manufacturer_id": 1,
-    "max_passengers": 0,
-    "max_range_nm": 1900
-  },
-  {
-    "designation": "A330-200",
-    "name": "Airbus A330-200",
-    "manufacturer_id": 1,
-    "max_passengers": 270,
-    "max_range_nm": 7250
+    "max_range_nm": 3500,
+    "number_of_engines": 2
   },
   {
     "designation": "A330-300",
     "name": "Airbus A330-300",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 255,
-    "max_range_nm": 6350
+    "max_range_nm": 6350,
+    "number_of_engines": 2
   },
   {
     "designation": "A340-300",
     "name": "Airbus A340-300",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 279,
-    "max_range_nm": 7300
+    "max_range_nm": 7300,
+    "number_of_engines": 4
   },
   {
     "designation": "A340-600",
     "name": "Airbus A340-600",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 297,
-    "max_range_nm": 7900
+    "max_range_nm": 7900,
+    "number_of_engines": 4
   },
   {
     "designation": "A350-900",
     "name": "Airbus A350-900",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 293,
-    "max_range_nm": 8100
+    "max_range_nm": 8100,
+    "number_of_engines": 2
   },
   {
     "designation": "A380-800",
     "name": "Airbus A380-800",
-    "manufacturer_id": 1,
+    "manufacturer": "Airbus",
     "max_passengers": 509,
-    "max_range_nm": 8000
+    "max_range_nm": 8000,
+    "number_of_engines": 4
   },
   {
     "designation": "747-400",
     "name": "Boeing 747-400",
-    "manufacturer_id": 2,
-    "max_passengers": 371,
-    "max_range_nm": 7260
+    "manufacturer": "Boeing",
+    "max_passengers": 383,
+    "max_range_nm": 7260,
+    "number_of_engines": 4
   },
   {
     "designation": "747-8",
-    "name": "Boeing 747-8 Intercontinental",
-    "manufacturer_id": 2,
+    "name": "Boeing 747-8",
+    "manufacturer": "Boeing",
     "max_passengers": 364,
-    "max_range_nm": 7730
-  },
-  {
-    "designation": "767-300ER",
-    "name": "Boeing 767-300ER",
-    "manufacturer_id": 2,
-    "max_passengers": 211,
-    "max_range_nm": 5900
-  },
-  {
-    "designation": "777-200ER",
-    "name": "Boeing 777-200ER",
-    "manufacturer_id": 2,
-    "max_passengers": 306,
-    "max_range_nm": 7000
+    "max_range_nm": 7730,
+    "number_of_engines": 4
   },
   {
     "designation": "777-300ER",
     "name": "Boeing 777-300ER",
-    "manufacturer_id": 2,
+    "manufacturer": "Boeing",
     "max_passengers": 340,
-    "max_range_nm": 7370
-  },
-  {
-    "designation": "777F",
-    "name": "Boeing 777 Freighter",
-    "manufacturer_id": 2,
-    "max_passengers": 0,
-    "max_range_nm": 4970
+    "max_range_nm": 7370,
+    "number_of_engines": 2
   },
   {
     "designation": "787-9",
-    "name": "Boeing 787-9 Dreamliner",
-    "manufacturer_id": 2,
+    "name": "Boeing 787-9",
+    "manufacturer": "Boeing",
     "max_passengers": 294,
-    "max_range_nm": 7635
+    "max_range_nm": 7635,
+    "number_of_engines": 2
   }
 ]

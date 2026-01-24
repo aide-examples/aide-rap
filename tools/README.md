@@ -4,7 +4,7 @@ Dieses Verzeichnis enthält Werkzeuge zur Verwaltung des Datenmodells und der Di
 
 ## Voraussetzungen
 
-### draw.io VS Code Extension
+### draw.io VS Code Extension (optional)
 
 ```bash
 code --install-extension hediet.vscode-drawio
@@ -27,7 +27,7 @@ DataModel.md          →  parse-datamodel.js  →  DataModel.yaml
 layout.drawio         →  extract-layout.js   →  layout.json
 (visuelles Layout)                               (Positionen)
                                                      ↓
-                                            generate-diagram.js
+                                            Layout Editor (Browser)
                                                      ↓
                                             diagram.svg / diagram-detailed.svg
 ```
@@ -65,19 +65,14 @@ layout.drawio         →  extract-layout.js   →  layout.json
    | other_class_id | int | Reference to OtherClass |
    ```
 
-2. **Position in layout.drawio hinzufügen:**
-   - draw.io öffnen
-   - Neue Box erstellen und positionieren
-   - Speichern
+2. **Layout Editor öffnen:**
+   - http://localhost:18354/layout-editor
+   - Dokument auswählen
+   - Neue Klasse wird automatisch angezeigt
 
-3. **Alles neu generieren:**
-   ```bash
-   cd /home/gero/aide-examples/aide-irma
-   node tools/parse-datamodel.js && \
-   node tools/extract-layout.js -i app/docs/requirements/layout.drawio && \
-   node tools/generate-diagram.js -o app/docs/requirements/diagram.svg && \
-   node tools/generate-diagram.js -a -o app/docs/requirements/diagram-detailed.svg
-   ```
+3. **Position anpassen und speichern:**
+   - Box per Drag & Drop positionieren
+   - "Save" klicken → SVG-Diagramme werden automatisch generiert
 
 ---
 
@@ -85,16 +80,27 @@ layout.drawio         →  extract-layout.js   →  layout.json
 
 Beziehungen werden automatisch aus den Attributen erkannt!
 
-1. **In DataModel.md:** Attribut mit "Reference to X" hinzufügen:
+1. **In DataModel.md:** Attribut mit Entitynamen als Typ hinzufügen:
    ```markdown
-   | other_id | int | Reference to OtherClass |
+   | other | OtherClass | Reference to OtherClass |
    ```
 
-2. **Neu generieren** (siehe oben)
+2. **Layout Editor öffnen** → Neue Verbindungslinie wird automatisch gezeichnet
+
+3. **Speichern** → SVG wird aktualisiert
 
 ---
 
-### 3. Layout visuell anpassen (mit draw.io)
+### 3. Layout visuell anpassen
+
+#### Option A: Layout Editor (empfohlen)
+
+1. **Layout Editor öffnen:** http://localhost:18354/layout-editor
+2. **Dokument auswählen**
+3. **Boxen per Drag & Drop verschieben**
+4. **"Save" klicken** → Speichert layout.json + diagram.svg + diagram-detailed.svg
+
+#### Option B: draw.io (für komplexe Layouts)
 
 1. **draw.io Datei öffnen:**
    - In VS Code: `app/docs/requirements/layout.drawio` öffnen
@@ -104,12 +110,12 @@ Beziehungen werden automatisch aus den Attributen erkannt!
    - Klassen per Drag & Drop positionieren
    - Speichern (Ctrl+S)
 
-3. **Positionen extrahieren und Diagramme generieren:**
+3. **Positionen extrahieren:**
    ```bash
-   node tools/extract-layout.js -i app/docs/requirements/layout.drawio && \
-   node tools/generate-diagram.js -o app/docs/requirements/diagram.svg && \
-   node tools/generate-diagram.js -a -o app/docs/requirements/diagram-detailed.svg
+   node tools/extract-layout.js -i app/docs/requirements/layout.drawio
    ```
+
+4. **Layout Editor öffnen** und "Save" klicken für SVG-Generierung
 
 ---
 
@@ -123,7 +129,7 @@ Beziehungen werden automatisch aus den Attributen erkannt!
    </tr>
    ```
 
-2. **Neu generieren**
+2. **Layout Editor öffnen und speichern** → Farben werden aktualisiert
 
 ---
 
@@ -137,22 +143,12 @@ Parst DataModel.md und erzeugt DataModel.yaml.
 node tools/parse-datamodel.js
 ```
 
-### generate-diagram.js
+### extract-layout.js
 
-Erzeugt SVG-Diagramm aus DataModel.yaml + layout.json.
+Liest Positionen aus draw.io Datei und aktualisiert layout.json.
 
 ```bash
-# Kompaktes Diagramm (nur Klassennamen)
-node tools/generate-diagram.js -o app/docs/requirements/diagram.svg
-
-# Mit Attributen (y-scale 2.5 Standard)
-node tools/generate-diagram.js -a -o app/docs/requirements/diagram-detailed.svg
-
-# Mit benutzerdefiniertem y-scale
-node tools/generate-diagram.js -a -y 3.0 -o app/docs/requirements/diagram-detailed.svg
-
-# Ohne Legende
-node tools/generate-diagram.js --no-legend -o output.svg
+node tools/extract-layout.js -i app/docs/requirements/layout.drawio
 ```
 
 ### generate-drawio.js
@@ -163,14 +159,6 @@ Erzeugt draw.io Datei aus DataModel.yaml + layout.json (für neue Klassen).
 node tools/generate-drawio.js -o app/docs/requirements/layout.drawio
 ```
 
-### extract-layout.js
-
-Liest Positionen aus draw.io Datei und aktualisiert layout.json.
-
-```bash
-node tools/extract-layout.js -i app/docs/requirements/layout.drawio
-```
-
 ---
 
 ## Schnellreferenz
@@ -179,18 +167,11 @@ node tools/extract-layout.js -i app/docs/requirements/layout.drawio
 cd /home/gero/aide-examples/aide-irma
 
 # Nach Änderungen in DataModel.md:
-node tools/parse-datamodel.js && \
-node tools/generate-diagram.js -o app/docs/requirements/diagram.svg && \
-node tools/generate-diagram.js -a -o app/docs/requirements/diagram-detailed.svg
+# 1. Layout Editor öffnen: http://localhost:18354/layout-editor
+# 2. Dokument auswählen → Änderungen werden automatisch geladen
+# 3. "Save" klicken → SVG-Diagramme werden generiert
 
 # Nach Layout-Änderungen in draw.io:
-node tools/extract-layout.js -i app/docs/requirements/layout.drawio && \
-node tools/generate-diagram.js -o app/docs/requirements/diagram.svg && \
-node tools/generate-diagram.js -a -o app/docs/requirements/diagram-detailed.svg
-
-# Komplette Regenerierung:
-node tools/parse-datamodel.js && \
-node tools/extract-layout.js -i app/docs/requirements/layout.drawio && \
-node tools/generate-diagram.js -o app/docs/requirements/diagram.svg && \
-node tools/generate-diagram.js -a -o app/docs/requirements/diagram-detailed.svg
+node tools/extract-layout.js -i app/docs/requirements/layout.drawio
+# Dann Layout Editor öffnen und "Save" klicken
 ```

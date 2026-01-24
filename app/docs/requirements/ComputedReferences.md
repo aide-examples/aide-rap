@@ -10,9 +10,9 @@ Algorithmisch berechnete FK-Beziehungen, die:
 ## Motivation
 
 **Beispiel: Aircraft.current_operator_id**
-- Finde FleetMember wo `aircraft_id = Aircraft.id` UND `exit_date IS NULL OR exit_date > TODAY`
+- Finde Registration wo `aircraft_id = Aircraft.id` UND `exit_date IS NULL OR exit_date > TODAY`
 - Von dort: `operator_id` → Operator
-- Es darf nur einen aktiven FleetMember geben
+- Es darf nur einen aktiven Registration geben
 
 **Wichtig:** Der Wechsel wird oft **vordatiert** eingegeben (exit_date in der Zukunft).
 Das bedeutet: Der Update darf NICHT beim Speichern passieren, sondern muss **täglich** ausgeführt werden!
@@ -31,7 +31,7 @@ Das berechnete Attribut wird **in der Attribut-Tabelle** mit einer Annotation de
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
 | ... | ... | ... | ... |
-| current_operator_id | int | Reference to Operator [READONLY] [DAILY=FleetMember[exit_date=null OR exit_date>TODAY].operator] | 5 |
+| current_operator_id | int | Reference to Operator [READONLY] [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator] | 5 |
 ```
 
 ### Annotation-Syntax
@@ -54,7 +54,7 @@ Das berechnete Attribut wird **in der Attribut-Tabelle** mit einer Annotation de
 ## Regel-Syntax (Rule)
 
 ```
-FleetMember[exit_date=null OR exit_date>TODAY].operator
+Registration[exit_date=null OR exit_date>TODAY].operator
 │          │                                  └── FK: operator_id → Operator
 │          └── Filter: WHERE exit_date IS NULL OR exit_date > CURRENT_DATE
 └── Start-Entity: WHERE aircraft_id = self.id (Konvention)
@@ -102,7 +102,7 @@ Neben der ID kann auch das **Display-Label** des Ziel-Records gespeichert werden
 
 | Situation | Verhalten |
 |-----------|-----------|
-| Kein Treffer (kein aktiver FleetMember) | `current_operator_id = null` |
+| Kein Treffer (kein aktiver Registration) | `current_operator_id = null` |
 | Mehrere Treffer (Dateninkonsistenz!) | `current_operator_id = null` + Warning-Log |
 | Ziel-Entity gelöscht | FK-Constraint verhindert oder CASCADE |
 
@@ -114,8 +114,8 @@ Neben der ID kann auch das **Display-Label** des Ziel-Records gespeichert werden
 Szenario: Aircraft D-AIUA wechselt am 2024-02-01 von Lufthansa zu Eurowings
 
 Tag 1 (2024-01-15): User gibt Wechsel ein
-  └── FleetMember für Lufthansa: exit_date = '2024-02-01' (Zukunft!)
-  └── FleetMember für Eurowings: entry_date = '2024-02-01'
+  └── Registration für Lufthansa: exit_date = '2024-02-01' (Zukunft!)
+  └── Registration für Eurowings: entry_date = '2024-02-01'
   └── Aircraft.current_operator_id bleibt Lufthansa (exit_date > TODAY)
 
 Tag 2-16: Keine Änderung
@@ -123,8 +123,8 @@ Tag 2-16: Keine Änderung
 
 Tag 17 (2024-02-01): CRON Job um 00:05
   └── Für Aircraft D-AIUA:
-      └── Query: FleetMember WHERE aircraft_id=1001 AND (exit_date IS NULL OR exit_date > '2024-02-01')
-      └── Ergebnis: Eurowings FleetMember (exit_date=null)
+      └── Query: Registration WHERE aircraft_id=1001 AND (exit_date IS NULL OR exit_date > '2024-02-01')
+      └── Ergebnis: Eurowings Registration (exit_date=null)
       └── UPDATE aircraft SET current_operator_id = (Eurowings ID) WHERE id = 1001
 
 Ergebnis: Aircraft zeigt jetzt Eurowings als current_operator

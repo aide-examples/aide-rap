@@ -1,4 +1,4 @@
-# FleetMember
+# Registration
 
 Assignment of an aircraft to an operator with entry and exit dates.
 An aircraft can move between operators over time (e.g., wet lease, operator change).

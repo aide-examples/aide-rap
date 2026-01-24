@@ -19,7 +19,7 @@ Individual aircraft identified by registration and serial number.
 | registration | [TailSign](../Types.md#tailsign) | Aircraft registration [LABEL] | D-AIUA |
 | serial_number | [MSN](../Types.md#msn) | Manufacturer serial number [LABEL2] | MSN 4711 |
 | type | AircraftType | Reference | 5 |
-| current_operator | Operator | [READONLY] [DAILY=FleetMember[exit_date=null OR exit_date>TODAY].operator] | 5 |
+| current_operator | Operator | [READONLY] [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator] | 5 |
 | manufacture_date | date | Date of manufacture | 2015-03-15 |
 | total_flight_hours | int | Accumulated flight hours | 45230 |
 | total_cycles | int | Accumulated cycles | 18500 |

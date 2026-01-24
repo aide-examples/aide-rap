@@ -63,7 +63,7 @@ Validation happens identically on frontend (for UX) and backend (for integrity).
 
 Group related entities into colored areas. The colors flow through from your data model diagram into the UI – entity selector, tree nodes, and table headers all respect the grouping:
 
-- **Fleet Management** (blue) – Aircraft, FleetMember, Operator
+- **Fleet Management** (blue) – Aircraft, Registration, Operator
 - **Technical Data** (green) – AircraftType, AircraftManufacturer
 - **Maintenance** (orange) – MaintenanceEvent, MaintenanceType
 
@@ -185,10 +185,10 @@ The Admin menu opens a dedicated interface for managing seed data across all ent
 Express dynamic relationships that depend on time:
 
 ```markdown
-current_operator: Operator [DAILY=FleetMember[exit_date=null OR exit_date>TODAY].operator]
+current_operator: Operator [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator]
 ```
 
-This calculates the current operator by finding the active FleetMember assignment – recalculated daily to handle future-dated changes.
+This calculates the current operator by finding the active Registration assignment – recalculated daily to handle future-dated changes.
 
 ### AI-Powered Seed Data Generation
 
@@ -324,7 +324,7 @@ Edit `app/config.json`:
 {
   "port": 18354,
   "crud": {
-    "enabledEntities": ["Aircraft", "Operator", "FleetMember", ...]
+    "enabledEntities": ["Aircraft", "Operator", "Registration", ...]
   },
   "llm": {
     "active": "gemini",

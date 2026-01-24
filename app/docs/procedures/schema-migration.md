@@ -1,136 +1,45 @@
-# Automatische Schema-Migration
+# Schema-Migration (Entwicklungsmodus)
 
-> Der Server erkennt Schema-Änderungen automatisch beim Start und führt sichere Migrationen durch.
-
-## Übersicht
-
-Die `_schema_metadata` Tabelle speichert das aktuelle Schema. Beim Startup vergleicht der Server das Markdown-Schema mit dem gespeicherten Schema und erkennt Änderungen.
-
-## Erkannte Änderungen
-
-### Entities
-
-| Änderung | Aktion | Log-Level |
-|----------|--------|-----------|
-| **Neue Entity** | CREATE TABLE | INFO |
-| **Entity entfernt** | DROP TABLE, VIEW, Seed | WARN |
-| **Entity umbenannt** | RENAME TABLE, Seed | INFO |
-
-### Attribute (Spalten)
-
-| Änderung | Aktion | Log-Level |
-|----------|--------|-----------|
-| **Neue Spalte** | ALTER TABLE ADD COLUMN | INFO |
-| **Spalte entfernt** | ALTER TABLE DROP COLUMN | INFO |
-| **Spalte umbenannt** | RENAME COLUMN (bei high confidence) | INFO |
-| **Typ geändert** | Nur Warnung (SQLite-Limit) | WARN |
-| **DEFAULT geändert** | Nur Info | INFO |
-| **Required geändert** | Warnung wenn jetzt required | WARN/INFO |
-| **FK-Referenz geändert** | Nur Warnung (SQLite-Limit) | WARN |
-
-### Types (Types.md)
-
-| Änderung | Aktion | Log-Level |
-|----------|--------|-----------|
-| **Pattern hinzugefügt** | Registriert | INFO |
-| **Pattern geändert** | Warnung | WARN |
-| **Pattern entfernt** | Warnung | WARN |
-| **Enum hinzugefügt** | Registriert | INFO |
-| **Enum geändert** | Warnung | WARN |
-| **Enum entfernt** | Warnung | WARN |
-
----
-
-## Rename-Erkennung
-
-### Entity-Rename
-- Erkannt via **identischer Schema-Hash**
-- Wenn eine Entity fehlt und eine neue Entity denselben Hash hat → Rename
-- Tabelle und Seed-Datei werden automatisch umbenannt
-
-### Spalten-Rename
-- **High Confidence**: Gleiche Description → automatisches RENAME COLUMN
-- **Low Confidence**: Nur gleicher Typ → Warnung, manuelle Prüfung nötig
-
----
-
-## SQLite-Limitierungen
-
-Folgende Änderungen können **nicht automatisch** durchgeführt werden:
-
-| Änderung | Grund | Lösung |
-|----------|-------|--------|
-| Typ ändern | Kein ALTER COLUMN | Tabelle neu erstellen |
-| NOT NULL hinzufügen | Bei existierenden NULL-Werten | Daten erst bereinigen |
-| FK-Constraint ändern | Kein ALTER CONSTRAINT | Tabelle neu erstellen |
-
----
+> Bei Schema-Änderungen wird die gesamte Datenbank neu aufgebaut.
 
 ## Workflow
 
-### Einfache Änderungen (automatisch)
+1. **Markdown-Dateien ändern** (Entity-Attribute, Types.md, etc.)
+2. **Server neu starten**
+3. **Seed-Daten laden** (Admin UI → "Load All")
 
-1. Markdown-Datei ändern (z.B. Attribut hinzufügen)
-2. Server neu starten
-3. Log prüfen: `Schema: ADD Entity.attribute`
+## Was passiert beim Start?
 
-### Komplexe Änderungen (manuell)
+Der Server berechnet einen Hash über alle Entities und Types. Bei Änderung:
 
-Bei Warnungen wie `(manual migration needed)`:
-
-1. Backup erstellen: `cp app/data/irma.sqlite app/data/irma.sqlite.bak`
-2. Manuelle SQL-Migration ausführen
-3. Server neu starten
-
----
-
-## Metadaten-Tabelle
-
-```sql
-SELECT * FROM _schema_metadata;
+```
+Schema changed - recreating all tables
+Dropped table aircraft
+Dropped table registration
+...
+Created table aircraft_oem
+Created table aircraft_type
+...
+Schema initialized (15 tables, hash: a1b2c3d4...)
 ```
 
-| entity_name | columns_json | schema_hash | updated_at |
-|-------------|--------------|-------------|------------|
-| Aircraft | [...] | abc123... | 2026-01-23 |
-| _types | {...} | def456... | 2026-01-23 |
+## Seed-Daten
 
----
+Die Seed-Dateien in `app/data/seed/` bleiben erhalten. Nach Schema-Neuaufbau:
 
-## Beispiele
+1. Admin-Menü öffnen (☰ → Admin)
+2. "Load All" klicken
 
-### Attribut hinzufügen
+Oder einzelne Entities per Rechtsklick → "Load..."
 
-```markdown
-# In Aircraft.md
-| rating | int | Quality rating | 5 |
-```
-
-Log: `Schema: ADD Aircraft.rating`
-
-### Attribut umbenennen (mit Description-Match)
-
-```markdown
-# Vorher
-| old_name | int | Quality rating | 5 |
-
-# Nachher
-| new_name | int | Quality rating | 5 |
-```
-
-Log: `Schema: RENAME Aircraft.old_name -> new_name (description match)`
-
-### Entity umbenennen
+## Manueller Reset
 
 ```bash
-# Datei umbenennen
-mv app/docs/requirements/classes/OldName.md app/docs/requirements/classes/NewName.md
-# Inhalt: ## NewName
+# Datenbank löschen und neu aufbauen
+rm app/data/irma.sqlite
+./run
 ```
 
-Log:
-```
-Schema: Entity renamed OldName -> NewName
-Renamed table old_name -> new_name
-Renamed seed file OldName.json -> NewName.json
-```
+## Für Produktion
+
+Für produktive Systeme mit bestehenden Daten wäre ein echtes Migrations-System nötig (z.B. mit Versionsnummern und Up/Down-Scripts). Das aktuelle Verhalten ist für die Prototyp-Entwicklung optimiert.

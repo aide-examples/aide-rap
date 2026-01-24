@@ -3,7 +3,7 @@
  *
  * Handles scheduled computation of redundant fields like:
  * - Engine.current_aircraft (from EngineMount)
- * - Aircraft.current_operator (from FleetMember)
+ * - Aircraft.current_operator (from Registration)
  *
  * Rule syntax: [DAILY=SourceEntity[condition].field]
  * Example: [DAILY=EngineMount[removed_date=null OR removed_date>TODAY].aircraft]

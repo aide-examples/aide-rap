@@ -1,4 +1,4 @@
-# AircraftManufacturer
+# AircraftOEM
 
 Manufacturers of aircraft types (e.g., Airbus, Boeing, Embraer).
 

@@ -9,7 +9,7 @@ const SeedGeneratorDialog = {
   instruction: '',
   generatedData: null,
   lastPrompt: null,
-  showPrompt: false,
+  activeTab: 'instruction',  // instruction, prompt, paste, result
   isGenerating: false,
   llmProvider: null,
 
@@ -27,7 +27,7 @@ const SeedGeneratorDialog = {
     this.entityName = entityName;
     this.generatedData = null;
     this.lastPrompt = null;
-    this.showPrompt = false;
+    this.activeTab = 'instruction';
     this.isGenerating = false;
 
     // Load schema
@@ -44,9 +44,10 @@ const SeedGeneratorDialog = {
 
     // Load LLM provider info
     try {
-      const resp = await fetch('/api/seed/llm-status');
+      const resp = await fetch('/api/seed/generator-status');
       const data = await resp.json();
-      this.llmProvider = data.activeProvider || null;
+      // Only set provider if enabled (API key configured)
+      this.llmProvider = data.enabled ? data.provider : null;
     } catch (e) {
       this.llmProvider = null;
     }
@@ -73,68 +74,37 @@ const SeedGeneratorDialog = {
     if (!this.container) return;
 
     const areaColor = this.schema?.areaColor || '#f5f5f5';
+    const hasResult = this.generatedData && this.generatedData.length > 0;
 
     this.container.innerHTML = `
       <div class="modal-overlay" data-action="close">
         <div class="modal-dialog seed-generator-dialog" onclick="event.stopPropagation()">
           <div class="modal-header" style="background-color: ${areaColor};">
-            <h2>Generate Seed Data: ${this.entityName}</h2>
+            <h2>Generate: ${this.entityName}</h2>
             <button class="modal-close" data-action="close">&times;</button>
           </div>
 
+          <div class="generator-tabs">
+            <button class="generator-tab ${this.activeTab === 'instruction' ? 'active' : ''}" data-tab="instruction">
+              1. Instruction
+            </button>
+            <button class="generator-tab ${this.activeTab === 'prompt' ? 'active' : ''}" data-tab="prompt" ${!this.lastPrompt ? 'disabled' : ''}>
+              2. AI Prompt
+            </button>
+            <button class="generator-tab tab-paste ${this.activeTab === 'paste' ? 'active' : ''}" data-tab="paste" ${!this.lastPrompt ? 'disabled' : ''}>
+              3. Paste Response
+            </button>
+            <button class="generator-tab ${this.activeTab === 'result' ? 'active' : ''} ${hasResult ? 'has-data' : ''}" data-tab="result" ${!hasResult ? 'disabled' : ''}>
+              4. Result ${hasResult ? `(${this.generatedData.length})` : ''}
+            </button>
+          </div>
+
           <div class="modal-body">
-            <div class="generator-instruction-section">
-              <label>Instruction:</label>
-              <textarea id="generator-instruction" rows="3" placeholder="Describe what data to generate (e.g., 'All subsidiaries of Lufthansa group')">${this.escapeHtml(this.instruction)}</textarea>
-              <div class="instruction-actions">
-                <button class="btn-seed btn-save-md" data-action="save-to-md">Save to MD</button>
-                <button class="btn-seed" data-action="show-prompt">AI</button>
-              </div>
-            </div>
-
-            ${this.showPrompt ? `
-            <div class="prompt-section">
-              <div class="prompt-header">
-                <label>LLM Prompt:</label>
-                <div class="prompt-actions">
-                  <button class="btn-seed btn-small" data-action="copy-prompt">Copy for manual AI chat</button>
-                  ${this.llmProvider ? `
-                  <button class="btn-seed btn-small primary" data-action="generate" ${this.isGenerating ? 'disabled' : ''}>
-                    ${this.isGenerating ? 'Generating...' : `Ask ${this.llmProvider} (API)`}
-                  </button>
-                  ` : ''}
-                </div>
-              </div>
-              <textarea id="llm-prompt-text" readonly rows="8">${this.escapeHtml(this.lastPrompt || '')}</textarea>
-            </div>
-
-            <div class="paste-response-section">
-              <div class="paste-header">
-                <label>Paste AI Response:</label>
-                <button class="btn-seed btn-small primary" data-action="parse-response">Parse JSON</button>
-              </div>
-              <textarea id="ai-response-text" rows="6" placeholder="Paste the JSON array from your AI chat here..."></textarea>
-            </div>
-            ` : ''}
-
-            <div class="generator-result-section" ${!this.generatedData ? 'style="display:none"' : ''}>
-              <div class="result-header">
-                <label>Result:</label>
-                ${this.generatedData ? `<span class="record-count">${this.generatedData.length} records</span>` : ''}
-              </div>
-              <div class="result-content">
-                ${this.renderResultContent()}
-              </div>
-            </div>
+            ${this.renderTabContent()}
           </div>
 
           <div class="modal-footer">
-            ${this.generatedData ? `
-              <button class="btn-seed" data-action="save-json">Save JSON</button>
-              <button class="btn-seed" data-action="load-db">Load into DB</button>
-              <button class="btn-seed primary" data-action="save-and-load">Save & Load</button>
-            ` : ''}
-            <button class="btn-seed" data-action="close">Cancel</button>
+            ${this.renderFooterButtons()}
           </div>
         </div>
       </div>
@@ -142,6 +112,87 @@ const SeedGeneratorDialog = {
 
     this.container.classList.add('active');
     this.attachEventHandlers();
+  },
+
+  /**
+   * Render content for the active tab
+   */
+  renderTabContent() {
+    switch (this.activeTab) {
+      case 'instruction':
+        return `
+          <div class="tab-content-instruction">
+            <textarea id="generator-instruction" rows="6" placeholder="Describe what data to generate...">${this.escapeHtml(this.instruction)}</textarea>
+          </div>
+        `;
+
+      case 'prompt':
+        return `
+          <div class="tab-content-prompt">
+            <textarea id="llm-prompt-text" readonly rows="12">${this.escapeHtml(this.lastPrompt || '')}</textarea>
+          </div>
+        `;
+
+      case 'paste':
+        return `
+          <div class="tab-content-paste" id="paste-drop-zone">
+            <div class="paste-hint">Paste or drop JSON here</div>
+            <textarea id="ai-response-text" rows="10" placeholder="Paste the JSON array from your AI chat here..."></textarea>
+          </div>
+        `;
+
+      case 'result':
+        return `
+          <div class="tab-content-result">
+            <div class="result-content">
+              ${this.renderResultContent()}
+            </div>
+          </div>
+        `;
+
+      default:
+        return '';
+    }
+  },
+
+  /**
+   * Render footer buttons based on active tab
+   */
+  renderFooterButtons() {
+    const hasResult = this.generatedData && this.generatedData.length > 0;
+
+    switch (this.activeTab) {
+      case 'instruction':
+        return `
+          <button class="btn-seed" data-action="save-to-md">Save to MD</button>
+          <button class="btn-seed primary" data-action="build-prompt">Build AI Prompt →</button>
+        `;
+
+      case 'prompt':
+        return `
+          <button class="btn-seed" data-action="copy-prompt">Copy Prompt</button>
+          ${this.llmProvider ? `
+          <button class="btn-seed" data-action="generate" ${this.isGenerating ? 'disabled' : ''}>
+            ${this.isGenerating ? 'Generating...' : `Ask ${this.llmProvider}`}
+          </button>
+          ` : ''}
+          <button class="btn-seed primary" data-action="goto-paste">Paste Response →</button>
+        `;
+
+      case 'paste':
+        return `
+          <button class="btn-seed primary" data-action="parse-response">Parse JSON</button>
+        `;
+
+      case 'result':
+        return `
+          <button class="btn-seed" data-action="save-json">Save JSON</button>
+          <button class="btn-seed primary" data-action="save-and-load">Save & Load into DB</button>
+        `;
+
+      default:
+        return `<button class="btn-seed" data-action="close">Close</button>`;
+    }
   },
 
   /**
@@ -214,34 +265,35 @@ const SeedGeneratorDialog = {
       el.addEventListener('click', () => this.close());
     });
 
+    // Tab switching
+    this.container.querySelectorAll('.generator-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        if (!tab.disabled) {
+          this.activeTab = tab.dataset.tab;
+          this.render();
+        }
+      });
+    });
+
     // Save to markdown
     this.container.querySelector('[data-action="save-to-md"]')?.addEventListener('click', () => {
       this.saveToMarkdown();
     });
 
-    // Generate
+    // Build prompt and go to prompt tab
+    this.container.querySelector('[data-action="build-prompt"]')?.addEventListener('click', () => {
+      this.buildPrompt();
+    });
+
+    // Generate via API
     this.container.querySelector('[data-action="generate"]')?.addEventListener('click', () => {
       this.generate();
     });
 
-    // Save JSON
-    this.container.querySelector('[data-action="save-json"]')?.addEventListener('click', () => {
-      this.saveJSON();
-    });
-
-    // Load into DB
-    this.container.querySelector('[data-action="load-db"]')?.addEventListener('click', () => {
-      this.loadIntoDB();
-    });
-
-    // Save & Load
-    this.container.querySelector('[data-action="save-and-load"]')?.addEventListener('click', () => {
-      this.saveAndLoad();
-    });
-
-    // Show prompt (without API call)
-    this.container.querySelector('[data-action="show-prompt"]')?.addEventListener('click', () => {
-      this.buildPrompt();
+    // Go to paste tab
+    this.container.querySelector('[data-action="goto-paste"]')?.addEventListener('click', () => {
+      this.activeTab = 'paste';
+      this.render();
     });
 
     // Copy prompt to clipboard
@@ -253,6 +305,37 @@ const SeedGeneratorDialog = {
     this.container.querySelector('[data-action="parse-response"]')?.addEventListener('click', () => {
       this.parseResponse();
     });
+
+    // Save JSON
+    this.container.querySelector('[data-action="save-json"]')?.addEventListener('click', () => {
+      this.saveJSON();
+    });
+
+    // Save & Load
+    this.container.querySelector('[data-action="save-and-load"]')?.addEventListener('click', () => {
+      this.saveAndLoad();
+    });
+
+    // Drag and drop for paste tab
+    const dropZone = this.container.querySelector('#paste-drop-zone');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const text = e.dataTransfer.getData('text');
+        if (text) {
+          const textarea = this.container.querySelector('#ai-response-text');
+          if (textarea) textarea.value = text;
+        }
+      });
+    }
   },
 
   /**
@@ -312,7 +395,7 @@ const SeedGeneratorDialog = {
 
       if (result.success) {
         this.lastPrompt = result.prompt;
-        this.showPrompt = true;
+        this.activeTab = 'prompt';  // Switch to prompt tab
       } else {
         this.showMessage(result.error || 'Failed to build prompt', true);
       }
@@ -351,7 +434,7 @@ const SeedGeneratorDialog = {
       if (result.success) {
         this.generatedData = result.data;
         this.lastPrompt = result.prompt || null;
-        console.log('Generated data:', this.generatedData); // Debug
+        this.activeTab = 'result';  // Switch to result tab
         this.showMessage(`Generated ${result.count} records`);
       } else {
         this.showMessage(result.error || 'Generation failed', true);
@@ -528,6 +611,7 @@ const SeedGeneratorDialog = {
       }
 
       this.generatedData = data;
+      this.activeTab = 'result';  // Switch to result tab
       this.showMessage(`Parsed ${data.length} records`);
       this.render();
     } catch (e) {
