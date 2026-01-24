@@ -169,7 +169,9 @@ app.get('/api/layout-editor/load', (req, res) => {
         // Load or create layout
         let layout = { classes: {}, canvas: { width: 1200, height: 900 } };
         if (fs.existsSync(layoutPath)) {
-            layout = JSON.parse(fs.readFileSync(layoutPath, 'utf-8'));
+            const loaded = JSON.parse(fs.readFileSync(layoutPath, 'utf-8'));
+            layout = { ...layout, ...loaded };
+            if (!layout.classes) layout.classes = {};
         }
 
         // Ensure all classes have positions
@@ -682,10 +684,10 @@ async function generateEntityCardsPDF(model, outputPath) {
 
     // Card dimensions
     const CARD_MARGIN = 25;
-    const HEADER_PADDING = 10;
-    const ATTR_LINE_HEIGHT = 18;
+    const HEADER_PADDING = 8;
+    const ATTR_LINE_HEIGHT = 14;
     const BOTTOM_SPACE = 40;  // Space for handwritten notes
-    const NAME_FONT_SIZE = 32;
+    const NAME_FONT_SIZE = 24;
     const ATTR_FONT_SIZE = 11;
     const FK_DASH_LENGTH = 12;
     const FK_DASH_OFFSET = 5;
@@ -806,6 +808,23 @@ async function generateEntityCardsPDF(model, outputPath) {
                .text(attr.name, x + CARD_PADDING, attrY, { lineBreak: false });
 
             attrY += ATTR_LINE_HEIGHT;
+        }
+
+        // Entity description to the right of the card
+        if (classDef.description) {
+            const descX = x + cardWidth + 25;
+            const descY = y + HEADER_PADDING;
+            // Calculate available width: page width (595) - right margin (40) - descX
+            const availableWidth = 595 - 40 - descX;
+            if (availableWidth > 50) {  // Only show if enough space
+                doc.fontSize(10)
+                   .font('Helvetica-Oblique')
+                   .fillColor('#666')
+                   .text(classDef.description, descX, descY, {
+                       width: availableWidth,
+                       lineBreak: true
+                   });
+            }
         }
     }
 
