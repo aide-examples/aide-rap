@@ -2,23 +2,17 @@
   {
     "designation": "GE90-115B",
     "name": "GE90",
-    "manufacturer": "General Electric",
-    "thrust_lbs": 115540
+    "manufacturer": "GE Aerospace",
+    "thrust_lbs": 115000
   },
   {
-    "designation": "GEnx-1B",
+    "designation": "GEnx-1B76",
     "name": "GEnx",
-    "manufacturer": "General Electric",
+    "manufacturer": "GE Aerospace",
     "thrust_lbs": 76100
   },
   {
-    "designation": "GE9X",
-    "name": "GE9X",
-    "manufacturer": "General Electric",
-    "thrust_lbs": 105000
-  },
-  {
-    "designation": "PW1100G-JM",
+    "designation": "PW1133G-JM",
     "name": "PW1000G",
     "manufacturer": "Pratt & Whitney",
     "thrust_lbs": 33000
@@ -30,16 +24,10 @@
     "thrust_lbs": 62000
   },
   {
-    "designation": "Trent XWB-84",
+    "designation": "Trent XWB-97",
     "name": "Trent XWB",
     "manufacturer": "Rolls-Royce",
-    "thrust_lbs": 84200
-  },
-  {
-    "designation": "Trent 1000-J",
-    "name": "Trent 1000",
-    "manufacturer": "Rolls-Royce",
-    "thrust_lbs": 78000
+    "thrust_lbs": 97000
   },
   {
     "designation": "Trent 700",
@@ -48,39 +36,27 @@
     "thrust_lbs": 71100
   },
   {
-    "designation": "CFM56-5B4",
+    "designation": "CFM56-7B27",
     "name": "CFM56",
     "manufacturer": "CFM International",
-    "thrust_lbs": 27000
+    "thrust_lbs": 27300
   },
   {
-    "designation": "CFM56-7B26",
-    "name": "CFM56",
-    "manufacturer": "CFM International",
-    "thrust_lbs": 26300
-  },
-  {
-    "designation": "LEAP-1A",
+    "designation": "LEAP-1A26",
     "name": "LEAP",
     "manufacturer": "CFM International",
-    "thrust_lbs": 35000
+    "thrust_lbs": 26600
   },
   {
-    "designation": "LEAP-1B",
-    "name": "LEAP",
-    "manufacturer": "CFM International",
-    "thrust_lbs": 29310
+    "designation": "V2533-A5",
+    "name": "V2500",
+    "manufacturer": "International Aero Engines",
+    "thrust_lbs": 33000
   },
   {
     "designation": "GP7270",
-    "name": "GP7000",
+    "name": "GP7200",
     "manufacturer": "Engine Alliance",
-    "thrust_lbs": 70000
-  },
-  {
-    "designation": "V2527-A5",
-    "name": "V2500",
-    "manufacturer": "IAE International Aero Engines",
-    "thrust_lbs": 26500
+    "thrust_lbs": 74740
   }
 ]

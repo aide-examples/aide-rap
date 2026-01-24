@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Lufthansa",
+    "iata_code": "LH",
+    "icao_code": "DLH",
+    "country": "Germany",
+    "own_operator": "Lufthansa"
+  },
+  {
+    "name": "Lufthansa CityLine",
+    "iata_code": "CL",
+    "icao_code": "CLH",
+    "country": "Germany",
+    "own_operator": "Lufthansa CityLine"
+  },
+  {
+    "name": "Lufthansa City Airlines",
+    "iata_code": "VL",
+    "icao_code": "LMT",
+    "country": "Germany",
+    "own_operator": "Lufthansa City Airlines"
+  },
+  {
+    "name": "Lufthansa Cargo",
+    "iata_code": "LH",
+    "icao_code": "GEC",
+    "country": "Germany",
+    "own_operator": "Lufthansa Cargo"
+  },
+  {
+    "name": "Swiss International Air Lines",
+    "iata_code": "LX",
+    "icao_code": "SWR",
+    "country": "Switzerland",
+    "own_operator": "Swiss International Air Lines"
+  },
+  {
+    "name": "Edelweiss Air",
+    "iata_code": "WK",
+    "icao_code": "EDW",
+    "country": "Switzerland",
+    "own_operator": "Edelweiss Air"
+  },
+  {
+    "name": "Austrian Airlines",
+    "iata_code": "OS",
+    "icao_code": "AUA",
+    "country": "Austria",
+    "own_operator": "Austrian Airlines"
+  },
+  {
+    "name": "Brussels Airlines",
+    "iata_code": "SN",
+    "icao_code": "BEL",
+    "country": "Belgium",
+    "own_operator": "Brussels Airlines"
+  },
+  {
+    "name": "Eurowings",
+    "iata_code": "EW",
+    "icao_code": "EWG",
+    "country": "Germany",
+    "own_operator": "Eurowings"
+  },
+  {
+    "name": "Eurowings Europe",
+    "iata_code": "E2",
+    "icao_code": "EWL",
+    "country": "Malta",
+    "own_operator": "Eurowings Europe"
+  },
+  {
+    "name": "Air Dolomiti",
+    "iata_code": "EN",
+    "icao_code": "DLA",
+    "country": "Italy",
+    "own_operator": "Air Dolomiti"
+  },
+  {
+    "name": "Discover Airlines",
+    "iata_code": "4Y",
+    "icao_code": "OCN",
+    "country": "Germany",
+    "own_operator": "Discover Airlines"
+  }
+]

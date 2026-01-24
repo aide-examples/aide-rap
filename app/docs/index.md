@@ -220,6 +220,7 @@ Design your data model visually with an interactive layout editor:
 - **Area Grouping**: Color-coded backgrounds show entity groupings
 - **Two Detail Levels**: Compact (names only) or detailed (with attributes)
 - **Persistent Layout**: Positions saved in `layout.json`, diagrams regenerated on change
+- **Entity Cards PDF**: Printable cards for each entity (32pt name, FK indicators, space for notes) – cut out for physical magnet board modeling
 
 The workflow:
 1. Define entities in Markdown (the source of truth)

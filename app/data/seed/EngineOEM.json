@@ -1,0 +1,32 @@
+[
+  {
+    "name": "GE Aerospace",
+    "country": "United States",
+    "icao_code": "GE"
+  },
+  {
+    "name": "Pratt & Whitney",
+    "country": "United States",
+    "icao_code": "PW"
+  },
+  {
+    "name": "Rolls-Royce",
+    "country": "United Kingdom",
+    "icao_code": "RR"
+  },
+  {
+    "name": "CFM International",
+    "country": "United States",
+    "icao_code": "CFM"
+  },
+  {
+    "name": "International Aero Engines",
+    "country": "United States",
+    "icao_code": "IAE"
+  },
+  {
+    "name": "Engine Alliance",
+    "country": "United States",
+    "icao_code": "EA"
+  }
+]

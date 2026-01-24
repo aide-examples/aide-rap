@@ -15,13 +15,13 @@
 
         <!-- Menu Bar for IRMA-specific navigation -->
         <nav id="irma-menu-bar" class="irma-menu-bar">
-            <a href="/about?doc=requirements/DataModel.md" class="menu-item" data-i18n="data_model">Data Model</a>
-            <a href="/layout-editor" class="menu-item" data-i18n="layout_editor">Layout Editor</a>
+            <a href="/about?doc=requirements/DataModel.md" class="menu-item" data-i18n="data_model">Model</a>
+            <a href="/layout-editor" class="menu-item" data-i18n="layout_editor">Layout</a>
             <span class="menu-separator">|</span>
             <label class="menu-label">Sort:</label>
             <select id="sort-attributes" class="menu-select" title="Attribute order">
-                <option value="schema">Schema order</option>
-                <option value="alpha">Alphabetical</option>
+                <option value="schema">Schema</option>
+                <option value="alpha">ABC</option>
             </select>
             <select id="sort-references" class="menu-select" title="References position">
                 <option value="end">References at end</option>
@@ -85,6 +85,12 @@
                             </button>
                             <div class="entity-selector-menu"></div>
                         </div>
+                        <button id="btn-refresh-counts" class="btn-icon" title="Refresh counts">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                        </button>
                     </div>
 
                     <!-- Entity Table (table view) -->

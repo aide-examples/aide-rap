@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const { parseSeedContext } = require('../utils/instruction-parser');
 
-const SEED_GENERATED_DIR = path.join(__dirname, '..', '..', 'data', 'seed_generated');
+const SEED_DIR = path.join(__dirname, '..', '..', 'data', 'seed');
 
 /**
  * Base class for LLM providers
@@ -446,11 +446,11 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
    * Save generated data to seed file
    */
   saveGeneratedData(entityName, data) {
-    if (!fs.existsSync(SEED_GENERATED_DIR)) {
-      fs.mkdirSync(SEED_GENERATED_DIR, { recursive: true });
+    if (!fs.existsSync(SEED_DIR)) {
+      fs.mkdirSync(SEED_DIR, { recursive: true });
     }
 
-    const filePath = path.join(SEED_GENERATED_DIR, `${entityName}.json`);
+    const filePath = path.join(SEED_DIR, `${entityName}.json`);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 
     return filePath;

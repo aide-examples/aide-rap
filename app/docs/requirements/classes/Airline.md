@@ -13,4 +13,4 @@ Customer-facing brand (e.g., Lufthansa, Swiss). Often identical to the Operator,
 
 ## Data Generator
 
-Create Lufthansa Group airlines: Lufthansa, Swiss, Austrian, Brussels Airlines, Eurowings.
+Create all Lufthansa Group airlines, e,g. Lufthansa, Swiss, Austrian, ..

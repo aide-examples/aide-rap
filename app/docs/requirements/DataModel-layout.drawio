@@ -32,22 +32,22 @@
                     <mxGeometry x="670" y="740" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="16" value="MRO" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6D9F2;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="1090" y="560" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="1090" y="500" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="17" value="RepairShop" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6D9F2;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="1090" y="720" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="1090" y="660" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="18" value="RepairOrder" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6D9F2;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
                     <mxGeometry x="880" y="680" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="19" value="Task" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6D9F2;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="870" y="980" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="910" y="860" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="20" value="TaskType" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6D9F2;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="710" y="900" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="670" y="920" width="140" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="21" value="Finding" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E6D9F2;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
-                    <mxGeometry x="1060" y="940" width="140" height="30" as="geometry"/>
+                    <mxGeometry x="1080" y="970" width="140" height="30" as="geometry"/>
                 </mxCell>
                             <mxCell id="24" value="AircraftOEM" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#333333;fontStyle=1" parent="1" vertex="1">
                     <mxGeometry x="20" y="120" width="140" height="30" as="geometry"/>

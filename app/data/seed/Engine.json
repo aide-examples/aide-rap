@@ -1,338 +1,296 @@
 [
   {
     "serial_number": "GE90-900101",
-    "type": "GE90",
     "manufacture_date": "2015-04-12",
     "total_flight_hours": 32450,
-    "total_cycles": 4520
+    "total_cycles": 4520,
+    "type": "GE90-115B (GE90)"
   },
   {
     "serial_number": "GE90-900102",
-    "type": "GE90",
     "manufacture_date": "2015-08-22",
     "total_flight_hours": 31200,
-    "total_cycles": 4380
+    "total_cycles": 4380,
+    "type": "GE90-115B (GE90)"
   },
   {
     "serial_number": "GE90-900103",
-    "type": "GE90",
     "manufacture_date": "2016-01-15",
     "total_flight_hours": 28500,
-    "total_cycles": 3900
+    "total_cycles": 3900,
+    "type": "GE90-115B (GE90)"
   },
   {
     "serial_number": "GE90-900104",
-    "type": "GE90",
     "manufacture_date": "2016-11-30",
     "total_flight_hours": 24100,
-    "total_cycles": 3150
+    "total_cycles": 3150,
+    "type": "GE90-115B (GE90)"
   },
   {
     "serial_number": "GE90-900105",
-    "type": "GE90",
     "manufacture_date": "2017-05-20",
     "total_flight_hours": 21400,
-    "total_cycles": 2840
+    "total_cycles": 2840,
+    "type": "GE90-115B (GE90)"
   },
   {
     "serial_number": "GE90-900106",
-    "type": "GE90",
     "manufacture_date": "2018-02-14",
     "total_flight_hours": 18200,
-    "total_cycles": 2410
+    "total_cycles": 2410,
+    "type": "GE90-115B (GE90)"
   },
   {
     "serial_number": "GEnx-100201",
-    "type": "GEnx",
     "manufacture_date": "2016-03-10",
     "total_flight_hours": 22500,
-    "total_cycles": 3100
+    "total_cycles": 3100,
+    "type": "GEnx-1B76 (GEnx)"
   },
   {
     "serial_number": "GEnx-100202",
-    "type": "GEnx",
     "manufacture_date": "2017-09-05",
     "total_flight_hours": 19400,
-    "total_cycles": 2650
+    "total_cycles": 2650,
+    "type": "GEnx-1B76 (GEnx)"
   },
   {
     "serial_number": "GEnx-100203",
-    "type": "GEnx",
     "manufacture_date": "2018-12-12",
     "total_flight_hours": 15200,
-    "total_cycles": 2100
+    "total_cycles": 2100,
+    "type": "GEnx-1B76 (GEnx)"
   },
   {
     "serial_number": "GEnx-100204",
-    "type": "GEnx",
     "manufacture_date": "2019-11-20",
     "total_flight_hours": 12300,
-    "total_cycles": 1740
+    "total_cycles": 1740,
+    "type": "GEnx-1B76 (GEnx)"
   },
   {
     "serial_number": "GEnx-100205",
-    "type": "GEnx",
     "manufacture_date": "2020-10-15",
     "total_flight_hours": 9800,
-    "total_cycles": 1350
+    "total_cycles": 1350,
+    "type": "GEnx-1B76 (GEnx)"
   },
   {
     "serial_number": "GEnx-100206",
-    "type": "GEnx",
     "manufacture_date": "2021-08-30",
     "total_flight_hours": 6100,
-    "total_cycles": 880
-  },
-  {
-    "serial_number": "GE9X-001",
-    "type": "GE9X",
-    "manufacture_date": "2023-01-10",
-    "total_flight_hours": 850,
-    "total_cycles": 120
-  },
-  {
-    "serial_number": "GE9X-002",
-    "type": "GE9X",
-    "manufacture_date": "2023-03-22",
-    "total_flight_hours": 620,
-    "total_cycles": 95
-  },
-  {
-    "serial_number": "GE9X-003",
-    "type": "GE9X",
-    "manufacture_date": "2023-06-15",
-    "total_flight_hours": 410,
-    "total_cycles": 60
-  },
-  {
-    "serial_number": "GE9X-004",
-    "type": "GE9X",
-    "manufacture_date": "2023-09-01",
-    "total_flight_hours": 220,
-    "total_cycles": 35
-  },
-  {
-    "serial_number": "GE9X-005",
-    "type": "GE9X",
-    "manufacture_date": "2023-11-12",
-    "total_flight_hours": 110,
-    "total_cycles": 18
-  },
-  {
-    "serial_number": "GE9X-006",
-    "type": "GE9X",
-    "manufacture_date": "2023-12-20",
-    "total_flight_hours": 45,
-    "total_cycles": 8
+    "total_cycles": 880,
+    "type": "GEnx-1B76 (GEnx)"
   },
   {
     "serial_number": "PW1G-4001",
-    "type": "PW1000G",
     "manufacture_date": "2019-02-14",
     "total_flight_hours": 14500,
-    "total_cycles": 9800
+    "total_cycles": 9800,
+    "type": "PW1133G-JM (PW1000G)"
   },
   {
     "serial_number": "PW1G-4002",
-    "type": "PW1000G",
     "manufacture_date": "2020-05-18",
     "total_flight_hours": 11200,
-    "total_cycles": 7400
+    "total_cycles": 7400,
+    "type": "PW1133G-JM (PW1000G)"
   },
   {
     "serial_number": "PW1G-4003",
-    "type": "PW1000G",
     "manufacture_date": "2021-01-25",
     "total_flight_hours": 8400,
-    "total_cycles": 5600
+    "total_cycles": 5600,
+    "type": "PW1133G-JM (PW1000G)"
   },
   {
     "serial_number": "PW1G-4004",
-    "type": "PW1000G",
     "manufacture_date": "2021-12-10",
     "total_flight_hours": 5100,
-    "total_cycles": 3400
+    "total_cycles": 3400,
+    "type": "PW1133G-JM (PW1000G)"
   },
   {
     "serial_number": "PW1G-4005",
-    "type": "PW1000G",
     "manufacture_date": "2022-09-15",
     "total_flight_hours": 3200,
-    "total_cycles": 2100
+    "total_cycles": 2100,
+    "type": "PW1133G-JM (PW1000G)"
   },
   {
     "serial_number": "PW1G-4006",
-    "type": "PW1000G",
     "manufacture_date": "2023-04-22",
     "total_flight_hours": 1200,
-    "total_cycles": 850
+    "total_cycles": 850,
+    "type": "PW1133G-JM (PW1000G)"
   },
   {
     "serial_number": "XWB-6001",
-    "type": "Trent XWB",
     "manufacture_date": "2018-11-20",
     "total_flight_hours": 18400,
-    "total_cycles": 2550
+    "total_cycles": 2550,
+    "type": "Trent XWB-97 (Trent XWB)"
   },
   {
     "serial_number": "XWB-6002",
-    "type": "Trent XWB",
     "manufacture_date": "2019-04-12",
     "total_flight_hours": 16200,
-    "total_cycles": 2240
+    "total_cycles": 2240,
+    "type": "Trent XWB-97 (Trent XWB)"
   },
   {
     "serial_number": "XWB-6003",
-    "type": "Trent XWB",
     "manufacture_date": "2020-02-28",
     "total_flight_hours": 13500,
-    "total_cycles": 1850
+    "total_cycles": 1850,
+    "type": "Trent XWB-97 (Trent XWB)"
   },
   {
     "serial_number": "XWB-6004",
-    "type": "Trent XWB",
     "manufacture_date": "2021-06-15",
     "total_flight_hours": 9100,
-    "total_cycles": 1240
+    "total_cycles": 1240,
+    "type": "Trent XWB-97 (Trent XWB)"
   },
   {
     "serial_number": "XWB-6005",
-    "type": "Trent XWB",
     "manufacture_date": "2022-01-10",
     "total_flight_hours": 6400,
-    "total_cycles": 890
+    "total_cycles": 890,
+    "type": "Trent XWB-97 (Trent XWB)"
   },
   {
     "serial_number": "XWB-6006",
-    "type": "Trent XWB",
     "manufacture_date": "2022-11-30",
     "total_flight_hours": 3200,
-    "total_cycles": 450
+    "total_cycles": 450,
+    "type": "Trent XWB-97 (Trent XWB)"
   },
   {
     "serial_number": "CFM56-901",
-    "type": "CFM56",
     "manufacture_date": "2015-01-10",
     "total_flight_hours": 28400,
-    "total_cycles": 21500
+    "total_cycles": 21500,
+    "type": "CFM56-7B27 (CFM56)"
   },
   {
     "serial_number": "CFM56-902",
-    "type": "CFM56",
     "manufacture_date": "2015-06-15",
     "total_flight_hours": 26100,
-    "total_cycles": 19400
+    "total_cycles": 19400,
+    "type": "CFM56-7B27 (CFM56)"
   },
   {
     "serial_number": "CFM56-903",
-    "type": "CFM56",
     "manufacture_date": "2016-03-22",
     "total_flight_hours": 23500,
-    "total_cycles": 17200
+    "total_cycles": 17200,
+    "type": "CFM56-7B27 (CFM56)"
   },
   {
     "serial_number": "CFM56-904",
-    "type": "CFM56",
     "manufacture_date": "2017-10-12",
     "total_flight_hours": 18400,
-    "total_cycles": 13500
+    "total_cycles": 13500,
+    "type": "CFM56-7B27 (CFM56)"
   },
   {
     "serial_number": "CFM56-905",
-    "type": "CFM56",
     "manufacture_date": "2018-12-05",
     "total_flight_hours": 14200,
-    "total_cycles": 10400
+    "total_cycles": 10400,
+    "type": "CFM56-7B27 (CFM56)"
   },
   {
     "serial_number": "CFM56-906",
-    "type": "CFM56",
     "manufacture_date": "2019-09-18",
     "total_flight_hours": 11100,
-    "total_cycles": 8200
+    "total_cycles": 8200,
+    "type": "CFM56-7B27 (CFM56)"
   },
   {
     "serial_number": "L1A-11001",
-    "type": "LEAP",
     "manufacture_date": "2020-02-14",
     "total_flight_hours": 12500,
-    "total_cycles": 9100
+    "total_cycles": 9100,
+    "type": "LEAP-1A26 (LEAP)"
   },
   {
     "serial_number": "L1A-11002",
-    "type": "LEAP",
     "manufacture_date": "2020-11-20",
     "total_flight_hours": 9800,
-    "total_cycles": 7100
+    "total_cycles": 7100,
+    "type": "LEAP-1A26 (LEAP)"
   },
   {
     "serial_number": "L1A-11003",
-    "type": "LEAP",
     "manufacture_date": "2021-05-12",
     "total_flight_hours": 7400,
-    "total_cycles": 5400
+    "total_cycles": 5400,
+    "type": "LEAP-1A26 (LEAP)"
   },
   {
     "serial_number": "L1A-11004",
-    "type": "LEAP",
     "manufacture_date": "2022-03-15",
     "total_flight_hours": 4200,
-    "total_cycles": 3100
+    "total_cycles": 3100,
+    "type": "LEAP-1A26 (LEAP)"
   },
   {
     "serial_number": "L1A-11005",
-    "type": "LEAP",
     "manufacture_date": "2022-12-10",
     "total_flight_hours": 2100,
-    "total_cycles": 1500
+    "total_cycles": 1500,
+    "type": "LEAP-1A26 (LEAP)"
   },
   {
     "serial_number": "L1A-11006",
-    "type": "LEAP",
     "manufacture_date": "2023-08-05",
     "total_flight_hours": 850,
-    "total_cycles": 620
+    "total_cycles": 620,
+    "type": "LEAP-1A26 (LEAP)"
   },
   {
     "serial_number": "V25-14001",
-    "type": "V2500",
     "manufacture_date": "2015-04-20",
     "total_flight_hours": 26500,
-    "total_cycles": 19800
+    "total_cycles": 19800,
+    "type": "V2533-A5 (V2500)"
   },
   {
     "serial_number": "V25-14002",
-    "type": "V2500",
     "manufacture_date": "2016-02-14",
     "total_flight_hours": 23200,
-    "total_cycles": 17400
+    "total_cycles": 17400,
+    "type": "V2533-A5 (V2500)"
   },
   {
     "serial_number": "V25-14003",
-    "type": "V2500",
     "manufacture_date": "2017-06-30",
     "total_flight_hours": 19100,
-    "total_cycles": 14200
+    "total_cycles": 14200,
+    "type": "V2533-A5 (V2500)"
   },
   {
     "serial_number": "V25-14004",
-    "type": "V2500",
     "manufacture_date": "2018-11-12",
     "total_flight_hours": 14500,
-    "total_cycles": 10800
+    "total_cycles": 10800,
+    "type": "V2533-A5 (V2500)"
   },
   {
     "serial_number": "V25-14005",
-    "type": "V2500",
     "manufacture_date": "2020-01-25",
     "total_flight_hours": 11200,
-    "total_cycles": 8400
+    "total_cycles": 8400,
+    "type": "V2533-A5 (V2500)"
   },
   {
     "serial_number": "V25-14006",
-    "type": "V2500",
     "manufacture_date": "2021-08-15",
     "total_flight_hours": 7200,
-    "total_cycles": 5400
+    "total_cycles": 5400,
+    "type": "V2533-A5 (V2500)"
   }
 ]

@@ -40,8 +40,28 @@ const fileFormat = winston.format.combine(
   winston.format.json()
 );
 
-// Determine log level from environment
-const logLevel = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+// Determine log level from config.json, environment, or default
+function getLogLevel() {
+  // 1. Environment variable has highest priority
+  if (process.env.LOG_LEVEL) {
+    return process.env.LOG_LEVEL.toLowerCase();
+  }
+  // 2. Try to read from config.json
+  try {
+    const configPath = path.join(__dirname, '../../config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (config.log_level) {
+        return config.log_level.toLowerCase();
+      }
+    }
+  } catch (e) {
+    // Ignore config read errors
+  }
+  // 3. Default based on NODE_ENV
+  return process.env.NODE_ENV === 'production' ? 'info' : 'debug';
+}
+const logLevel = getLogLevel();
 
 // Create logger instance
 const logger = winston.createLogger({

@@ -310,6 +310,12 @@ const EntityTable = {
 
     // Attach event listeners
     this.attachEventListeners();
+
+    // Update record count in status bar (with filtered count)
+    const filteredCount = this.getFilteredRecords().length;
+    if (typeof EntityExplorer !== 'undefined') {
+      EntityExplorer.updateRecordStatus(filteredCount);
+    }
   },
 
   /**

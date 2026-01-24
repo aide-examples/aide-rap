@@ -495,12 +495,49 @@ function getEnabledEntities() {
   return Object.keys(schema.entities);
 }
 
+// Cache for entity record counts
+let entityCountsCache = null;
+let entityCountsCacheTime = 0;
+const COUNTS_CACHE_TTL = 30000; // 30 seconds
+
 /**
- * Get list of all enabled entities with area info
+ * Get record counts for all enabled entities (with caching)
+ */
+function getEntityCounts() {
+  const now = Date.now();
+  if (entityCountsCache && (now - entityCountsCacheTime) < COUNTS_CACHE_TTL) {
+    return entityCountsCache;
+  }
+
+  const schema = getSchema();
+  const db = getDatabase();
+  const counts = {};
+
+  const orderedNames = schema.enabledEntities || Object.keys(schema.entities);
+  for (const name of orderedNames) {
+    const entity = schema.entities[name];
+    if (!entity) continue;
+
+    try {
+      const row = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get();
+      counts[name] = row.count;
+    } catch (e) {
+      counts[name] = 0;
+    }
+  }
+
+  entityCountsCache = counts;
+  entityCountsCacheTime = now;
+  return counts;
+}
+
+/**
+ * Get list of all enabled entities with area info and record counts
  * Preserves the order from config.json enabledEntities
  */
 function getEnabledEntitiesWithAreas() {
   const schema = getSchema();
+  const counts = getEntityCounts();
   const entities = [];
 
   // Use enabledEntities order from config (preserves user-defined order)
@@ -517,7 +554,8 @@ function getEnabledEntitiesWithAreas() {
       name,
       area: areaKey,
       areaName: areaInfo.name,
-      areaColor: areaInfo.color
+      areaColor: areaInfo.color,
+      count: counts[name] || 0
     });
   }
 

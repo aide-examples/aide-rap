@@ -2,7 +2,7 @@
   "_comment": "Layout positions for DataModel diagram. Edit x/y values to reposition classes.",
   "canvas": {
     "width": 1290,
-    "height": 1142
+    "height": 1164
   },
   "classes": {
     "AircraftOEM": {
@@ -51,27 +51,27 @@
     },
     "MRO": {
       "x": 1090,
-      "y": 560
+      "y": 500
     },
     "RepairShop": {
       "x": 1090,
-      "y": 720
+      "y": 660
     },
     "RepairOrder": {
       "x": 880,
       "y": 680
     },
     "Task": {
-      "x": 870,
-      "y": 980
+      "x": 910,
+      "y": 860
     },
     "TaskType": {
-      "x": 710,
-      "y": 900
+      "x": 670,
+      "y": 920
     },
     "Finding": {
-      "x": 1060,
-      "y": 940
+      "x": 1080,
+      "y": 970
     },
     "Registration": {
       "x": 610,

@@ -260,6 +260,17 @@
     border-left: 3px solid transparent;
     line-height: 1.2;
     white-space: nowrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.entity-selector-item .entity-count {
+    color: #9ca3af;
+    font-size: 0.75rem;
+    min-width: 24px;
+    text-align: right;
 }
 
 .entity-selector-item:hover {
@@ -269,6 +280,23 @@
 .entity-selector-item.selected {
     background: #e5e7eb;
     font-weight: 500;
+}
+
+.btn-icon {
+    padding: 6px;
+    background: transparent;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #6b7280;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon:hover {
+    background: #f3f4f6;
+    color: #374151;
 }
 
 .btn-toolbar {

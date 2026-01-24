@@ -51,6 +51,7 @@ router.get('/', (req, res, next) => {
         area: e.area,
         areaName: e.areaName,
         areaColor: e.areaColor,
+        count: e.count,
         schema: `/api/entities/${e.name}/schema`,
         endpoint: `/api/entities/${e.name}`
       }))

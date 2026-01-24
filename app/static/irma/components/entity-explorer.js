@@ -56,6 +56,12 @@ const EntityExplorer = {
     this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
     this.btnViewTreeV.addEventListener('click', () => this.setViewMode('tree-v'));
 
+    // Refresh counts button
+    const btnRefresh = document.getElementById('btn-refresh-counts');
+    if (btnRefresh) {
+      btnRefresh.addEventListener('click', () => this.refreshCounts());
+    }
+
     // Open dropdown on start
     this.openDropdown();
   },
@@ -91,7 +97,10 @@ const EntityExplorer = {
         menuHtml += `<div class="entity-selector-group">`;
         menuHtml += `<div class="entity-selector-group-label" style="background-color: ${group.color};">${areaName}</div>`;
         group.entities.forEach(e => {
-          menuHtml += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">${e.name}</div>`;
+          menuHtml += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">
+            <span class="entity-name">${e.name}</span>
+            <span class="entity-count">${e.count}</span>
+          </div>`;
         });
         menuHtml += `</div>`;
       }
@@ -106,6 +115,19 @@ const EntityExplorer = {
     } catch (err) {
       console.error('Failed to load entity types:', err);
     }
+  },
+
+  async refreshCounts() {
+    const currentSelection = this.selectorValue;
+    await this.loadEntityTypes();
+    // Restore selection state in menu
+    if (currentSelection) {
+      this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
+        item.classList.toggle('selected', item.dataset.value === currentSelection);
+      });
+    }
+    // Keep dropdown open after refresh
+    this.openDropdown();
   },
 
   selectEntityFromDropdown(entityName, areaColor) {
@@ -138,6 +160,7 @@ const EntityExplorer = {
       this.currentEntity = null;
       this.records = [];
       this.renderCurrentView();
+      this.updateRecordStatus();
       DetailPanel.clear();
       return;
     }
@@ -157,6 +180,7 @@ const EntityExplorer = {
       const result = await ApiClient.getAll(this.currentEntity, options);
       this.records = result.data || [];
       this.renderCurrentView();
+      this.updateRecordStatus();
     } catch (err) {
       console.error('Failed to load records:', err);
       this.records = [];
@@ -186,6 +210,7 @@ const EntityExplorer = {
     } else {
       this.renderCurrentView();
     }
+    this.updateRecordStatus();
   },
 
   updateViewToggle() {
@@ -398,6 +423,22 @@ const EntityExplorer = {
 
   async refresh() {
     await this.loadRecords();
+  },
+
+  updateRecordStatus(count = null) {
+    const recordsEl = document.getElementById('sw-records');
+    const sepEl = document.getElementById('sw-records-sep');
+    if (!recordsEl) return;
+
+    if (this.viewMode === 'table' && this.currentEntity && this.records.length > 0) {
+      // Use provided count or get from EntityTable (which may be filtered)
+      const displayCount = count !== null ? count : this.records.length;
+      recordsEl.textContent = `${displayCount} records`;
+      if (sepEl) sepEl.style.display = '';
+    } else {
+      recordsEl.textContent = '';
+      if (sepEl) sepEl.style.display = 'none';
+    }
   },
 
   /**

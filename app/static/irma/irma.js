@@ -30,6 +30,22 @@
         showLayoutToggle: false,
         layoutDefault: 'page-fill'
       });
+
+      // Add record count to status footer (without modifying aide-frame)
+      const footerInfo = document.querySelector('.status-footer-info');
+      if (footerInfo) {
+        const sep = document.createElement('span');
+        sep.className = 'status-footer-sep';
+        sep.textContent = '·';
+        sep.id = 'sw-records-sep';
+        sep.style.display = 'none';
+
+        const recordsEl = document.createElement('span');
+        recordsEl.id = 'sw-records';
+
+        footerInfo.appendChild(sep);
+        footerInfo.appendChild(recordsEl);
+      }
     }
 
     // Initialize IRMA components
