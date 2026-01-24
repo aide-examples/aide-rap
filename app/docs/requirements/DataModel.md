@@ -11,11 +11,10 @@ Entity definitions are stored in separate files under [classes/](classes/).
 
 | Entity | Description |
 |--------|-------------|
-| [AircraftManufacturer](classes/AircraftManufacturer.md) | Manufacturers of aircraft types |
+| [AircraftOEM](classes/AircraftOEM.md) | Manufacturers of aircraft types |
 | [AircraftType](classes/AircraftType.md) | Specific aircraft models |
-| [EngineManufacturer](classes/EngineManufacturer.md) | Manufacturers of engines |
+| [EngineOEM](classes/EngineOEM.md) | Manufacturers of engines |
 | [EngineType](classes/EngineType.md) | Specific engine models |
-| [EngineMountPossible](classes/EngineMountPossible.md) | Aircraft-engine type compatibility |
 | [MaintenancePlan](classes/MaintenancePlan.md) | OEM-defined maintenance program |
 | [MaintenancePlanTask](classes/MaintenancePlanTask.md) | Task in maintenance plan |
 </div>
@@ -25,9 +24,12 @@ Entity definitions are stored in separate files under [classes/](classes/).
 
 | Entity | Description |
 |--------|-------------|
-| [Operator](classes/Operator.md) | Airlines or aircraft operators |
+| [CAMO](classes/CAMO.md) | Continuing Airworthiness Management Organisation |
+| [Airline](classes/Airline.md) | Customer-facing brand |
+| [WetLease](classes/WetLease.md) | Wet lease between airline and operator |
+| [Operator](classes/Operator.md) | Aircraft operators |
 | [Fleet](classes/Fleet.md) | Operator's fleet of a specific aircraft type |
-| [FleetMember](classes/FleetMember.md) | Aircraft assignment to fleet with dates |
+| [Registration](classes/Registration.md) | Aircraft assignment to operator with dates |
 | [Aircraft](classes/Aircraft.md) | Individual aircraft |
 </div>
 
@@ -37,7 +39,13 @@ Entity definitions are stored in separate files under [classes/](classes/).
 | Entity | Description |
 |--------|-------------|
 | [Engine](classes/Engine.md) | Individual engine |
-| [EngineMount](classes/EngineMount.md) | Engine-aircraft mount history |
+| [EngineEvent](classes/EngineEvent.md) | Engine maintenance event |
+| [EngineAllocation](classes/EngineAllocation.md) | Engine responsibility assignment |
+| [EngineStandBase](classes/EngineStandBase.md) | Wheeled base for engine transport |
+| [EngineStandCradle](classes/EngineStandCradle.md) | Engine-specific cradle adapter |
+| [EngineStand](classes/EngineStand.md) | Assembled engine transport stand |
+| [EngineStandMounting](classes/EngineStandMounting.md) | Engine-to-stand placement history |
+| [TransportOrder](classes/TransportOrder.md) | Engine stand transport order |
 | [Workscope](classes/Workscope.md) | Maintenance planning document |
 | [InspectionType](classes/InspectionType.md) | Scheduled inspection intervals |
 </div>
@@ -57,7 +65,7 @@ Entity definitions are stored in separate files under [classes/](classes/).
 
 ## Class Diagram
 
-**Reading the diagram:** Arrows point from a class to its referenced type (read as "is of type" or "references"). The label shows the attribute name on the class where the arrow originates. Example: `AircraftType --manufacturer--> AircraftManufacturer` means AircraftType has an attribute `manufacturer` referencing AircraftManufacturer.
+**Reading the diagram:** Arrows point from a class to its referenced type (read as "is of type" or "references"). The label shows the attribute name on the class where the arrow originates. Example: `AircraftType --manufacturer--> AircraftOEM` means AircraftType has an attribute `manufacturer` referencing AircraftManufacturer.
 
 ![Data Model Diagram (Detailed)](/docs-assets/requirements/DataModel-diagram-detailed.svg)
 

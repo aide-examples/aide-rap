@@ -96,9 +96,11 @@ const app = server.getApp();
 // =============================================================================
 
 if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0) {
+    // Filter out area separator comments (entries starting with 20 dashes)
+    const enabledEntities = cfg.crud.enabledEntities.filter(e => !e.startsWith('--------------------'));
     backend.init(app, {
         appDir: SCRIPT_DIR,
-        enabledEntities: cfg.crud.enabledEntities
+        enabledEntities
     });
 }
 

@@ -6,105 +6,113 @@
 
 ## Overview
 
-IRMA is a demonstration application for managing aircraft fleet data, operators, and maintenance records. It showcases the capabilities of the AIDE rapid application development framework.
+IRMA is a demonstration application for managing the process of engine maintenance in aviation. It showcases the capabilities of the AIDE rapid application development framework.
+
+AIDE IRMA could be used to design a real IT system which supports the planning and control of engine repair and maintenance. Such a system would presumably import all its reference data from a data warehouse or from existing neighbor systems. It would own its core entities and export some portion of them to the data warehouse so they could be used by other applications as their reference data.
+
+```mermaid
+flowchart BT
+    DW[("Data Warehouse")]
+
+    subgraph CAMO["CAMO App"]
+        CAMO_CORE["Core Entities<br/>(owned)"]
+        CAMO_REF["Reference Data<br/>(imported)"]
+    end
+
+    subgraph IRMA["AIDE IRMA"]
+        IRMA_CORE["Core Entities<br/>(owned)"]
+        IRMA_REF["Reference Data<br/>(imported)"]
+    end
+
+    subgraph OTHER["Other Applications"]
+        OTHER_CORE["Core Entities<br/>(owned)"]
+        OTHER_REF["Reference Data<br/>(imported)"]
+    end
+
+    DW -->|import| IRMA_REF
+    DW -->|import| CAMO_REF
+    DW -->|import| OTHER_REF
+    IRMA_REF --> IRMA_CORE
+    CAMO_REF --> CAMO_CORE
+    OTHER_REF --> OTHER_CORE
+    IRMA_CORE -->|export| DW
+    CAMO_CORE -->|export| DW
+    OTHER_CORE -->|export| DW
+    CAMO_CORE <-->|sync| IRMA_CORE
+
+    style IRMA fill:#FCE5CD
+    style CAMO fill:#D9EAD3
+    style OTHER fill:#E0E0E0
+```
 
 ---
 
 ## Navigation
 
-### Header
-- **App name**: Click to return to home
-- **Menu bar**: Quick access to common functions
+### Menu Bar
+- **Data Model**: View entity documentation
+- **Layout Editor**: Edit diagram layouts
+- **Sort**: Attribute order and reference positioning
+- **IDs**: Toggle technical ID display
+- **↻**: Toggle cycle reference visibility
+- **Admin**: Seed data management
 
-### Entity Explorer (Left Panel)
-- **Entity selector**: Dropdown to choose data type (Aircraft, Operator, etc.)
-- **View modes**: Switch between Table, Tree (vertical), or Tree (horizontal)
-- **Filter**: Search within current entity
-- **New button**: Create a new record
+### Entity Explorer (Left)
+- **View modes**: Table, Tree (horizontal), Tree (vertical)
+- **Entity selector**: Dropdown grouped by area
+- **Right-click**: Context menu for actions
 
-### Detail Panel (Right Panel)
-- **Collapsed**: Click the expand button on the right edge
-- **View mode**: Shows record details (read-only)
-- **Edit mode**: Form for modifying records
+### Detail Panel (Right)
+- Opens via context menu (right-click → Details)
+- View mode (read-only) or Edit mode
 
 ---
 
 ## Working with Data
 
-### Viewing Records
+### CRUD Operations
+- **Create**: Right-click → New, or use New button
+- **Read**: Click record to select, right-click → Details
+- **Update**: Right-click → Edit, modify fields, Save
+- **Delete**: Right-click → Delete (blocked if referenced)
 
-1. Select an entity type from the dropdown (e.g., "Aircraft")
-2. Records appear in the main view
-3. Click a record to select it
-4. Right-click for context menu → **Details** to view in side panel
+### Tree View
+- **▶** expands foreign key references
+- **Back-references** show incoming links
+- **↻** marks cycles (toggle visibility in menu)
 
-### Creating Records
-
-1. Click the **New** button
-2. Fill in the form fields (required fields marked with *)
-3. For foreign keys: Select from dropdown or search
-4. Click **Save**
-
-### Editing Records
-
-1. Right-click a record → **Edit**
-2. Modify fields as needed
-3. Click **Save** to apply changes
-
-### Deleting Records
-
-1. Right-click a record → **Delete**
-2. Confirm the deletion
-3. Note: Records referenced by other data cannot be deleted
+### Export
+- **PDF**: Export table or tree view
+- **CSV**: Export table data
 
 ---
 
-## Tree View Features
-
-### Expanding Relationships
-
-- Click the **▶** triangle next to a foreign key to expand it
-- Continue expanding to explore deeper relationships
-- **Back-references** show which records point to the current one
-
-### Cycle Detection
-
-When navigating relationships, you may encounter cycles (e.g., Aircraft → Type → Aircraft). These are marked with **↻** to prevent infinite loops.
-
-### Focused Navigation
-
-Opening a new branch automatically closes other expanded branches, keeping the view manageable.
-
----
-
-## Data Types
+## Data Model
 
 ### Areas of Competence
-
-Entities are grouped by colored areas:
-- Each area represents a domain (Fleet, Technical, Maintenance, etc.)
-- Colors appear in the entity selector and throughout the UI
+Entities are grouped by domain:
+- **Engine Management** (orange): Engine, Workscope, Transport
+- **Maintenance & Repair** (purple): MRO, RepairOrder, Task
+- **Operations** (green): Airline, Operator, Aircraft, CAMO
+- **OEM** (blue): AircraftType, EngineType, MaintenancePlan
 
 ### Validation
-
-- **Required fields**: Must be filled before saving
-- **Pattern validation**: Some fields require specific formats (e.g., aircraft registration)
-- **Enum fields**: Choose from predefined values
-- **Foreign keys**: Must reference existing records
+- Required fields marked with *
+- Pattern validation (e.g., aircraft registration D-XXXX)
+- Enum fields with predefined values
+- Foreign keys must reference existing records
 
 ---
 
-## Tips & Shortcuts
+## Admin Tools
 
-- **Right-click**: Opens context menu on any record
-- **Escape**: Closes context menu or dialog
-- **Filter**: Type to search across label fields
-- **Session persistence**: View preferences are remembered
+### Seed Manager
+- **Load/Clear**: Import or reset entity data
+- **Export**: Download as JSON
+- **Generate**: LLM-based data generation
 
 ---
 
 ## About
 
 IRMA is built with the [AIDE Framework](/about) – a rapid application development platform that generates applications from Markdown-based data models.
-
-For technical documentation, see the [Framework Guide](/about).
