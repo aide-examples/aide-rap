@@ -148,13 +148,14 @@ class LLMGenerator {
    * @param {string} instruction - Data generator instruction
    * @param {Object} existingData - FK reference data
    * @param {Object} contextData - Seed context data (validation entities)
+   * @param {Object} backRefData - Back-reference data (entities that reference this one)
    */
-  async generateSeedData(entityName, schema, instruction, existingData = {}, contextData = {}) {
+  async generateSeedData(entityName, schema, instruction, existingData = {}, contextData = {}, backRefData = {}) {
     if (!this.enabled) {
       throw new Error('LLM Generator not configured. Add llm configuration to config.json');
     }
 
-    const prompt = this.buildPrompt(entityName, schema, instruction, existingData, contextData);
+    const prompt = this.buildPrompt(entityName, schema, instruction, existingData, contextData, backRefData);
 
     try {
       const response = await this.provider.generate(prompt);
@@ -171,8 +172,9 @@ class LLMGenerator {
    * @param {string} instruction - Data generator instruction
    * @param {Object} existingData - FK reference data
    * @param {Object} contextData - Seed context data (validation/constraint entities)
+   * @param {Object} backRefData - Back-reference data (entities that reference this one)
    */
-  buildPrompt(entityName, schema, instruction, existingData, contextData = {}) {
+  buildPrompt(entityName, schema, instruction, existingData, contextData = {}, backRefData = {}) {
     // Filter out computed columns (DAILY, IMMEDIATE, HOURLY, ON_DEMAND annotations)
     // These are auto-calculated and should not be generated
     const isComputedColumn = (col) => {
@@ -237,7 +239,7 @@ ${instruction}
 
 ## Available Foreign Key References
 ${Object.keys(fkSummary).length > 0 ? JSON.stringify(fkSummary, null, 2) : 'None - no referenced entities have seed data yet.'}
-${this.buildSeedContextSection(contextData)}
+${this.buildBackReferenceSection(entityName, backRefData)}${this.buildSeedContextSection(contextData)}
 ## Requirements
 - Generate a valid JSON array of objects
 - Each object must have all non-nullable columns
@@ -281,6 +283,27 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
       section += JSON.stringify(data.records, null, 2);
       section += '\n\n';
     }
+
+    return section;
+  }
+
+  /**
+   * Build the Back-Reference section of the prompt
+   * @param {string} entityName - Name of entity being generated
+   * @param {Object} backRefData - { EntityName: { records: [...], referencingColumn: "..." } }
+   * @returns {string} Formatted back-reference section or empty string
+   */
+  buildBackReferenceSection(entityName, backRefData) {
+    if (!backRefData || Object.keys(backRefData).length === 0) {
+      return '';
+    }
+
+    let section = `\n## Referencing Entities (Context)\n`;
+    section += `The following entities have foreign key columns that can reference ${entityName}.\n`;
+    section += `These records already exist and may want to link to the new ${entityName} records you generate.\n`;
+    section += `Consider their business keys when generating compatible data:\n\n`;
+    section += JSON.stringify(backRefData, null, 2);
+    section += '\n\n';
 
     return section;
   }
@@ -440,6 +463,58 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
     }
 
     return existingData;
+  }
+
+  /**
+   * Load data from entities that REFERENCE the target entity (back-references).
+   * These entities have FK columns pointing to the entity being generated.
+   * This provides context for the AI about what data might want to link to the new records.
+   * @param {string} entityName - Name of the entity being generated
+   * @param {Function} getDatabase - Function to get database connection
+   * @param {Object} fullSchema - Full schema with inverseRelationships
+   */
+  loadBackReferenceData(entityName, getDatabase, fullSchema) {
+    if (!getDatabase || !fullSchema) {
+      return {};
+    }
+
+    const db = getDatabase();
+    const inverseRels = fullSchema.inverseRelationships?.[entityName] || [];
+    const backRefData = {};
+
+    for (const rel of inverseRels) {
+      const refEntityDef = fullSchema.entities[rel.entity];
+      if (!refEntityDef) continue;
+
+      try {
+        const records = db.prepare(`SELECT * FROM ${refEntityDef.tableName}`).all();
+        if (records && records.length > 0) {
+          // Get labelFields from entity definition
+          const labelFields = refEntityDef.ui?.labelFields || [];
+          // Fallback field names for label detection
+          const fallbackFields = ['name', 'title', 'designation', 'serial_number', 'registration', 'icao_code'];
+
+          backRefData[rel.entity] = {
+            records: records.map(r => {
+              // Try labelFields first, then fallbacks
+              let label = null;
+              for (const field of [...labelFields, ...fallbackFields]) {
+                if (r[field]) {
+                  label = r[field];
+                  break;
+                }
+              }
+              return { id: r.id, label: label || `#${r.id}` };
+            }),
+            referencingColumn: rel.column
+          };
+        }
+      } catch (e) {
+        // Table might not exist yet, ignore
+      }
+    }
+
+    return backRefData;
   }
 
   /**

@@ -247,11 +247,6 @@ const EntityExplorer = {
       return;
     }
 
-    if (this.records.length === 0) {
-      this.tableContainer.innerHTML = '<p class="empty-message">No records found.</p>';
-      return;
-    }
-
     await EntityTable.loadEntity(this.currentEntity, this.records);
   },
 

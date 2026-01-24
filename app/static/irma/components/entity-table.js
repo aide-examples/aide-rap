@@ -174,11 +174,6 @@ const EntityTable = {
       return;
     }
 
-    if (this.records.length === 0) {
-      this.container.innerHTML = '<p class="empty-message">No records found.</p>';
-      return;
-    }
-
     const columns = this.getVisibleColumns();
     const sortedRecords = this.getSortedRecords();
     const backRefs = this.schema.backReferences || [];
@@ -244,6 +239,10 @@ const EntityTable = {
 
     // Body rows
     html += '<tbody>';
+    if (sortedRecords.length === 0) {
+      const colSpan = columns.length + backRefs.length;
+      html += `<tr><td colspan="${colSpan}" class="empty-table-message">No records found.</td></tr>`;
+    }
     for (let i = 0; i < sortedRecords.length; i++) {
       const record = sortedRecords[i];
       const isSelected = record.id === this.selectedId;

@@ -363,6 +363,13 @@
     font-size: 0.9rem;
 }
 
+.empty-table-message {
+    color: #888;
+    text-align: center;
+    padding: 30px 20px;
+    font-style: italic;
+}
+
 /* Entity Row */
 .entity-row {
     display: flex;

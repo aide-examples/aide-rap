@@ -534,6 +534,9 @@ app.post('/api/seed/prompt/:entity', (req, res) => {
         // Load existing FK data from database (pass full schema for labelFields lookup)
         const existingData = generator.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
 
+        // Load back-reference data (entities that reference this one)
+        const backRefData = generator.loadBackReferenceData(entityName, getDatabase, schema);
+
         // Load seed context data (validation/constraint entities)
         const mdPath = getEntityMdPath(entityName);
         let contextData = {};
@@ -544,7 +547,7 @@ app.post('/api/seed/prompt/:entity', (req, res) => {
         }
 
         // Build the prompt (without calling API)
-        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData, contextData);
+        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData, contextData, backRefData);
 
         res.json({
             success: true,
@@ -605,6 +608,9 @@ app.post('/api/seed/generate/:entity', async (req, res) => {
         // Load existing FK data from database (pass full schema for labelFields lookup)
         const existingData = generator.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
 
+        // Load back-reference data (entities that reference this one)
+        const backRefData = generator.loadBackReferenceData(entityName, getDatabase, schema);
+
         // Load seed context data (validation/constraint entities)
         const mdPath = getEntityMdPath(entityName);
         let contextData = {};
@@ -615,10 +621,10 @@ app.post('/api/seed/generate/:entity', async (req, res) => {
         }
 
         // Build the prompt (for display)
-        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData, contextData);
+        const prompt = generator.buildPrompt(entityName, schemaInfo, instruction, existingData, contextData, backRefData);
 
         // Generate data
-        const data = await generator.generateSeedData(entityName, schemaInfo, instruction, existingData, contextData);
+        const data = await generator.generateSeedData(entityName, schemaInfo, instruction, existingData, contextData, backRefData);
 
         res.json({
             success: true,
