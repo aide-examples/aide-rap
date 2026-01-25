@@ -1,16 +1,16 @@
-# Schema-Migration (Entwicklungsmodus)
+# Schema Migration (Development Mode)
 
-> Bei Schema-Änderungen wird die gesamte Datenbank neu aufgebaut.
+> For schema changes, the entire database is rebuilt.
 
 ## Workflow
 
-1. **Markdown-Dateien ändern** (Entity-Attribute, Types.md, etc.)
-2. **Server neu starten**
-3. **Seed-Daten laden** (Admin UI → "Load All")
+1. **Modify Markdown files** (entity attributes, Types.md, etc.)
+2. **Restart server**
+3. **Load seed data** (Admin UI -> "Load All")
 
-## Was passiert beim Start?
+## What Happens at Startup?
 
-Der Server berechnet einen Hash über alle Entities und Types. Bei Änderung:
+The server calculates a hash over all entities and types. On change:
 
 ```
 Schema changed - recreating all tables
@@ -23,23 +23,23 @@ Created table aircraft_type
 Schema initialized (15 tables, hash: a1b2c3d4...)
 ```
 
-## Seed-Daten
+## Seed Data
 
-Die Seed-Dateien in `app/data/seed/` bleiben erhalten. Nach Schema-Neuaufbau:
+The seed files in `app/systems/<system>/data/seed/` are preserved. After schema rebuild:
 
-1. Admin-Menü öffnen (☰ → Admin)
-2. "Load All" klicken
+1. Open Admin menu (hamburger -> Admin)
+2. Click "Load All"
 
-Oder einzelne Entities per Rechtsklick → "Load..."
+Or load individual entities via right-click -> "Load..."
 
-## Manueller Reset
+## Manual Reset
 
 ```bash
-# Datenbank löschen und neu aufbauen
-rm app/data/irma.sqlite
-./run
+# Delete database and rebuild
+rm app/systems/<system>/data/<system>.sqlite
+./run -s <system>
 ```
 
-## Für Produktion
+## For Production
 
-Für produktive Systeme mit bestehenden Daten wäre ein echtes Migrations-System nötig (z.B. mit Versionsnummern und Up/Down-Scripts). Das aktuelle Verhalten ist für die Prototyp-Entwicklung optimiert.
+For production systems with existing data, a real migration system would be needed (e.g., with version numbers and up/down scripts). The current behavior is optimized for prototype development.

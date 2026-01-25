@@ -1,153 +1,153 @@
-# Prozedur: Attribut hinzufügen
+# Procedure: Add Attribute
 
-> Wiederverwendbare Anleitung für das Hinzufügen eines neuen Attributs zu einer bestehenden Entity.
+> Reusable guide for adding a new attribute to an existing entity.
 
-## Variablen
+## Variables
 
 ```
-ENTITY_NAME = <EntityName>       # Entity-Name (PascalCase)
-ATTR_NAME   = <attribute_name>   # Attributname (snake_case)
-ATTR_TYPE   = <type>             # Datentyp (string, int, date, bool, oder FK-Entity)
+ENTITY_NAME = <EntityName>       # Entity name (PascalCase)
+ATTR_NAME   = <attribute_name>   # Attribute name (snake_case)
+ATTR_TYPE   = <type>             # Data type (string, int, date, bool, or FK entity)
 ```
 
 ---
 
-## Schritt 1: Attribut in Markdown-Tabelle hinzufügen
+## Step 1: Add Attribute to Markdown Table
 
-In `app/docs/requirements/classes/ENTITY_NAME.md` eine neue Zeile zur Attribut-Tabelle hinzufügen:
+In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, add a new row to the attribute table:
 
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| ... bestehende Attribute ... |
-| ATTR_NAME | ATTR_TYPE | Beschreibung [MARKER] | Beispielwert |
+| ... existing attributes ... |
+| ATTR_NAME | ATTR_TYPE | Description [MARKER] | Example value |
 ```
 
-### Optionale Marker
+### Optional Markers
 
-| Marker | Bedeutung | Beispiel |
-|--------|-----------|----------|
-| `[DEFAULT=x]` | Standardwert für neue/bestehende Zeilen | `[DEFAULT=100]` |
-| `[LABEL]` | Primäres Label für TreeView | |
-| `[LABEL2]` | Sekundäres Label | |
-| `[READONLY]` | Nicht editierbar in UI | |
-| `[HIDDEN]` | Nicht in UI angezeigt | |
-| `[UK1]` | Teil eines Unique Keys | |
+| Marker | Meaning | Example |
+|--------|---------|---------|
+| `[DEFAULT=x]` | Default value for new/existing rows | `[DEFAULT=100]` |
+| `[LABEL]` | Primary label for TreeView | |
+| `[LABEL2]` | Secondary label | |
+| `[READONLY]` | Not editable in UI | |
+| `[HIDDEN]` | Not displayed in UI | |
+| `[UK1]` | Part of a unique key | |
 
-**Beispiel mit Default:**
+**Example with default:**
 ```markdown
 | severity_factor | int | Effect of flight profile on degradation in % [DEFAULT=100] | 90 |
 ```
 
 ---
 
-## Schritt 2: DataModel.yaml aktualisieren
+## Step 2: Update DataModel.yaml
 
-In `app/docs/requirements/DataModel.yaml` das neue Attribut zur Entity hinzufügen:
+In `app/systems/<system>/docs/requirements/DataModel.yaml`, add the new attribute to the entity:
 
 ```yaml
 ENTITY_NAME:
   attributes:
-    # ... bestehende Attribute ...
+    # ... existing attributes ...
     - name: ATTR_NAME
       type: ATTR_TYPE
-      description: Beschreibung [MARKER]
+      description: Description [MARKER]
 ```
 
-**Hinweis:** Die Reihenfolge in der YAML sollte der Markdown-Tabelle entsprechen.
+**Note:** The order in YAML should match the Markdown table.
 
 ---
 
-## Schritt 3: Server neu starten
+## Step 3: Restart Server
 
 ```bash
-./run -p 18355  # oder User-Port 18354
+./run -s <system>
 ```
 
-Der SchemaGenerator:
-1. Erkennt das neue Attribut im Schema
-2. Führt `ALTER TABLE ... ADD COLUMN` aus
-3. Setzt den DEFAULT-Wert (falls angegeben) für neue Zeilen
-4. Erstellt die View mit der neuen Spalte neu
+The SchemaGenerator will:
+1. Detect the new attribute in the schema
+2. Execute `ALTER TABLE ... ADD COLUMN`
+3. Set the DEFAULT value (if specified) for new rows
+4. Recreate the view with the new column
 
 ---
 
-## Schritt 4: Bestehende Daten aktualisieren (optional)
+## Step 4: Update Existing Data (Optional)
 
-Falls ein `[DEFAULT=x]` angegeben wurde, haben bestehende Zeilen zunächst `NULL`. Um den Default nachträglich zu setzen:
+If a `[DEFAULT=x]` was specified, existing rows will initially have `NULL`. To set the default retroactively:
 
 ```sql
 UPDATE ENTITY_TABLE SET ATTR_NAME = DEFAULT_VALUE WHERE ATTR_NAME IS NULL;
 ```
 
-**Beispiel:**
+**Example:**
 ```sql
 UPDATE engine SET severity_factor = 100 WHERE severity_factor IS NULL;
 ```
 
 ---
 
-## Schritt 5: Verifizierung
+## Step 5: Verification
 
-- [ ] Server startet ohne Fehler
-- [ ] Neues Attribut erscheint in der Entity-Tabelle (UI)
-- [ ] Neues Attribut ist editierbar (falls nicht READONLY)
-- [ ] Default-Wert wird bei neuen Datensätzen gesetzt
-- [ ] Bestehende Datensätze haben korrekten Wert (nach UPDATE)
+- [ ] Server starts without errors
+- [ ] New attribute appears in entity table (UI)
+- [ ] New attribute is editable (unless READONLY)
+- [ ] Default value is set for new records
+- [ ] Existing records have correct value (after UPDATE)
 
 ---
 
-## Hinweise
+## Notes
 
-### Foreign Key Attribute
+### Foreign Key Attributes
 
-Wenn das neue Attribut eine Referenz auf eine andere Entity ist:
+If the new attribute is a reference to another entity:
 
 ```markdown
 | operator | Operator | Reference to operator [LABEL2] | 5 |
 ```
 
-Der SchemaGenerator erstellt automatisch:
-- Die FK-Spalte (`operator_id INTEGER`)
-- Den Foreign Key Constraint
-- Die View mit Label-Auflösung (`operator_label`)
+The SchemaGenerator automatically creates:
+- The FK column (`operator_id INTEGER`)
+- The foreign key constraint
+- The view with label resolution (`operator_label`)
 
 ### Computed Fields
 
-Computed Fields werden nicht in der Datenbank gespeichert:
+Computed fields are not stored in the database:
 
 ```markdown
 | current_aircraft | Aircraft | [READONLY] [DAILY=EngineMount[removed_date=null].aircraft] | 1001 |
 ```
 
-Diese benötigen keinen `ALTER TABLE` - sie werden zur Laufzeit berechnet.
+These don't require `ALTER TABLE` - they are calculated at runtime.
 
-### Seed-Daten
+### Seed Data
 
-Falls `app/data/seed_generated/ENTITY_NAME.json` existiert und das neue Attribut dort fehlt:
-- Seed-Daten können so bleiben (NULL wird eingefügt)
-- Oder Seed-Daten manuell/per LLM aktualisieren
+If `app/systems/<system>/data/seed/ENTITY_NAME.json` exists and the new attribute is missing:
+- Seed data can remain as-is (NULL will be inserted)
+- Or update seed data manually/via LLM
 
 ---
 
-## Beispiel: severity_factor bei Engine
+## Example: severity_factor for Engine
 
-**Änderung in Engine.md:**
+**Change in Engine.md:**
 ```markdown
 | severity_factor | int | Effect of flight profile on degradation in % [DEFAULT=100] | 90 |
 ```
 
-**Änderung in DataModel.yaml:**
+**Change in DataModel.yaml:**
 ```yaml
 Engine:
   attributes:
-    # ... andere Attribute ...
+    # ... other attributes ...
     - name: severity_factor
       type: int
       description: Effect of flight profile on degradation in % [DEFAULT=100]
 ```
 
-**Nach Server-Neustart:**
+**After server restart:**
 ```sql
 UPDATE engine SET severity_factor = 100 WHERE severity_factor IS NULL;
 ```

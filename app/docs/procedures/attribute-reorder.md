@@ -1,37 +1,37 @@
-# Prozedur: Attribut-Reihenfolge ändern
+# Procedure: Reorder Attributes
 
-> Wiederverwendbare Anleitung für das Umordnen von Attributen einer Entity im AIDE-IRMA Projekt.
+> Reusable guide for changing the order of attributes within an entity.
 
-## Variablen
+## Variables
 
 ```
-ENTITY_NAME = <EntityName>       # Entity-Name (PascalCase)
+ENTITY_NAME = <EntityName>       # Entity name (PascalCase)
 ```
 
 ---
 
-## Hintergrund
+## Background
 
-Die Attribut-Reihenfolge wird an mehreren Stellen verwendet:
+Attribute order is used in multiple places:
 
-| Quelle | Verwendung |
-|--------|------------|
-| `classes/ENTITY_NAME.md` (Markdown-Tabelle) | **Source of Truth** - definiert die Reihenfolge |
-| `DataModel.yaml` | Schema-Definition (wird beim Start geparst) |
-| SchemaGenerator | Erstellt Views mit der Reihenfolge aus dem Schema |
-| UI (entity-table.js) | Liest `schema.columns` für Spaltenreihenfolge |
+| Source | Usage |
+|--------|-------|
+| `classes/ENTITY_NAME.md` (Markdown table) | **Source of Truth** - defines the order |
+| `DataModel.yaml` | Schema definition (parsed at startup) |
+| SchemaGenerator | Creates views with the order from schema |
+| UI (entity-table.js) | Reads `schema.columns` for column order |
 
-**Wichtig:** SQLite unterstützt kein `ALTER TABLE ... REORDER COLUMNS`. Die physische Spaltenreihenfolge in der Tabelle ändert sich nicht, aber:
-- Die **View** wird mit der neuen Reihenfolge erstellt
-- Die **UI** zeigt die Spalten in der Schema-Reihenfolge
+**Important:** SQLite doesn't support `ALTER TABLE ... REORDER COLUMNS`. The physical column order in the table doesn't change, but:
+- The **View** is created with the new order
+- The **UI** displays columns in schema order
 
 ---
 
-## Schritt 1: Markdown-Tabelle umordnen
+## Step 1: Reorder Markdown Table
 
-In `app/docs/requirements/classes/ENTITY_NAME.md` die Zeilen der Attribut-Tabelle in die gewünschte Reihenfolge bringen.
+In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, arrange the rows of the attribute table in the desired order.
 
-**Beispiel vorher:**
+**Example before:**
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
@@ -40,7 +40,7 @@ In `app/docs/requirements/classes/ENTITY_NAME.md` die Zeilen der Attribut-Tabell
 | position | int | Engine position | 1 |
 ```
 
-**Beispiel nachher:**
+**Example after:**
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
@@ -51,18 +51,18 @@ In `app/docs/requirements/classes/ENTITY_NAME.md` die Zeilen der Attribut-Tabell
 
 ---
 
-## Schritt 2: DataModel.yaml anpassen
+## Step 2: Update DataModel.yaml
 
-In `app/docs/requirements/DataModel.yaml` die Attribute der Entity in die gleiche Reihenfolge bringen.
+In `app/systems/<system>/docs/requirements/DataModel.yaml`, arrange the attributes of the entity in the same order.
 
-**Beispiel:**
+**Example:**
 ```yaml
 EngineMount:
   attributes:
-    aircraft:        # jetzt zuerst
+    aircraft:        # now first
       type: Aircraft
       ...
-    engine:          # jetzt zweites
+    engine:          # now second
       type: Engine
       ...
     position:
@@ -72,50 +72,50 @@ EngineMount:
 
 ---
 
-## Schritt 3: Server neu starten
+## Step 3: Restart Server
 
 ```bash
-./run -p 18355  # oder User-Port 18354
+./run -s <system>
 ```
 
-Der Server:
-1. Parst das aktualisierte Schema
-2. Erstellt die Views mit der neuen Spaltenreihenfolge neu
-3. Die UI zeigt die Spalten in der neuen Reihenfolge
+The server will:
+1. Parse the updated schema
+2. Recreate views with the new column order
+3. The UI displays columns in the new order
 
 ---
 
-## Schritt 4: Verifizierung
+## Step 4: Verification
 
-- [ ] Entity-Tabelle in UI zeigt Spalten in neuer Reihenfolge
-- [ ] Tree-View zeigt korrekte Labels
-- [ ] CRUD-Operationen funktionieren weiterhin
+- [ ] Entity table in UI shows columns in new order
+- [ ] Tree view shows correct labels
+- [ ] CRUD operations continue to work
 
 ---
 
-## Hinweise
+## Notes
 
-### Seed-Daten
+### Seed Data
 
-Falls `app/data/seed_generated/ENTITY_NAME.json` existiert, ist die Reihenfolge der Keys in JSON-Objekten nicht relevant - JSON-Objekte sind per Definition ungeordnet.
+If `app/systems/<system>/data/seed/ENTITY_NAME.json` exists, the order of keys in JSON objects is not relevant - JSON objects are unordered by definition.
 
-### Physische Tabellenstruktur
+### Physical Table Structure
 
-Die physische Spaltenreihenfolge in SQLite bleibt unverändert. Dies hat keine praktischen Auswirkungen, da:
-- Alle Abfragen über Views laufen
-- Die UI die Schema-Reihenfolge verwendet
-- INSERT-Statements explizite Spaltennamen verwenden
+The physical column order in SQLite remains unchanged. This has no practical impact because:
+- All queries go through views
+- The UI uses schema order
+- INSERT statements use explicit column names
 
 ### Computed Fields
 
-Computed Fields (z.B. `[COMPUTED:...]`) können an beliebiger Position stehen - sie werden nicht in der Datenbank gespeichert.
+Computed fields (e.g., `[COMPUTED:...]`) can be at any position - they are not stored in the database.
 
 ---
 
-## Beispiel: EngineMount (aircraft vor engine)
+## Example: EngineMount (aircraft before engine)
 
-**Betroffene Dateien:**
-1. `app/docs/requirements/classes/EngineMount.md` - Tabellenzeilen tauschen
-2. `app/docs/requirements/DataModel.yaml` - Attribut-Reihenfolge anpassen
+**Affected files:**
+1. `app/systems/<system>/docs/requirements/classes/EngineMount.md` - Swap table rows
+2. `app/systems/<system>/docs/requirements/DataModel.yaml` - Adjust attribute order
 
-**Änderung:** `engine, aircraft, position, ...` → `aircraft, engine, position, ...`
+**Change:** `engine, aircraft, position, ...` -> `aircraft, engine, position, ...`
