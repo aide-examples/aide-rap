@@ -13,3 +13,8 @@ app/systems/*/logs/
 
 # Databases (generated at runtime)
 app/systems/*/data/*.sqlite
+
+# Generated documentation artifacts
+app/systems/*/docs/requirements/DataModel-diagram*.svg
+app/systems/*/docs/requirements/DataModel-layout.*
+app/systems/*/docs/requirements/EntityCards.pdf
