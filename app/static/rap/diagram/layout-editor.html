@@ -23,7 +23,8 @@
         <span class="help-text">Drag boxes to reposition</span>
         <a id="linkCompact" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Compact</a>
         <a id="linkDetailed" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Detailed</a>
-        <a id="linkCards" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Cards</a>
+        <a id="linkCardsPdf" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Cards.pdf</a>
+        <a id="linkCardsDocx" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Cards.docx</a>
         <button id="saveBtn">Save</button>
         <span class="status" id="status"></span>
         <a href="/" class="back-link" id="backLink">BACK</a>
@@ -109,7 +110,8 @@
         const viewLayoutBtn = document.getElementById('viewLayout');
         const linkCompact = document.getElementById('linkCompact');
         const linkDetailed = document.getElementById('linkDetailed');
-        const linkCards = document.getElementById('linkCards');
+        const linkCardsPdf = document.getElementById('linkCardsPdf');
+        const linkCardsDocx = document.getElementById('linkCardsDocx');
 
         // Calculate box height based on visible attributes
         function getBoxHeight(className) {
@@ -191,10 +193,12 @@
                 // Update diagram links
                 linkCompact.href = `/docs-assets/requirements/${docName}-diagram.svg`;
                 linkDetailed.href = `/docs-assets/requirements/${docName}-diagram-detailed.svg`;
-                linkCards.href = `/docs-assets/requirements/EntityCards.pdf`;
+                linkCardsPdf.href = `/docs-assets/requirements/EntityCards.pdf`;
+                linkCardsDocx.href = `/docs-assets/requirements/EntityCards.docx`;
                 linkCompact.style.display = 'inline';
                 linkDetailed.style.display = 'inline';
-                linkCards.style.display = 'inline';
+                linkCardsPdf.style.display = 'inline';
+                linkCardsDocx.style.display = 'inline';
 
                 renderCanvas();
             } catch (e) {

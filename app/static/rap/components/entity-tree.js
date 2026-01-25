@@ -452,5 +452,20 @@ const EntityTree = {
             referencePosition: this.referencePosition,
             showCycles: this.showCycles
         });
+    },
+
+    /**
+     * Export currently visible/expanded tree to DOCX (Word)
+     */
+    async exportDocx() {
+        return TreePdfExport.exportDocx({
+            currentEntity: this.currentEntity,
+            records: this.records,
+            state: this.state,
+            attributeLayout: this.attributeLayout,
+            attributeOrder: this.attributeOrder,
+            referencePosition: this.referencePosition,
+            showCycles: this.showCycles
+        });
     }
 };

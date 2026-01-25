@@ -18,6 +18,7 @@ app/systems/*/data/*.sqlite
 app/systems/*/docs/requirements/DataModel-diagram*.svg
 app/systems/*/docs/requirements/DataModel-layout.*
 app/systems/*/docs/requirements/EntityCards.pdf
+app/systems/*/docs/requirements/EntityCards.docx
 
 # Claude Code session data
 .claude/

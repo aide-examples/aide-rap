@@ -9,7 +9,7 @@ const fs = require('fs');
 
 module.exports = function(cfg, options = {}) {
     const router = express.Router();
-    const { appDir, parseDatamodel, generateEntityCardsPDF } = options;
+    const { appDir, parseDatamodel, generateEntityCardsPDF, generateEntityCardsDocx } = options;
 
     // Layout Editor page
     router.get('/layout-editor', (req, res) => {
@@ -146,11 +146,18 @@ module.exports = function(cfg, options = {}) {
                 fs.writeFileSync(svgDetailedPath, svgDetailed);
             }
 
-            // Generate Entity Cards PDF if model is provided
+            // Generate Entity Cards PDF and DOCX if model is provided
             const model = req.body.model;
-            if (model && model.classes && generateEntityCardsPDF) {
-                const pdfPath = path.join(docsDir, 'EntityCards.pdf');
-                await generateEntityCardsPDF(model, pdfPath);
+            if (model && model.classes) {
+                if (generateEntityCardsPDF) {
+                    const pdfPath = path.join(docsDir, 'EntityCards.pdf');
+                    await generateEntityCardsPDF(model, pdfPath);
+                }
+                if (generateEntityCardsDocx) {
+                    const classesDir = path.join(docsDir, 'classes');
+                    const docxPath = path.join(docsDir, 'EntityCards.docx');
+                    await generateEntityCardsDocx(model, classesDir, docxPath);
+                }
             }
 
             res.json({ success: true });

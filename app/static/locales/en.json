@@ -59,6 +59,7 @@
     "ctx_edit": "Edit",
     "ctx_delete": "Delete",
     "ctx_export_pdf": "Export PDF",
+    "ctx_export_docx": "Export DOCX",
     "ctx_export_csv": "Export CSV",
 
     "no_data_to_export": "No data to export. Expand some nodes first.",

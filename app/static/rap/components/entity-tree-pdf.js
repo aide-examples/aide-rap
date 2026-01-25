@@ -72,6 +72,73 @@ const TreePdfExport = {
     },
 
     /**
+     * Export currently visible/expanded tree to DOCX (Word) format
+     * Uses typed nodes with colors for visual hierarchy
+     * @param {Object} treeContext - The EntityTree context with state and data
+     */
+    async exportDocx(treeContext) {
+        const { currentEntity, records, state, attributeLayout, attributeOrder, referencePosition, showCycles } = treeContext;
+
+        if (!currentEntity || !records.length) {
+            return;
+        }
+
+        const schema = await SchemaCache.getExtended(currentEntity);
+        const nodes = [];
+
+        // Build context for collection functions
+        const context = {
+            state,
+            attributeLayout,
+            attributeOrder,
+            referencePosition,
+            showCycles,
+            currentEntity,
+            records
+        };
+
+        // Collect visible data as typed nodes (reuses PDF collection logic)
+        await this.collectTreeNodes(nodes, schema, context);
+
+        if (nodes.length === 0) {
+            alert(i18n.t('no_data_to_export'));
+            return;
+        }
+
+        const entityColor = schema.areaColor || '#1a365d';
+
+        try {
+            const response = await fetch(`/api/entities/${currentEntity}/export-tree-docx`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: `${currentEntity} (Tree View)`,
+                    nodes,
+                    entityColor,
+                    layout: attributeLayout  // 'row' or 'list'
+                })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentEntity}_tree.docx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else {
+                const error = await response.json();
+                alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
+            }
+        } catch (err) {
+            alert(i18n.t('export_failed', { message: err.message }));
+        }
+    },
+
+    /**
      * Collect tree nodes with types and colors for hierarchical PDF
      */
     async collectTreeNodes(nodes, schema, context) {

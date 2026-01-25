@@ -1,6 +1,16 @@
 {
   "port": 18361,
   "log_level": "INFO",
+  "auth": {
+    "enabled": true,
+    "passwords": {
+      "admin": "$2b$10$NZ/wiqzblmaxQJklCdcGuuw5.2b1O0gGsBnBUmI.C0a4JLHeSZY5.",
+      "user": "",
+      "guest": ""
+    },
+    "sessionSecret": "book2-session-secret-change-in-production",
+    "sessionTimeout": 86400
+  },  
   "docsEditable": true,
   "helpEditable": true,
   "pwa": {

@@ -15,6 +15,16 @@ const ApiClient = {
     };
 
     const response = await fetch(url, { ...defaultOptions, ...options });
+
+    // Handle 401 Unauthorized - session expired or not authenticated
+    if (response.status === 401) {
+      if (typeof LoginDialog !== 'undefined') {
+        // Show login dialog and reload page after login
+        await LoginDialog.show();
+        return; // Execution stops here, page will reload
+      }
+    }
+
     const data = await response.json();
 
     if (!response.ok) {

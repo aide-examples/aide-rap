@@ -37,6 +37,10 @@ const ContextMenu = {
         <span class="context-menu-icon">&#128462;</span>
         <span data-i18n="ctx_export_pdf">Export PDF</span>
       </div>
+      <div class="context-menu-item" data-action="export-docx">
+        <span class="context-menu-icon">&#128221;</span>
+        <span data-i18n="ctx_export_docx">Export DOCX</span>
+      </div>
       <div class="context-menu-item" data-action="export-csv">
         <span class="context-menu-icon">&#128196;</span>
         <span data-i18n="ctx_export_csv">Export CSV</span>
@@ -54,6 +58,10 @@ const ContextMenu = {
     menu.querySelectorAll('.context-menu-item').forEach(item => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
+        // Ignore clicks on disabled items
+        if (item.classList.contains('disabled')) {
+          return;
+        }
         const action = item.dataset.action;
         this.handleAction(action);
       });
@@ -78,6 +86,21 @@ const ContextMenu = {
     this.menu.style.left = `${x}px`;
     this.menu.style.top = `${y}px`;
     this.menu.classList.add('visible');
+
+    // Check if user has write access (not a guest)
+    const hasWriteAccess = window.currentUser && ['user', 'admin', 'master'].includes(window.currentUser.role);
+
+    // Enable/disable write actions based on role
+    ['new', 'edit', 'delete'].forEach(action => {
+      const item = this.menu.querySelector(`[data-action="${action}"]`);
+      if (item) {
+        if (hasWriteAccess) {
+          item.classList.remove('disabled');
+        } else {
+          item.classList.add('disabled');
+        }
+      }
+    });
 
     // Adjust if menu goes off-screen
     const rect = this.menu.getBoundingClientRect();
@@ -123,6 +146,12 @@ const ContextMenu = {
         EntityTree.exportPdf();
       } else {
         EntityTable.exportPdf();
+      }
+    } else if (action === 'export-docx') {
+      if (source === 'tree') {
+        EntityTree.exportDocx();
+      } else {
+        EntityTable.exportDocx();
       }
     } else if (action === 'export-csv') {
       EntityTable.exportCsv();

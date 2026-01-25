@@ -63,6 +63,60 @@
       }
     }
 
+    // Check authentication status
+    if (typeof LoginDialog !== 'undefined') {
+      // First check if auth is enabled at all
+      const authConfigRes = await fetch('/api/auth/config');
+      const authConfig = await authConfigRes.json();
+
+      if (!authConfig.enabled && !authConfig.notConfigured) {
+        // Auth disabled (e.g., --noauth flag) - full access as "master"
+        window.currentUser = { role: 'master' };
+      } else {
+        // Auth enabled - check session
+        const authRes = await fetch('/api/auth/me');
+        if (authRes.status === 401) {
+          // Not authenticated - show login dialog
+          await LoginDialog.show();
+          return; // Stop initialization until login completes
+        }
+        // Store current user for permission checks
+        window.currentUser = await authRes.json();
+      }
+
+      // Add user indicator to status footer
+      const footerInfo = document.querySelector('.status-footer-info');
+      if (footerInfo && window.currentUser) {
+        const sep = document.createElement('span');
+        sep.className = 'status-footer-sep';
+        sep.textContent = '·';
+
+        const userEl = document.createElement('span');
+        userEl.className = 'status-user-indicator';
+        const isMaster = window.currentUser.role === 'master';
+        userEl.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 3px;">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+          <span class="status-user-role">${window.currentUser.role}</span>
+        `;
+        if (isMaster) {
+          userEl.title = 'Development mode (--noauth)';
+        } else {
+          userEl.title = 'Click to logout';
+          userEl.style.cursor = 'pointer';
+          userEl.addEventListener('click', () => {
+            if (confirm('Logout?')) {
+              LoginDialog.logout();
+            }
+          });
+        }
+
+        footerInfo.appendChild(sep);
+        footerInfo.appendChild(userEl);
+      }
+    }
+
     // Initialize RAP components
     await EntityExplorer.init();
     DetailPanel.init();

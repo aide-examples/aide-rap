@@ -1484,6 +1484,119 @@
     background: #047857;
 }
 
+/* -----------------------------------------------------------------------------
+   Login Dialog
+   ----------------------------------------------------------------------------- */
+.login-overlay {
+    background: rgba(30, 41, 59, 0.85);
+}
+
+.login-dialog {
+    max-width: 360px;
+}
+
+.login-dialog .modal-header {
+    justify-content: center;
+    border-bottom: none;
+    padding-bottom: 8px;
+}
+
+.login-dialog .modal-header h2 {
+    font-size: 1.3rem;
+}
+
+.login-dialog .modal-body {
+    padding: 0 24px 16px;
+}
+
+.login-dialog .form-group {
+    margin-bottom: 16px;
+}
+
+.login-dialog .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.login-dialog .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.login-dialog .form-control:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.login-dialog .form-control:disabled {
+    background: #f3f4f6;
+    color: #9ca3af;
+}
+
+.login-error {
+    padding: 10px 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    color: #dc2626;
+    font-size: 0.9rem;
+    margin-top: 8px;
+}
+
+.login-dialog .modal-footer {
+    border-top: none;
+    padding: 0 24px 24px;
+    justify-content: center;
+}
+
+.login-dialog .btn-primary {
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* Shake animation for login dialog */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+.login-dialog.shake {
+    animation: shake 0.3s ease-in-out;
+}
+
+/* -----------------------------------------------------------------------------
+   User Indicator in Status Footer
+   ----------------------------------------------------------------------------- */
+.status-user-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #475569;
+    transition: background 0.15s, color 0.15s;
+}
+
+.status-user-indicator:hover {
+    background: #e2e8f0;
+    color: #1e40af;
+}
+
+.status-user-role {
+    text-transform: capitalize;
+    font-weight: 500;
+}
+
 /* Modal Toolbar (for source selector, upload, etc.) */
 .modal-toolbar {
     display: flex;

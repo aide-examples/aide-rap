@@ -1,9 +1,14 @@
 /**
- * PrintService - Server-side PDF generation for entity tables
- * Uses PDFKit to generate A4 Landscape PDFs with dynamic columns
+ * PrintService - Server-side PDF and DOCX generation for entity tables
+ * Uses PDFKit for PDFs and docx for Word documents
  */
 
 const PDFDocument = require('pdfkit');
+const {
+  Document, Packer, Paragraph, Table, TableRow, TableCell,
+  WidthType, HeadingLevel, TextRun, BorderStyle, AlignmentType,
+  convertInchesToTwip
+} = require('docx');
 
 class PrintService {
   constructor(options = {}) {
@@ -544,6 +549,272 @@ class PrintService {
         y += attrHeight;
       }
     }
+  }
+
+  // =========================================================================
+  // DOCX Generation Methods
+  // =========================================================================
+
+  /**
+   * Generate Word document for table export
+   * @param {Object} data - { title, columns, records, entityColor }
+   * @returns {Promise<Buffer>} - DOCX buffer
+   */
+  async generateDocx(data) {
+    const { title, columns, records, entityColor } = data;
+    const color = (entityColor || this.defaultColor).replace('#', '');
+
+    // Build header row cells
+    const headerCells = columns.map(col =>
+      new TableCell({
+        children: [new Paragraph({
+          children: [new TextRun({ text: col.label || col.key, bold: true })]
+        })],
+        shading: { fill: (col.color || entityColor || this.defaultColor).replace('#', '') }
+      })
+    );
+    // Add Notes column header
+    headerCells.push(new TableCell({
+      children: [new Paragraph({
+        children: [new TextRun({ text: 'Notes', bold: true })]
+      })],
+      shading: { fill: 'EEEEEE' },
+      width: { size: 20, type: WidthType.PERCENTAGE }
+    }));
+
+    // Build data rows
+    const dataRows = records.map(record =>
+      new TableRow({
+        children: [
+          ...columns.map(col =>
+            new TableCell({
+              children: [new Paragraph({
+                children: [new TextRun({ text: String(record[col.key] ?? '') })]
+              })]
+            })
+          ),
+          // Empty Notes cell
+          new TableCell({
+            children: [new Paragraph({ text: '' })],
+            width: { size: 20, type: WidthType.PERCENTAGE }
+          })
+        ]
+      })
+    );
+
+    // Build document
+    const doc = new Document({
+      sections: [{
+        children: [
+          // Title
+          new Paragraph({
+            text: title,
+            heading: HeadingLevel.HEADING_1
+          }),
+          // Date
+          new Paragraph({
+            children: [new TextRun({
+              text: `Generated: ${new Date().toLocaleString('de-DE')}`,
+              color: '666666',
+              size: 20
+            })],
+            spacing: { after: 200 }
+          }),
+          // Table
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: headerCells,
+                tableHeader: true
+              }),
+              ...dataRows
+            ]
+          })
+        ]
+      }]
+    });
+
+    return await Packer.toBuffer(doc);
+  }
+
+  /**
+   * Generate Word document for tree export
+   * @param {Object} data - { title, nodes, entityColor }
+   * @returns {Promise<Buffer>} - DOCX buffer
+   */
+  async generateTreeDocx(data) {
+    const { title, nodes, entityColor } = data;
+    const color = (entityColor || this.defaultColor).replace('#', '');
+
+    const children = [];
+
+    // Title
+    children.push(new Paragraph({
+      text: title,
+      heading: HeadingLevel.HEADING_1
+    }));
+
+    // Date
+    children.push(new Paragraph({
+      children: [new TextRun({
+        text: `Generated: ${new Date().toLocaleString('de-DE')}`,
+        color: '666666',
+        size: 20
+      })],
+      spacing: { after: 200 }
+    }));
+
+    // Process nodes
+    let currentRootLabel = '';
+    for (const node of nodes) {
+      const indent = node.depth * 360; // twips (1/20 of a point)
+
+      if (node.type === 'root' || node.type === 'section') {
+        // Section header
+        currentRootLabel = node.value || node.label;
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: node.label + ': ', color: '666666' }),
+            new TextRun({ text: node.value || '', bold: true })
+          ],
+          heading: node.type === 'root' ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3,
+          indent: { left: indent },
+          shading: { fill: (node.color || 'E2E8F0').replace('#', '') },
+          spacing: { before: 120, after: 60 }
+        }));
+
+      } else if (node.type === 'fk') {
+        // FK reference
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: '▸ ', color: '666666' }),
+            new TextRun({ text: node.label + ': ', color: '666666', size: 20 }),
+            new TextRun({ text: node.value || '', size: 20 })
+          ],
+          indent: { left: indent },
+          spacing: { before: 40, after: 40 }
+        }));
+
+      } else if (node.type === 'backref') {
+        // Back-reference header
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: '◂ ', color: '666666' }),
+            new TextRun({ text: node.label + ': ', italics: true, color: '666666', size: 20 }),
+            new TextRun({ text: node.value || '', size: 20 })
+          ],
+          indent: { left: indent },
+          shading: { fill: 'F0F4F8' },
+          spacing: { before: 80, after: 40 }
+        }));
+
+      } else if (node.type === 'backref-item') {
+        // Back-reference item
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: '• ', color: '666666' }),
+            new TextRun({ text: node.label + ': ', color: '666666', size: 18 }),
+            new TextRun({ text: node.value || '', size: 18 })
+          ],
+          indent: { left: indent },
+          spacing: { before: 20, after: 20 }
+        }));
+
+        // Notes line for backref items
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: 'Notes: ', color: '999999', size: 18 }),
+            new TextRun({ text: '_'.repeat(40), color: 'CCCCCC', size: 18 })
+          ],
+          indent: { left: indent + 180 },
+          spacing: { after: 60 }
+        }));
+
+      } else if (node.type === 'attribute-row') {
+        // Horizontal attribute table
+        const cols = node.columns || [];
+        const vals = node.values || [];
+        if (cols.length > 0) {
+          // Build mini-table for row layout
+          const headerCells = cols.map(col =>
+            new TableCell({
+              children: [new Paragraph({
+                children: [new TextRun({ text: col, size: 16, color: '666666' })]
+              })],
+              shading: { fill: 'F1F5F9' }
+            })
+          );
+
+          const valueCells = vals.map(val =>
+            new TableCell({
+              children: [new Paragraph({
+                children: [new TextRun({ text: val || '', size: 18 })]
+              })]
+            })
+          );
+
+          // Add Notes column
+          headerCells.push(new TableCell({
+            children: [new Paragraph({
+              children: [new TextRun({ text: 'Notes', size: 16, color: '666666' })]
+            })],
+            shading: { fill: 'EEEEEE' }
+          }));
+          valueCells.push(new TableCell({
+            children: [new Paragraph({ text: '' })]
+          }));
+
+          children.push(new Table({
+            width: { size: 100 - (node.depth * 5), type: WidthType.PERCENTAGE },
+            indent: { size: indent, type: WidthType.DXA },
+            rows: [
+              new TableRow({ children: headerCells }),
+              new TableRow({ children: valueCells })
+            ]
+          }));
+
+          children.push(new Paragraph({ text: '', spacing: { after: 120 } }));
+        }
+
+      } else {
+        // Regular attribute (list layout)
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: node.label + ': ', color: '666666', size: 18 }),
+            new TextRun({ text: node.value || '', size: 18 })
+          ],
+          indent: { left: indent },
+          spacing: { before: 20, after: 20 }
+        }));
+      }
+    }
+
+    // Add final notes section
+    children.push(new Paragraph({
+      text: '',
+      spacing: { before: 200 }
+    }));
+    children.push(new Paragraph({
+      text: 'Notes:',
+      heading: HeadingLevel.HEADING_3
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: '_'.repeat(80), color: 'CCCCCC' })]
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: '_'.repeat(80), color: 'CCCCCC' })]
+    }));
+    children.push(new Paragraph({
+      children: [new TextRun({ text: '_'.repeat(80), color: 'CCCCCC' })]
+    }));
+
+    // Build document
+    const doc = new Document({
+      sections: [{ children }]
+    });
+
+    return await Packer.toBuffer(doc);
   }
 }
 

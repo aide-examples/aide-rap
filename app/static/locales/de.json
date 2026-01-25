@@ -59,6 +59,7 @@
     "ctx_edit": "Bearbeiten",
     "ctx_delete": "Löschen",
     "ctx_export_pdf": "PDF exportieren",
+    "ctx_export_docx": "Word exportieren",
     "ctx_export_csv": "CSV exportieren",
 
     "no_data_to_export": "Keine Daten zum Exportieren. Erweitern Sie zuerst einige Knoten.",

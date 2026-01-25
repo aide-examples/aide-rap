@@ -30,6 +30,7 @@ paths.init(APP_DIR);
 
 const parseDatamodel = require(path.join(TOOLS_DIR, 'parse-datamodel'));
 const backend = require('./server');
+const cookieParser = require('cookie-parser');
 
 // =============================================================================
 // 4. CONFIGURATION
@@ -51,6 +52,7 @@ program.description('AIDE RAP - Rapid Application Prototyping');
 args.addCommonArgs(program);  // Adds --log-level, --config, --regenerate-icons
 program.requiredOption('-s, --system <name>', 'System name (required, subdirectory in systems/)');
 program.option('-p, --port <number>', 'Override port', parseInt);
+program.option('--noauth', 'Disable authentication (for development)');
 program.parse();
 
 const opts = program.opts();
@@ -159,12 +161,63 @@ const server = new HttpServer({
 const app = server.getApp();
 
 // =============================================================================
-// 7a. BACKEND INITIALIZATION (CRUD API)
+// 7a. AUTHENTICATION
+// =============================================================================
+
+// Cookie parser for session cookies (required for auth)
+const sessionSecret = cfg.auth?.sessionSecret || 'aide-rap-default-secret';
+app.use(cookieParser(sessionSecret));
+
+// Auth router (login, logout, session check)
+app.use(require('./server/routers/auth.router')(cfg));
+
+// Auth middleware - only active when auth is enabled (and --noauth not set)
+const { authMiddleware, requireRole } = require('./server/middleware');
+const authEnabled = cfg.auth?.enabled === true && !opts.noauth;
+
+if (opts.noauth) {
+    console.log('Authentication disabled via --noauth flag');
+    cfg.noauth = true;  // Pass to auth router
+}
+
+// Conditional auth middleware factory
+function protectRoute(...roles) {
+    if (!authEnabled) {
+        return (req, res, next) => next(); // No-op if auth disabled
+    }
+    return [authMiddleware, requireRole(...roles)];
+}
+
+// =============================================================================
+// 7b. BACKEND INITIALIZATION (CRUD API)
 // =============================================================================
 
 if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0) {
     // Filter out area separator comments (entries starting with 20 dashes)
     const enabledEntities = cfg.crud.enabledEntities.filter(e => !e.startsWith('--------------------'));
+
+    // Protect CRUD routes based on HTTP method
+    if (authEnabled) {
+        // All authenticated users (guest, user, admin) can READ data
+        app.use('/api/entities', authMiddleware, requireRole('guest', 'user', 'admin'));
+
+        // Only user/admin can CREATE, UPDATE, DELETE (but allow export routes for all)
+        app.use('/api/entities', (req, res, next) => {
+            if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+                // Allow export routes for all authenticated users (they use POST but are read-only)
+                const isExportRoute = req.path.includes('/export-pdf') ||
+                                      req.path.includes('/export-tree-pdf') ||
+                                      req.path.includes('/export-csv') ||
+                                      req.path.includes('/export-docx') ||
+                                      req.path.includes('/export-tree-docx');
+                if (!isExportRoute && (!req.user || !['user', 'admin'].includes(req.user.role))) {
+                    return res.status(403).json({ error: 'Write access denied for guests' });
+                }
+            }
+            next();
+        });
+    }
+
     backend.init(app, {
         appDir: APP_DIR,
         enabledEntities,
@@ -173,7 +226,7 @@ if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0)
 }
 
 // =============================================================================
-// 7b. STATIC ROUTES
+// 7c. STATIC ROUTES
 // =============================================================================
 
 // Main page
@@ -186,29 +239,39 @@ app.get('/index.html', (req, res) => {
 });
 
 // =============================================================================
-// 7c. ROUTERS
+// 7d. ROUTERS
 // =============================================================================
 
-// Import generateEntityCardsPDF for layout-editor
-const { generateEntityCardsPDF } = require('./server/routers/export.router');
+// Import EntityCards generators for layout-editor
+const { generateEntityCardsPDF, generateEntityCardsDocx } = require('./server/routers/export.router');
 
 // Layout Editor Router
 app.use(require('./server/routers/layout-editor.router')(cfg, {
     appDir: APP_DIR,
     parseDatamodel,
-    generateEntityCardsPDF
+    generateEntityCardsPDF,
+    generateEntityCardsDocx
 }));
 
-// Seed Data Management Router
+// Seed Data Management Router (admin only)
+if (authEnabled) {
+    app.use('/api/seed', authMiddleware, requireRole('admin'));
+}
 app.use(require('./server/routers/seed.router')(cfg));
 
-// LLM Seed Generator Router
+// LLM Seed Generator Router (admin only)
+if (authEnabled) {
+    app.use('/api/generator', authMiddleware, requireRole('admin'));
+}
 app.use(require('./server/routers/generator.router')(cfg));
 
-// Export Router (PDF, CSV)
+// Export Router (PDF, CSV) - routes are under /api/entities, protection handled there
 app.use(require('./server/routers/export.router')(cfg));
 
-// Model Builder Router (create new systems)
+// Model Builder Router (create new systems) - admin only
+if (authEnabled) {
+    app.use('/api/model-builder', authMiddleware, requireRole('admin'));
+}
 app.use(require('./server/routers/model-builder.router')(cfg));
 
 // =============================================================================
