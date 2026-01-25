@@ -3,36 +3,23 @@
  * Seed Database Tool
  *
  * Usage:
- *   node tools/seed-database.js                   # Load all seed data (from generated)
- *   node tools/seed-database.js --source imported # Load from imported source
- *   node tools/seed-database.js Aircraft          # Load specific entities
- *   node tools/seed-database.js --reset Aircraft  # Reset table and reload
- *   node tools/seed-database.js --clear           # Clear all tables
+ *   node tools/seed-database.js -s irma              # Load all seed data
+ *   node tools/seed-database.js -s irma Aircraft     # Load specific entities
+ *   node tools/seed-database.js -s irma --reset Aircraft  # Reset table and reload
+ *   node tools/seed-database.js -s irma --clear      # Clear all tables
  */
 
 const path = require('path');
 const fs = require('fs');
 
-const SCRIPT_DIR = path.join(__dirname, '..', 'app');
-const SEED_GENERATED_DIR = path.join(SCRIPT_DIR, 'data', 'seed_generated');
-const SEED_IMPORTED_DIR = path.join(SCRIPT_DIR, 'data', 'seed_imported');
-const CONFIG_PATH = path.join(SCRIPT_DIR, 'config.json');
-const DATA_MODEL_PATH = path.join(SCRIPT_DIR, 'docs', 'requirements', 'DataModel.md');
-const DB_PATH = path.join(SCRIPT_DIR, 'data', 'irma.sqlite');
-
-// Load config
-const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-const enabledEntities = config.crud?.enabledEntities || [];
-
-// Initialize database
-const { initDatabase, getDatabase, resetTable, closeDatabase } = require(path.join(SCRIPT_DIR, 'server', 'config', 'database'));
-const { getSchema } = require(path.join(SCRIPT_DIR, 'server', 'config', 'database'));
+const APP_DIR = path.join(__dirname, '..', 'app');
+const SYSTEMS_DIR = path.join(APP_DIR, 'systems');
 
 // Parse arguments
 const args = process.argv.slice(2);
 let resetMode = false;
 let clearMode = false;
-let source = 'generated'; // default source
+let systemName = null;
 const entities = [];
 
 for (let i = 0; i < args.length; i++) {
@@ -41,15 +28,47 @@ for (let i = 0; i < args.length; i++) {
     resetMode = true;
   } else if (arg === '--clear') {
     clearMode = true;
-  } else if (arg === '--source' && args[i + 1]) {
-    source = args[++i];
+  } else if ((arg === '-s' || arg === '--system') && args[i + 1]) {
+    systemName = args[++i];
   } else if (!arg.startsWith('-')) {
     entities.push(arg);
   }
 }
 
-// Determine seed directory based on source
-const SEED_DIR = source === 'imported' ? SEED_IMPORTED_DIR : SEED_GENERATED_DIR;
+// Validate system parameter
+if (!systemName) {
+  console.error('Error: System name is required.');
+  console.error('Usage: node tools/seed-database.js -s <system-name> [options] [entities...]');
+  console.error('\nAvailable systems:');
+  if (fs.existsSync(SYSTEMS_DIR)) {
+    const systems = fs.readdirSync(SYSTEMS_DIR).filter(f => {
+      const stat = fs.statSync(path.join(SYSTEMS_DIR, f));
+      return stat.isDirectory();
+    });
+    systems.forEach(s => console.error(`  - ${s}`));
+  }
+  process.exit(1);
+}
+
+// Setup system paths
+const SYSTEM_DIR = path.join(SYSTEMS_DIR, systemName);
+if (!fs.existsSync(SYSTEM_DIR)) {
+  console.error(`Error: System directory not found: ${SYSTEM_DIR}`);
+  process.exit(1);
+}
+
+const CONFIG_PATH = path.join(SYSTEM_DIR, 'config.json');
+const DATA_MODEL_PATH = path.join(SYSTEM_DIR, 'docs', 'requirements', 'DataModel.md');
+const DB_PATH = path.join(SYSTEM_DIR, 'data', 'irma.sqlite');
+const SEED_DIR = path.join(SYSTEM_DIR, 'data', 'seed');
+
+// Load config
+const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+const enabledEntities = (config.crud?.enabledEntities || []).filter(e => !e.startsWith('--------------------'));
+
+// Initialize database
+const { initDatabase, getDatabase, resetTable, closeDatabase } = require(path.join(APP_DIR, 'server', 'config', 'database'));
+const { getSchema } = require(path.join(APP_DIR, 'server', 'config', 'database'));
 
 /**
  * Load seed data for an entity
@@ -195,7 +214,8 @@ function clearAllTables() {
 async function main() {
   console.log('Seed Database Tool');
   console.log('==================');
-  console.log(`Source: ${source} (${SEED_DIR})`);
+  console.log(`System: ${systemName}`);
+  console.log(`Seed Dir: ${SEED_DIR}`);
 
   // Initialize database
   initDatabase(DB_PATH, DATA_MODEL_PATH, enabledEntities);

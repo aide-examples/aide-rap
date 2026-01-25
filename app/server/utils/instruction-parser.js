@@ -6,7 +6,27 @@
 const fs = require('fs');
 const path = require('path');
 
-const CLASSES_DIR = path.join(__dirname, '..', '..', 'docs', 'requirements', 'classes');
+// Module-level classes directory (configured via init())
+let CLASSES_DIR = null;
+
+/**
+ * Initialize instruction-parser with a specific docs directory
+ * @param {string} docsDir - Path to the docs/requirements directory
+ */
+function init(docsDir) {
+  CLASSES_DIR = path.join(docsDir, 'classes');
+}
+
+/**
+ * Get the classes directory
+ * @returns {string} - The classes directory path
+ */
+function getClassesDir() {
+  if (!CLASSES_DIR) {
+    throw new Error('Instruction-parser not initialized. Call init(docsDir) first.');
+  }
+  return CLASSES_DIR;
+}
 
 /**
  * Get the markdown file path for an entity
@@ -14,7 +34,7 @@ const CLASSES_DIR = path.join(__dirname, '..', '..', 'docs', 'requirements', 'cl
  * @returns {string} Path to markdown file
  */
 function getEntityMdPath(entityName) {
-  return path.join(CLASSES_DIR, `${entityName}.md`);
+  return path.join(getClassesDir(), `${entityName}.md`);
 }
 
 /**
@@ -158,6 +178,8 @@ function writeEntityInstruction(entityName, instruction) {
 }
 
 module.exports = {
+  init,
+  getClassesDir,
   getEntityMdPath,
   extractGeneratorInstruction,
   updateGeneratorInstruction,

@@ -8,8 +8,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const path = require('path');
 const fs = require('fs');
 const { parseSeedContext } = require('../utils/instruction-parser');
-
-const SEED_DIR = path.join(__dirname, '..', '..', 'data', 'seed');
+const SeedManager = require('../utils/SeedManager');
 
 /**
  * Base class for LLM providers
@@ -521,11 +520,12 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
    * Save generated data to seed file
    */
   saveGeneratedData(entityName, data) {
-    if (!fs.existsSync(SEED_DIR)) {
-      fs.mkdirSync(SEED_DIR, { recursive: true });
+    const seedDir = SeedManager.getSeedDir();
+    if (!fs.existsSync(seedDir)) {
+      fs.mkdirSync(seedDir, { recursive: true });
     }
 
-    const filePath = path.join(SEED_DIR, `${entityName}.json`);
+    const filePath = path.join(seedDir, `${entityName}.json`);
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
 
     return filePath;

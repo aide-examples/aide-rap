@@ -19,13 +19,17 @@ const logger = require('./utils/logger');
  * @param {Object} config - Configuration object
  * @param {string} config.appDir - Application directory
  * @param {string[]} config.enabledEntities - List of enabled entity names
+ * @param {Object} config.paths - System-specific paths
+ * @param {string} config.paths.data - Data directory
+ * @param {string} config.paths.docs - Docs/requirements directory
+ * @param {string} config.paths.database - Database filename
  */
 function init(app, config) {
-  const { appDir, enabledEntities } = config;
+  const { appDir, enabledEntities, paths } = config;
 
-  // Paths
-  const dbPath = path.join(appDir, 'data', 'irma.sqlite');
-  const dataModelPath = path.join(appDir, 'docs', 'requirements', 'DataModel.md');
+  // Paths (use config paths if provided, fallback to legacy paths)
+  const dbPath = paths ? path.join(paths.data, paths.database) : path.join(appDir, 'data', 'irma.sqlite');
+  const dataModelPath = paths ? path.join(paths.docs, 'DataModel.md') : path.join(appDir, 'docs', 'requirements', 'DataModel.md');
 
   // Initialize database
   initDatabase(dbPath, dataModelPath, enabledEntities);

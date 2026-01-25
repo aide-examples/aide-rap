@@ -1,0 +1,12 @@
+{
+  "port": 18352,
+  "log_level": "INFO",
+  "docsEditable": true,
+  "helpEditable": true,
+  "crud": {
+    "enabledEntities": [
+      "Author",
+      "Book"
+    ]
+  }
+}

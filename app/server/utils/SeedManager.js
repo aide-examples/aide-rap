@@ -8,13 +8,30 @@
 const fs = require('fs');
 const path = require('path');
 
-// Paths are relative to app directory
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const SEED_DIR = path.join(DATA_DIR, 'seed');
+// Module-level seed directory (configured via init())
+let SEED_DIR = null;
 
-// Ensure seed directory exists
-if (!fs.existsSync(SEED_DIR)) {
-  fs.mkdirSync(SEED_DIR, { recursive: true });
+/**
+ * Initialize SeedManager with a specific seed directory
+ * @param {string} seedDir - Path to the seed directory
+ */
+function init(seedDir) {
+  SEED_DIR = seedDir;
+  // Ensure seed directory exists
+  if (!fs.existsSync(SEED_DIR)) {
+    fs.mkdirSync(SEED_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Get the current seed directory
+ * @returns {string} - The seed directory path
+ */
+function getSeedDir() {
+  if (!SEED_DIR) {
+    throw new Error('SeedManager not initialized. Call init(seedDir) first.');
+  }
+  return SEED_DIR;
 }
 
 /**
@@ -144,7 +161,7 @@ function getStatus() {
   for (const entity of schema.orderedEntities) {
     const rowCount = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get().count;
     const seedFile = `${entity.className}.json`;
-    const seedPath = path.join(SEED_DIR, seedFile);
+    const seedPath = path.join(getSeedDir(), seedFile);
     const seedTotal = countSeedFile(seedPath);
 
     // Calculate valid count if seed file exists
@@ -421,7 +438,7 @@ function loadEntity(entityName, lookups = null, options = {}) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
 
-  const seedFile = path.join(SEED_DIR, `${entityName}.json`);
+  const seedFile = path.join(getSeedDir(), `${entityName}.json`);
   if (!fs.existsSync(seedFile)) {
     throw new Error(`No seed file found for ${entityName}`);
   }
@@ -564,7 +581,7 @@ function loadAll() {
 
   // Load in dependency order
   for (const entity of schema.orderedEntities) {
-    const seedFile = path.join(SEED_DIR, `${entity.className}.json`);
+    const seedFile = path.join(getSeedDir(), `${entity.className}.json`);
     if (fs.existsSync(seedFile)) {
       try {
         const result = loadEntity(entity.className, lookups);
@@ -643,13 +660,15 @@ function uploadEntity(entityName, jsonData) {
     throw new Error('Data must be an array of records');
   }
 
-  const filePath = path.join(SEED_DIR, `${entityName}.json`);
+  const filePath = path.join(getSeedDir(), `${entityName}.json`);
   fs.writeFileSync(filePath, JSON.stringify(records, null, 2));
 
   return { uploaded: records.length, file: `${entityName}.json` };
 }
 
 module.exports = {
+  init,
+  getSeedDir,
   getStatus,
   validateImport,
   loadEntity,
@@ -659,6 +678,6 @@ module.exports = {
   resetAll,
   uploadEntity,
   buildLabelLookup,
-  // Export path for testing
-  SEED_DIR
+  // Export getter for path (for testing and external access)
+  get SEED_DIR() { return getSeedDir(); }
 };

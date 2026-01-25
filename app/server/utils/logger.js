@@ -6,10 +6,44 @@ const path = require('path');
 const fs = require('fs');
 require('winston-daily-rotate-file');
 
-// Ensure logs directory exists
-const logsDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+// Module-level logs directory (can be reconfigured via init)
+let logsDir = null;
+
+/**
+ * Initialize logger with a specific logs directory
+ * @param {string} logsDirPath - Path to the logs directory
+ */
+function init(logsDirPath) {
+  logsDir = logsDirPath;
+
+  // Ensure logs directory exists
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+
+  // Reconfigure transports with new paths
+  logger.transports.forEach(t => {
+    if (t instanceof winston.transports.DailyRotateFile) {
+      // Update filename to use new logsDir
+      const filename = path.basename(t.options.filename);
+      t.options.filename = path.join(logsDir, filename);
+    }
+  });
+}
+
+/**
+ * Get the current logs directory
+ * Falls back to default if not initialized
+ */
+function getLogsDir() {
+  if (!logsDir) {
+    // Default fallback for backwards compatibility
+    logsDir = path.join(__dirname, '../../logs');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+  }
+  return logsDir;
 }
 
 // Define log format
@@ -71,7 +105,7 @@ const logger = winston.createLogger({
   transports: [
     // Error log file - DAILY ROTATION
     new winston.transports.DailyRotateFile({
-      filename: path.join(logsDir, 'error-%DATE%.log'),
+      filename: path.join(getLogsDir(), 'error-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       level: 'error',
       format: fileFormat,
@@ -82,7 +116,7 @@ const logger = winston.createLogger({
 
     // Combined log file - DAILY ROTATION
     new winston.transports.DailyRotateFile({
-      filename: path.join(logsDir, 'combined-%DATE%.log'),
+      filename: path.join(getLogsDir(), 'combined-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       format: fileFormat,
       maxSize: '20m',  // Rotate at 20MB
@@ -105,7 +139,7 @@ if (process.env.NODE_ENV !== 'production' || process.env.CONSOLE_LOGS === 'true'
 // Handle uncaught exceptions and unhandled rejections - DAILY ROTATION
 logger.exceptions.handle(
   new winston.transports.DailyRotateFile({
-    filename: path.join(logsDir, 'exceptions-%DATE%.log'),
+    filename: path.join(getLogsDir(), 'exceptions-%DATE%.log'),
     datePattern: 'YYYY-MM-DD',
     format: fileFormat,
     maxSize: '20m',
@@ -116,7 +150,7 @@ logger.exceptions.handle(
 
 logger.rejections.handle(
   new winston.transports.DailyRotateFile({
-    filename: path.join(logsDir, 'rejections-%DATE%.log'),
+    filename: path.join(getLogsDir(), 'rejections-%DATE%.log'),
     datePattern: 'YYYY-MM-DD',
     format: fileFormat,
     maxSize: '20m',
@@ -141,5 +175,9 @@ logger.withCorrelation = function(correlationId) {
     debug: (message, meta = {}) => logger.debug(message, { ...meta, correlationId }),
   };
 };
+
+// Add init function to logger for external configuration
+logger.init = init;
+logger.getLogsDir = getLogsDir;
 
 module.exports = logger;
