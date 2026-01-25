@@ -164,7 +164,7 @@ node tools/generate-drawio.js -o app/docs/requirements/layout.drawio
 ## Quick Reference
 
 ```bash
-cd /home/gero/aide-examples/aide-rap
+# From project root:
 
 # After changes in DataModel.md:
 # 1. Open Layout Editor: http://localhost:18354/layout-editor
