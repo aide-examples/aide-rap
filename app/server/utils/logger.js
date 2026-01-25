@@ -101,7 +101,7 @@ const logLevel = getLogLevel();
 const logger = winston.createLogger({
   level: logLevel,
   format: logFormat,
-  defaultMeta: { service: 'irma' },
+  defaultMeta: { service: 'rap' },
   transports: [
     // Error log file - DAILY ROTATION
     new winston.transports.DailyRotateFile({

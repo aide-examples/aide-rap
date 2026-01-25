@@ -10,7 +10,7 @@
 const { getDatabase, getSchema } = require('../config/database');
 const { ObjectValidator } = require('../../shared/validation');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
-const ColumnUtils = require('../../static/irma/utils/ColumnUtils');
+const ColumnUtils = require('../../static/rap/utils/ColumnUtils');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 const { ForeignKeyConstraintError, UniqueConstraintError } = require('../errors/ConflictError');
 const logger = require('../utils/logger');

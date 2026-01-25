@@ -1,5 +1,5 @@
 /* =============================================================================
-   AIDE IRMA - Application Styles
+   AIDE RAP - Application Styles
    ============================================================================= */
 
 /* -----------------------------------------------------------------------------
@@ -41,9 +41,9 @@
 }
 
 /* -----------------------------------------------------------------------------
-   IRMA Secondary Menu Bar (below Framework header)
+   RAP Secondary Menu Bar (below Framework header)
    ----------------------------------------------------------------------------- */
-.irma-menu-bar {
+.rap-menu-bar {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -55,7 +55,7 @@
     flex-shrink: 0;
 }
 
-.irma-menu-bar .menu-item {
+.rap-menu-bar .menu-item {
     padding: 6px 14px;
     color: #555;
     text-decoration: none;
@@ -64,24 +64,24 @@
     transition: background 0.15s, color 0.15s;
 }
 
-.irma-menu-bar .menu-item:hover {
+.rap-menu-bar .menu-item:hover {
     background: #e2e8f0;
     color: #2563eb;
     text-decoration: none;
 }
 
-.irma-menu-bar .menu-separator {
+.rap-menu-bar .menu-separator {
     color: #cbd5e1;
     margin: 0 8px;
 }
 
-.irma-menu-bar .menu-label {
+.rap-menu-bar .menu-label {
     color: #64748b;
     font-size: 0.8rem;
     margin-right: 4px;
 }
 
-.irma-menu-bar .menu-select {
+.rap-menu-bar .menu-select {
     padding: 4px 8px;
     border: 1px solid #cbd5e1;
     border-radius: 4px;
@@ -91,17 +91,17 @@
     cursor: pointer;
 }
 
-.irma-menu-bar .menu-select:hover {
+.rap-menu-bar .menu-select:hover {
     border-color: #2563eb;
 }
 
-.irma-menu-bar .menu-select:focus {
+.rap-menu-bar .menu-select:focus {
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-.irma-menu-bar .menu-checkbox {
+.rap-menu-bar .menu-checkbox {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -115,17 +115,17 @@
     user-select: none;
 }
 
-.irma-menu-bar .menu-checkbox:hover {
+.rap-menu-bar .menu-checkbox:hover {
     border-color: #2563eb;
 }
 
-.irma-menu-bar .menu-checkbox:has(input:checked) {
+.rap-menu-bar .menu-checkbox:has(input:checked) {
     background: #dbeafe;
     border-color: #2563eb;
     color: #1d4ed8;
 }
 
-.irma-menu-bar .menu-checkbox input {
+.rap-menu-bar .menu-checkbox input {
     margin: 0;
     cursor: pointer;
 }

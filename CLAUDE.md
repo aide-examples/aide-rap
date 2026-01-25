@@ -19,7 +19,7 @@ Der User und Claude nutzen separate Ports für die Entwicklung:
 - `app/` - Hauptapplikation
   - `server/` - Node.js Backend
   - `shared/` - Isomorpher Code (Browser + Node.js)
-  - `static/irma/` - Frontend
+  - `static/rap/` - Frontend
   - `docs/requirements/` - Markdown-Dokumentation und Typdefinitionen
 - `tools/` - Build- und Generierungsskripte
 - `aide-frame/` - Framework (Submodule)

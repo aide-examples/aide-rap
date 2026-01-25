@@ -10,4 +10,4 @@ if command -v nvm &> /dev/null && nvm ls 24 &> /dev/null; then
     nvm use 24 --silent
 fi
 
-node irma.js "$@"
+node rap.js "$@"

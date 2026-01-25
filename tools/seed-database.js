@@ -3,10 +3,10 @@
  * Seed Database Tool
  *
  * Usage:
- *   node tools/seed-database.js -s irma              # Load all seed data
- *   node tools/seed-database.js -s irma Aircraft     # Load specific entities
+ *   node tools/seed-database.js -s irma              # Load all seed data (irma system)
+ *   node tools/seed-database.js -s book Author       # Load specific entities (book system)
  *   node tools/seed-database.js -s irma --reset Aircraft  # Reset table and reload
- *   node tools/seed-database.js -s irma --clear      # Clear all tables
+ *   node tools/seed-database.js -s book --clear      # Clear all tables
  */
 
 const path = require('path');
@@ -59,7 +59,7 @@ if (!fs.existsSync(SYSTEM_DIR)) {
 
 const CONFIG_PATH = path.join(SYSTEM_DIR, 'config.json');
 const DATA_MODEL_PATH = path.join(SYSTEM_DIR, 'docs', 'requirements', 'DataModel.md');
-const DB_PATH = path.join(SYSTEM_DIR, 'data', 'irma.sqlite');
+const DB_PATH = path.join(SYSTEM_DIR, 'data', 'rap.sqlite');
 const SEED_DIR = path.join(SYSTEM_DIR, 'data', 'seed');
 
 // Load config

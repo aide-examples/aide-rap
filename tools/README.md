@@ -1,4 +1,4 @@
-# IRMA Tools
+# RAP Tools
 
 Dieses Verzeichnis enthält Werkzeuge zur Verwaltung des Datenmodells und der Diagramme.
 
@@ -164,7 +164,7 @@ node tools/generate-drawio.js -o app/docs/requirements/layout.drawio
 ## Schnellreferenz
 
 ```bash
-cd /home/gero/aide-examples/aide-irma
+cd /home/gero/aide-examples/aide-rap
 
 # Nach Änderungen in DataModel.md:
 # 1. Layout Editor öffnen: http://localhost:18354/layout-editor

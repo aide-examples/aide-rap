@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * AIDE IRMA - Intelligent Repair and Maintenance in Aviation
+ * AIDE RAP - Rapid Application Prototyping
  */
 
 const path = require('path');
@@ -48,7 +48,7 @@ const DEFAULT_CONFIG = {
 const { Command } = require('commander');
 const program = new Command();
 
-program.description('AIDE IRMA - Intelligent Repair and Maintenance in Aviation');
+program.description('AIDE RAP - Rapid Application Prototyping');
 args.addCommonArgs(program);  // Adds --log-level, --config, --regenerate-icons
 program.requiredOption('-s, --system <name>', 'System name (required, subdirectory in systems/)');
 program.option('-p, --port <number>', 'Override port', parseInt);
@@ -82,7 +82,7 @@ const systemPaths = {
     seed: path.join(SYSTEM_DIR, 'data', 'seed'),
     logs: path.join(SYSTEM_DIR, 'logs'),
     help: path.join(SYSTEM_DIR, 'help'),
-    database: 'irma.sqlite'
+    database: 'rap.sqlite'
 };
 
 // Apply common args (log level, config loading, icon generation)
@@ -115,7 +115,7 @@ if (opts.port) {
 const logger = require('./server/utils/logger');
 logger.init(cfg.paths.logs);
 
-console.log(`Starting AIDE IRMA - System: ${systemName}`);
+console.log(`Starting AIDE RAP - System: ${systemName}`);
 
 // =============================================================================
 // 6. SERVER SETUP
@@ -130,7 +130,7 @@ const server = new HttpServer({
     port: cfg.port,
     appDir: APP_DIR,
     docsConfig: {
-        appName: `AIDE IRMA [${systemName}]`,
+        appName: `AIDE RAP [${systemName}]`,
         pwa: cfg.pwa && cfg.pwa.enabled ? cfg.pwa : null,
         docsEditable: cfg.docsEditable,
         helpEditable: cfg.helpEditable,
@@ -138,8 +138,8 @@ const server = new HttpServer({
         docsDir: cfg.paths.docs,
     },
     updateConfig: {
-        githubRepo: 'aide-examples/aide-irma',
-        serviceName: 'aide-irma',
+        githubRepo: 'aide-examples/aide-rap',
+        serviceName: 'aide-rap',
     }
 });
 
@@ -169,7 +169,7 @@ if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0)
 
 // Main page
 app.get('/', (req, res) => {
-    res.sendFile(path.join(APP_DIR, 'static', 'irma', 'irma.html'));
+    res.sendFile(path.join(APP_DIR, 'static', 'rap', 'rap.html'));
 });
 
 app.get('/index.html', (req, res) => {
@@ -178,7 +178,7 @@ app.get('/index.html', (req, res) => {
 
 // Layout Editor page
 app.get('/layout-editor', (req, res) => {
-    res.sendFile(path.join(APP_DIR, 'static', 'irma', 'diagram', 'layout-editor.html'));
+    res.sendFile(path.join(APP_DIR, 'static', 'rap', 'diagram', 'layout-editor.html'));
 });
 
 // API: List available data model documents

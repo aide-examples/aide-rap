@@ -1,5 +1,5 @@
 /**
- * AIDE IRMA - Client-side initialization
+ * AIDE RAP - Client-side initialization
  */
 
 (async () => {
@@ -12,7 +12,7 @@
     // Initialize Framework Header Widget
     if (typeof HeaderWidget !== 'undefined') {
       HeaderWidget.init('#app-header', {
-        appName: 'AIDE IRMA',
+        appName: 'AIDE RAP',
         showAbout: true,
         showHelp: true,
         showLanguage: true,
@@ -48,7 +48,7 @@
       }
     }
 
-    // Initialize IRMA components
+    // Initialize RAP components
     await EntityExplorer.init();
     DetailPanel.init();
     ConfirmDialog.init();
@@ -63,7 +63,7 @@
       SeedManager.open();
     });
 
-    console.log('AIDE IRMA initialized');
+    console.log('AIDE RAP initialized');
 
     // Handle page unload warning for unsaved changes
     window.addEventListener('beforeunload', (e) => {
@@ -74,6 +74,6 @@
     });
 
   } catch (err) {
-    console.error('Failed to initialize AIDE IRMA:', err);
+    console.error('Failed to initialize AIDE RAP:', err);
   }
 })();

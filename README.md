@@ -1,6 +1,6 @@
-# AIDE IRMA
+# AIDE RAP
 
-A **Rapid Application Development** demonstration built on the AIDE Framework.
+**Rapid Application Prototyping** – a demonstration platform built on the AIDE Framework.
 
 ---
 
@@ -20,9 +20,12 @@ A rapid application development platform that generates complete applications fr
 
 **[Read the Framework Documentation →](app/docs/index.md)**
 
-### 2. IRMA – A Demo Application
+### 2. Demo Systems
 
-*Intelligent Repair and Maintenance in Aviation* – a demonstration application for managing aircraft fleet data, operators, and maintenance records.
+Example applications demonstrating the platform:
+
+- **IRMA** – *Intelligent Repair and Maintenance in Aviation* – manages aircraft fleet data, operators, and maintenance records
+- **Book** – A simple publishing system with authors and books
 
 **[Read the User Guide →](app/help/index.md)**
 
@@ -32,16 +35,17 @@ A rapid application development platform that generates complete applications fr
 
 ```bash
 # Clone both repositories
-git clone https://github.com/aide-examples/aide-irma.git
+git clone https://github.com/aide-examples/aide-rap.git
 git clone https://github.com/aide-examples/aide-frame.git
 
 # Create symlink
-cd aide-irma
+cd aide-rap
 ln -s ../aide-frame aide-frame
 
 # Install and run
 npm install
-npm start
+./run -s irma         # Start IRMA system
+./run -s book -p 18352  # Start Book system on different port
 ```
 
 Open http://localhost:18354
@@ -53,24 +57,26 @@ Open http://localhost:18354
 | Menu Item | Description |
 |-----------|-------------|
 | **About** (`/about`) | Framework documentation – how the RAD system works |
-| **Help** (`/help`) | User guide – how to use the IRMA application |
+| **Help** (`/help`) | User guide – how to use the application |
 
 ---
 
 ## Project Structure
 
 ```
-aide-irma/
+aide-rap/
 ├── app/
 │   ├── docs/                 # Framework documentation
 │   │   ├── index.md          # ← RAD system overview
-│   │   └── requirements/     # Data model definitions
+│   │   └── statistics.md     # ← Project-wide LOC statistics
 │   ├── help/
 │   │   └── index.md          # ← Application user guide
 │   ├── server/               # Backend (Node.js)
 │   ├── shared/               # Isomorphic code (validation, types)
-│   ├── static/irma/          # Frontend (HTML, CSS, JS)
-│   └── data/                 # Database and seed data
+│   ├── static/rap/           # Frontend (HTML, CSS, JS)
+│   └── systems/              # Multi-system support
+│       ├── irma/             # IRMA aviation system
+│       └── book/             # Book demo system
 ├── tools/                    # CLI utilities
 └── aide-frame/               # Framework (symlink)
 ```

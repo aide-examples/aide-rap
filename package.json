@@ -1,10 +1,10 @@
 {
-  "name": "aide-irma",
+  "name": "aide-rap",
   "version": "1.0.0",
-  "description": "AIDE IRMA - Intelligent Repair and Maintenance in Aviation",
-  "main": "app/irma.js",
+  "description": "AIDE RAP - Rapid Application Prototyping",
+  "main": "app/rap.js",
   "scripts": {
-    "start": "node app/irma.js"
+    "start": "node app/rap.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

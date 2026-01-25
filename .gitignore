@@ -9,3 +9,7 @@ aide-frame
 
 # Logs
 app/logs/
+app/systems/*/logs/
+
+# Databases (generated at runtime)
+app/systems/*/data/*.sqlite

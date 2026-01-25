@@ -158,9 +158,9 @@ fi
 server_loc=$(count_loc "$PROJECT_ROOT/app/server" "*.js")
 shared_loc=$(count_loc "$PROJECT_ROOT/app/shared" "*.js")
 
-frontend_js=$(count_loc "$PROJECT_ROOT/app/static/irma" "*.js")
-frontend_css=$(count_loc "$PROJECT_ROOT/app/static/irma" "*.css")
-frontend_html=$(count_loc "$PROJECT_ROOT/app/static/irma" "*.html")
+frontend_js=$(count_loc "$PROJECT_ROOT/app/static/rap" "*.js")
+frontend_css=$(count_loc "$PROJECT_ROOT/app/static/rap" "*.css")
+frontend_html=$(count_loc "$PROJECT_ROOT/app/static/rap" "*.html")
 frontend_total=$((frontend_js + frontend_css + frontend_html))
 
 tools_js=$(count_loc "$PROJECT_ROOT/tools" "*.js")
