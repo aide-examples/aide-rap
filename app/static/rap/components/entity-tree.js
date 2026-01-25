@@ -926,7 +926,7 @@ const EntityTree = {
    */
   async onDelete(entityName, recordId) {
     const confirmed = await ConfirmDialog.show(
-      `Are you sure you want to delete this ${entityName}?`
+      i18n.t('confirm_delete', { entity: entityName })
     );
 
     if (confirmed) {
@@ -935,7 +935,7 @@ const EntityTree = {
         // Refresh via EntityExplorer
         await EntityExplorer.refresh();
       } catch (err) {
-        alert(`Delete failed: ${err.message}`);
+        alert(i18n.t('delete_failed', { message: err.message }));
       }
     }
   },
@@ -1008,7 +1008,7 @@ const EntityTree = {
     await this.collectTreeNodes(nodes, schema);
 
     if (nodes.length === 0) {
-      alert('No data to export. Expand some nodes first.');
+      alert(i18n.t('no_data_to_export'));
       return;
     }
 
@@ -1038,10 +1038,10 @@ const EntityTree = {
         URL.revokeObjectURL(url);
       } else {
         const error = await response.json();
-        alert(`PDF export failed: ${error.error || 'Unknown error'}`);
+        alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
       }
     } catch (err) {
-      alert(`PDF export failed: ${err.message}`);
+      alert(i18n.t('export_failed', { message: err.message }));
     }
   },
 

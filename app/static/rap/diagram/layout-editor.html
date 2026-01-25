@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="toolbar">
-        <h1>Layout Editor</h1>
+        <h1 id="pageTitle">Layout Editor</h1>
         <label>Document:
             <select id="docSelect">
                 <option value="">Loading...</option>
@@ -22,6 +22,7 @@
         <a id="linkCards" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Cards</a>
         <button id="saveBtn">Save</button>
         <span class="status" id="status"></span>
+        <a href="/" class="back-link" id="backLink">BACK</a>
     </div>
     <div class="canvas-container">
         <div class="canvas" id="canvas">
@@ -570,7 +571,23 @@
             }
         });
 
+        // Load app config for title
+        async function loadAppConfig() {
+            try {
+                const res = await fetch('/api/app/config');
+                if (res.ok) {
+                    const config = await res.json();
+                    const appName = config.app_name || 'AIDE RAP';
+                    document.getElementById('pageTitle').textContent = appName + ' - Layout Editor';
+                    document.title = 'Layout Editor - ' + appName;
+                }
+            } catch (e) {
+                console.warn('Could not load app config:', e);
+            }
+        }
+
         // Initialize
+        loadAppConfig();
         loadDocuments();
     </script>
 </body>

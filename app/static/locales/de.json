@@ -1,4 +1,69 @@
 {
     "app_title": "AIDE RAP",
-    "hello": "Hallo"
+
+    "data_model": "Modell",
+    "layout_editor": "Layout",
+    "menu_sort": "Sortierung:",
+    "menu_admin": "Admin",
+
+    "sort_attr_schema": "Schema",
+    "sort_attr_alpha": "ABC",
+    "sort_ref_end": "Referenzen am Ende",
+    "sort_ref_start": "Referenzen zuerst",
+    "sort_ref_inline": "Referenzen inline",
+
+    "tooltip_attr_order": "Attributreihenfolge",
+    "tooltip_ref_position": "Referenzposition",
+    "tooltip_show_ids": "Technische IDs im Detailbereich anzeigen",
+    "tooltip_show_cycles": "Zyklische Referenzen anzeigen (sonst verborgen)",
+    "tooltip_refresh_counts": "Zählungen aktualisieren",
+    "tooltip_table_view": "Tabellenansicht",
+    "tooltip_tree_view_h": "Baumansicht (horizontale Attribute)",
+    "tooltip_tree_view_v": "Baumansicht (vertikale Attribute)",
+    "tooltip_collapse_panel": "Panel einklappen",
+    "tooltip_expand_panel": "Panel ausklappen",
+
+    "select_entity": "Entität auswählen...",
+    "details": "Details",
+    "select_record_message": "Wählen Sie einen Datensatz aus, um Details anzuzeigen.",
+    "select_entity_message": "Wählen Sie einen Entitätstyp aus, um Datensätze anzuzeigen.",
+    "no_records_found": "Keine Datensätze gefunden.",
+
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "save": "Speichern",
+    "save_changes": "Änderungen speichern",
+    "create": "Erstellen",
+    "edit": "Bearbeiten",
+
+    "new_entity": "Neues %{entity}",
+    "edit_entity": "%{entity} #%{id} bearbeiten",
+    "entity_title": "%{entity} #%{id}",
+
+    "confirm_delete": "Möchten Sie dieses %{entity} wirklich löschen?",
+    "dont_ask_again": "Diese Sitzung nicht mehr fragen",
+    "unsaved_changes_warning": "Sie haben ungespeicherte Änderungen. Möchten Sie diese wirklich verwerfen?",
+
+    "select_option": "-- Auswählen --",
+    "loading": "Laden...",
+    "search_options": "Suchen (%{count} Optionen)...",
+    "error_loading_options": "-- Fehler beim Laden --",
+
+    "error_generic": "Fehler: %{message}",
+    "delete_failed": "Löschen fehlgeschlagen: %{message}",
+    "error_loading_records": "Fehler beim Laden der Datensätze: %{message}",
+
+    "ctx_new": "Neu...",
+    "ctx_details": "Details",
+    "ctx_edit": "Bearbeiten",
+    "ctx_delete": "Löschen",
+    "ctx_export_pdf": "PDF exportieren",
+    "ctx_export_csv": "CSV exportieren",
+
+    "no_data_to_export": "Keine Daten zum Exportieren. Erweitern Sie zuerst einige Knoten.",
+    "no_records_to_export": "Keine Datensätze zum Exportieren.",
+    "export_failed": "Export fehlgeschlagen: %{message}",
+
+    "no_references": "Keine Referenzen",
+    "no_relations": "Keine Beziehungen"
 }

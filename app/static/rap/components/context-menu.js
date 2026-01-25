@@ -17,33 +17,38 @@ const ContextMenu = {
     menu.innerHTML = `
       <div class="context-menu-item" data-action="new">
         <span class="context-menu-icon">&#10133;</span>
-        New...
+        <span data-i18n="ctx_new">New...</span>
       </div>
       <div class="context-menu-separator"></div>
       <div class="context-menu-item" data-action="details">
         <span class="context-menu-icon">&#128269;</span>
-        Details
+        <span data-i18n="ctx_details">Details</span>
       </div>
       <div class="context-menu-item" data-action="edit">
         <span class="context-menu-icon">&#9998;</span>
-        Edit
+        <span data-i18n="ctx_edit">Edit</span>
       </div>
       <div class="context-menu-item context-menu-item-danger" data-action="delete">
         <span class="context-menu-icon">&#128465;</span>
-        Delete
+        <span data-i18n="ctx_delete">Delete</span>
       </div>
       <div class="context-menu-separator"></div>
       <div class="context-menu-item" data-action="export-pdf">
         <span class="context-menu-icon">&#128462;</span>
-        Export PDF
+        <span data-i18n="ctx_export_pdf">Export PDF</span>
       </div>
       <div class="context-menu-item" data-action="export-csv">
         <span class="context-menu-icon">&#128196;</span>
-        Export CSV
+        <span data-i18n="ctx_export_csv">Export CSV</span>
       </div>
     `;
     document.body.appendChild(menu);
     this.menu = menu;
+
+    // Apply i18n translations to menu items
+    if (typeof i18n !== 'undefined') {
+      i18n.applyToDOM(menu);
+    }
 
     // Click handlers for menu items
     menu.querySelectorAll('.context-menu-item').forEach(item => {

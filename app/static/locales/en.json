@@ -1,4 +1,69 @@
 {
     "app_title": "AIDE RAP",
-    "hello": "Hello"
+
+    "data_model": "Model",
+    "layout_editor": "Layout",
+    "menu_sort": "Sort:",
+    "menu_admin": "Admin",
+
+    "sort_attr_schema": "Schema",
+    "sort_attr_alpha": "ABC",
+    "sort_ref_end": "References at end",
+    "sort_ref_start": "References first",
+    "sort_ref_inline": "References inline",
+
+    "tooltip_attr_order": "Attribute order",
+    "tooltip_ref_position": "References position",
+    "tooltip_show_ids": "Show technical IDs in detail panel",
+    "tooltip_show_cycles": "Show cycle references (otherwise hidden)",
+    "tooltip_refresh_counts": "Refresh counts",
+    "tooltip_table_view": "Table view",
+    "tooltip_tree_view_h": "Tree view (horizontal attributes)",
+    "tooltip_tree_view_v": "Tree view (vertical attributes)",
+    "tooltip_collapse_panel": "Collapse panel",
+    "tooltip_expand_panel": "Expand panel",
+
+    "select_entity": "Select Entity...",
+    "details": "Details",
+    "select_record_message": "Select a record to view details.",
+    "select_entity_message": "Select an entity type to view records.",
+    "no_records_found": "No records found.",
+
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "save": "Save",
+    "save_changes": "Save Changes",
+    "create": "Create",
+    "edit": "Edit",
+
+    "new_entity": "New %{entity}",
+    "edit_entity": "Edit %{entity} #%{id}",
+    "entity_title": "%{entity} #%{id}",
+
+    "confirm_delete": "Are you sure you want to delete this %{entity}?",
+    "dont_ask_again": "Don't ask again this session",
+    "unsaved_changes_warning": "You have unsaved changes. Are you sure you want to discard them?",
+
+    "select_option": "-- Select --",
+    "loading": "Loading...",
+    "search_options": "Search (%{count} options)...",
+    "error_loading_options": "-- Error loading --",
+
+    "error_generic": "Error: %{message}",
+    "delete_failed": "Delete failed: %{message}",
+    "error_loading_records": "Error loading records: %{message}",
+
+    "ctx_new": "New...",
+    "ctx_details": "Details",
+    "ctx_edit": "Edit",
+    "ctx_delete": "Delete",
+    "ctx_export_pdf": "Export PDF",
+    "ctx_export_csv": "Export CSV",
+
+    "no_data_to_export": "No data to export. Expand some nodes first.",
+    "no_records_to_export": "No records to export.",
+    "export_failed": "Export failed: %{message}",
+
+    "no_references": "No references",
+    "no_relations": "No relations"
 }

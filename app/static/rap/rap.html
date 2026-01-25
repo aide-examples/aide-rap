@@ -18,27 +18,27 @@
             <a href="/about?doc=requirements/DataModel.md" class="menu-item" data-i18n="data_model">Model</a>
             <a href="/layout-editor" class="menu-item" data-i18n="layout_editor">Layout</a>
             <span class="menu-separator">|</span>
-            <label class="menu-label">Sort:</label>
-            <select id="sort-attributes" class="menu-select" title="Attribute order">
-                <option value="schema">Schema</option>
-                <option value="alpha">ABC</option>
+            <label class="menu-label" data-i18n="menu_sort">Sort:</label>
+            <select id="sort-attributes" class="menu-select" title="Attribute order" data-i18n-title="tooltip_attr_order">
+                <option value="schema" data-i18n="sort_attr_schema">Schema</option>
+                <option value="alpha" data-i18n="sort_attr_alpha">ABC</option>
             </select>
-            <select id="sort-references" class="menu-select" title="References position">
-                <option value="end">References at end</option>
-                <option value="start">References first</option>
-                <option value="inline">References inline</option>
+            <select id="sort-references" class="menu-select" title="References position" data-i18n-title="tooltip_ref_position">
+                <option value="end" data-i18n="sort_ref_end">References at end</option>
+                <option value="start" data-i18n="sort_ref_start">References first</option>
+                <option value="inline" data-i18n="sort_ref_inline">References inline</option>
             </select>
             <span class="menu-separator">|</span>
-            <label class="menu-checkbox" title="Show technical IDs in detail panel">
+            <label class="menu-checkbox" title="Show technical IDs in detail panel" data-i18n-title="tooltip_show_ids">
                 <input type="checkbox" id="show-ids-toggle">
                 <span>IDs</span>
             </label>
-            <label class="menu-checkbox" title="Show cycle references (otherwise hidden)">
+            <label class="menu-checkbox" title="Show cycle references (otherwise hidden)" data-i18n-title="tooltip_show_cycles">
                 <input type="checkbox" id="show-cycles-toggle">
                 <span style="font-size: 1.1em;">&#x21bb;</span>
             </label>
             <span class="menu-separator">|</span>
-            <a href="#" id="menu-tools" class="menu-item">Admin</a>
+            <a href="#" id="menu-tools" class="menu-item" data-i18n="menu_admin">Admin</a>
         </nav>
 
         <!-- Modal Container (for Seed Manager and other tools) -->
@@ -53,7 +53,7 @@
                     <div class="explorer-toolbar">
                         <!-- View mode toggle: Table / Tree-H / Tree-V -->
                         <div class="view-mode-buttons">
-                            <button id="btn-view-table" class="btn-view-mode" title="Table view">
+                            <button id="btn-view-table" class="btn-view-mode" title="Table view" data-i18n-title="tooltip_table_view">
                                 <!-- Grid/Table icon -->
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                                     <rect x="0" y="0" width="6" height="3"/><rect x="8" y="0" width="6" height="3"/>
@@ -61,7 +61,7 @@
                                     <rect x="0" y="10" width="6" height="3"/><rect x="8" y="10" width="6" height="3"/>
                                 </svg>
                             </button>
-                            <button id="btn-view-tree-h" class="btn-view-mode" title="Tree view (horizontal attributes)">
+                            <button id="btn-view-tree-h" class="btn-view-mode" title="Tree view (horizontal attributes)" data-i18n-title="tooltip_tree_view_h">
                                 <!-- Tree with horizontal bars -->
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                                     <rect x="0" y="0" width="14" height="2"/>
@@ -70,7 +70,7 @@
                                     <rect x="4" y="12" width="10" height="2"/>
                                 </svg>
                             </button>
-                            <button id="btn-view-tree-v" class="btn-view-mode active" title="Tree view (vertical attributes)">
+                            <button id="btn-view-tree-v" class="btn-view-mode active" title="Tree view (vertical attributes)" data-i18n-title="tooltip_tree_view_v">
                                 <!-- Tree with vertical bar indicating stacked layout -->
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                                     <rect x="0" y="0" width="14" height="2"/>
@@ -85,7 +85,7 @@
                             </button>
                             <div class="entity-selector-menu"></div>
                         </div>
-                        <button id="btn-refresh-counts" class="btn-icon" title="Refresh counts">
+                        <button id="btn-refresh-counts" class="btn-icon" title="Refresh counts" data-i18n-title="tooltip_refresh_counts">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M23 4v6h-6M1 20v-6h6"/>
                                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
@@ -106,7 +106,7 @@
                 <aside id="detail-panel" class="detail-panel">
                     <div class="panel-header">
                         <span id="panel-title" class="panel-title" data-i18n="details">Details</span>
-                        <button id="panel-toggle" class="panel-toggle" title="Collapse panel">&#9666;</button>
+                        <button id="panel-toggle" class="panel-toggle" title="Collapse panel" data-i18n-title="tooltip_collapse_panel">&#9666;</button>
                     </div>
                     <div id="panel-content" class="panel-content">
                         <p class="empty-message" data-i18n="select_record_message">Select a record to view details.</p>
@@ -114,7 +114,7 @@
                 </aside>
 
                 <!-- Collapsed Panel Toggle -->
-                <button id="panel-expand" class="panel-expand hidden" title="Expand panel">&#9656;</button>
+                <button id="panel-expand" class="panel-expand hidden" title="Expand panel" data-i18n-title="tooltip_expand_panel">&#9656;</button>
             </div>
 
             <!-- Framework Status Widget (Footer) -->

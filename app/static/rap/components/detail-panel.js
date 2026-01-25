@@ -75,8 +75,8 @@ const DetailPanel = {
     this.currentEntity = null;
     this.currentRecord = null;
     this.mode = null;
-    this.setTitle('Details');
-    this.content.innerHTML = '<p class="empty-message">Select a record to view details.</p>';
+    this.setTitle(i18n.t('details'));
+    this.content.innerHTML = `<p class="empty-message">${i18n.t('select_record_message')}</p>`;
   },
 
   /**
@@ -112,7 +112,7 @@ const DetailPanel = {
     // Ensure panel is visible when showing a record
     this.show();
 
-    this.setTitle(`${entityName} #${record.id}`);
+    this.setTitle(i18n.t('entity_title', { entity: entityName, id: record.id }));
 
     // Use extended schema for enum value formatting
     const schema = await SchemaCache.getExtended(entityName);
@@ -164,7 +164,7 @@ const DetailPanel = {
 
     html += `
       <div class="form-actions">
-        <button class="btn-save" id="btn-panel-edit">Edit</button>
+        <button class="btn-save" id="btn-panel-edit">${i18n.t('edit')}</button>
       </div>
     </div>`;
 
@@ -186,7 +186,7 @@ const DetailPanel = {
     this.currentEntity = entityName;
     this.currentRecord = null;
 
-    this.setTitle(`New ${entityName}`);
+    this.setTitle(i18n.t('new_entity', { entity: entityName }));
     await EntityForm.render(this.content, entityName, null);
 
     if (this.isCollapsed) {
@@ -200,7 +200,7 @@ const DetailPanel = {
     this.currentRecord = record;
 
     this.show();
-    this.setTitle(`Edit ${entityName} #${record.id}`);
+    this.setTitle(i18n.t('edit_entity', { entity: entityName, id: record.id }));
     await EntityForm.render(this.content, entityName, record);
   },
 

@@ -7,15 +7,30 @@
     // Initialize Framework i18n
     if (typeof i18n !== 'undefined') {
       await i18n.init();
+      i18n.applyToDOM();  // Apply translations to data-i18n and data-i18n-title attributes
+    }
+
+    // Load app config to get system-specific name
+    let appName = 'AIDE RAP';
+    try {
+      const configRes = await fetch('/api/app/config');
+      if (configRes.ok) {
+        const config = await configRes.json();
+        appName = config.app_name || appName;
+        document.title = appName;
+      }
+    } catch (e) {
+      console.warn('Could not load app config:', e);
     }
 
     // Initialize Framework Header Widget
     if (typeof HeaderWidget !== 'undefined') {
       HeaderWidget.init('#app-header', {
-        appName: 'AIDE RAP',
+        appName: appName,
         showAbout: true,
         showHelp: true,
         showLanguage: true,
+        showGoogleTranslate: true,
         aboutLink: '/about',
         helpLink: '/help'
       });

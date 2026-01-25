@@ -1,4 +1,69 @@
 {
     "app_title": "AIDE RAP",
-    "hello": "Hola"
+
+    "data_model": "Modelo",
+    "layout_editor": "Diseño",
+    "menu_sort": "Ordenar:",
+    "menu_admin": "Admin",
+
+    "sort_attr_schema": "Esquema",
+    "sort_attr_alpha": "ABC",
+    "sort_ref_end": "Referencias al final",
+    "sort_ref_start": "Referencias primero",
+    "sort_ref_inline": "Referencias en línea",
+
+    "tooltip_attr_order": "Orden de atributos",
+    "tooltip_ref_position": "Posición de referencias",
+    "tooltip_show_ids": "Mostrar IDs técnicos en panel de detalles",
+    "tooltip_show_cycles": "Mostrar referencias cíclicas (sino ocultas)",
+    "tooltip_refresh_counts": "Actualizar conteos",
+    "tooltip_table_view": "Vista de tabla",
+    "tooltip_tree_view_h": "Vista de árbol (atributos horizontales)",
+    "tooltip_tree_view_v": "Vista de árbol (atributos verticales)",
+    "tooltip_collapse_panel": "Colapsar panel",
+    "tooltip_expand_panel": "Expandir panel",
+
+    "select_entity": "Seleccionar entidad...",
+    "details": "Detalles",
+    "select_record_message": "Seleccione un registro para ver los detalles.",
+    "select_entity_message": "Seleccione un tipo de entidad para ver registros.",
+    "no_records_found": "No se encontraron registros.",
+
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "save_changes": "Guardar cambios",
+    "create": "Crear",
+    "edit": "Editar",
+
+    "new_entity": "Nuevo %{entity}",
+    "edit_entity": "Editar %{entity} #%{id}",
+    "entity_title": "%{entity} #%{id}",
+
+    "confirm_delete": "¿Está seguro de que desea eliminar este %{entity}?",
+    "dont_ask_again": "No preguntar de nuevo esta sesión",
+    "unsaved_changes_warning": "Tiene cambios sin guardar. ¿Está seguro de que desea descartarlos?",
+
+    "select_option": "-- Seleccionar --",
+    "loading": "Cargando...",
+    "search_options": "Buscar (%{count} opciones)...",
+    "error_loading_options": "-- Error al cargar --",
+
+    "error_generic": "Error: %{message}",
+    "delete_failed": "Error al eliminar: %{message}",
+    "error_loading_records": "Error al cargar registros: %{message}",
+
+    "ctx_new": "Nuevo...",
+    "ctx_details": "Detalles",
+    "ctx_edit": "Editar",
+    "ctx_delete": "Eliminar",
+    "ctx_export_pdf": "Exportar PDF",
+    "ctx_export_csv": "Exportar CSV",
+
+    "no_data_to_export": "No hay datos para exportar. Expanda algunos nodos primero.",
+    "no_records_to_export": "No hay registros para exportar.",
+    "export_failed": "Error en exportación: %{message}",
+
+    "no_references": "Sin referencias",
+    "no_relations": "Sin relaciones"
 }

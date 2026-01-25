@@ -57,9 +57,9 @@ const EntityForm = {
     html += `
       <div class="form-actions">
         <button type="submit" class="btn-save" id="btn-save">
-          ${isEdit ? 'Save Changes' : 'Create'}
+          ${i18n.t(isEdit ? 'save_changes' : 'create')}
         </button>
-        <button type="button" class="btn-cancel" id="btn-cancel">Cancel</button>
+        <button type="button" class="btn-cancel" id="btn-cancel">${i18n.t('cancel')}</button>
       </div>
     </form>`;
 
@@ -128,7 +128,7 @@ const EntityForm = {
         }
       } catch (err) {
         // On error, show a simple input fallback
-        select.innerHTML = `<option value="${currentValue}">${currentValue || '-- Error loading --'}</option>`;
+        select.innerHTML = `<option value="${currentValue}">${currentValue || i18n.t('error_loading_options')}</option>`;
         console.error(`Failed to load FK options for ${entityName}:`, err);
       }
     }
@@ -138,7 +138,7 @@ const EntityForm = {
    * Render FK field as a simple dropdown (for small datasets)
    */
   renderFKDropdown(select, options, currentValue) {
-    let optionsHtml = '<option value="">-- Select --</option>';
+    let optionsHtml = `<option value="">${i18n.t('select_option')}</option>`;
 
     for (const opt of options) {
       const selected = String(opt.id) === String(currentValue) ? 'selected' : '';
@@ -178,7 +178,7 @@ const EntityForm = {
     searchInput.type = 'text';
     searchInput.className = 'form-input fk-combobox';
     searchInput.setAttribute('list', datalistId);
-    searchInput.placeholder = `Search (${options.length} options)...`;
+    searchInput.placeholder = i18n.t('search_options', { count: options.length });
     searchInput.value = displayValue;
     searchInput.autocomplete = 'off';
 
@@ -247,7 +247,7 @@ const EntityForm = {
 
     // Enum fields: render as dropdown
     if (col.enumValues && col.enumValues.length > 0) {
-      let options = '<option value="">-- Select --</option>';
+      let options = `<option value="">${i18n.t('select_option')}</option>`;
       for (const opt of col.enumValues) {
         // Support both formats: { value, label } and { internal, external }
         const value = opt.value !== undefined ? opt.value : opt.internal;
@@ -275,7 +275,7 @@ const EntityForm = {
                 data-fk-entity="${col.foreignKey.entity}"
                 data-fk-value="${displayValue}"
                 ${disabled}>
-          <option value="">Loading...</option>
+          <option value="">${i18n.t('loading')}</option>
         </select>
       `;
     }
@@ -403,7 +403,7 @@ const EntityForm = {
       });
     } else {
       // General error
-      alert(`Error: ${err.message}`);
+      alert(i18n.t('error_generic', { message: err.message }));
     }
   },
 
@@ -414,7 +414,7 @@ const EntityForm = {
 
   async onCancel() {
     if (this.isDirty) {
-      const confirmed = confirm('You have unsaved changes. Are you sure you want to discard them?');
+      const confirmed = confirm(i18n.t('unsaved_changes_warning'));
       if (!confirmed) return;
     }
 

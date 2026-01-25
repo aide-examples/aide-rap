@@ -241,7 +241,7 @@ const EntityTable = {
     html += '<tbody>';
     if (sortedRecords.length === 0) {
       const colSpan = columns.length + backRefs.length;
-      html += `<tr><td colspan="${colSpan}" class="empty-table-message">No records found.</td></tr>`;
+      html += `<tr><td colspan="${colSpan}" class="empty-table-message">${i18n.t('no_records_found')}</td></tr>`;
     }
     for (let i = 0; i < sortedRecords.length; i++) {
       const record = sortedRecords[i];
@@ -555,7 +555,7 @@ const EntityTable = {
    */
   async onDelete(id) {
     const confirmed = await ConfirmDialog.show(
-      `Are you sure you want to delete this ${this.currentEntity}?`
+      i18n.t('confirm_delete', { entity: this.currentEntity })
     );
 
     if (confirmed) {
@@ -563,7 +563,7 @@ const EntityTable = {
         await ApiClient.delete(this.currentEntity, id);
         await EntityExplorer.refresh();
       } catch (err) {
-        alert(`Delete failed: ${err.message}`);
+        alert(i18n.t('delete_failed', { message: err.message }));
       }
     }
   },
@@ -618,7 +618,7 @@ const EntityTable = {
 
     const records = this.getFilteredRecords();
     if (records.length === 0) {
-      alert('No records to export.');
+      alert(i18n.t('no_records_to_export'));
       return;
     }
 
@@ -687,10 +687,10 @@ const EntityTable = {
         URL.revokeObjectURL(url);
       } else {
         const error = await response.json();
-        alert(`PDF export failed: ${error.error || 'Unknown error'}`);
+        alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
       }
     } catch (err) {
-      alert(`PDF export failed: ${err.message}`);
+      alert(i18n.t('export_failed', { message: err.message }));
     }
   },
 
@@ -704,7 +704,7 @@ const EntityTable = {
 
     const records = this.getFilteredRecords();
     if (records.length === 0) {
-      alert('No records to export.');
+      alert(i18n.t('no_records_to_export'));
       return;
     }
 
@@ -764,10 +764,10 @@ const EntityTable = {
         URL.revokeObjectURL(url);
       } else {
         const error = await response.json();
-        alert(`CSV export failed: ${error.error || 'Unknown error'}`);
+        alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
       }
     } catch (err) {
-      alert(`CSV export failed: ${err.message}`);
+      alert(i18n.t('export_failed', { message: err.message }));
     }
   },
 };

@@ -184,7 +184,7 @@ const EntityExplorer = {
     } catch (err) {
       console.error('Failed to load records:', err);
       this.records = [];
-      const message = `<p class="empty-message">Error loading records: ${err.message}</p>`;
+      const message = `<p class="empty-message">${i18n.t('error_loading_records', { message: err.message })}</p>`;
       if (this.viewMode === 'table') {
         this.tableContainer.innerHTML = message;
       } else {
@@ -243,7 +243,7 @@ const EntityExplorer = {
 
   async renderTable() {
     if (!this.currentEntity) {
-      this.tableContainer.innerHTML = '<p class="empty-message">Select an entity type to view records.</p>';
+      this.tableContainer.innerHTML = `<p class="empty-message">${i18n.t('select_entity_message')}</p>`;
       return;
     }
 
@@ -252,12 +252,12 @@ const EntityExplorer = {
 
   renderList() {
     if (!this.currentEntity) {
-      this.list.innerHTML = '<p class="empty-message">Select an entity type to view records.</p>';
+      this.list.innerHTML = `<p class="empty-message">${i18n.t('select_entity_message')}</p>`;
       return;
     }
 
     if (this.records.length === 0) {
-      this.list.innerHTML = '<p class="empty-message">No records found.</p>';
+      this.list.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
       return;
     }
 
@@ -314,12 +314,12 @@ const EntityExplorer = {
 
   async renderTree() {
     if (!this.currentEntity) {
-      this.treeContainer.innerHTML = '<p class="empty-message">Select an entity type to view records.</p>';
+      this.treeContainer.innerHTML = `<p class="empty-message">${i18n.t('select_entity_message')}</p>`;
       return;
     }
 
     if (this.records.length === 0) {
-      this.treeContainer.innerHTML = '<p class="empty-message">No records found.</p>';
+      this.treeContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
       return;
     }
 
@@ -383,7 +383,7 @@ const EntityExplorer = {
     if (!record) return;
 
     const confirmed = await ConfirmDialog.show(
-      `Are you sure you want to delete this ${this.currentEntity}?`
+      i18n.t('confirm_delete', { entity: this.currentEntity })
     );
 
     if (confirmed) {
@@ -395,7 +395,7 @@ const EntityExplorer = {
           DetailPanel.clear();
         }
       } catch (err) {
-        alert(`Delete failed: ${err.message}`);
+        alert(i18n.t('delete_failed', { message: err.message }));
       }
     }
   },
