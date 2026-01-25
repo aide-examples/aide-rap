@@ -27,11 +27,12 @@ grep -r "OLD_NAME" app/systems/<system>/config.json
 **Typical locations:**
 - `app/systems/<system>/docs/requirements/classes/OLD_NAME.md` - Entity definition
 - `app/systems/<system>/docs/requirements/DataModel.md` - List and links
-- `app/systems/<system>/docs/requirements/DataModel.yaml` - Schema definition
 - `app/systems/<system>/docs/requirements/DataModel-layout.json` - Diagram position
 - `app/systems/<system>/docs/requirements/classes/*.md` - Seed context in other entities
 - `app/systems/<system>/data/seed/OLD_NAME.json` - Generated seed data
 - `app/systems/<system>/config.json` - enabledEntities list
+
+**Note:** `DataModel.yaml` is auto-generated - no need to search there.
 
 ---
 
@@ -56,16 +57,13 @@ mv app/systems/<system>/data/seed/OLD_NAME.json app/systems/<system>/data/seed/N
 - Update link: `[OLD_NAME](classes/OLD_NAME.md)` -> `[NEW_NAME](classes/NEW_NAME.md)`
 - Adjust description text if needed
 
-### 3.3 DataModel.yaml
-- Change entity key: `OLD_NAME:` -> `NEW_NAME:`
-
-### 3.4 DataModel-layout.json
+### 3.3 DataModel-layout.json
 - Change key: `"OLD_NAME":` -> `"NEW_NAME":`
 
-### 3.5 config.json
+### 3.4 config.json
 - Rename in `crud.enabledEntities` array
 
-### 3.6 Other Entity Files (Seed Context, FK References, Prose)
+### 3.5 Other Entity Files (Seed Context, FK References, Prose)
 - Replace all `OLD_NAME` references with `NEW_NAME`
 - **Important:** Also check prose in `## Data Generator` sections!
 
@@ -128,12 +126,13 @@ conn.close()
 
 **Affected files:**
 1. `classes/EngineTypePossible.md` -> `classes/EngineMountPossible.md`
-2. `DataModel.md` - Line 18
-3. `DataModel.yaml` - Entity key
-4. `DataModel-layout.json` - Position key
-5. `config.json` - enabledEntities
-6. `classes/EngineMount.md` - Seed context
-7. `seed/EngineTypePossible.json` -> `seed/EngineMountPossible.json`
+2. `DataModel.md` - Link update
+3. `DataModel-layout.json` - Position key
+4. `config.json` - enabledEntities
+5. `classes/EngineMount.md` - Seed context
+6. `seed/EngineTypePossible.json` -> `seed/EngineMountPossible.json`
+
+**Note:** `DataModel.yaml` is auto-generated - will update on server restart.
 
 **Database:**
 - `engine_type_possible` -> `engine_mount_possible` (30 records)

@@ -1,0 +1,30 @@
+{
+  "port": 18360,
+  "log_level": "INFO",
+  "docsEditable": true,
+  "helpEditable": true,
+  "pwa": {
+    "enabled": true,
+    "name": "AIDE RAP [book_1]",
+    "short_name": "book_1",
+    "description": "A minimal model for authors and books",
+    "theme_color": "#59eb24",
+    "background_color": "#f5f5f5",
+    "icon192": "/static/icons/icon-192.svg",
+    "icon512": "/static/icons/icon-512.svg",
+    "icon": {
+      "background": "#59eb24",
+      "line1_text": "aide",
+      "line1_color": "#94a3b8",
+      "line2_text": "book_1",
+      "line2_color": "#ffffff",
+      "line2_size": 0.38
+    }
+  },
+  "crud": {
+    "enabledEntities": [
+      "Author",
+      "Book"
+    ]
+  }
+}

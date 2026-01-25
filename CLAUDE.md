@@ -17,6 +17,14 @@ When Claude says "Server restart required", the user restarts their server on 18
 
 ## Creating a New System
 
+**Recommended:** Use the Model Builder UI (see `app/docs/procedures/system-create.md`)
+
+1. Open Seed Data Manager (toolbar or `/` key)
+2. Click **+ New System**
+3. Follow the wizard tabs
+
+**Alternative (manual):**
+
 ```bash
 cp -r app/systems/book app/systems/myapp
 ```
@@ -61,6 +69,12 @@ Description of what this entity represents.
 ## Procedures
 
 Standard procedures are documented in `app/docs/procedures/`:
+
+**System Management:**
+- `system-create.md` - How to create a new system via Model Builder
+- `system-delete.md` - How to delete a system completely
+
+**Entity Operations:**
 - `entity-rename.md` - How to rename an entity
 - `attribute-add.md` - How to add a new attribute
 - `attribute-delete.md` - How to remove an attribute

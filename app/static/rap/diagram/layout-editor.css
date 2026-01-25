@@ -56,6 +56,16 @@ body {
     font-size: 12px;
     color: #aaa;
 }
+.toolbar .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.toolbar .toggle-label input {
+    cursor: pointer;
+}
 .canvas-container {
     flex: 1;
     overflow: auto;

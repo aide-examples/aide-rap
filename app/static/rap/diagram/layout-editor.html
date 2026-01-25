@@ -15,6 +15,10 @@
             </select>
         </label>
         <button id="viewLayout" class="secondary active">Layout</button>
+        <label class="toggle-label">
+            <input type="checkbox" id="fitToContent">
+            <span>Fit to content</span>
+        </label>
         <div class="spacer"></div>
         <span class="help-text">Drag boxes to reposition</span>
         <a id="linkCompact" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Compact</a>
@@ -60,6 +64,42 @@
         let layout = null;
         let showDetailed = true;
         let isDirty = false;
+        let fitToContent = false;
+
+        // Canvas for text measurement
+        const measureCanvas = document.createElement('canvas');
+        const measureCtx = measureCanvas.getContext('2d');
+
+        // Measure text width using canvas
+        function measureText(text, fontSize, fontFamily) {
+            measureCtx.font = `${fontSize}px ${fontFamily}`;
+            return measureCtx.measureText(text).width;
+        }
+
+        // Calculate box width based on content
+        function getBoxWidth(className) {
+            if (!fitToContent) {
+                return BOX_WIDTH;
+            }
+
+            const classDef = model.classes[className] || {};
+            const attrs = getVisibleAttributes(className);
+
+            // Measure class name (header)
+            let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
+
+            // Measure all attributes
+            if (showDetailed) {
+                for (const attr of attrs) {
+                    const attrText = `${attr.name}: ${attr.type}`;
+                    const attrWidth = measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY);
+                    maxWidth = Math.max(maxWidth, attrWidth);
+                }
+            }
+
+            // Add padding (left + right)
+            return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
+        }
 
         // DOM elements
         const docSelect = document.getElementById('docSelect');
@@ -176,7 +216,8 @@
             for (const className of Object.keys(model.classes)) {
                 const pos = positions[className] || { x: 50, y: 50 };
                 const height = getBoxHeight(className);
-                maxX = Math.max(maxX, pos.x + BOX_WIDTH + 50);
+                const width = getBoxWidth(className);
+                maxX = Math.max(maxX, pos.x + width + 50);
                 maxY = Math.max(maxY, pos.y + height + 50);
             }
 
@@ -213,9 +254,11 @@
             const toPos = positions[toClass] || { x: 50, y: 50 };
             const fromHeight = getBoxHeight(fromClass);
             const toHeight = getBoxHeight(toClass);
+            const fromWidth = getBoxWidth(fromClass);
+            const toWidth = getBoxWidth(toClass);
 
             return ConnectionCalculator.getConnectionPoint(
-                fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed
+                fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed, fromWidth, toWidth
             );
         }
 
@@ -253,7 +296,8 @@
 
                         if (className === baseType) {
                             // Self-reference: arc from first attribute to header center
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos);
+                            const boxWidth = getBoxWidth(className);
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, boxWidth);
                             pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
                             labelPos = ConnectionCalculator.getSelfReferenceLabelPosition(arc);
                             textAnchor = 'start';
@@ -419,12 +463,13 @@
         // Create a draggable class box element
         function createClassBox(className, classDef, pos) {
             const box = document.createElement('div');
-            box.className = 'class-box' + (showDetailed ? '' : ' compact');
+            box.className = 'class-box' + (showDetailed ? '' : ' compact') + (fitToContent ? ' fit-content' : '');
             box.dataset.className = className;
             box.style.left = pos.x + 'px';
             box.style.top = pos.y + 'px';
             box.style.backgroundColor = getColor(className);
             box.style.height = getBoxHeight(className) + 'px';
+            box.style.width = getBoxWidth(className) + 'px';
 
             // Header
             const header = document.createElement('div');
@@ -562,6 +607,13 @@
         docSelect.addEventListener('change', () => loadDocument(docSelect.value));
         saveBtn.addEventListener('click', saveLayout);
         viewLayoutBtn.addEventListener('click', toggleDetailedView);
+
+        // Fit to content toggle
+        const fitToContentCheckbox = document.getElementById('fitToContent');
+        fitToContentCheckbox.addEventListener('change', () => {
+            fitToContent = fitToContentCheckbox.checked;
+            renderCanvas();
+        });
 
         // Warn on unsaved changes
         window.addEventListener('beforeunload', (e) => {

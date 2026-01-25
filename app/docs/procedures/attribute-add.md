@@ -41,24 +41,7 @@ In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, add a new ro
 
 ---
 
-## Step 2: Update DataModel.yaml
-
-In `app/systems/<system>/docs/requirements/DataModel.yaml`, add the new attribute to the entity:
-
-```yaml
-ENTITY_NAME:
-  attributes:
-    # ... existing attributes ...
-    - name: ATTR_NAME
-      type: ATTR_TYPE
-      description: Description [MARKER]
-```
-
-**Note:** The order in YAML should match the Markdown table.
-
----
-
-## Step 3: Restart Server
+## Step 2: Restart Server
 
 ```bash
 ./run -s <system>
@@ -137,17 +120,9 @@ If `app/systems/<system>/data/seed/ENTITY_NAME.json` exists and the new attribut
 | severity_factor | int | Effect of flight profile on degradation in % [DEFAULT=100] | 90 |
 ```
 
-**Change in DataModel.yaml:**
-```yaml
-Engine:
-  attributes:
-    # ... other attributes ...
-    - name: severity_factor
-      type: int
-      description: Effect of flight profile on degradation in % [DEFAULT=100]
-```
-
 **After server restart:**
 ```sql
 UPDATE engine SET severity_factor = 100 WHERE severity_factor IS NULL;
 ```
+
+**Note:** `DataModel.yaml` is auto-generated from the markdown files - no manual editing needed.

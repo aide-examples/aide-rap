@@ -46,11 +46,23 @@
 
         /**
          * Get connection points for a relationship between two entities.
+         * @param {Object} fromPos - Source position {x, y}
+         * @param {Object} toPos - Target position {x, y}
+         * @param {number} fromHeight - Source box height
+         * @param {number} toHeight - Target box height
+         * @param {number} attrIndex - Attribute index for connection point
+         * @param {boolean} showDetailed - Whether detailed view is shown
+         * @param {number} fromWidth - Source box width (optional, defaults to BOX_WIDTH)
+         * @param {number} toWidth - Target box width (optional, defaults to BOX_WIDTH)
          */
-        getConnectionPoint(fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed) {
+        getConnectionPoint(fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed, fromWidth, toWidth) {
             const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT } = DiagramConstants;
 
-            const toCx = toPos.x + BOX_WIDTH / 2;
+            // Use provided widths or fall back to default
+            const actualFromWidth = fromWidth || BOX_WIDTH;
+            const actualToWidth = toWidth || BOX_WIDTH;
+
+            const toCx = toPos.x + actualToWidth / 2;
             const toCy = toPos.y + toHeight / 2;
 
             // Source Y: attribute row in detailed mode, or box center
@@ -62,29 +74,32 @@
             }
 
             // Source X: left or right edge depending on target position
-            let fromX = toCx > fromPos.x + BOX_WIDTH / 2
-                ? fromPos.x + BOX_WIDTH
+            let fromX = toCx > fromPos.x + actualFromWidth / 2
+                ? fromPos.x + actualFromWidth
                 : fromPos.x;
 
             // Calculate intersection with target box
             const intersection = this.rayBoxIntersection(
                 fromX, fromY, toCx, toCy,
-                toPos.x, toPos.y, BOX_WIDTH, toHeight
+                toPos.x, toPos.y, actualToWidth, toHeight
             );
 
             // Direction: away from source box (right edge = +1, left edge = -1)
-            const direction = (fromX === fromPos.x + BOX_WIDTH) ? 1 : -1;
+            const direction = (fromX === fromPos.x + actualFromWidth) ? 1 : -1;
 
             return { fromX, fromY, toX: intersection.x, toY: intersection.y, direction };
         },
 
         /**
          * Calculate self-reference arc geometry.
+         * @param {Object} pos - Entity position {x, y}
+         * @param {number} boxWidth - Box width (optional, defaults to BOX_WIDTH)
          */
-        getSelfReferenceArc(pos) {
+        getSelfReferenceArc(pos, boxWidth) {
             const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT, MIN_LOOP_RADIUS } = DiagramConstants;
 
-            const startX = pos.x + BOX_WIDTH;
+            const actualWidth = boxWidth || BOX_WIDTH;
+            const startX = pos.x + actualWidth;
             const startY = pos.y + HEADER_HEIGHT + 0.5 * ATTR_LINE_HEIGHT + 2;
             const endX = startX;
             const endY = pos.y + HEADER_HEIGHT / 2;

@@ -51,6 +51,8 @@ function getDbAndSchema() {
  * - Secondary LABEL2 field (e.g., "name" -> "Airbus A320neo")
  * - Combined format: "LABEL (LABEL2)" (e.g., "Airbus (France)")
  *   This matches the display format used in Views and exports.
+ * - Index notation: "#1", "#2", etc. - maps to records by row order (id ascending)
+ *   This supports AI-generated seed data that uses "#n" for FK references.
  */
 function buildLabelLookup(entityName) {
   const { db, schema } = getDbAndSchema();
@@ -62,17 +64,17 @@ function buildLabelLookup(entityName) {
   const labelCol = entity.columns.find(c => c.ui?.label);
   const label2Col = entity.columns.find(c => c.ui?.label2);
 
-  if (!labelCol && !label2Col) return {};
-
-  // Build column list for SELECT
+  // Build column list for SELECT - always include id for index-based lookup
   const selectCols = ['id'];
   if (labelCol) selectCols.push(labelCol.name);
   if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
 
-  const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName}`;
+  const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} ORDER BY id`;
   const rows = db.prepare(sql).all();
 
   const lookup = {};
+  let rowIndex = 1; // 1-based index for "#n" notation
+
   for (const row of rows) {
     const primaryVal = labelCol ? row[labelCol.name] : null;
     const secondaryVal = label2Col ? row[label2Col.name] : null;
@@ -89,6 +91,10 @@ function buildLabelLookup(entityName) {
     if (primaryVal && secondaryVal) {
       lookup[`${primaryVal} (${secondaryVal})`] = row.id;
     }
+    // Add index-based notation: "#1", "#2", etc.
+    // This supports AI-generated data that uses "#n" for FK references
+    lookup[`#${rowIndex}`] = row.id;
+    rowIndex++;
   }
 
   return lookup;

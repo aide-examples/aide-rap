@@ -77,8 +77,8 @@ const SeedGeneratorDialog = {
     const hasResult = this.generatedData && this.generatedData.length > 0;
 
     this.container.innerHTML = `
-      <div class="modal-overlay" data-action="close">
-        <div class="modal-dialog seed-generator-dialog" onclick="event.stopPropagation()">
+      <div class="modal-overlay">
+        <div class="modal-dialog seed-generator-dialog">
           <div class="modal-header" style="background-color: ${areaColor};">
             <h2>Generate: ${this.entityName}</h2>
             <button class="modal-close" data-action="close">&times;</button>
@@ -260,8 +260,11 @@ const SeedGeneratorDialog = {
    * Attach event handlers
    */
   attachEventHandlers() {
-    // Close dialog
-    this.container.querySelectorAll('[data-action="close"]').forEach(el => {
+    // Modal dialog: do NOT close on overlay click
+    // Dialog can only be closed via X button
+
+    // Close button
+    this.container.querySelectorAll('.modal-close').forEach(el => {
       el.addEventListener('click', () => this.close());
     });
 

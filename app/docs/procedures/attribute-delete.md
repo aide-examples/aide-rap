@@ -26,23 +26,7 @@ In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, delete the r
 
 ---
 
-## Step 2: Remove Attribute from DataModel.yaml
-
-In `app/systems/<system>/docs/requirements/DataModel.yaml`, delete the attribute block:
-
-```yaml
-ENTITY_NAME:
-  attributes:
-    # ...
-    - name: ATTR_NAME        <- Delete this block
-      type: ...
-      description: ...
-    # ...
-```
-
----
-
-## Step 3: Remove Database Column
+## Step 2: Remove Database Column
 
 **Option A: SQLite 3.35.0+ (ALTER TABLE DROP COLUMN)**
 
@@ -77,7 +61,7 @@ conn.close()
 
 ---
 
-## Step 4: Restart Server
+## Step 3: Restart Server
 
 ```bash
 ./run -s <system>
@@ -88,9 +72,11 @@ The SchemaGenerator will:
 2. Recreate the view without the deleted column
 3. Warn about "orphaned column" if column still exists in DB
 
+**Note:** `DataModel.yaml` is auto-generated from the markdown files - no manual editing needed.
+
 ---
 
-## Step 5: Verification
+## Step 4: Verification
 
 - [ ] Server starts without errors
 - [ ] Attribute no longer appears in UI
@@ -128,16 +114,9 @@ Computed fields (e.g., `[DAILY=...]`) don't exist in the database:
 | severity_factor | int [DEFAULT=100] | ... | 90 |  <- delete
 ```
 
-**Step 2:** DataModel.yaml - Remove block:
-```yaml
-      - name: severity_factor
-        type: int
-        description: ...
-```
-
-**Step 3:** Database:
+**Step 2:** Database:
 ```sql
 ALTER TABLE engine DROP COLUMN severity_factor;
 ```
 
-**Step 4:** Restart server
+**Step 3:** Restart server

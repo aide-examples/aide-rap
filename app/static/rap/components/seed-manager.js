@@ -209,8 +209,8 @@ const SeedManager = {
     }).join('');
 
     this.container.innerHTML = `
-      <div class="modal-overlay" data-action="close">
-        <div class="modal-dialog seed-manager-modal" onclick="event.stopPropagation()">
+      <div class="modal-overlay">
+        <div class="modal-dialog seed-manager-modal">
           <div class="modal-header">
             <h2>Seed Data Manager</h2>
             <button class="modal-close" data-action="close">&times;</button>
@@ -232,6 +232,8 @@ const SeedManager = {
             </table>
           </div>
           <div class="modal-footer">
+            <button class="btn-seed btn-new-system" title="Create a new AIDE RAP system">+ New System</button>
+            <span class="footer-spacer"></span>
             <button class="btn-seed btn-load-all">Load All</button>
             <button class="btn-seed btn-clear-all">Clear All</button>
             <button class="btn-seed btn-reset-all">Reset All</button>
@@ -248,8 +250,11 @@ const SeedManager = {
    * Attach event handlers
    */
   attachEventHandlers() {
-    // Close modal
-    this.container.querySelectorAll('[data-action="close"]').forEach(el => {
+    // Modal dialog: do NOT close on overlay click
+    // Dialog can only be closed via X button
+
+    // Close button
+    this.container.querySelectorAll('.modal-close').forEach(el => {
       el.addEventListener('click', () => this.close());
     });
 
@@ -270,6 +275,7 @@ const SeedManager = {
     this.container.querySelector('.btn-load-all')?.addEventListener('click', () => this.loadAll());
     this.container.querySelector('.btn-clear-all')?.addEventListener('click', () => this.clearAll());
     this.container.querySelector('.btn-reset-all')?.addEventListener('click', () => this.resetAll());
+    this.container.querySelector('.btn-new-system')?.addEventListener('click', () => this.openModelBuilder());
   },
 
   /**
@@ -406,6 +412,21 @@ const SeedManager = {
       await SeedGeneratorDialog.open(entityName);
     } else {
       this.showMessage('Generator dialog not loaded', true);
+    }
+  },
+
+  /**
+   * Open the Model Builder dialog for creating new systems
+   */
+  async openModelBuilder() {
+    if (typeof ModelBuilderDialog !== 'undefined') {
+      // Close the seed manager first
+      this.close();
+      // Open the model builder dialog
+      ModelBuilderDialog.init('modal-container');
+      await ModelBuilderDialog.open();
+    } else {
+      this.showMessage('Model Builder not loaded', true);
     }
   }
 };

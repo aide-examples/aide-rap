@@ -147,8 +147,8 @@ const SeedPreviewDialog = {
     this.modalElement = document.createElement('div');
     this.modalElement.className = 'modal-container active';
     this.modalElement.innerHTML = `
-      <div class="modal-overlay" data-action="close">
-        <div class="modal-dialog seed-preview-modal" onclick="event.stopPropagation()">
+      <div class="modal-overlay">
+        <div class="modal-dialog seed-preview-modal">
           <div class="modal-header">
             <h2>${title}</h2>
             <button class="modal-close" data-action="close">&times;</button>
@@ -215,8 +215,11 @@ const SeedPreviewDialog = {
    * Attach event handlers
    */
   attachEventHandlers() {
-    // Close handlers
-    this.modalElement.querySelectorAll('[data-action="close"]').forEach(el => {
+    // Modal dialog: do NOT close on overlay click
+    // Dialog can only be closed via X button
+
+    // Close button
+    this.modalElement.querySelectorAll('.modal-close').forEach(el => {
       el.addEventListener('click', () => this.hide());
     });
 

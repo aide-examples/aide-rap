@@ -435,29 +435,49 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
     const fkColumns = entitySchema.columns.filter(c => c.foreignKey);
     const existingData = {};
 
-    if (!getDatabase) {
-      return existingData;
-    }
-
-    const db = getDatabase();
     for (const col of fkColumns) {
       const refEntity = col.foreignKey.entity;
       const refTable = col.foreignKey.table;
-      try {
-        const records = db.prepare(`SELECT * FROM ${refTable}`).all();
-        if (records && records.length > 0) {
-          // Get labelFields from the referenced entity's schema if available
-          let labelFields = null;
-          if (fullSchema && fullSchema.entities && fullSchema.entities[refEntity]) {
-            labelFields = fullSchema.entities[refEntity].ui?.labelFields;
-          }
-          existingData[refEntity] = {
-            records,
-            labelFields
-          };
+      let records = [];
+      let labelFields = null;
+
+      // Get labelFields from the referenced entity's schema if available
+      if (fullSchema && fullSchema.entities && fullSchema.entities[refEntity]) {
+        labelFields = fullSchema.entities[refEntity].ui?.labelFields;
+      }
+
+      // Try to load from database first
+      if (getDatabase) {
+        try {
+          const db = getDatabase();
+          records = db.prepare(`SELECT * FROM ${refTable}`).all() || [];
+        } catch (e) {
+          // Table might not exist yet, ignore
         }
-      } catch (e) {
-        // Table might not exist yet, ignore
+      }
+
+      // Fallback: load from seed JSON file if database is empty
+      if (records.length === 0) {
+        try {
+          const seedDir = SeedManager.getSeedDir();
+          const seedFile = path.join(seedDir, `${refEntity}.json`);
+          if (fs.existsSync(seedFile)) {
+            const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+            if (Array.isArray(seedData) && seedData.length > 0) {
+              // Add synthetic IDs if missing (seed files don't have IDs yet)
+              records = seedData.map((r, idx) => ({ id: idx + 1, ...r }));
+            }
+          }
+        } catch (e) {
+          // Seed file might not exist or be invalid, ignore
+        }
+      }
+
+      if (records.length > 0) {
+        existingData[refEntity] = {
+          records,
+          labelFields
+        };
       }
     }
 

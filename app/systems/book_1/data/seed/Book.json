@@ -1,0 +1,32 @@
+[
+  {
+    "isbn": "9780141439518",
+    "title": "Pride and Prejudice",
+    "publishing_year": 1813,
+    "author": "Jane"
+  },
+  {
+    "isbn": "9780307389732",
+    "title": "One Hundred Years of Solitude",
+    "publishing_year": 1967,
+    "author": "Gabriel"
+  },
+  {
+    "isbn": "9780099448761",
+    "title": "Kafka on the Shore",
+    "publishing_year": 2002,
+    "author": "Haruki"
+  },
+  {
+    "isbn": "9781400095209",
+    "title": "Half of a Yellow Sun",
+    "publishing_year": 2006,
+    "author": "Chimamanda"
+  },
+  {
+    "isbn": "9780553383805",
+    "title": "The House of the Spirits",
+    "publishing_year": 1982,
+    "author": "Isabel"
+  }
+]

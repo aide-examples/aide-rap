@@ -208,6 +208,9 @@ app.use(require('./server/routers/generator.router')(cfg));
 // Export Router (PDF, CSV)
 app.use(require('./server/routers/export.router')(cfg));
 
+// Model Builder Router (create new systems)
+app.use(require('./server/routers/model-builder.router')(cfg));
+
 // =============================================================================
 // 8. START SERVER
 // =============================================================================
