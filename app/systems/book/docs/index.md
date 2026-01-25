@@ -1,13 +1,29 @@
-# Book
+# Book - Data Model Documentation
 
 A simple library data model with Authors and Books.
 
+> *A minimal demo system showcasing the AIDE RAP platform.*
+
+---
+
 ## Overview
 
-This system demonstrates the basic AIDE IRMA capabilities:
+This system demonstrates basic AIDE RAP capabilities:
 
-- **Author**: Stores author information (name, birth date)
-- **Book**: Stores book information with a foreign key to Author
+- **Author** – Stores author information (name, birth date)
+- **Book** – Stores book information with a foreign key to Author
+
+---
+
+## Quick Links
+
+| Link | Description |
+|------|-------------|
+| **[Data Model →](requirements/DataModel.md)** | Entity definitions |
+| **[RAP Platform Docs →](/rap)** | How the RAP engine works |
+| **[User Guide →](/help)** | How to use the application |
+
+---
 
 ## Getting Started
 

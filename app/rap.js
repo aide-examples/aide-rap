@@ -125,6 +125,7 @@ console.log(`Starting AIDE RAP - System: ${systemName}`);
 // This prevents auto-registration from using default app/docs and app/help paths
 paths.register('DOCS_DIR', path.join(cfg.paths.docs, '..'));  // docs/ not requirements/
 paths.register('HELP_DIR', cfg.paths.help);
+paths.register('RAP_DOCS_DIR', path.join(APP_DIR, 'docs'));   // Generic RAP platform docs
 
 const server = new HttpServer({
     port: cfg.port,
@@ -136,6 +137,15 @@ const server = new HttpServer({
         helpEditable: cfg.helpEditable,
         // Point docs to system-specific directory
         docsDir: cfg.paths.docs,
+        // Add RAP platform docs as separate root
+        customRoots: {
+            'rap': {
+                title: 'RAP Platform',
+                route: '/rap',
+                dirKey: 'RAP_DOCS_DIR',
+                editable: false
+            }
+        }
     },
     updateConfig: {
         githubRepo: 'aide-examples/aide-rap',
