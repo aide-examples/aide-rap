@@ -192,7 +192,9 @@ function parseAllUserViews(viewsConfig, schema) {
     if (typeof entry === 'string') {
       const label = entry.replace(/^-+\s*/, '').trim();
       currentGroup = label || null;
-      groups.push({ type: 'separator', label: currentGroup });
+      const groupColor = Object.values(schema.areas)
+          .find(a => a.name === currentGroup)?.color || '#f1f5f9';
+      groups.push({ type: 'separator', label: currentGroup, color: groupColor });
       continue;
     }
 

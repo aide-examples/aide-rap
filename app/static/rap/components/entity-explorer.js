@@ -211,7 +211,7 @@ const EntityExplorer = {
           if (currentGroup) menuHtml += `</div>`;
           currentGroup = entry.label;
           menuHtml += `<div class="view-selector-group">`;
-          menuHtml += `<div class="view-selector-group-label">${entry.label}</div>`;
+          menuHtml += `<div class="view-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
         } else if (entry.type === 'view') {
           const view = viewsData.views.find(v => v.name === entry.name);
           if (view) {

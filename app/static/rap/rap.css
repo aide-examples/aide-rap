@@ -173,44 +173,57 @@
 }
 
 /* Custom Entity Selector Dropdown */
-.entity-selector-dropdown {
+/* Selector Dropdowns — shared styles for Entity + View selectors */
+.entity-selector-dropdown,
+.view-selector-dropdown {
     position: relative;
-    min-width: 180px;
 }
 
-.entity-selector-trigger {
+.entity-selector-dropdown { min-width: 180px; }
+.view-selector-dropdown { min-width: 140px; }
+
+/* Trigger buttons — shared base */
+.entity-selector-trigger,
+.view-selector-trigger {
     width: 100%;
     padding: 6px 12px;
-    border: 1px solid #d1d5db;
     border-radius: 6px;
-    background: #fff;
     font-size: 0.9rem;
     text-align: left;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: #333;
 }
 
-.entity-selector-trigger::after {
-    content: '▼';
+.entity-selector-trigger { border: 1px solid #d1d5db; background: #fff; color: #333; }
+.view-selector-trigger { border: 1px solid #93c5fd; background: #eff6ff; color: #1e40af; }
+
+.entity-selector-trigger::after,
+.view-selector-trigger::after {
+    content: '\25BC';
     font-size: 0.7rem;
     margin-left: 8px;
-    color: #666;
 }
 
-.entity-selector-dropdown.open .entity-selector-trigger::after {
-    content: '▲';
+.entity-selector-trigger::after { color: #666; }
+.view-selector-trigger::after { color: #3b82f6; }
+
+.entity-selector-dropdown.open .entity-selector-trigger::after,
+.view-selector-dropdown.open .view-selector-trigger::after {
+    content: '\25B2';
 }
 
-.entity-selector-trigger:focus {
+.entity-selector-trigger:focus,
+.view-selector-trigger:focus {
     outline: none;
     border-color: #2563eb;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-.entity-selector-menu {
+/* Dropdown menus */
+.entity-selector-menu,
+.view-selector-menu {
     display: none;
     position: absolute;
     top: 100%;
@@ -223,27 +236,31 @@
     overflow-y: auto;
     z-index: 100;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    /* Multi-column layout for areas */
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 0;
 }
 
-.entity-selector-dropdown.open .entity-selector-menu {
+.entity-selector-dropdown.open .entity-selector-menu,
+.view-selector-dropdown.open .view-selector-menu {
     display: flex;
 }
 
-.entity-selector-group {
+/* Groups */
+.entity-selector-group,
+.view-selector-group {
     padding: 4px 0;
     min-width: 140px;
     border-right: 1px solid #e5e7eb;
 }
 
-.entity-selector-group:last-child {
+.entity-selector-group:last-child,
+.view-selector-group:last-child {
     border-right: none;
 }
 
-.entity-selector-group-label {
+.entity-selector-group-label,
+.view-selector-group-label {
     padding: 4px 10px;
     font-size: 0.65rem;
     font-weight: 600;
@@ -253,7 +270,9 @@
     white-space: nowrap;
 }
 
-.entity-selector-item {
+/* Items */
+.entity-selector-item,
+.view-selector-item {
     padding: 3px 10px;
     cursor: pointer;
     font-size: 0.8rem;
@@ -261,10 +280,11 @@
     line-height: 1.2;
     white-space: nowrap;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 12px;
 }
+
+.entity-selector-item { justify-content: space-between; gap: 12px; }
+.view-selector-item { gap: 8px; }
 
 .entity-selector-item .entity-count {
     color: #9ca3af;
@@ -273,106 +293,14 @@
     text-align: right;
 }
 
-.entity-selector-item:hover {
+.entity-selector-item:hover,
+.view-selector-item:hover {
     background: #f3f4f6;
 }
 
-.entity-selector-item.selected {
-    background: #e5e7eb;
-    font-weight: 500;
-}
-
-/* Custom View Selector Dropdown (separate from entity selector) */
-.view-selector-dropdown {
-    position: relative;
-    min-width: 140px;
-}
-
-.view-selector-trigger {
-    width: 100%;
-    padding: 6px 12px;
-    border: 1px solid #93c5fd;
-    border-radius: 6px;
-    background: #eff6ff;
-    font-size: 0.9rem;
-    text-align: left;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #1e40af;
-}
-
-.view-selector-trigger::after {
-    content: '▼';
-    font-size: 0.7rem;
-    margin-left: 8px;
-    color: #3b82f6;
-}
-
-.view-selector-dropdown.open .view-selector-trigger::after {
-    content: '▲';
-}
-
-.view-selector-trigger:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-}
-
-.view-selector-menu {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    background: #fff;
-    border: 1px solid #93c5fd;
-    border-radius: 6px;
-    margin-top: 4px;
-    max-height: 400px;
-    overflow-y: auto;
-    z-index: 100;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-    min-width: 180px;
-}
-
-.view-selector-dropdown.open .view-selector-menu {
-    display: block;
-}
-
-.view-selector-group {
-    padding: 4px 0;
-}
-
-.view-selector-group-label {
-    padding: 4px 10px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-    background: #f1f5f9;
-}
-
-.view-selector-item {
-    padding: 5px 10px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    border-left: 3px solid transparent;
-    line-height: 1.2;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.view-selector-item:hover {
-    background: #eff6ff;
-}
-
+.entity-selector-item.selected,
 .view-selector-item.selected {
-    background: #dbeafe;
+    background: #e5e7eb;
     font-weight: 500;
 }
 
@@ -518,7 +446,9 @@
     opacity: 1;
 }
 
-.btn-row-action {
+/* Action buttons — shared base for detail panel + tree */
+.btn-row-action,
+.btn-tree-action {
     padding: 4px 8px;
     background: none;
     border: 1px solid #d1d5db;
@@ -528,17 +458,20 @@
     cursor: pointer;
 }
 
-.btn-row-action:hover {
+.btn-row-action:hover,
+.btn-tree-action:hover {
     border-color: #2563eb;
     color: #2563eb;
 }
 
-.btn-row-action.danger {
+.btn-row-action.danger,
+.btn-tree-action.btn-delete {
     border-color: transparent;
     color: #999;
 }
 
-.btn-row-action.danger:hover {
+.btn-row-action.danger:hover,
+.btn-tree-action.btn-delete:hover {
     border-color: transparent;
     color: #dc2626;
 }
@@ -908,30 +841,6 @@
     display: inline-flex;
 }
 
-.btn-tree-action {
-    padding: 4px 8px;
-    background: none;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    color: #666;
-    cursor: pointer;
-}
-
-.btn-tree-action:hover {
-    border-color: #2563eb;
-    color: #2563eb;
-}
-
-.btn-tree-action.btn-delete {
-    border-color: transparent;
-    color: #999;
-}
-
-.btn-tree-action.btn-delete:hover {
-    border-color: transparent;
-    color: #dc2626;
-}
 
 /* Tree node content (expanded) */
 .tree-node-content {
@@ -2278,14 +2187,14 @@
     border-radius: 6px;
 }
 
-/* Save Button */
-.btn-save {
+/* Save Button (seed import — green to distinguish from entity form save) */
+.btn-seed.btn-save {
     background: #22c55e;
     border-color: #16a34a;
     color: white;
 }
 
-.btn-save:hover:not(:disabled) {
+.btn-seed.btn-save:hover:not(:disabled) {
     background: #16a34a;
 }
 
