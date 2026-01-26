@@ -571,7 +571,9 @@ function loadEntity(entityName, lookups = null, options = {}) {
   }
 
   // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
+  // Exception: computed FK columns are kept — seed data can provide initial relationship values
   const isComputedColumn = (col) => {
+    if (col.foreignKey) return false;
     if (col.computed) return true;  // Schema already parsed
     const desc = col.description || '';
     return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
