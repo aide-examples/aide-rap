@@ -12,11 +12,13 @@
 
     // Load app config to get system-specific name
     let appName = 'AIDE RAP';
+    let titleHtml = null;
     try {
       const configRes = await fetch('/api/app/config');
       if (configRes.ok) {
         const config = await configRes.json();
         appName = config.app_name || appName;
+        titleHtml = config.title_html || null;
         document.title = appName;
       }
     } catch (e) {
@@ -34,6 +36,12 @@
         aboutLink: '/about',
         helpLink: '/help'
       });
+
+      // Apply custom title HTML if configured
+      if (titleHtml) {
+        const h1 = document.querySelector('#app-header h1');
+        if (h1) h1.innerHTML = titleHtml;
+      }
     }
 
     // Initialize Framework Status Widget (Footer)

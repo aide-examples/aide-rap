@@ -133,6 +133,7 @@ const server = new HttpServer({
     appDir: APP_DIR,
     docsConfig: {
         appName: `AIDE RAP [${systemName}]`,
+        titleHtml: cfg.titleHtml || null,
         pwa: cfg.pwa && cfg.pwa.enabled ? cfg.pwa : null,
         docsEditable: cfg.docsEditable,
         helpEditable: cfg.helpEditable,
@@ -228,6 +229,9 @@ if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0)
 // =============================================================================
 // 7c. STATIC ROUTES
 // =============================================================================
+
+// System-specific icons (e.g., for custom titleHtml)
+app.use('/icons', require('express').static(path.join(SYSTEM_DIR, 'icons')));
 
 // Main page
 app.get('/', (req, res) => {
