@@ -1,4 +1,11 @@
 /**
+ * Split CamelCase into separate words: "EngineType" → "Engine Type"
+ */
+function splitCamelCase(str) {
+  return str.replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+/**
  * Entity Table Component
  * Sortable, scrollable table view for entity records
  */
@@ -136,6 +143,22 @@ const EntityTable = {
   },
 
   /**
+   * Get active filter descriptions for export headers
+   * @returns {Array<{column: string, value: string}>} Active filters with display names
+   */
+  getActiveFilterDescriptions() {
+    return Object.entries(this.columnFilters)
+      .filter(([_, value]) => value && value.trim() !== '')
+      .map(([column, value]) => {
+        // Build display name: use conceptual name for FK columns
+        const displayName = column.endsWith('_id')
+          ? splitCamelCase(column.slice(0, -3)).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          : splitCamelCase(column).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        return { column: displayName, value: value.trim() };
+      });
+  },
+
+  /**
    * Get sorted records
    */
   getSortedRecords() {
@@ -216,7 +239,7 @@ const EntityTable = {
       // Use area color of the referencing entity
       const bgColor = ref.areaColor || '#fef3c7';
       html += `<th class="backref-column" style="background-color: ${bgColor}" title="Records in ${ref.entity} referencing this via ${fieldName}">
-        <span class="backref-entity">${ref.entity}</span>
+        <span class="backref-entity">${splitCamelCase(ref.entity)}</span>
         <span class="backref-field">${fieldName}</span>
       </th>`;
     }
@@ -633,7 +656,7 @@ const EntityTable = {
 
         return {
           key: col.name,
-          label: displayName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          label: splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
           color: col.foreignKey?.areaColor || null  // FK columns get target entity color
         };
       });
@@ -671,7 +694,8 @@ const EntityTable = {
           title: this.currentEntity,
           columns,
           records: formattedRecords,
-          entityColor
+          entityColor,
+          filters: this.getActiveFilterDescriptions()
         })
       });
 
@@ -719,7 +743,7 @@ const EntityTable = {
 
         return {
           key: col.name,
-          label: displayName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          label: splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
           color: col.foreignKey?.areaColor || null  // FK columns get target entity color
         };
       });
@@ -757,7 +781,8 @@ const EntityTable = {
           title: this.currentEntity,
           columns,
           records: formattedRecords,
-          entityColor
+          entityColor,
+          filters: this.getActiveFilterDescriptions()
         })
       });
 
@@ -805,7 +830,7 @@ const EntityTable = {
 
         return {
           key: col.name,
-          label: displayName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          label: splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
         };
       });
 

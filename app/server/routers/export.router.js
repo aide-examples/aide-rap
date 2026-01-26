@@ -465,7 +465,7 @@ function createRouter(cfg) {
     // Export entity table to PDF
     router.post('/api/entities/:entity/export-pdf', (req, res) => {
         try {
-            const { title, columns, records, entityColor } = req.body;
+            const { title, columns, records, entityColor, filters } = req.body;
 
             if (!columns || !Array.isArray(columns) || !records || !Array.isArray(records)) {
                 return res.status(400).json({ error: 'columns and records arrays are required' });
@@ -475,7 +475,7 @@ function createRouter(cfg) {
             res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}.pdf"`);
 
             const printService = new PrintService();
-            printService.generatePdf({ title, columns, records, entityColor }, res);
+            printService.generatePdf({ title, columns, records, entityColor, filters }, res);
 
         } catch (error) {
             console.error('PDF generation error:', error);
@@ -528,14 +528,14 @@ function createRouter(cfg) {
     // Export entity table to DOCX (Word)
     router.post('/api/entities/:entity/export-docx', async (req, res) => {
         try {
-            const { title, columns, records, entityColor } = req.body;
+            const { title, columns, records, entityColor, filters } = req.body;
 
             if (!columns || !Array.isArray(columns) || !records || !Array.isArray(records)) {
                 return res.status(400).json({ error: 'columns and records arrays are required' });
             }
 
             const printService = new PrintService();
-            const buffer = await printService.generateDocx({ title, columns, records, entityColor });
+            const buffer = await printService.generateDocx({ title, columns, records, entityColor, filters });
 
             const filename = (title || req.params.entity).replace(/[^a-z0-9]/gi, '_');
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');

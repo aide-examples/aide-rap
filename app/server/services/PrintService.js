@@ -80,7 +80,7 @@ class PrintService {
    * @param {Response} res - Express response object
    */
   generatePdf(data, res) {
-    const { title, columns, records, entityColor } = data;
+    const { title, columns, records, entityColor, filters } = data;
     const color = entityColor || this.defaultColor;
 
     const doc = new PDFDocument({
@@ -95,8 +95,13 @@ class PrintService {
     // Draw title
     this.drawTitle(doc, title, color);
 
+    // Draw filter line (if any filters active)
+    if (filters && filters.length > 0) {
+      this.drawFilterLine(doc, filters);
+    }
+
     // Draw table
-    this.drawTable(doc, columns, records, color);
+    this.drawTable(doc, columns, records, color, filters);
 
     // Add page numbers
     this.addPageNumbers(doc);
@@ -139,9 +144,46 @@ class PrintService {
   }
 
   /**
+   * Draw filter criteria line below title/at top of page
+   * @param {PDFDocument} doc
+   * @param {Array<{column: string, value: string}>} filters
+   */
+  drawFilterLine(doc, filters) {
+    if (!filters || filters.length === 0) return;
+
+    const tableWidth = this.pageWidth - 2 * this.margin;
+    const filterBarHeight = 16;
+    const y = doc.y;
+
+    // Light gray background strip
+    doc.rect(this.margin, y, tableWidth, filterBarHeight)
+       .fill('#f0f0f0');
+
+    // Filter text: "Filter: Column ≈ Value | Column ≈ Value"
+    const filterText = 'Filter:  ' + filters
+      .map(f => `${f.column} = ${f.value}`)
+      .join('  |  ');
+
+    doc.fontSize(8)
+       .fillColor('#555555')
+       .font('Helvetica-Oblique')
+       .text(filterText, this.margin + 6, y + 3, {
+         width: tableWidth - 12,
+         height: filterBarHeight - 2,
+         ellipsis: true,
+         lineBreak: false
+       });
+
+    // Reset to regular font
+    doc.font('Helvetica');
+
+    doc.y = y + filterBarHeight + 4;
+  }
+
+  /**
    * Draw the data table
    */
-  drawTable(doc, columns, records, headerColor) {
+  drawTable(doc, columns, records, headerColor, filters) {
     const tableWidth = this.pageWidth - 2 * this.margin;
     const colCount = columns.length;
 
@@ -160,6 +202,12 @@ class PrintService {
       if (y + this.rowHeight > this.pageHeight - this.margin) {
         doc.addPage();
         y = this.margin;
+        // Redraw filter line on new page
+        if (filters && filters.length > 0) {
+          doc.y = y;
+          this.drawFilterLine(doc, filters);
+          y = doc.y;
+        }
         // Redraw header on new page
         y = this.drawHeaderRow(doc, columns, colWidths, y, headerColor);
       }
@@ -192,10 +240,6 @@ class PrintService {
       y += this.rowHeight;
     }
 
-    // Draw table border
-    const tableHeight = y - (doc.y - this.headerRowHeight);
-    doc.rect(this.margin, doc.y - this.headerRowHeight, tableWidth, y - (doc.y - this.headerRowHeight))
-       .stroke('#cccccc');
   }
 
   /**
@@ -561,7 +605,7 @@ class PrintService {
    * @returns {Promise<Buffer>} - DOCX buffer
    */
   async generateDocx(data) {
-    const { title, columns, records, entityColor } = data;
+    const { title, columns, records, entityColor, filters } = data;
     const color = (entityColor || this.defaultColor).replace('#', '');
 
     // Build header row cells
@@ -618,8 +662,18 @@ class PrintService {
               color: '666666',
               size: 20
             })],
-            spacing: { after: 200 }
+            spacing: { after: filters && filters.length > 0 ? 80 : 200 }
           }),
+          // Filter line (if active)
+          ...(filters && filters.length > 0 ? [new Paragraph({
+            children: [new TextRun({
+              text: 'Filter:  ' + filters.map(f => `${f.column} = ${f.value}`).join('  |  '),
+              italics: true,
+              color: '555555',
+              size: 18
+            })],
+            spacing: { after: 120 }
+          })] : []),
           // Table
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
