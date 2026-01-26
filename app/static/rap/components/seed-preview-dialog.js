@@ -221,7 +221,7 @@ const SeedPreviewDialog = {
     const rows = previewRows.map(record => {
       const cells = columns.map(col => {
         const value = record[col];
-        const displayValue = value === null ? '<span class="null-value">null</span>' : this.escapeHtml(String(value));
+        const displayValue = value === null ? '' : this.escapeHtml(String(value));
         return `<td>${displayValue}</td>`;
       }).join('');
       return `<tr>${cells}</tr>`;

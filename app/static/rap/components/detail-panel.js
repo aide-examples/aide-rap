@@ -133,7 +133,7 @@ const DetailPanel = {
       const value = record[col.name];
       let displayValue;
       if (value === null || value === undefined) {
-        displayValue = '<em>null</em>';
+        displayValue = '';
       } else {
         // Use ValueFormatter to convert enum internal->external
         displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));

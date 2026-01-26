@@ -14,9 +14,11 @@ const crypto = require('crypto');
 const logger = require('../utils/logger');
 const { generateSchema, generateCreateTableSQL, generateViewSQL } = require('../utils/SchemaGenerator');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
+const { parseAllUserViews, generateUserViewSQL } = require('../utils/UserViewGenerator');
 
 let db = null;
 let schema = null;
+let storedViewsConfig = null;
 
 /**
  * Check if table exists
@@ -125,7 +127,15 @@ function saveSchemaHash(hash) {
  * Drop all entity tables and views (in reverse dependency order)
  */
 function dropAllTables(orderedEntities) {
-  // Drop views first
+  // Drop user views (uv_*) first
+  const uvViews = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='view' AND name LIKE 'uv_%'"
+  ).all();
+  for (const { name } of uvViews) {
+    db.exec(`DROP VIEW IF EXISTS ${name}`);
+  }
+
+  // Drop entity views
   for (const entity of orderedEntities) {
     const viewName = entity.tableName + '_view';
     if (viewExists(viewName)) {
@@ -173,12 +183,48 @@ function createAllViews(orderedEntities) {
 }
 
 /**
+ * Create user-defined views (uv_*) from config
+ */
+function createUserViews(viewsConfig) {
+  if (!viewsConfig || viewsConfig.length === 0) return;
+
+  // Drop existing user views first
+  const uvViews = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='view' AND name LIKE 'uv_%'"
+  ).all();
+  for (const { name } of uvViews) {
+    db.exec(`DROP VIEW IF EXISTS ${name}`);
+  }
+
+  const { views, groups } = parseAllUserViews(viewsConfig, schema);
+
+  for (const view of views) {
+    try {
+      const sql = generateUserViewSQL(view);
+      db.exec(sql);
+      logger.debug(`Created user view ${view.sqlName}`);
+    } catch (err) {
+      logger.error(`Failed to create user view "${view.name}"`, { error: err.message });
+    }
+  }
+
+  // Store on schema for API access
+  schema.userViews = views;
+  schema.userViewGroups = groups;
+
+  if (views.length > 0) {
+    logger.info(`Created ${views.length} user view(s)`);
+  }
+}
+
+/**
  * Initialize database
  * @param {string} dbPath - Path to SQLite database file
  * @param {string} dataModelPath - Path to DataModel.md
  * @param {string[]} enabledEntities - List of entity names to enable
+ * @param {Array} [viewsConfig] - Optional user view definitions from config
  */
-function initDatabase(dbPath, dataModelPath, enabledEntities) {
+function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
   // Ensure data directory exists
   const dataDir = path.dirname(dbPath);
   if (!fs.existsSync(dataDir)) {
@@ -190,6 +236,9 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
   db.pragma('foreign_keys = OFF'); // Disable during setup
 
   logger.info('Database opened', { path: dbPath });
+
+  // Store views config for forceRebuild
+  storedViewsConfig = viewsConfig || [];
 
   // Generate schema from DataModel.md
   schema = generateSchema(dataModelPath, enabledEntities);
@@ -214,6 +263,7 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
     dropAllTables(schema.orderedEntities);
     createAllTables(schema.orderedEntities);
     createAllViews(schema.orderedEntities);
+    createUserViews(viewsConfig);
     saveSchemaHash(currentHash);
 
     logger.info('Schema initialized', {
@@ -225,6 +275,7 @@ function initDatabase(dbPath, dataModelPath, enabledEntities) {
 
     // Still recreate views (they might reference label columns that changed)
     createAllViews(schema.orderedEntities);
+    createUserViews(viewsConfig);
   }
 
   // Enable foreign keys for runtime
@@ -278,6 +329,7 @@ function forceRebuild() {
   dropAllTables(schema.orderedEntities);
   createAllTables(schema.orderedEntities);
   createAllViews(schema.orderedEntities);
+  createUserViews(storedViewsConfig);
 
   const hash = computeSchemaHash(schema);
   saveSchemaHash(hash);

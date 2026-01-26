@@ -126,7 +126,7 @@ const TreeRenderer = {
             const value = record[col.name];
             let displayValue;
             if (value === null || value === undefined) {
-                displayValue = '<em>null</em>';
+                displayValue = '';
             } else {
                 displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
             }
@@ -150,7 +150,7 @@ const TreeRenderer = {
     renderAttribute(name, value, schema = null) {
         let displayValue;
         if (value === null || value === undefined) {
-            displayValue = '<em>null</em>';
+            displayValue = '';
         } else if (schema) {
             // Use ValueFormatter for enum conversion
             displayValue = this.escapeHtml(ValueFormatter.format(value, name, schema));
@@ -176,7 +176,7 @@ const TreeRenderer = {
             return `
             <div class="tree-attribute fk-field">
               <span class="attr-name">${col.name}:</span>
-              <span class="attr-value"><em>null</em></span>
+              <span class="attr-value"></span>
             </div>
           `;
         }
@@ -394,7 +394,7 @@ const TreeRenderer = {
                     const value = record[col.name];
                     let displayValue;
                     if (value === null || value === undefined) {
-                        displayValue = '<em>null</em>';
+                        displayValue = '';
                     } else {
                         displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
                     }

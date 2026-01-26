@@ -123,6 +123,44 @@ const ApiClient = {
       method: 'DELETE',
     });
   },
+
+  // --- User Views ---
+
+  /**
+   * Get list of user views with groups
+   */
+  async getViews() {
+    return this.request('/api/views');
+  },
+
+  /**
+   * Get view data with optional filter/sort/pagination
+   * @param {string} viewName - View display name
+   * @param {Object} options - { filter, sort, order, limit, offset }
+   */
+  async getViewData(viewName, options = {}) {
+    const params = new URLSearchParams();
+    if (options.filter) params.set('filter', options.filter);
+    if (options.sort) params.set('sort', options.sort);
+    if (options.order) params.set('order', options.order);
+    if (options.limit) params.set('limit', options.limit);
+    if (options.offset) params.set('offset', options.offset);
+
+    const queryString = params.toString();
+    const url = queryString
+      ? `/api/views/${encodeURIComponent(viewName)}?${queryString}`
+      : `/api/views/${encodeURIComponent(viewName)}`;
+
+    return this.request(url);
+  },
+
+  /**
+   * Get view schema (column metadata)
+   * @param {string} viewName - View display name
+   */
+  async getViewSchema(viewName) {
+    return this.request(`/api/views/${encodeURIComponent(viewName)}/schema`);
+  },
 };
 
 // Schema cache to avoid repeated fetches
@@ -194,7 +232,7 @@ const ValueFormatter = {
    */
   formatWithNull(value, columnName, schema) {
     if (value === null || value === undefined) {
-      return '<em class="null-value">null</em>';
+      return '';
     }
     return this.format(value, columnName, schema);
   },

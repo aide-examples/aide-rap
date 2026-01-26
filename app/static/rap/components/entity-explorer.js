@@ -7,12 +7,18 @@ const EntityExplorer = {
   selectorTrigger: null,
   selectorMenu: null,
   selectorValue: '',
+  // View selector (separate dropdown)
+  viewSelector: null,
+  viewSelectorTrigger: null,
+  viewSelectorMenu: null,
+  viewSelectorValue: '',
   tableContainer: null,
   treeContainer: null,
   btnViewTable: null,
   btnViewTreeH: null,
   btnViewTreeV: null,
   currentEntity: null,
+  currentView: null, // null = entity mode, object = view mode { name, base, color }
   records: [],
   selectedId: null,
   viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
@@ -21,6 +27,9 @@ const EntityExplorer = {
     this.selector = document.getElementById('entity-selector');
     this.selectorTrigger = this.selector.querySelector('.entity-selector-trigger');
     this.selectorMenu = this.selector.querySelector('.entity-selector-menu');
+    this.viewSelector = document.getElementById('view-selector');
+    this.viewSelectorTrigger = this.viewSelector.querySelector('.view-selector-trigger');
+    this.viewSelectorMenu = this.viewSelector.querySelector('.view-selector-menu');
     this.tableContainer = document.getElementById('entity-table-container');
     this.treeContainer = document.getElementById('entity-tree-container');
     this.btnViewTable = document.getElementById('btn-view-table');
@@ -41,16 +50,23 @@ const EntityExplorer = {
     }
     this.updateViewToggle();
 
-    // Load entity types into selector
+    // Load entity types and views
     await this.loadEntityTypes();
+    await this.loadViews();
 
-    // Event listeners for custom dropdown
+    // Event listeners for entity dropdown
     this.selectorTrigger.addEventListener('click', () => this.toggleDropdown());
     document.addEventListener('click', (e) => {
       if (!this.selector.contains(e.target)) {
         this.closeDropdown();
       }
+      if (!this.viewSelector.contains(e.target)) {
+        this.closeViewDropdown();
+      }
     });
+
+    // Event listeners for view dropdown
+    this.viewSelectorTrigger.addEventListener('click', () => this.toggleViewDropdown());
 
     this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
     this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
@@ -62,8 +78,12 @@ const EntityExplorer = {
       btnRefresh.addEventListener('click', () => this.refreshCounts());
     }
 
-    // Open dropdown on start
-    this.openDropdown();
+    // Open views dropdown on start if views exist, otherwise entity dropdown
+    if (this.viewSelector.style.display !== 'none') {
+      this.toggleViewDropdown();
+    } else {
+      this.openDropdown();
+    }
   },
 
   toggleDropdown() {
@@ -76,6 +96,14 @@ const EntityExplorer = {
 
   closeDropdown() {
     this.selector.classList.remove('open');
+  },
+
+  toggleViewDropdown() {
+    this.viewSelector.classList.toggle('open');
+  },
+
+  closeViewDropdown() {
+    this.viewSelector.classList.remove('open');
   },
 
   async loadEntityTypes() {
@@ -104,6 +132,7 @@ const EntityExplorer = {
         });
         menuHtml += `</div>`;
       }
+
       this.selectorMenu.innerHTML = menuHtml;
 
       // Add click handlers for menu items
@@ -130,19 +159,30 @@ const EntityExplorer = {
     this.openDropdown();
   },
 
-  selectEntityFromDropdown(entityName, areaColor) {
-    this.selectorValue = entityName;
+  selectEntityFromDropdown(name, areaColor) {
+    this.selectorValue = name;
     // Update trigger text
     const textSpan = this.selectorTrigger.querySelector('.entity-selector-text');
-    if (textSpan) textSpan.textContent = entityName;
+    if (textSpan) textSpan.textContent = name;
     this.selectorTrigger.style.backgroundColor = areaColor || '';
 
     // Update selected state in menu
     this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
-      item.classList.toggle('selected', item.dataset.value === entityName);
+      item.classList.toggle('selected', item.dataset.value === name);
     });
 
     this.closeDropdown();
+
+    // Deselect view when an entity is selected
+    this.currentView = null;
+    this.viewSelectorValue = '';
+    const viewText = this.viewSelectorTrigger.querySelector('.view-selector-text');
+    if (viewText) viewText.textContent = 'Views';
+    this.viewSelectorTrigger.style.backgroundColor = '';
+    this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+
     this.onEntityChange();
   },
 
@@ -153,8 +193,82 @@ const EntityExplorer = {
     }
   },
 
+  async loadViews() {
+    try {
+      const viewsData = await ApiClient.getViews();
+      if (!viewsData.views || viewsData.views.length === 0) {
+        this.viewSelector.style.display = 'none';
+        return;
+      }
+
+      // Show view selector
+      this.viewSelector.style.display = '';
+
+      let menuHtml = '';
+      let currentGroup = null;
+      for (const entry of viewsData.groups) {
+        if (entry.type === 'separator') {
+          if (currentGroup) menuHtml += `</div>`;
+          currentGroup = entry.label;
+          menuHtml += `<div class="view-selector-group">`;
+          menuHtml += `<div class="view-selector-group-label">${entry.label}</div>`;
+        } else if (entry.type === 'view') {
+          const view = viewsData.views.find(v => v.name === entry.name);
+          if (view) {
+            menuHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" style="border-left-color: ${view.color};">
+              <span class="view-name">${view.name}</span>
+            </div>`;
+          }
+        }
+      }
+      if (currentGroup) menuHtml += `</div>`;
+
+      this.viewSelectorMenu.innerHTML = menuHtml;
+
+      // Add click handlers
+      this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
+        item.addEventListener('click', () => {
+          this.selectViewFromDropdown(item.dataset.value, item.dataset.base, item.dataset.color);
+        });
+      });
+    } catch (err) {
+      console.warn('Failed to load user views:', err);
+      this.viewSelector.style.display = 'none';
+    }
+  },
+
+  selectViewFromDropdown(viewName, baseName, color) {
+    this.viewSelectorValue = viewName;
+    // Update trigger text
+    const viewText = this.viewSelectorTrigger.querySelector('.view-selector-text');
+    if (viewText) viewText.textContent = viewName;
+    this.viewSelectorTrigger.style.backgroundColor = color || '';
+
+    // Update selected state in view menu
+    this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
+      item.classList.toggle('selected', item.dataset.value === viewName);
+    });
+
+    this.closeViewDropdown();
+
+    // Deselect entity
+    this.selectorValue = '';
+    const entityText = this.selectorTrigger.querySelector('.entity-selector-text');
+    if (entityText) entityText.textContent = i18n.t('select_entity');
+    this.selectorTrigger.style.backgroundColor = '';
+    this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+
+    this.onViewChange(viewName, baseName, color);
+  },
+
   async onEntityChange() {
     const entityName = this.selectorValue;
+
+    // Restore tree buttons (may have been hidden in view mode)
+    this.btnViewTreeH.style.display = '';
+    this.btnViewTreeV.style.display = '';
 
     if (!entityName) {
       this.currentEntity = null;
@@ -170,6 +284,33 @@ const EntityExplorer = {
 
     await this.loadRecords();
     DetailPanel.clear();
+  },
+
+  async onViewChange(viewName, baseName, color) {
+    this.currentView = { name: viewName, base: baseName, color };
+    this.currentEntity = null;
+    this.selectedId = null;
+    this.records = [];
+
+    // Force table view, hide tree buttons
+    this.btnViewTreeH.style.display = 'none';
+    this.btnViewTreeV.style.display = 'none';
+    this.viewMode = 'table';
+    this.updateViewToggle();
+
+    DetailPanel.clear();
+
+    // Load view data
+    try {
+      const result = await ApiClient.getViewData(viewName);
+      this.records = result.data || [];
+      const viewSchema = await ApiClient.getViewSchema(viewName);
+      await EntityTable.loadView(viewName, viewSchema, this.records);
+      this.updateRecordStatus(this.records.length);
+    } catch (err) {
+      console.error('Failed to load view:', err);
+      this.tableContainer.innerHTML = `<p class="empty-message">Error: ${err.message}</p>`;
+    }
   },
 
   async loadRecords(filter = '') {
@@ -425,7 +566,7 @@ const EntityExplorer = {
     const sepEl = document.getElementById('sw-records-sep');
     if (!recordsEl) return;
 
-    if (this.viewMode === 'table' && this.currentEntity && this.records.length > 0) {
+    if (this.viewMode === 'table' && (this.currentEntity || this.currentView) && this.records.length > 0) {
       // Use provided count or get from EntityTable (which may be filtered)
       const displayCount = count !== null ? count : this.records.length;
       recordsEl.textContent = `${displayCount} records`;
@@ -453,6 +594,24 @@ const EntityExplorer = {
       expandLevels: expandLevels
     };
     await EntityTree.loadEntity(this.currentEntity, this.records, options);
+  },
+
+  /**
+   * Jump to base entity edit mode for a record (used by view row click)
+   */
+  async editInBaseEntity(entityName, recordId) {
+    // Switch to the base entity
+    this.selectEntity(entityName);
+
+    // Wait for records to load, then open edit
+    await this.loadRecords();
+    this.selectedId = recordId;
+    this.updateSelection();
+
+    const record = this.records.find(r => r.id === recordId);
+    if (record) {
+      DetailPanel.showEditForm(entityName, record);
+    }
   },
 
   escapeHtml(text) {

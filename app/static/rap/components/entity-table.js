@@ -12,6 +12,7 @@ function splitCamelCase(str) {
 const EntityTable = {
   container: null,
   currentEntity: null,
+  currentViewConfig: null, // null = entity mode, object = view mode
   records: [],
   schema: null,
   selectedId: null,
@@ -66,6 +67,7 @@ const EntityTable = {
    */
   async loadEntity(entityName, records) {
     this.currentEntity = entityName;
+    this.currentViewConfig = null; // Exit view mode
     this.records = records;
     this.selectedId = null;
     this.sortColumn = null;
@@ -76,6 +78,189 @@ const EntityTable = {
     this.schema = await SchemaCache.getExtended(entityName);
 
     await this.render();
+  },
+
+  /**
+   * Load and display a user-defined view (read-only)
+   */
+  async loadView(viewName, viewSchema, records) {
+    this.currentEntity = null;
+    this.currentViewConfig = viewSchema;
+    this.records = records;
+    this.selectedId = null;
+    this.sortColumn = null;
+    this.sortDirection = 'asc';
+    this.columnFilters = {};
+    this.schema = null;
+
+    this.renderView();
+  },
+
+  /**
+   * Render a user view table (read-only, no CRUD)
+   */
+  renderView() {
+    if (!this.currentViewConfig) {
+      this.container.innerHTML = '';
+      return;
+    }
+
+    const columns = this.currentViewConfig.columns;
+    const sortedRecords = this.getViewSortedRecords(columns);
+
+    let html = '<div class="entity-table-wrapper"><table class="entity-table">';
+
+    // Header row
+    html += '<thead><tr>';
+    for (const col of columns) {
+      const isSorted = this.sortColumn === col.key;
+      const sortIcon = isSorted
+        ? (this.sortDirection === 'asc' ? ' &#9650;' : ' &#9660;')
+        : ' <span class="sort-hint">&#8645;</span>';
+
+      html += `<th class="sortable" data-column="${col.key}">
+        ${splitCamelCase(col.label)}${sortIcon}
+      </th>`;
+    }
+    html += '</tr>';
+
+    // Filter row
+    html += '<tr class="filter-row">';
+    for (const col of columns) {
+      const filterValue = this.columnFilters[col.key] || '';
+      html += `<th class="filter-cell">
+        <input type="text" class="column-filter" data-column="${col.key}"
+               value="${this.escapeHtml(filterValue)}" placeholder="Filter...">
+      </th>`;
+    }
+    html += '</tr></thead>';
+
+    // Body rows
+    html += '<tbody>';
+    if (sortedRecords.length === 0) {
+      html += `<tr><td colspan="${columns.length}" class="empty-table-message">${i18n.t('no_records_found')}</td></tr>`;
+    }
+    for (let i = 0; i < sortedRecords.length; i++) {
+      const record = sortedRecords[i];
+      const isSelected = record.id === this.selectedId;
+      const rowClass = isSelected ? 'selected' : (i % 2 === 1 ? 'zebra' : '');
+
+      html += `<tr class="${rowClass}" data-id="${record.id}">`;
+      for (const col of columns) {
+        const value = record[col.key];
+        let displayValue = '';
+        if (value == null) {
+          // null/undefined: suppress unless no omit rule would hide it anyway
+        } else if (col.omit !== undefined && String(value) === col.omit) {
+          // value matches omit rule: suppress
+        } else {
+          displayValue = this.escapeHtml(String(value));
+        }
+        html += `<td>${displayValue}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+
+    this.container.innerHTML = html;
+    this.attachViewEventListeners(columns);
+
+    // Update record count
+    const filteredCount = this.getViewFilteredRecords(columns).length;
+    if (typeof EntityExplorer !== 'undefined') {
+      EntityExplorer.updateRecordStatus(filteredCount);
+    }
+  },
+
+  /**
+   * Get filtered records for view mode
+   */
+  getViewFilteredRecords(columns) {
+    const activeFilters = Object.entries(this.columnFilters)
+      .filter(([_, value]) => value && value.trim() !== '');
+
+    if (activeFilters.length === 0) return this.records;
+
+    return this.records.filter(record => {
+      return activeFilters.every(([colKey, filterValue]) => {
+        const filter = filterValue.toLowerCase().trim();
+        const cellValue = record[colKey];
+        if (cellValue == null) return false;
+        return String(cellValue).toLowerCase().includes(filter);
+      });
+    });
+  },
+
+  /**
+   * Get sorted records for view mode
+   */
+  getViewSortedRecords(columns) {
+    const filtered = this.getViewFilteredRecords(columns);
+
+    if (!this.sortColumn) return filtered;
+
+    return [...filtered].sort((a, b) => {
+      let valA = a[this.sortColumn];
+      let valB = b[this.sortColumn];
+      if (valA == null) valA = '';
+      if (valB == null) valB = '';
+
+      let cmp = 0;
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        cmp = valA - valB;
+      } else {
+        cmp = String(valA).localeCompare(String(valB));
+      }
+      return this.sortDirection === 'desc' ? -cmp : cmp;
+    });
+  },
+
+  /**
+   * Attach event listeners for view mode (read-only)
+   */
+  attachViewEventListeners(columns) {
+    // Column header click for sorting
+    this.container.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const column = th.dataset.column;
+        if (this.sortColumn === column) {
+          this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          this.sortColumn = column;
+          this.sortDirection = 'asc';
+        }
+        this.renderView();
+      });
+    });
+
+    // Column filter inputs
+    this.container.querySelectorAll('.column-filter').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const column = input.dataset.column;
+        const cursorPos = e.target.selectionStart;
+        this.columnFilters[column] = e.target.value;
+        this.renderView();
+        const newInput = this.container.querySelector(`.column-filter[data-column="${column}"]`);
+        if (newInput) {
+          newInput.focus();
+          newInput.setSelectionRange(cursorPos, cursorPos);
+        }
+      });
+      input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // Row click → jump to base entity edit
+    this.container.querySelectorAll('tbody tr').forEach(row => {
+      row.addEventListener('click', () => {
+        const id = parseInt(row.dataset.id);
+        if (this.currentViewConfig && EntityExplorer.currentView) {
+          EntityExplorer.editInBaseEntity(EntityExplorer.currentView.base, id);
+        }
+      });
+
+      // Cursor indicates clickable
+      row.style.cursor = 'pointer';
+    });
   },
 
   /**
@@ -303,7 +488,7 @@ const EntityTable = {
           // Regular value - use ValueFormatter to convert enum internal->external
           const displayValue = value != null
             ? this.escapeHtml(ValueFormatter.format(value, col.name, this.schema))
-            : '<em class="null-value">null</em>';
+            : '';
           html += `<td>${displayValue}</td>`;
         }
       }

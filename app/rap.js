@@ -222,7 +222,8 @@ if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0)
     backend.init(app, {
         appDir: APP_DIR,
         enabledEntities,
-        paths: cfg.paths
+        paths: cfg.paths,
+        viewsConfig: cfg.views || []
     });
 }
 
@@ -269,6 +270,12 @@ if (authEnabled) {
     app.use('/api/entity', authMiddleware, requireRole('admin'));
 }
 app.use(require('./server/routers/prompt.router')(cfg));
+
+// User Views Router (read-only for all authenticated users)
+if (authEnabled) {
+    app.use('/api/views', authMiddleware, requireRole('guest', 'user', 'admin'));
+}
+app.use(require('./server/routers/UserViewRouter')());
 
 // Export Router (PDF, CSV) - routes are under /api/entities, protection handled there
 app.use(require('./server/routers/export.router')(cfg));
