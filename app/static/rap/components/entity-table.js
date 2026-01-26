@@ -1,11 +1,4 @@
 /**
- * Split CamelCase into separate words: "EngineType" → "Engine Type"
- */
-function splitCamelCase(str) {
-  return str.replace(/([a-z])([A-Z])/g, '$1 $2');
-}
-
-/**
  * Entity Table Component
  * Sortable, scrollable table view for entity records
  */
@@ -118,8 +111,9 @@ const EntityTable = {
         ? (this.sortDirection === 'asc' ? ' &#9650;' : ' &#9660;')
         : ' <span class="sort-hint">&#8645;</span>';
 
+      const headerLabel = DomUtils.splitCamelCase(col.label).replace(/[_ ]/g, '<br>');
       html += `<th class="sortable" data-column="${col.key}">
-        ${splitCamelCase(col.label)}${sortIcon}
+        ${headerLabel}${sortIcon}
       </th>`;
     }
     html += '</tr>';
@@ -130,7 +124,7 @@ const EntityTable = {
       const filterValue = this.columnFilters[col.key] || '';
       html += `<th class="filter-cell">
         <input type="text" class="column-filter" data-column="${col.key}"
-               value="${this.escapeHtml(filterValue)}" placeholder="Filter...">
+               value="${DomUtils.escapeHtml(filterValue)}" placeholder="Filter...">
       </th>`;
     }
     html += '</tr></thead>';
@@ -154,7 +148,7 @@ const EntityTable = {
         } else if (col.omit !== undefined && String(value) === col.omit) {
           // value matches omit rule: suppress
         } else {
-          displayValue = this.escapeHtml(String(value));
+          displayValue = DomUtils.escapeHtml(String(value));
         }
         html += `<td>${displayValue}</td>`;
       }
@@ -199,11 +193,18 @@ const EntityTable = {
 
     if (!this.sortColumn) return filtered;
 
+    const sortCol = columns.find(c => c.key === this.sortColumn);
+    const omitValue = sortCol?.omit;
+
     return [...filtered].sort((a, b) => {
-      let valA = a[this.sortColumn];
-      let valB = b[this.sortColumn];
-      if (valA == null) valA = '';
-      if (valB == null) valB = '';
+      const valA = a[this.sortColumn];
+      const valB = b[this.sortColumn];
+
+      // OMIT values (null or matching omit rule) always sort to end
+      const aOmit = valA == null || (omitValue !== undefined && String(valA) === omitValue);
+      const bOmit = valB == null || (omitValue !== undefined && String(valB) === omitValue);
+      if (aOmit !== bOmit) return aOmit ? 1 : -1;
+      if (aOmit && bOmit) return 0;
 
       let cmp = 0;
       if (typeof valA === 'number' && typeof valB === 'number') {
@@ -339,8 +340,8 @@ const EntityTable = {
       .map(([column, value]) => {
         // Build display name: use conceptual name for FK columns
         const displayName = column.endsWith('_id')
-          ? splitCamelCase(column.slice(0, -3)).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-          : splitCamelCase(column).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          ? DomUtils.splitCamelCase(column.slice(0, -3)).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          : DomUtils.splitCamelCase(column).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         return { column: displayName, value: value.trim() };
       });
   },
@@ -401,11 +402,11 @@ const EntityTable = {
       const isFK = col.foreignKey ? ' fk-column' : '';
 
       // Use conceptual name for FKs (type instead of type_id)
-      // Replace underscores with <br> for line breaks in headers
-      const displayName = (col.foreignKey
+      // Split at CamelCase, underscores, and spaces for line breaks in headers
+      const rawName = col.foreignKey
         ? (col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name)
-        : col.name
-      ).replace(/_/g, '<br>');
+        : col.name;
+      const displayName = DomUtils.splitCamelCase(rawName).replace(/[_ ]/g, '<br>');
 
       // Use area color for FK columns
       const bgStyle = col.foreignKey?.areaColor
@@ -426,7 +427,7 @@ const EntityTable = {
       // Use area color of the referencing entity
       const bgColor = ref.areaColor || '#fef3c7';
       html += `<th class="backref-column" style="background-color: ${bgColor}" title="Records in ${ref.entity} referencing this via ${fieldName}">
-        <span class="backref-entity">${splitCamelCase(ref.entity)}</span>
+        <span class="backref-entity">${DomUtils.splitCamelCase(ref.entity)}</span>
         <span class="backref-field">${fieldName}</span>
       </th>`;
     }
@@ -438,7 +439,7 @@ const EntityTable = {
       const filterValue = this.columnFilters[col.name] || '';
       html += `<th class="filter-cell">
         <input type="text" class="column-filter" data-column="${col.name}"
-               value="${this.escapeHtml(filterValue)}" placeholder="Filter...">
+               value="${DomUtils.escapeHtml(filterValue)}" placeholder="Filter...">
       </th>`;
     }
     // Empty cells for back-reference columns (no filtering)
@@ -475,7 +476,7 @@ const EntityTable = {
             // Label already available from View - render directly
             html += `<td class="fk-cell">
               <span class="fk-value" data-action="navigate" data-entity="${col.foreignKey.entity}" data-id="${value}">
-                ${this.escapeHtml(preloadedLabel)}
+                ${DomUtils.escapeHtml(preloadedLabel)}
               </span>
             </td>`;
           } else {
@@ -487,7 +488,7 @@ const EntityTable = {
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const displayValue = value != null
-            ? this.escapeHtml(ValueFormatter.format(value, col.name, this.schema))
+            ? DomUtils.escapeHtml(ValueFormatter.format(value, col.name, this.schema))
             : '';
           html += `<td>${displayValue}</td>`;
         }
@@ -551,7 +552,7 @@ const EntityTable = {
 
         cell.innerHTML = `
           <span class="fk-value" data-action="navigate" data-entity="${entityName}" data-id="${id}">
-            ${this.escapeHtml(fullLabel)}
+            ${DomUtils.escapeHtml(fullLabel)}
           </span>
         `;
       } catch {
@@ -810,57 +811,38 @@ const EntityTable = {
   },
 
   /**
-   * Escape HTML for safe rendering
+   * Prepare export data: build display columns and format records
    */
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  },
-
-  /**
-   * Export current table view to PDF
-   */
-  async exportPdf() {
-    if (!this.currentEntity || !this.schema) {
-      return;
-    }
+  prepareExportData() {
+    if (!this.currentEntity || !this.schema) return null;
 
     const records = this.getFilteredRecords();
     if (records.length === 0) {
       alert(i18n.t('no_records_to_export'));
-      return;
+      return null;
     }
 
-    // Build columns (exclude id, use display names, include colors for FK columns)
     const columns = this.getVisibleColumns()
       .filter(col => col.name !== 'id')
       .map(col => {
-        // Use conceptual name for FKs (type instead of type_id)
         const displayName = col.foreignKey && col.name.endsWith('_id')
           ? col.name.slice(0, -3)
           : col.name;
-
         return {
           key: col.name,
-          label: splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-          color: col.foreignKey?.areaColor || null  // FK columns get target entity color
+          label: DomUtils.splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          color: col.foreignKey?.areaColor || null
         };
       });
 
-    // Format records (use labels for FKs, format enums)
     const formattedRecords = records.map(record => {
       const formatted = {};
       for (const col of columns) {
         const colDef = this.schema.columns.find(c => c.name === col.key);
-
         if (colDef?.foreignKey) {
-          // Use preloaded label from view
-          const displayName = col.key.endsWith('_id') ? col.key.slice(0, -3) : col.key;
-          const labelField = displayName + '_label';
-          formatted[col.key] = record[labelField] || record[col.key] || '';
+          const dn = col.key.endsWith('_id') ? col.key.slice(0, -3) : col.key;
+          formatted[col.key] = record[dn + '_label'] || record[col.key] || '';
         } else {
-          // Use ValueFormatter for enum conversion
           const value = record[col.key];
           formatted[col.key] = value != null
             ? ValueFormatter.format(value, col.key, this.schema)
@@ -870,119 +852,32 @@ const EntityTable = {
       return formatted;
     });
 
-    // Get entity area color
-    const entityColor = this.schema.areaColor || '#1a365d';
-
-    try {
-      const response = await fetch(`/api/entities/${this.currentEntity}/export-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: this.currentEntity,
-          columns,
-          records: formattedRecords,
-          entityColor,
-          filters: this.getActiveFilterDescriptions()
-        })
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.currentEntity}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        const error = await response.json();
-        alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
-      }
-    } catch (err) {
-      alert(i18n.t('export_failed', { message: err.message }));
-    }
+    return {
+      title: this.currentEntity,
+      columns,
+      records: formattedRecords,
+      entityColor: this.schema.areaColor || '#1a365d',
+      filters: this.getActiveFilterDescriptions()
+    };
   },
 
   /**
-   * Export current table view to DOCX (Word)
+   * Export current table view to a server-rendered format (pdf, docx, csv)
    */
-  async exportDocx() {
-    if (!this.currentEntity || !this.schema) {
-      return;
-    }
-
-    const records = this.getFilteredRecords();
-    if (records.length === 0) {
-      alert(i18n.t('no_records_to_export'));
-      return;
-    }
-
-    // Build columns (exclude id, use display names, include colors for FK columns)
-    const columns = this.getVisibleColumns()
-      .filter(col => col.name !== 'id')
-      .map(col => {
-        // Use conceptual name for FKs (type instead of type_id)
-        const displayName = col.foreignKey && col.name.endsWith('_id')
-          ? col.name.slice(0, -3)
-          : col.name;
-
-        return {
-          key: col.name,
-          label: splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-          color: col.foreignKey?.areaColor || null  // FK columns get target entity color
-        };
-      });
-
-    // Format records (use labels for FKs, format enums)
-    const formattedRecords = records.map(record => {
-      const formatted = {};
-      for (const col of columns) {
-        const colDef = this.schema.columns.find(c => c.name === col.key);
-
-        if (colDef?.foreignKey) {
-          // Use preloaded label from view
-          const displayName = col.key.endsWith('_id') ? col.key.slice(0, -3) : col.key;
-          const labelField = displayName + '_label';
-          formatted[col.key] = record[labelField] || record[col.key] || '';
-        } else {
-          // Use ValueFormatter for enum conversion
-          const value = record[col.key];
-          formatted[col.key] = value != null
-            ? ValueFormatter.format(value, col.key, this.schema)
-            : '';
-        }
-      }
-      return formatted;
-    });
-
-    // Get entity area color
-    const entityColor = this.schema.areaColor || '#1a365d';
+  async exportToFormat(format) {
+    const data = this.prepareExportData();
+    if (!data) return;
 
     try {
-      const response = await fetch(`/api/entities/${this.currentEntity}/export-docx`, {
+      const response = await fetch(`/api/entities/${this.currentEntity}/export-${format}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: this.currentEntity,
-          columns,
-          records: formattedRecords,
-          entityColor,
-          filters: this.getActiveFilterDescriptions()
-        })
+        body: JSON.stringify(data)
       });
 
       if (response.ok) {
         const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.currentEntity}.docx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        DomUtils.downloadBlob(blob, `${this.currentEntity}.${format}`);
       } else {
         const error = await response.json();
         alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
@@ -992,80 +887,7 @@ const EntityTable = {
     }
   },
 
-  /**
-   * Export current table view to CSV
-   */
-  async exportCsv() {
-    if (!this.currentEntity || !this.schema) {
-      return;
-    }
-
-    const records = this.getFilteredRecords();
-    if (records.length === 0) {
-      alert(i18n.t('no_records_to_export'));
-      return;
-    }
-
-    // Build columns (exclude id, use display names)
-    const columns = this.getVisibleColumns()
-      .filter(col => col.name !== 'id')
-      .map(col => {
-        // Use conceptual name for FKs (type instead of type_id)
-        const displayName = col.foreignKey && col.name.endsWith('_id')
-          ? col.name.slice(0, -3)
-          : col.name;
-
-        return {
-          key: col.name,
-          label: splitCamelCase(displayName).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-        };
-      });
-
-    // Format records (use labels for FKs, format enums)
-    const formattedRecords = records.map(record => {
-      const formatted = {};
-      for (const col of columns) {
-        const colDef = this.schema.columns.find(c => c.name === col.key);
-
-        if (colDef?.foreignKey) {
-          // Use preloaded label from view
-          const displayName = col.key.endsWith('_id') ? col.key.slice(0, -3) : col.key;
-          const labelField = displayName + '_label';
-          formatted[col.key] = record[labelField] || record[col.key] || '';
-        } else {
-          // Use ValueFormatter for enum conversion
-          const value = record[col.key];
-          formatted[col.key] = value != null
-            ? ValueFormatter.format(value, col.key, this.schema)
-            : '';
-        }
-      }
-      return formatted;
-    });
-
-    try {
-      const response = await fetch(`/api/entities/${this.currentEntity}/export-csv`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columns, records: formattedRecords })
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.currentEntity}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        const error = await response.json();
-        alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
-      }
-    } catch (err) {
-      alert(i18n.t('export_failed', { message: err.message }));
-    }
-  },
+  async exportPdf() { return this.exportToFormat('pdf'); },
+  async exportDocx() { return this.exportToFormat('docx'); },
+  async exportCsv() { return this.exportToFormat('csv'); },
 };

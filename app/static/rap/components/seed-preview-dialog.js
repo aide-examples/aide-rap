@@ -217,11 +217,11 @@ const SeedPreviewDialog = {
     // Limit preview to first 50 rows
     const previewRows = this.records.slice(0, 50);
 
-    const headerCells = columns.map(c => `<th>${this.escapeHtml(c)}</th>`).join('');
+    const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
     const rows = previewRows.map(record => {
       const cells = columns.map(col => {
         const value = record[col];
-        const displayValue = value === null ? '' : this.escapeHtml(String(value));
+        const displayValue = value === null ? '' : DomUtils.escapeHtml(String(value));
         return `<td>${displayValue}</td>`;
       }).join('');
       return `<tr>${cells}</tr>`;
@@ -286,7 +286,8 @@ const SeedPreviewDialog = {
   exportJson() {
     const json = JSON.stringify(this.records, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
-    this.downloadBlob(blob, `${this.entityName}.json`);
+    DomUtils.downloadBlob(blob, `${this.entityName}.json`);
+    this.hide();
   },
 
   /**
@@ -310,7 +311,8 @@ const SeedPreviewDialog = {
     const csv = bom + header + '\n' + rows.join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    this.downloadBlob(blob, `${this.entityName}.csv`);
+    DomUtils.downloadBlob(blob, `${this.entityName}.csv`);
+    this.hide();
   },
 
   /**
@@ -324,27 +326,4 @@ const SeedPreviewDialog = {
     return str;
   },
 
-  /**
-   * Download a blob as file
-   */
-  downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    this.hide();
-  },
-
-  /**
-   * Escape HTML for safe rendering
-   */
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 };

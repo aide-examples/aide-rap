@@ -136,7 +136,7 @@ const DetailPanel = {
         displayValue = '';
       } else {
         // Use ValueFormatter to convert enum internal->external
-        displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+        displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, schema));
       }
 
       // For FK columns, show both label and ID when showIds is enabled
@@ -148,7 +148,7 @@ const DetailPanel = {
         const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
         const labelField = displayName + '_label';
         if (record[labelField]) {
-          displayValue = this.escapeHtml(record[labelField]) + idSuffix;
+          displayValue = DomUtils.escapeHtml(record[labelField]) + idSuffix;
         } else {
           displayValue = displayValue + idSuffix;
         }
@@ -204,11 +204,6 @@ const DetailPanel = {
     await EntityForm.render(this.content, entityName, record);
   },
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  },
 };
 
 // Add CSS for detail rows

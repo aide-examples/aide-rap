@@ -5,15 +5,6 @@
 
 const TreeRenderer = {
     /**
-     * Escape HTML for safe rendering
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    },
-
-    /**
      * Render a root-level node (entity record from the main list)
      * @param {Object} context - Render context with state and settings
      */
@@ -31,8 +22,8 @@ const TreeRenderer = {
                data-record-id="${record.id}">
             <div class="tree-node-header" data-action="toggle" style="background-color: ${areaColor};">
               <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
-              <span class="tree-node-label">${this.escapeHtml(label.title)}</span>
-              ${label.subtitle ? `<span class="tree-node-subtitle">${this.escapeHtml(label.subtitle)}</span>` : ''}
+              <span class="tree-node-label">${DomUtils.escapeHtml(label.title)}</span>
+              ${label.subtitle ? `<span class="tree-node-subtitle">${DomUtils.escapeHtml(label.subtitle)}</span>` : ''}
             </div>
         `;
 
@@ -128,7 +119,7 @@ const TreeRenderer = {
             if (value === null || value === undefined) {
                 displayValue = '';
             } else {
-                displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+                displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, schema));
             }
             return `<td title="${col.name}">${displayValue}</td>`;
         }).join('');
@@ -153,9 +144,9 @@ const TreeRenderer = {
             displayValue = '';
         } else if (schema) {
             // Use ValueFormatter for enum conversion
-            displayValue = this.escapeHtml(ValueFormatter.format(value, name, schema));
+            displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, name, schema));
         } else {
-            displayValue = this.escapeHtml(String(value));
+            displayValue = DomUtils.escapeHtml(String(value));
         }
 
         return `
@@ -222,7 +213,7 @@ const TreeRenderer = {
               <div class="tree-fk-header disabled" style="background-color: ${areaColor};">
                 <span class="cycle-icon" title="Cycle detected - already visited">&#8635;</span>
                 <span class="attr-name">${col.name}:</span>
-                <span class="fk-label">${this.escapeHtml(refLabel)}</span>
+                <span class="fk-label">${DomUtils.escapeHtml(refLabel)}</span>
                 <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
               </div>
             </div>
@@ -238,7 +229,7 @@ const TreeRenderer = {
             <div class="tree-fk-header" data-action="toggle-fk" style="background-color: ${areaColor};">
               <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
               <span class="attr-name">${col.name}:</span>
-              <span class="fk-label">${this.escapeHtml(refLabel)}</span>
+              <span class="fk-label">${DomUtils.escapeHtml(refLabel)}</span>
               <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
             </div>
         `;
@@ -396,7 +387,7 @@ const TreeRenderer = {
                     if (value === null || value === undefined) {
                         displayValue = '';
                     } else {
-                        displayValue = this.escapeHtml(ValueFormatter.format(value, col.name, schema));
+                        displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, schema));
                     }
                     return `<td title="${col.name}">${displayValue}</td>`;
                 }).join('');

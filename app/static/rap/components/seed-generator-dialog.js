@@ -137,7 +137,7 @@ const SeedGeneratorDialog = {
             <div class="instruction-status ${this.hasInstruction ? 'has-instruction' : 'no-instruction'}">
               ${this.hasInstruction ? '✓ Instruction found in Markdown' : 'No instruction defined yet — write one below.'}
             </div>
-            <textarea id="generator-instruction" rows="6" placeholder="Describe what data to generate...">${this.escapeHtml(this.instruction)}</textarea>
+            <textarea id="generator-instruction" rows="6" placeholder="Describe what data to generate...">${DomUtils.escapeHtml(this.instruction)}</textarea>
           </div>
         `;
 
@@ -162,7 +162,7 @@ const SeedGeneratorDialog = {
                   </span>
                 ` : ''}
               </div>
-              <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${this.escapeHtml(this.lastPrompt || '')}</textarea>
+              <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${DomUtils.escapeHtml(this.lastPrompt || '')}</textarea>
             </div>
             <div class="paste-section" id="paste-drop-zone">
               <div class="paste-section-header">
@@ -255,7 +255,7 @@ const SeedGeneratorDialog = {
     }
 
     const columns = [...dataKeys];
-    const headerCells = columns.map(c => `<th>${this.escapeHtml(c)}</th>`).join('');
+    const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
 
     // Limit preview to first 50 rows
     const previewRows = this.generatedData.slice(0, 50);
@@ -274,9 +274,9 @@ const SeedGeneratorDialog = {
         const strValue = String(value);
         const displayValue = strValue.length > 30 ? strValue.substring(0, 27) + '...' : strValue;
         if (warning) {
-          return `<td class="fk-invalid" title="${this.escapeHtml(warning.message || '')}">${this.escapeHtml(displayValue)} ⚠</td>`;
+          return `<td class="fk-invalid" title="${DomUtils.escapeHtml(warning.message || '')}">${DomUtils.escapeHtml(displayValue)} ⚠</td>`;
         }
-        return `<td title="${this.escapeHtml(strValue)}">${this.escapeHtml(displayValue)}</td>`;
+        return `<td title="${DomUtils.escapeHtml(strValue)}">${DomUtils.escapeHtml(displayValue)}</td>`;
       }).join('');
 
       const rowClass = isInvalidRow ? 'class="invalid-row"' : '';
@@ -337,7 +337,7 @@ const SeedGeneratorDialog = {
 
       const warningLines = Array.from(uniqueWarnings.values())
         .slice(0, 3)
-        .map(w => `"${this.escapeHtml(w.value)}" not found in ${this.escapeHtml(w.targetEntity)}`)
+        .map(w => `"${DomUtils.escapeHtml(w.value)}" not found in ${DomUtils.escapeHtml(w.targetEntity)}`)
         .join('<br>');
 
       html += `<div class="warning-section"><div class="warning-icon">⚠</div><div class="warning-text">${warningLines}`;
@@ -704,13 +704,4 @@ const SeedGeneratorDialog = {
     setTimeout(() => msg.remove(), 3000);
   },
 
-  /**
-   * Escape HTML
-   */
-  escapeHtml(text) {
-    if (text === null || text === undefined) return '';
-    const div = document.createElement('div');
-    div.textContent = String(text);
-    return div.innerHTML;
-  }
 };

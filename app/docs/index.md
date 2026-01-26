@@ -116,6 +116,32 @@ LEFT JOIN operator o ON a.operator_id = o.id
 
 One query returns everything the UI needs – no N+1 problems.
 
+### User Views — Cross-Entity Join Tables
+
+Define read-only views in `config.json` that join data across entities via FK chains:
+
+```json
+{
+    "name": "Engine Status",
+    "base": "EngineAllocation",
+    "columns": [
+        "engine.serial_number AS ESN",
+        "engine.type.thrust_lbs AS Thrust",
+        "mount_position AS pos OMIT 0"
+    ]
+}
+```
+
+- **Dot-notation paths** follow FK relationships: `engine.type.thrust_lbs` → EngineAllocation → Engine → EngineType
+- **AS alias** for custom column headers
+- **OMIT** suppresses specific values from display (FK columns default to `OMIT null`)
+- Materialized as SQL views (`uv_*`) at startup — no runtime overhead
+- Separate **Views dropdown** (blue) left of the entity selector
+- Full column filtering and sorting, same as entity tables
+- Row click jumps to the base entity's edit form
+
+See [Views Configuration](procedures/views-config.md) for the full syntax reference.
+
 ### Context Menu Actions
 
 Right-click any record (in table or tree) for quick actions:
@@ -293,6 +319,7 @@ Views    Extended Schema
 | Type Validation | Code annotations | Markdown patterns |
 | Seed Data | Manual JSON files | AI-generated from descriptions |
 | Relationship Navigation | Flat lists | Infinite-depth tree with cycle detection |
+| Cross-Entity Views | Custom SQL or reporting tools | Config-driven dot-notation FK joins |
 | Entity Grouping | Folder structure | Color-coded areas in UI |
 
 ---
@@ -309,6 +336,10 @@ GET    /api/entities/:entity/:id/references   # Back-references
 POST   /api/entities/:entity              # Create (with validation)
 PUT    /api/entities/:entity/:id          # Update (with validation)
 DELETE /api/entities/:entity/:id          # Delete (with FK check)
+
+GET    /api/views                         # List views with groups/colors
+GET    /api/views/:name                   # Query view data (filter, sort, page)
+GET    /api/views/:name/schema            # View column metadata
 ```
 
 **Filtering**: `?filter=column:value` or `?filter=searchterm` (LIKE search)
@@ -327,6 +358,10 @@ Edit `app/config.json`:
   "crud": {
     "enabledEntities": ["Aircraft", "Operator", "Registration", ...]
   },
+  "views": [
+    "-------------------- Fleet Analysis",
+    { "name": "Engine Status", "base": "EngineAllocation", "columns": ["..."] }
+  ],
   "llm": {
     "active": "gemini",
     "providers": {
@@ -363,6 +398,15 @@ Ideas for future development:
 - [x] **Seed File FK Fallback** – Load FK references from seed files when DB table is empty
 
 See [Seed Data Reference](seed-data.md) for technical details.
+
+### User Views
+- [x] **Cross-Entity Views** – Dot-notation FK paths, SQL view materialization, separate dropdown
+- [x] **OMIT Value Suppression** – Per-column `OMIT <value>`, FK default `OMIT null`
+- [x] **Row-Click Navigation** – Jump from view row to base entity edit form
+- [ ] Back-reference columns (one-to-many joins)
+- [ ] Aggregation (GROUP BY, COUNT)
+
+See [Views Configuration](procedures/views-config.md) for syntax details.
 
 ### UI Enhancements
 - [ ] Keyboard shortcuts (arrow keys, Enter for details)

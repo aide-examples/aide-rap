@@ -418,8 +418,8 @@ const EntityExplorer = {
       return `
         <div class="entity-row ${isSelected ? 'selected' : ''}" data-id="${record.id}">
           <div class="entity-row-content">
-            <div class="entity-row-title">${this.escapeHtml(String(title))}</div>
-            <div class="entity-row-subtitle">${this.escapeHtml(String(subtitle))}</div>
+            <div class="entity-row-title">${DomUtils.escapeHtml(String(title))}</div>
+            <div class="entity-row-subtitle">${DomUtils.escapeHtml(String(subtitle))}</div>
           </div>
           <div class="entity-row-actions">
             <button class="btn-row-action btn-edit" data-id="${record.id}" title="Edit">&#9998;</button>
@@ -614,9 +614,4 @@ const EntityExplorer = {
     }
   },
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  },
 };

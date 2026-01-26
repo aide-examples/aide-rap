@@ -142,7 +142,7 @@ const EntityForm = {
 
     for (const opt of options) {
       const selected = String(opt.id) === String(currentValue) ? 'selected' : '';
-      optionsHtml += `<option value="${opt.id}" ${selected}>${this.escapeHtml(opt.label)}</option>`;
+      optionsHtml += `<option value="${opt.id}" ${selected}>${DomUtils.escapeHtml(opt.label)}</option>`;
     }
 
     select.innerHTML = optionsHtml;
@@ -163,7 +163,7 @@ const EntityForm = {
     // Create datalist with options
     let datalistHtml = '';
     for (const opt of options) {
-      datalistHtml += `<option value="${this.escapeHtml(opt.label)}" data-id="${opt.id}">`;
+      datalistHtml += `<option value="${DomUtils.escapeHtml(opt.label)}" data-id="${opt.id}">`;
     }
 
     // Create hidden input for actual ID value
@@ -226,12 +226,6 @@ const EntityForm = {
     select.replaceWith(hiddenInput);
     hiddenInput.after(searchInput);
     searchInput.after(datalist);
-  },
-
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   },
 
   getInputType(col) {

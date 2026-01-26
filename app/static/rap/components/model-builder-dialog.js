@@ -89,7 +89,7 @@ const ModelBuilderDialog = {
             <div class="modal-overlay">
                 <div class="modal-dialog model-builder-dialog">
                     <div class="modal-header" style="background-color: ${this.themeColor};">
-                        <h2>${this.escapeHtml(title)}</h2>
+                        <h2>${DomUtils.escapeHtml(title)}</h2>
                         <button class="modal-close" data-action="close">&times;</button>
                     </div>
 
@@ -142,8 +142,8 @@ const ModelBuilderDialog = {
                             <select id="system-select">
                                 <option value="">-- Create New System --</option>
                                 ${this.existingSystems.map(s =>
-                                    `<option value="${this.escapeHtml(s.name)}" ${this.selectedSystem === s.name ? 'selected' : ''}>
-                                        ${this.escapeHtml(s.displayName)} (${this.escapeHtml(s.name)})
+                                    `<option value="${DomUtils.escapeHtml(s.name)}" ${this.selectedSystem === s.name ? 'selected' : ''}>
+                                        ${DomUtils.escapeHtml(s.displayName)} (${DomUtils.escapeHtml(s.name)})
                                     </option>`
                                 ).join('')}
                             </select>
@@ -162,18 +162,18 @@ const ModelBuilderDialog = {
                     <div class="tab-content-info">
                         <div class="form-group">
                             <label for="system-name">System Name (snake_case)</label>
-                            <input type="text" id="system-name" value="${this.escapeHtml(this.systemName)}"
+                            <input type="text" id="system-name" value="${DomUtils.escapeHtml(this.systemName)}"
                                    placeholder="my_system" pattern="[a-z][a-z0-9_]*" ${isEditing ? 'readonly' : ''}>
                             <div class="field-hint">${isEditing ? 'System name cannot be changed after creation' : 'Lowercase letters, numbers, underscores. E.g., library, inventory_app'}</div>
                         </div>
                         <div class="form-group">
                             <label for="display-name">Display Name</label>
-                            <input type="text" id="display-name" value="${this.escapeHtml(this.displayName)}"
+                            <input type="text" id="display-name" value="${DomUtils.escapeHtml(this.displayName)}"
                                    placeholder="My System">
                         </div>
                         <div class="form-group">
                             <label for="system-description">Description</label>
-                            <input type="text" id="system-description" value="${this.escapeHtml(this.description)}"
+                            <input type="text" id="system-description" value="${DomUtils.escapeHtml(this.description)}"
                                    placeholder="A brief description of what this system manages">
                         </div>
                         <div class="form-group">
@@ -200,7 +200,7 @@ I need a library system with:
 - Books with title, ISBN, publication year
 - Authors with name and biography
 - Categories for organizing books
-- Each book has one author and can belong to multiple categories">${this.escapeHtml(this.designBrief)}</textarea>
+- Each book has one author and can belong to multiple categories">${DomUtils.escapeHtml(this.designBrief)}</textarea>
                         </div>
                     </div>
                 `;
@@ -208,7 +208,7 @@ I need a library system with:
             case 'prompt':
                 return `
                     <div class="tab-content-prompt">
-                        <textarea id="ai-prompt-text" readonly rows="12">${this.escapeHtml(this.prompt || '')}</textarea>
+                        <textarea id="ai-prompt-text" readonly rows="12">${DomUtils.escapeHtml(this.prompt || '')}</textarea>
                     </div>
                 `;
 
@@ -237,7 +237,7 @@ erDiagram
 
 SEEDING:
 - Author: ...
-- Book: ...">${this.escapeHtml(this.mermaidCode)}</textarea>
+- Book: ...">${DomUtils.escapeHtml(this.mermaidCode)}</textarea>
                     </div>
                 `;
 
@@ -326,13 +326,13 @@ SEEDING:
         if (validation.errors.length > 0) {
             html += `<div class="validation-errors">
                 <strong>Errors:</strong>
-                <ul>${validation.errors.map(e => `<li>${this.escapeHtml(e)}</li>`).join('')}</ul>
+                <ul>${validation.errors.map(e => `<li>${DomUtils.escapeHtml(e)}</li>`).join('')}</ul>
             </div>`;
         }
         if (validation.warnings.length > 0) {
             html += `<div class="validation-warnings">
                 <strong>Warnings:</strong>
-                <ul>${validation.warnings.map(w => `<li>${this.escapeHtml(w)}</li>`).join('')}</ul>
+                <ul>${validation.warnings.map(w => `<li>${DomUtils.escapeHtml(w)}</li>`).join('')}</ul>
             </div>`;
         }
 
@@ -352,10 +352,10 @@ SEEDING:
                         <div class="area-card" style="border-left: 4px solid ${areaData.color}; background: ${areaData.color}20;">
                             <div class="area-header">
                                 <span class="area-color" style="background: ${areaData.color};"></span>
-                                <strong>${this.escapeHtml(areaName)}</strong>
+                                <strong>${DomUtils.escapeHtml(areaName)}</strong>
                             </div>
                             <div class="area-entities">
-                                ${areaData.entities.map(e => `<span class="area-entity">${this.escapeHtml(e)}</span>`).join('')}
+                                ${areaData.entities.map(e => `<span class="area-entity">${DomUtils.escapeHtml(e)}</span>`).join('')}
                             </div>
                         </div>
                     `).join('')}
@@ -398,9 +398,9 @@ SEEDING:
                         return `
                         <tr class="${entity.isJunction ? 'junction-entity' : ''}" ${rowStyle}>
                             <td>
-                                <strong>${this.escapeHtml(entity.name)}</strong>
+                                <strong>${DomUtils.escapeHtml(entity.name)}</strong>
                                 ${entity.isJunction ? '<span class="badge">Junction</span>' : ''}
-                                ${desc ? `<div class="entity-description">${this.escapeHtml(desc)}</div>` : ''}
+                                ${desc ? `<div class="entity-description">${DomUtils.escapeHtml(desc)}</div>` : ''}
                             </td>
                             <td>
                                 ${entity.attributes.map(attr => {
@@ -409,11 +409,11 @@ SEEDING:
                                     if (attr.label2) markers.push('[LABEL2]');
                                     if (attr.foreignKey) markers.push(`FK→${attr.foreignKey}`);
                                     const markerStr = markers.length > 0 ? ` <span class="attr-markers">${markers.join(' ')}</span>` : '';
-                                    return `<div class="attr-item">${this.escapeHtml(attr.name)}: ${attr.foreignKey || attr.type}${markerStr}</div>`;
+                                    return `<div class="attr-item">${DomUtils.escapeHtml(attr.name)}: ${attr.foreignKey || attr.type}${markerStr}</div>`;
                                 }).join('')}
                             </td>
                             <td class="seeding-cell">
-                                ${seedingInstructions[entity.name] ? this.escapeHtml(seedingInstructions[entity.name]) : '<span class="text-muted">—</span>'}
+                                ${seedingInstructions[entity.name] ? DomUtils.escapeHtml(seedingInstructions[entity.name]) : '<span class="text-muted">—</span>'}
                             </td>
                         </tr>
                     `;}).join('')}
@@ -1048,13 +1048,4 @@ SEEDING:
         setTimeout(() => msg.remove(), 4000);
     },
 
-    /**
-     * Escape HTML
-     */
-    escapeHtml(text) {
-        if (text === null || text === undefined) return '';
-        const div = document.createElement('div');
-        div.textContent = String(text);
-        return div.innerHTML;
-    }
 };

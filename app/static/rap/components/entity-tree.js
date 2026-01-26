@@ -433,13 +433,6 @@ const EntityTree = {
     },
 
     /**
-     * Escape HTML for safe rendering (delegated to renderer)
-     */
-    escapeHtml(text) {
-        return TreeRenderer.escapeHtml(text);
-    },
-
-    /**
      * Export currently visible/expanded tree to PDF
      */
     async exportPdf() {

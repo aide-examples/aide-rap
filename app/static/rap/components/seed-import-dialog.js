@@ -324,7 +324,7 @@ const SeedImportDialog = {
     const previewRows = this.parsedData.slice(0, 10);
 
     // Build table
-    const headerCells = columns.map(c => `<th>${this.escapeHtml(c)}</th>`).join('');
+    const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
     const rows = previewRows.map((record, idx) => {
       const rowNum = idx + 1;
       const rowWarnings = warningLookup[rowNum] || {};
@@ -336,9 +336,9 @@ const SeedImportDialog = {
         const displayValue = value === null ? '' : String(value);
 
         if (warning) {
-          return `<td class="fk-invalid" title="${this.escapeHtml(warning.message || '')}">${this.escapeHtml(displayValue)} ⚠</td>`;
+          return `<td class="fk-invalid" title="${DomUtils.escapeHtml(warning.message || '')}">${DomUtils.escapeHtml(displayValue)} ⚠</td>`;
         }
-        return `<td>${this.escapeHtml(displayValue)}</td>`;
+        return `<td>${DomUtils.escapeHtml(displayValue)}</td>`;
       }).join('');
 
       const rowClass = isInvalidRow ? 'class="invalid-row"' : '';
@@ -517,7 +517,7 @@ const SeedImportDialog = {
     this.switchTab('preview');
 
     if (tableDiv) {
-      tableDiv.innerHTML = `<div class="import-error">${this.escapeHtml(message)}</div>`;
+      tableDiv.innerHTML = `<div class="import-error">${DomUtils.escapeHtml(message)}</div>`;
     }
     if (statusDiv) {
       statusDiv.style.display = 'none';
@@ -528,12 +528,4 @@ const SeedImportDialog = {
     this.modalElement.querySelector('#btn-save-only').disabled = true;
   },
 
-  /**
-   * Escape HTML for safe rendering
-   */
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
 };
