@@ -172,6 +172,249 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
 }
 
 /**
+ * Parse back-reference parameter string from inside parentheses.
+ *
+ * Supports comma-separated directives:
+ *   "COUNT"                        → { count: true }
+ *   "LIST"                         → { list: true }
+ *   "WHERE end_date=null"          → { where: [{ column: "end_date", value: "null" }] }
+ *   "ORDER BY start_date DESC"     → { orderBy: { column: "start_date", dir: "DESC" } }
+ *   "LIMIT 1"                      → { limit: 1 }
+ *
+ * @param {string} paramsStr - Raw string from inside parentheses
+ * @returns {{ where: Array, orderBy: Object|null, limit: number|null, count: boolean, list: boolean }}
+ */
+function parseBackRefParams(paramsStr) {
+  const result = { where: [], orderBy: null, limit: null, count: false, list: false };
+
+  if (!paramsStr || !paramsStr.trim()) return result;
+
+  const parts = paramsStr.split(',').map(s => s.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    if (/^COUNT$/i.test(part)) {
+      result.count = true;
+    } else if (/^LIST$/i.test(part)) {
+      result.list = true;
+    } else if (/^WHERE\s+/i.test(part)) {
+      const whereStr = part.replace(/^WHERE\s+/i, '');
+      const eqMatch = whereStr.match(/^(\w+)\s*=\s*(.+)$/);
+      if (eqMatch) {
+        result.where.push({ column: eqMatch[1], value: eqMatch[2].trim() });
+      }
+    } else if (/^ORDER\s+BY\s+/i.test(part)) {
+      const orderStr = part.replace(/^ORDER\s+BY\s+/i, '');
+      const orderMatch = orderStr.match(/^(\w+)(?:\s+(ASC|DESC))?$/i);
+      if (orderMatch) {
+        result.orderBy = { column: orderMatch[1], dir: (orderMatch[2] || 'ASC').toUpperCase() };
+      }
+    } else if (/^LIMIT\s+/i.test(part)) {
+      const limitMatch = part.match(/^LIMIT\s+(\d+)$/i);
+      if (limitMatch) {
+        result.limit = parseInt(limitMatch[1], 10);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Resolve a back-reference path against the schema.
+ *
+ * Syntax: Entity<fk_field(params).outbound.chain.column
+ *
+ * Examples:
+ *   "EngineAllocation<engine(COUNT)"
+ *   "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).mount_position"
+ *   "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration"
+ *
+ * Returns the same interface as resolveColumnPath():
+ *   { joins: [], selectExpr: "(SELECT ...)", label, jsType }
+ *
+ * @param {string} pathStr - Back-reference path expression
+ * @param {string} baseEntityName - The view's base entity
+ * @param {Object} schema - Full schema object
+ */
+function resolveBackRefPath(pathStr, baseEntityName, schema) {
+  const match = pathStr.match(/^(\w+)<(\w+)\(([^)]*)\)(?:\.(.+))?$/);
+  if (!match) {
+    throw new Error(`Invalid back-reference syntax: "${pathStr}"`);
+  }
+
+  const [, refEntityName, fkFieldName, paramsStr, tailPath] = match;
+
+  // Validate child entity
+  const refEntity = schema.entities[refEntityName];
+  if (!refEntity) {
+    throw new Error(`Back-ref entity "${refEntityName}" not found in schema`);
+  }
+
+  // Find FK column in child entity that points to base entity
+  const fkCol = refEntity.columns.find(
+    c => c.foreignKey && (c.displayName === fkFieldName || c.name === fkFieldName || c.name === fkFieldName + '_id')
+  );
+  if (!fkCol || !fkCol.foreignKey) {
+    throw new Error(
+      `FK "${fkFieldName}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
+    );
+  }
+
+  // Verify FK target matches the view's base entity
+  if (fkCol.foreignKey.entity !== baseEntityName) {
+    throw new Error(
+      `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
+      `not "${baseEntityName}" (back-ref: "${pathStr}")`
+    );
+  }
+
+  const params = parseBackRefParams(paramsStr);
+
+  // Resolve outbound FK tail path (e.g., "aircraft.registration")
+  let targetSelectExpr;
+  let targetLabel;
+  let targetJsType;
+  const internalJoins = [];
+
+  if (tailPath) {
+    const segments = tailPath.split('.');
+
+    if (segments.length === 1) {
+      // Direct column on child entity
+      const col = refEntity.columns.find(c => c.name === segments[0] || c.displayName === segments[0]);
+      if (!col) {
+        throw new Error(
+          `Column "${segments[0]}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
+        );
+      }
+      targetSelectExpr = `_br.${col.name}`;
+      targetLabel = titleCase(col.displayName || col.name);
+      targetJsType = col.jsType || 'string';
+    } else {
+      // Multi-segment: walk FK chain from child entity
+      let currentEntity = refEntity;
+      let currentAlias = '_br';
+      const pathParts = [];
+
+      for (let i = 0; i < segments.length - 1; i++) {
+        const seg = segments[i];
+        pathParts.push(seg);
+
+        const innerFkCol = currentEntity.columns.find(
+          c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
+        );
+
+        if (!innerFkCol || !innerFkCol.foreignKey) {
+          throw new Error(
+            `FK segment "${seg}" not found in entity "${currentEntity.className}" ` +
+            `(back-ref tail: "${tailPath}", path: "${pathStr}")`
+          );
+        }
+
+        const targetEntityName = innerFkCol.foreignKey.entity;
+        const targetEntity = schema.entities[targetEntityName];
+        if (!targetEntity) {
+          throw new Error(`FK target entity "${targetEntityName}" not found in schema`);
+        }
+
+        const joinAlias = '_br_' + pathParts.join('_');
+
+        internalJoins.push({
+          table: targetEntity.tableName,
+          alias: joinAlias,
+          onLeft: `${currentAlias}.${innerFkCol.name}`,
+          onRight: `${joinAlias}.id`
+        });
+
+        currentEntity = targetEntity;
+        currentAlias = joinAlias;
+      }
+
+      // Terminal column on the last joined entity
+      const terminalColName = segments[segments.length - 1];
+      const col = currentEntity.columns.find(
+        c => c.name === terminalColName || c.displayName === terminalColName
+      );
+      if (!col) {
+        throw new Error(
+          `Terminal column "${terminalColName}" not found in entity "${currentEntity.className}" ` +
+          `(back-ref tail: "${tailPath}", path: "${pathStr}")`
+        );
+      }
+
+      targetSelectExpr = `${currentAlias}.${col.name}`;
+      targetLabel = titleCase(col.displayName || col.name);
+      targetJsType = col.jsType || 'string';
+    }
+  }
+
+  // Determine aggregation mode
+  const isCount = params.count;
+  const isList = params.list;
+
+  if (!isCount && !tailPath) {
+    throw new Error(
+      `Back-ref requires a target column (.column) or COUNT aggregate (path: "${pathStr}")`
+    );
+  }
+
+  // Build correlated subquery
+  const joinClausesSQL = internalJoins.map(
+    j => `LEFT JOIN ${j.table} ${j.alias} ON ${j.onLeft} = ${j.onRight}`
+  ).join(' ');
+
+  let whereClause = `_br.${fkCol.name} = b.id`;
+  for (const cond of params.where) {
+    const condCol = refEntity.columns.find(c => c.name === cond.column || c.displayName === cond.column);
+    const colName = condCol ? condCol.name : cond.column;
+    if (cond.value === 'null') {
+      whereClause += ` AND _br.${colName} IS NULL`;
+    } else {
+      whereClause += ` AND _br.${colName} = '${cond.value}'`;
+    }
+  }
+
+  let orderClause = '';
+  if (params.orderBy) {
+    const orderCol = refEntity.columns.find(
+      c => c.name === params.orderBy.column || c.displayName === params.orderBy.column
+    );
+    const orderColName = orderCol ? orderCol.name : params.orderBy.column;
+    orderClause = ` ORDER BY _br.${orderColName} ${params.orderBy.dir}`;
+  }
+
+  let selectExpr;
+  let label;
+  let jsType;
+
+  if (isCount) {
+    const fromClause = `${refEntity.tableName} _br`;
+    selectExpr = `(SELECT COUNT(*) FROM ${fromClause}${joinClausesSQL ? ' ' + joinClausesSQL : ''} WHERE ${whereClause})`;
+    label = 'Count';
+    jsType = 'number';
+  } else if (isList) {
+    const fromClause = `${refEntity.tableName} _br`;
+    selectExpr = `(SELECT GROUP_CONCAT(${targetSelectExpr}, ', ') FROM ${fromClause}${joinClausesSQL ? ' ' + joinClausesSQL : ''} WHERE ${whereClause}${orderClause})`;
+    label = targetLabel;
+    jsType = 'string';
+  } else {
+    // Scalar mode: implicit LIMIT 1 if not specified
+    const limitClause = ` LIMIT ${params.limit || 1}`;
+    const fromClause = `${refEntity.tableName} _br`;
+    selectExpr = `(SELECT ${targetSelectExpr} FROM ${fromClause}${joinClausesSQL ? ' ' + joinClausesSQL : ''} WHERE ${whereClause}${orderClause}${limitClause})`;
+    label = targetLabel;
+    jsType = targetJsType;
+  }
+
+  return {
+    joins: [],
+    selectExpr,
+    label,
+    jsType
+  };
+}
+
+/**
  * Parse all user view definitions and resolve against schema.
  *
  * @param {Array} viewsConfig - Array from config.json "views" key
@@ -235,7 +478,10 @@ function parseAllUserViews(viewsConfig, schema) {
       }
 
       try {
-        const resolved = resolveColumnPath(parsed.path, entry.base, schema);
+        const isBackRef = parsed.path.includes('<');
+        const resolved = isBackRef
+          ? resolveBackRefPath(parsed.path, entry.base, schema)
+          : resolveColumnPath(parsed.path, entry.base, schema);
         const label = parsed.label || resolved.label;
 
         // FK paths (dot notation) default to omit null
@@ -314,5 +560,7 @@ module.exports = {
   generateUserViewSQL,
   toSqlName,
   resolveColumnPath,
-  parseColumnEntry
+  resolveBackRefPath,
+  parseColumnEntry,
+  parseBackRefParams
 };

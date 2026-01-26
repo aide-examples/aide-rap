@@ -149,6 +149,73 @@ Join aliases use the pattern `j_{path_segments}` (e.g., `j_type`, `j_type_manufa
 
 ---
 
+## Back-Reference Columns (Inbound FKs)
+
+Back-references allow a view to pull data from child entities that point *to* the base entity via a foreign key. They are implemented as correlated SQL subqueries.
+
+### Syntax
+
+```
+Entity<fk_field(params).column AS Label
+```
+
+| Part | Description | Example |
+|------|-------------|---------|
+| `Entity` | Child entity that has an FK pointing to the base entity | `EngineAllocation` |
+| `<fk_field` | FK column name (displayName, without `_id`) | `<engine` (= `engine_id`) |
+| `(params)` | Filter, sort, limit, or aggregation directives | `(WHERE end_date=null, LIMIT 1)` |
+| `.column` | Target column on the child entity (or FK chain from it) | `.mount_position` |
+
+### Parameters (comma-separated inside parentheses)
+
+| Parameter | Effect | Example |
+|-----------|--------|---------|
+| `COUNT` | Returns count of matching records (no `.column` needed) | `(COUNT)` |
+| `LIST` | Returns comma-separated values (GROUP_CONCAT) | `(LIST)` |
+| `WHERE col=val` | Filter condition (`null` maps to `IS NULL`) | `WHERE end_date=null` |
+| `ORDER BY col [ASC\|DESC]` | Sort order | `ORDER BY start_date DESC` |
+| `LIMIT n` | Maximum records (scalar mode defaults to LIMIT 1) | `LIMIT 1` |
+
+### FK-Following After Back-Reference
+
+The `.column` part supports multi-segment dot-paths, following FK chains from the child entity outward:
+
+```json
+"EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+```
+
+This resolves as: find `EngineAllocation` records where `engine_id = base.id` and `end_date IS NULL`, then follow the `aircraft` FK to `Aircraft` and return `registration`. The FK chain within the subquery produces internal LEFT JOINs.
+
+### Examples
+
+```json
+"EngineAllocation<engine(COUNT) AS Allocations"
+"EngineEvent<engine(COUNT) AS Events OMIT 0"
+"EngineAllocation<engine(ORDER BY start_date DESC, LIMIT 1).mount_position AS Last Pos"
+"EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+"EngineStandMounting<engine(LIST, ORDER BY mounted_date DESC).mounted_date AS Mount History"
+```
+
+### Generated SQL
+
+Back-reference columns become correlated subqueries in the SELECT clause:
+
+```sql
+-- COUNT:
+(SELECT COUNT(*) FROM engine_allocation _br
+ WHERE _br.engine_id = b.id) AS "Allocations"
+
+-- Scalar with FK-following:
+(SELECT _br_aircraft.registration FROM engine_allocation _br
+ LEFT JOIN aircraft _br_aircraft ON _br.aircraft_id = _br_aircraft.id
+ WHERE _br.engine_id = b.id AND _br.end_date IS NULL
+ LIMIT 1) AS "Current Aircraft"
+```
+
+Subquery aliases use `_br` for the child table and `_br_{field}` for internal joins.
+
+---
+
 ## UI Behavior
 
 - Views appear in a separate **Views** dropdown (blue border) to the left of the entity selector
@@ -187,6 +254,16 @@ Join aliases use the pattern `j_{path_segments}` (e.g., `j_type`, `j_type_manufa
             { "path": "type.manufacturer.name", "label": "Manufacturer" }
         ]
     },
+    {
+        "name": "Engine Overview",
+        "base": "Engine",
+        "columns": [
+            "serial_number AS ESN",
+            "type.designation AS Type",
+            "EngineAllocation<engine(COUNT) AS Allocations",
+            "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+        ]
+    },
     "-------------------- Maintenance",
     {
         "name": "Open Shop Orders",
@@ -220,7 +297,6 @@ After adding or changing views, restart the server and check:
 
 ## Limitations
 
-- **Outbound FKs only**: Dot-paths follow foreign key references outward. Back-references (one-to-many) are not supported in V1.
+- **Single-level back-references**: Back-reference columns support one inbound FK step with optional outbound FK-following. Chaining multiple back-references (e.g., `...column<Entity(...)`) is not supported.
 - **Read-only**: Views do not support create, update, or delete operations.
-- **No aggregation**: Views show individual rows; GROUP BY / COUNT are not available.
-- **FK chain depth**: There is no hard limit, but deeply nested paths (3+ joins) may impact query performance on large datasets.
+- **FK chain depth**: There is no hard limit, but deeply nested paths (3+ joins) or many back-reference subqueries may impact query performance on large datasets.
