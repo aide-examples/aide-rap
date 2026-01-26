@@ -2440,6 +2440,69 @@
     font-size: 0.75rem;
 }
 
+/* Instruction status indicator */
+.instruction-status {
+    font-size: 0.8rem;
+    padding: 4px 0;
+    margin-bottom: 6px;
+}
+
+.instruction-status.has-instruction {
+    color: #059669;
+}
+
+.instruction-status.no-instruction {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* AI Quick-Link badges */
+.prompt-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ai-link {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 3px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+
+.ai-link:hover {
+    opacity: 0.8;
+}
+
+.ai-link-chatgpt {
+    background: #10a37f;
+    color: white;
+}
+
+.ai-link-claude {
+    background: #d97706;
+    color: white;
+}
+
+.ai-link-gemini {
+    background: #4285f4;
+    color: white;
+}
+
+/* FK dependency warning */
+.fk-dependency-warning {
+    padding: 8px 12px;
+    background: #fef3c7;
+    border: 1px solid #fbbf24;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #92400e;
+}
+
 /* Result Tab Content */
 .tab-content-result {
     height: 100%;

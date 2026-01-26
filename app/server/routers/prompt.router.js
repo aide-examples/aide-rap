@@ -86,6 +86,11 @@ module.exports = function(cfg) {
             // Load existing FK data from database
             const existingData = promptBuilder.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
 
+            // Compute which FK entities have no data
+            const fkEntities = entity.columns.filter(c => c.foreignKey).map(c => c.foreignKey.entity);
+            const loadedEntities = Object.keys(existingData);
+            const emptyFKs = [...new Set(fkEntities.filter(e => !loadedEntities.includes(e)))];
+
             // Load back-reference data (entities that reference this one)
             const backRefData = promptBuilder.loadBackReferenceData(entityName, getDatabase, schema);
 
@@ -104,7 +109,8 @@ module.exports = function(cfg) {
             res.json({
                 success: true,
                 prompt,
-                instruction
+                instruction,
+                emptyFKs
             });
         } catch (e) {
             console.error(`Failed to build prompt for ${req.params.entity}:`, e);

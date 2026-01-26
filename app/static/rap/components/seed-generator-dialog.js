@@ -11,6 +11,8 @@ const SeedGeneratorDialog = {
   generatedData: null,
   lastPrompt: null,
   activeTab: 'instruction',  // instruction, prompt, result
+  hasInstruction: false,
+  emptyFKs: [],
   // Validation state (populated by /api/seed/parse)
   fkWarnings: [],
   invalidRows: [],
@@ -43,8 +45,10 @@ const SeedGeneratorDialog = {
       const resp = await fetch(`/api/entity/${entityName}/generator-instruction`);
       const data = await resp.json();
       this.instruction = data.instruction || '';
+      this.hasInstruction = data.hasInstruction || false;
     } catch (e) {
       this.instruction = '';
+      this.hasInstruction = false;
     }
 
     this.render();
@@ -54,6 +58,7 @@ const SeedGeneratorDialog = {
    * Reset validation state
    */
   resetValidation() {
+    this.emptyFKs = [];
     this.fkWarnings = [];
     this.invalidRows = [];
     this.validCount = 0;
@@ -125,6 +130,9 @@ const SeedGeneratorDialog = {
       case 'instruction':
         return `
           <div class="tab-content-instruction">
+            <div class="instruction-status ${this.hasInstruction ? 'has-instruction' : 'no-instruction'}">
+              ${this.hasInstruction ? '✓ Instruction found in Markdown' : 'No instruction defined yet — write one below.'}
+            </div>
             <textarea id="generator-instruction" rows="6" placeholder="Describe what data to generate...">${this.escapeHtml(this.instruction)}</textarea>
           </div>
         `;
@@ -132,10 +140,20 @@ const SeedGeneratorDialog = {
       case 'prompt':
         return `
           <div class="tab-content-prompt-paste">
+            ${this.emptyFKs.length > 0 ? `
+              <div class="fk-dependency-warning">⚠ No data for: ${this.emptyFKs.join(', ')} — FK references will be unresolvable.</div>
+            ` : ''}
             <div class="prompt-section">
               <div class="prompt-section-header">
                 <span class="prompt-section-label">AI Prompt</span>
-                ${this.lastPrompt ? '<button class="btn-seed btn-small" data-action="copy-prompt">Copy</button>' : ''}
+                ${this.lastPrompt ? `
+                  <span class="prompt-actions">
+                    <button class="btn-seed btn-small" data-action="copy-prompt">Copy</button>
+                    <a href="https://chatgpt.com/" target="chatgpt" class="ai-link ai-link-chatgpt" data-action="open-ai">GPT</a>
+                    <a href="https://claude.ai/new" target="claude" class="ai-link ai-link-claude" data-action="open-ai">Claude</a>
+                    <a href="https://gemini.google.com/app" target="gemini" class="ai-link ai-link-gemini" data-action="open-ai">Gemini</a>
+                  </span>
+                ` : ''}
               </div>
               <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${this.escapeHtml(this.lastPrompt || '')}</textarea>
             </div>
@@ -143,7 +161,7 @@ const SeedGeneratorDialog = {
               <div class="paste-section-header">
                 <span class="paste-section-label">AI Response</span>
               </div>
-              <textarea id="ai-response-text" rows="8" placeholder="Paste the JSON array from your AI chat here..."></textarea>
+              <textarea id="ai-response-text" rows="8" placeholder="Paste JSON array or CSV data here..."></textarea>
             </div>
           </div>
         `;
@@ -371,6 +389,18 @@ const SeedGeneratorDialog = {
       this.copyPrompt();
     });
 
+    // AI quick-links: copy prompt before navigating
+    this.container.querySelectorAll('[data-action="open-ai"]').forEach(link => {
+      link.addEventListener('click', () => {
+        if (this.lastPrompt) {
+          navigator.clipboard.writeText(this.lastPrompt).catch(() => {
+            const textarea = this.container.querySelector('#llm-prompt-text');
+            if (textarea) { textarea.select(); document.execCommand('copy'); }
+          });
+        }
+      });
+    });
+
     // Parse & validate pasted AI response
     this.container.querySelector('[data-action="parse-response"]')?.addEventListener('click', () => {
       this.parseAndValidate();
@@ -472,6 +502,7 @@ const SeedGeneratorDialog = {
 
       if (result.success) {
         this.lastPrompt = result.prompt;
+        this.emptyFKs = result.emptyFKs || [];
         this.activeTab = 'prompt';
       } else {
         this.showMessage(result.error || 'Failed to build prompt', true);
@@ -519,12 +550,33 @@ const SeedGeneratorDialog = {
     }
 
     try {
-      const resp = await fetch(`/api/seed/parse/${this.entityName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-      const result = await resp.json();
+      let result;
+      const format = CsvParser.detectFormat(text);
+
+      if (format === 'csv') {
+        // CSV: parse client-side, validate via existing endpoint
+        const records = CsvParser.parse(text);
+        if (records.length === 0) throw new Error('No records found in CSV input');
+        for (const record of records) { delete record.id; }
+
+        const resp = await fetch(`/api/seed/validate/${this.entityName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ records })
+        });
+        result = await resp.json();
+        result.records = records;
+        result.count = records.length;
+        result.success = true;
+      } else {
+        // JSON: server-side parse (strips markdown) + validate
+        const resp = await fetch(`/api/seed/parse/${this.entityName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        result = await resp.json();
+      }
 
       if (result.success) {
         this.generatedData = result.records;
@@ -534,7 +586,7 @@ const SeedGeneratorDialog = {
         this.conflicts = result.conflicts || [];
         this.selectedMode = this.conflicts.length > 0 ? 'merge' : 'replace';
         this.activeTab = 'result';
-        this.showMessage(`Parsed ${result.count} records`);
+        this.showMessage(`Parsed ${result.count} records${format === 'csv' ? ' (CSV)' : ''}`);
       } else {
         this.showMessage(result.error || 'Parse failed', true);
       }
