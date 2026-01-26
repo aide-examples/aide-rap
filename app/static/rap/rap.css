@@ -1597,6 +1597,18 @@
     font-weight: 500;
 }
 
+.status-powered-by {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-decoration: none;
+    margin-left: 8px;
+}
+
+.status-powered-by:hover {
+    color: #6b7280;
+    text-decoration: underline;
+}
+
 /* Modal Toolbar (for source selector, upload, etc.) */
 .modal-toolbar {
     display: flex;

@@ -29,6 +29,7 @@
     if (typeof HeaderWidget !== 'undefined') {
       HeaderWidget.init('#app-header', {
         appName: appName,
+        titleHtml: titleHtml,
         showAbout: true,
         showHelp: true,
         showLanguage: true,
@@ -36,39 +37,19 @@
         aboutLink: '/about',
         helpLink: '/help'
       });
-
-      // Apply custom title HTML if configured
-      if (titleHtml) {
-        const h1 = document.querySelector('#app-header h1');
-        if (h1) h1.innerHTML = titleHtml;
-      }
     }
 
     // Initialize Framework Status Widget (Footer)
     if (typeof StatusWidget !== 'undefined') {
       StatusWidget.init('#status-widget', {
-        showRestart: true,
+        showRestart: false,
         showUpdate: true,
         showInstall: true,
         showLayoutToggle: false,
-        layoutDefault: 'page-fill'
+        layoutDefault: 'page-fill',
+        extraInfo: '<span id="sw-records-sep" class="status-footer-sep" style="display:none">·</span><span id="sw-records"></span>',
+        extraActions: '<a href="https://github.com/aide-examples/aide-rap" target="_blank" class="status-powered-by">powered by AIDE RAP</a>'
       });
-
-      // Add record count to status footer (without modifying aide-frame)
-      const footerInfo = document.querySelector('.status-footer-info');
-      if (footerInfo) {
-        const sep = document.createElement('span');
-        sep.className = 'status-footer-sep';
-        sep.textContent = '·';
-        sep.id = 'sw-records-sep';
-        sep.style.display = 'none';
-
-        const recordsEl = document.createElement('span');
-        recordsEl.id = 'sw-records';
-
-        footerInfo.appendChild(sep);
-        footerInfo.appendChild(recordsEl);
-      }
     }
 
     // Check authentication status
