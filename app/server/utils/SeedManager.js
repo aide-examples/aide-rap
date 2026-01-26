@@ -167,6 +167,19 @@ function resolveConceptualFKs(entityName, record, lookups) {
         console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
       }
     }
+    // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
+    // AI sometimes uses _id suffix despite prompt instructions
+    else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
+      const labelValue = record[technicalName];
+      const lookup = lookups[targetEntity] || {};
+      const resolvedId = lookup[labelValue];
+
+      if (resolvedId !== undefined) {
+        resolved[technicalName] = resolvedId;
+      } else {
+        console.warn(`  Warning: Could not resolve ${technicalName}="${labelValue}" for ${entityName}`);
+      }
+    }
   }
 
   return resolved;
@@ -351,6 +364,7 @@ function validateImport(entityName, records) {
     // Check FK references
     for (const fk of entity.foreignKeys) {
       const conceptualName = fk.displayName;
+      const technicalName = fk.column;
       const targetEntity = fk.references.entity;
 
       // Check conceptual name (e.g., "manufacturer": "Airbus")
@@ -362,6 +376,22 @@ function validateImport(entityName, records) {
           warnings.push({
             row: i + 1,
             field: conceptualName,
+            value: labelValue,
+            targetEntity,
+            message: `"${labelValue}" not found in ${targetEntity}`
+          });
+          invalidRows.add(i + 1);
+        }
+      }
+      // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
+      else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
+        const labelValue = record[technicalName];
+        const lookup = lookups[targetEntity] || {};
+
+        if (!lookup[labelValue]) {
+          warnings.push({
+            row: i + 1,
+            field: technicalName,
             value: labelValue,
             targetEntity,
             message: `"${labelValue}" not found in ${targetEntity}`
