@@ -2232,6 +2232,38 @@
     font-weight: 500;
 }
 
+.load-conflict-warning {
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+}
+
+.load-conflict-warning .conflict-summary {
+    color: #92400e;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.load-conflict-warning .conflict-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.load-conflict-warning .conflict-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #78350f;
+}
+
+.load-conflict-warning .conflict-option input[type="radio"] {
+    margin: 0;
+}
+
 .seed-preview-container {
     flex: 1;
     overflow: auto;

@@ -124,8 +124,8 @@ const SeedManager = {
    */
   openLoadPreview(entityName) {
     if (typeof SeedPreviewDialog !== 'undefined') {
-      SeedPreviewDialog.showLoad(entityName, async () => {
-        await this.loadEntity(entityName);
+      SeedPreviewDialog.showLoad(entityName, async (mode) => {
+        await this.loadEntity(entityName, mode);
       });
     } else {
       this.showMessage('Preview dialog not loaded', true);
@@ -202,8 +202,8 @@ const SeedManager = {
         <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}">
           <td class="level">${idx + 1}</td>
           <td class="entity-name">${e.name}</td>
-          <td class="row-count">${e.rowCount}</td>
           <td class="seed-count">${seedDisplay}</td>
+          <td class="row-count">${e.rowCount}</td>
         </tr>
       `;
     }).join('');
@@ -222,8 +222,8 @@ const SeedManager = {
                 <tr>
                   <th>#</th>
                   <th>Entity</th>
-                  <th>DB Rows</th>
                   <th>Seed Available</th>
+                  <th>DB Rows</th>
                 </tr>
               </thead>
               <tbody>
@@ -301,13 +301,22 @@ const SeedManager = {
   /**
    * Load seed data for a single entity
    */
-  async loadEntity(entityName) {
+  async loadEntity(entityName, mode) {
     try {
-      const response = await fetch(`/api/seed/load/${entityName}`, { method: 'POST' });
+      const fetchOptions = { method: 'POST' };
+      if (mode) {
+        fetchOptions.headers = { 'Content-Type': 'application/json' };
+        fetchOptions.body = JSON.stringify({ mode });
+      }
+      const response = await fetch(`/api/seed/load/${entityName}`, fetchOptions);
       const data = await response.json();
 
       if (data.success) {
-        this.showMessage(`Loaded ${data.loaded} records into ${entityName}`);
+        const parts = [];
+        if (data.loaded > 0) parts.push(`${data.loaded} loaded`);
+        if (data.updated > 0) parts.push(`${data.updated} updated`);
+        if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
+        this.showMessage(`${entityName}: ${parts.join(', ') || 'no changes'}`);
         await this.loadStatus();
         this.render();
       } else {

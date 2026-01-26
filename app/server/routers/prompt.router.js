@@ -83,10 +83,10 @@ module.exports = function(cfg) {
                 types: schema.types || {}
             };
 
-            // Load existing FK data from database
-            const existingData = promptBuilder.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
+            // Load existing FK data from database (with seed file fallback)
+            const { existingData, seedOnlyFKs } = promptBuilder.loadExistingDataForFKs(schemaInfo, getDatabase, schema);
 
-            // Compute which FK entities have no data
+            // Compute which FK entities have no data at all (not in DB, not in seed)
             const fkEntities = entity.columns.filter(c => c.foreignKey).map(c => c.foreignKey.entity);
             const loadedEntities = Object.keys(existingData);
             const emptyFKs = [...new Set(fkEntities.filter(e => !loadedEntities.includes(e)))];
@@ -110,7 +110,8 @@ module.exports = function(cfg) {
                 success: true,
                 prompt,
                 instruction,
-                emptyFKs
+                emptyFKs,
+                seedOnlyFKs // FK entities with data only in seed files (not loaded in DB)
             });
         } catch (e) {
             console.error(`Failed to build prompt for ${req.params.entity}:`, e);

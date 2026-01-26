@@ -270,12 +270,14 @@ function parseResponse(text) {
 function loadExistingDataForFKs(entitySchema, getDatabase, fullSchema = null) {
   const fkColumns = entitySchema.columns.filter(c => c.foreignKey);
   const existingData = {};
+  const seedOnlyFKs = []; // FK entities loaded from seed file (not in DB)
 
   for (const col of fkColumns) {
     const refEntity = col.foreignKey.entity;
     const refTable = col.foreignKey.table;
     let records = [];
     let labelFields = null;
+    let fromSeed = false;
 
     if (fullSchema && fullSchema.entities && fullSchema.entities[refEntity]) {
       labelFields = fullSchema.entities[refEntity].ui?.labelFields;
@@ -300,6 +302,7 @@ function loadExistingDataForFKs(entitySchema, getDatabase, fullSchema = null) {
           const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
           if (Array.isArray(seedData) && seedData.length > 0) {
             records = seedData.map((r, idx) => ({ id: idx + 1, ...r }));
+            fromSeed = true;
           }
         }
       } catch (e) {
@@ -312,10 +315,13 @@ function loadExistingDataForFKs(entitySchema, getDatabase, fullSchema = null) {
         records,
         labelFields
       };
+      if (fromSeed) {
+        seedOnlyFKs.push(refEntity);
+      }
     }
   }
 
-  return existingData;
+  return { existingData, seedOnlyFKs };
 }
 
 /**

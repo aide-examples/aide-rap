@@ -43,6 +43,30 @@ function getDbAndSchema() {
 }
 
 /**
+ * Build a lookup map from rows: LABEL value -> id
+ * Supports primary LABEL, secondary LABEL2, combined, and index notation.
+ */
+function buildLookupFromRows(rows, labelCol, label2Col) {
+  const lookup = {};
+  let rowIndex = 1;
+
+  for (const row of rows) {
+    const primaryVal = labelCol ? row[labelCol.name] : null;
+    const secondaryVal = label2Col ? row[label2Col.name] : null;
+
+    if (primaryVal) lookup[primaryVal] = row.id;
+    if (secondaryVal) lookup[secondaryVal] = row.id;
+    if (primaryVal && secondaryVal) {
+      lookup[`${primaryVal} (${secondaryVal})`] = row.id;
+    }
+    lookup[`#${rowIndex}`] = row.id;
+    rowIndex++;
+  }
+
+  return lookup;
+}
+
+/**
  * Build a lookup map for an entity: LABEL value -> id
  * Used to resolve conceptual FK references (e.g., "manufacturer": "Airbus" -> manufacturer_id: 1)
  *
@@ -60,11 +84,9 @@ function buildLabelLookup(entityName) {
 
   if (!entity) return {};
 
-  // Find the LABEL and LABEL2 columns
   const labelCol = entity.columns.find(c => c.ui?.label);
   const label2Col = entity.columns.find(c => c.ui?.label2);
 
-  // Build column list for SELECT - always include id for index-based lookup
   const selectCols = ['id'];
   if (labelCol) selectCols.push(labelCol.name);
   if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
@@ -72,32 +94,41 @@ function buildLabelLookup(entityName) {
   const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} ORDER BY id`;
   const rows = db.prepare(sql).all();
 
-  const lookup = {};
-  let rowIndex = 1; // 1-based index for "#n" notation
+  return buildLookupFromRows(rows, labelCol, label2Col);
+}
 
-  for (const row of rows) {
-    const primaryVal = labelCol ? row[labelCol.name] : null;
-    const secondaryVal = label2Col ? row[label2Col.name] : null;
+/**
+ * Build a lookup map from a seed JSON file (fallback when DB table is empty).
+ * Returns { lookup, found } where found indicates if a seed file was used.
+ */
+function buildLabelLookupFromSeed(entityName) {
+  const { schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
 
-    // Add primary label to lookup
-    if (primaryVal) {
-      lookup[primaryVal] = row.id;
-    }
-    // Add secondary label to lookup (allows matching by full name)
-    if (secondaryVal) {
-      lookup[secondaryVal] = row.id;
-    }
-    // Add combined format: "primary (secondary)" - matches View display format
-    if (primaryVal && secondaryVal) {
-      lookup[`${primaryVal} (${secondaryVal})`] = row.id;
-    }
-    // Add index-based notation: "#1", "#2", etc.
-    // This supports AI-generated data that uses "#n" for FK references
-    lookup[`#${rowIndex}`] = row.id;
-    rowIndex++;
+  if (!entity) return { lookup: {}, found: false };
+
+  const labelCol = entity.columns.find(c => c.ui?.label);
+  const label2Col = entity.columns.find(c => c.ui?.label2);
+
+  try {
+    const seedFile = path.join(getSeedDir(), `${entityName}.json`);
+    if (!fs.existsSync(seedFile)) return { lookup: {}, found: false };
+
+    const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+    if (!Array.isArray(seedData) || seedData.length === 0) return { lookup: {}, found: false };
+
+    // Seed files use attribute names (not DB column names with _id suffix).
+    // LABEL/LABEL2 columns are always non-FK attributes, so names match.
+    const rows = seedData.map((r, idx) => ({
+      id: idx + 1,
+      ...(labelCol ? { [labelCol.name]: r[labelCol.name] ?? null } : {}),
+      ...(label2Col ? { [label2Col.name]: r[label2Col.name] ?? null } : {})
+    }));
+
+    return { lookup: buildLookupFromRows(rows, labelCol, label2Col), found: true };
+  } catch (e) {
+    return { lookup: {}, found: false };
   }
-
-  return lookup;
 }
 
 /**
@@ -288,12 +319,23 @@ function validateImport(entityName, records) {
   const warnings = [];
   const invalidRows = new Set();
   const conflicts = [];
+  const seedFallbacks = []; // FK entities resolved from seed files (not loaded in DB)
 
-  // Build lookups for FK validation
+  // Build lookups for FK validation (with seed file fallback)
   const lookups = {};
   for (const fk of entity.foreignKeys) {
     if (!lookups[fk.references.entity]) {
-      lookups[fk.references.entity] = buildLabelLookup(fk.references.entity);
+      const dbLookup = buildLabelLookup(fk.references.entity);
+      if (Object.keys(dbLookup).length > 0) {
+        lookups[fk.references.entity] = dbLookup;
+      } else {
+        // DB table empty — fall back to seed file
+        const { lookup: seedLookup, found } = buildLabelLookupFromSeed(fk.references.entity);
+        lookups[fk.references.entity] = seedLookup;
+        if (found) {
+          seedFallbacks.push(fk.references.entity);
+        }
+      }
     }
   }
 
@@ -386,7 +428,8 @@ function validateImport(entityName, records) {
     validCount: records.length - invalidRows.size,
     invalidRows: invalidRowsArray,
     conflicts,
-    hasConflicts: conflicts.length > 0
+    hasConflicts: conflicts.length > 0,
+    seedFallbacks // FK entities resolved from seed files instead of DB
   };
 }
 
@@ -420,7 +463,62 @@ function findExistingByUnique(entityName, record) {
     }
   }
 
+  // Fallback: check LABEL column (business key) if no explicit unique constraints matched
+  if (uniqueCols.length === 0 && Object.keys(entity.uniqueKeys || {}).length === 0) {
+    const labelCol = entity.columns.find(c => c.ui?.label);
+    if (labelCol) {
+      const value = record[labelCol.name];
+      if (value !== null && value !== undefined) {
+        const sql = `SELECT id FROM ${entity.tableName} WHERE ${labelCol.name} = ?`;
+        const existing = db.prepare(sql).get(value);
+        if (existing) return existing.id;
+      }
+    }
+  }
+
   return null;
+}
+
+/**
+ * Count how many seed records conflict with existing DB records (by unique constraint).
+ * Used by the preview dialog to warn about duplicates before loading.
+ * @param {string} entityName
+ * @returns {{ dbRowCount: number, conflictCount: number }}
+ */
+function countSeedConflicts(entityName) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) return { dbRowCount: 0, conflictCount: 0 };
+
+  const dbRowCount = db.prepare(`SELECT COUNT(*) as cnt FROM ${entity.tableName}`).get().cnt;
+  if (dbRowCount === 0) return { dbRowCount: 0, conflictCount: 0 };
+
+  // Read seed file
+  const seedFile = path.join(getSeedDir(), `${entityName}.json`);
+  if (!fs.existsSync(seedFile)) return { dbRowCount, conflictCount: 0 };
+
+  const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+  if (!Array.isArray(records) || records.length === 0) return { dbRowCount, conflictCount: 0 };
+
+  // Build FK lookups for resolving conceptual names
+  const lookups = {};
+  for (const fk of entity.foreignKeys) {
+    if (!lookups[fk.references.entity]) {
+      lookups[fk.references.entity] = buildLabelLookup(fk.references.entity);
+    }
+  }
+
+  // Resolve FKs and check each record for conflicts
+  let conflictCount = 0;
+  for (const record of records) {
+    const resolved = resolveConceptualFKs(entityName, record, lookups);
+    if (findExistingByUnique(entityName, resolved)) {
+      conflictCount++;
+    }
+  }
+
+  return { dbRowCount, conflictCount };
 }
 
 /**
@@ -590,7 +688,7 @@ function loadAll() {
     const seedFile = path.join(getSeedDir(), `${entity.className}.json`);
     if (fs.existsSync(seedFile)) {
       try {
-        const result = loadEntity(entity.className, lookups);
+        const result = loadEntity(entity.className, lookups, { mode: 'merge' });
         results[entity.className] = result;
 
         // Update lookup for this entity (so subsequent entities can reference it)
@@ -684,6 +782,7 @@ module.exports = {
   resetAll,
   uploadEntity,
   buildLabelLookup,
+  countSeedConflicts,
   // Export getter for path (for testing and external access)
   get SEED_DIR() { return getSeedDir(); }
 };

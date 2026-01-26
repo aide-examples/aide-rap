@@ -10,6 +10,9 @@ const SeedPreviewDialog = {
   records: [],
   mode: null, // 'load' or 'export'
   onConfirm: null,
+  dbRowCount: 0,
+  conflictCount: 0,
+  selectedLoadMode: 'skip', // 'skip' = keep existing, 'merge' = overwrite existing
 
   /**
    * Initialize the preview dialog
@@ -48,9 +51,15 @@ const SeedPreviewDialog = {
       const response = await fetch(`/api/seed/content/${this.entityName}`);
       const data = await response.json();
       this.records = data.records || [];
+      this.dbRowCount = data.dbRowCount || 0;
+      this.conflictCount = data.conflictCount || 0;
+      this.selectedLoadMode = this.conflictCount > 0 ? 'skip_conflicts' : 'replace';
     } catch (err) {
       console.error('Failed to load seed content:', err);
       this.records = [];
+      this.dbRowCount = 0;
+      this.conflictCount = 0;
+      this.selectedLoadMode = 'replace';
     }
   },
 
@@ -136,6 +145,26 @@ const SeedPreviewDialog = {
       ? 'No records in seed file'
       : 'No records in database';
 
+    // Conflict info for load mode
+    const hasConflicts = this.mode === 'load' && this.conflictCount > 0;
+    const newCount = this.records.length - this.conflictCount;
+
+    const conflictSection = hasConflicts ? `
+      <div class="load-conflict-warning">
+        <div class="conflict-summary">⚠ ${this.conflictCount} of ${this.records.length} records already exist in the database (${this.dbRowCount} DB rows total).</div>
+        <div class="conflict-options">
+          <label class="conflict-option">
+            <input type="radio" name="loadMode" value="skip_conflicts" ${this.selectedLoadMode === 'skip_conflicts' ? 'checked' : ''}>
+            <span>Keep existing — only load ${newCount} new record${newCount !== 1 ? 's' : ''}</span>
+          </label>
+          <label class="conflict-option">
+            <input type="radio" name="loadMode" value="merge">
+            <span>Overwrite existing — update ${this.conflictCount}, insert ${newCount} new</span>
+          </label>
+        </div>
+      </div>
+    ` : '';
+
     const actionButtons = this.mode === 'load'
       ? `<button class="btn-seed btn-load-confirm" id="btn-confirm-load">Load ${this.records.length} Records</button>`
       : `
@@ -157,6 +186,7 @@ const SeedPreviewDialog = {
             <div class="preview-info">
               ${sourceInfo}
             </div>
+            ${conflictSection}
             <div class="seed-preview-container" id="preview-container">
               ${this.renderTable(emptyMessage)}
             </div>
@@ -223,11 +253,19 @@ const SeedPreviewDialog = {
       el.addEventListener('click', () => this.hide());
     });
 
-    // Load confirm
+    // Load mode radio buttons
+    this.modalElement.querySelectorAll('input[name="loadMode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        this.selectedLoadMode = e.target.value;
+      });
+    });
+
+    // Load confirm — pass selected mode to callback
     this.modalElement.querySelector('#btn-confirm-load')?.addEventListener('click', async () => {
       if (this.onConfirm) {
+        const mode = this.selectedLoadMode;
         this.hide();
-        await this.onConfirm();
+        await this.onConfirm(mode);
       }
     });
 

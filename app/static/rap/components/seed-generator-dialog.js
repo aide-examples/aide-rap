@@ -13,7 +13,9 @@ const SeedGeneratorDialog = {
   activeTab: 'instruction',  // instruction, prompt, result
   hasInstruction: false,
   emptyFKs: [],
+  seedOnlyFKs: [], // FK entities with data only in seed files (not loaded in DB)
   // Validation state (populated by /api/seed/parse)
+  seedFallbacks: [], // FK entities resolved from seed files during validation
   fkWarnings: [],
   invalidRows: [],
   validCount: 0,
@@ -59,6 +61,8 @@ const SeedGeneratorDialog = {
    */
   resetValidation() {
     this.emptyFKs = [];
+    this.seedOnlyFKs = [];
+    this.seedFallbacks = [];
     this.fkWarnings = [];
     this.invalidRows = [];
     this.validCount = 0;
@@ -142,6 +146,9 @@ const SeedGeneratorDialog = {
           <div class="tab-content-prompt-paste">
             ${this.emptyFKs.length > 0 ? `
               <div class="fk-dependency-warning">⚠ No data for: ${this.emptyFKs.join(', ')} — FK references will be unresolvable.</div>
+            ` : ''}
+            ${this.seedOnlyFKs.length > 0 ? `
+              <div class="fk-dependency-warning seed-only">⚠ ${this.seedOnlyFKs.join(', ')} — not loaded in DB, using seed files. Load dependencies first or use "Load All".</div>
             ` : ''}
             <div class="prompt-section">
               <div class="prompt-section-header">
@@ -307,6 +314,15 @@ const SeedGeneratorDialog = {
       html += `<div class="validation-summary"><strong>${this.validCount} valid</strong> / ${total} total</div>`;
     } else {
       html += `<div class="validation-summary">${total} records — all valid</div>`;
+    }
+
+    // Seed fallback info
+    if (this.seedFallbacks.length > 0) {
+      html += `<div class="warning-section seed-fallback-info">
+        <div class="warning-icon">⚠</div>
+        <div class="warning-text">FK labels resolved from seed files (not loaded in DB): <strong>${this.seedFallbacks.join(', ')}</strong>.
+          <br>Use "Save only", then load dependencies first or use "Load All".</div>
+      </div>`;
     }
 
     // FK warnings
@@ -503,6 +519,7 @@ const SeedGeneratorDialog = {
       if (result.success) {
         this.lastPrompt = result.prompt;
         this.emptyFKs = result.emptyFKs || [];
+        this.seedOnlyFKs = result.seedOnlyFKs || [];
         this.activeTab = 'prompt';
       } else {
         this.showMessage(result.error || 'Failed to build prompt', true);
@@ -580,6 +597,7 @@ const SeedGeneratorDialog = {
 
       if (result.success) {
         this.generatedData = result.records;
+        this.seedFallbacks = result.seedFallbacks || [];
         this.fkWarnings = result.warnings || [];
         this.invalidRows = result.invalidRows || [];
         this.validCount = result.validCount ?? result.count;

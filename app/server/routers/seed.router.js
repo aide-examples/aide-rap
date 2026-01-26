@@ -29,7 +29,7 @@ module.exports = function(cfg) {
         }
     });
 
-    // Get seed file content for preview/export
+    // Get seed file content for preview/export (includes conflict detection)
     router.get('/api/seed/content/:entity', (req, res) => {
         try {
             const seedFile = path.join(SeedManager.getSeedDir(), `${req.params.entity}.json`);
@@ -39,7 +39,12 @@ module.exports = function(cfg) {
             }
 
             const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
-            res.json({ records: Array.isArray(records) ? records : [] });
+            const recordsArray = Array.isArray(records) ? records : [];
+
+            // Check for conflicts with existing DB data
+            const { dbRowCount, conflictCount } = SeedManager.countSeedConflicts(req.params.entity);
+
+            res.json({ records: recordsArray, dbRowCount, conflictCount });
         } catch (e) {
             console.error(`Failed to read seed file for ${req.params.entity}:`, e);
             res.status(500).json({ error: e.message, records: [] });
