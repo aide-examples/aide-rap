@@ -58,7 +58,7 @@ program.parse();
 const opts = program.opts();
 
 // Validate and setup system paths
-const systemName = opts.system;
+const systemName = path.basename(opts.system);
 const SYSTEM_DIR = path.join(SYSTEMS_DIR, systemName);
 
 if (!fs.existsSync(SYSTEM_DIR)) {
