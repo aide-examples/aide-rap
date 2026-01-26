@@ -126,15 +126,17 @@ const EntityTable = {
     return this.records.filter(record => {
       return activeFilters.every(([column, filterValue]) => {
         const filter = filterValue.toLowerCase().trim();
-        let cellValue = record[column];
 
-        // For FK columns, also check the _label field
-        if (cellValue == null) {
-          // Try label field for FK
+        // For FK columns, filter against the label (not the numeric ID)
+        if (column.endsWith('_id')) {
           const labelField = column.replace(/_id$/, '') + '_label';
-          cellValue = record[labelField];
+          const labelValue = record[labelField];
+          if (labelValue != null) {
+            return String(labelValue).toLowerCase().includes(filter);
+          }
         }
 
+        const cellValue = record[column];
         if (cellValue == null) return false;
 
         return String(cellValue).toLowerCase().includes(filter);
