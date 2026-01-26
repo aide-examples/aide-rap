@@ -352,10 +352,17 @@ Ideas for future development:
 ### Admin / Seed Data Manager
 - [x] **Import Dialog** – Paste or drag & drop JSON/CSV, auto-detect format, FK validation preview
 - [x] **Export Dialog** – Export seed file as JSON or CSV
-- [x] **Load Preview** – Preview seed data before loading into database
+- [x] **Load Preview** – Preview seed data before loading into database with conflict detection
 - [x] **AI Generate** – LLM-powered seed data generation from entity descriptions
 - [x] **Seed Context** – `## Seed Context` section for cross-entity validation constraints
 - [x] **Context Menu** – Right-click on entity rows: Import, Export, Generate, Load, Clear
+- [x] **Duplicate Detection** – Business key matching on load (LABEL column fallback)
+- [x] **Load Modes** – Skip conflicts / merge / replace with user choice in preview
+- [x] **FK Label Fallback** – Resolves `engine_id: "GE-900101"` (technical name with label)
+- [x] **Computed FK Support** – READONLY FK columns included in AI prompts and seed loading
+- [x] **Seed File FK Fallback** – Load FK references from seed files when DB table is empty
+
+See [Seed Data Reference](seed-data.md) for technical details.
 
 ### UI Enhancements
 - [ ] Keyboard shortcuts (arrow keys, Enter for details)
