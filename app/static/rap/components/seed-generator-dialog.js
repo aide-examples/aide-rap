@@ -1,6 +1,7 @@
 /**
  * Seed Generator Dialog
- * Modal for generating seed data using LLM based on natural language instructions
+ * Modal for generating seed data via interactive copy/paste workflow:
+ * 1. Write instruction → 2. Build prompt, copy, paste AI response → 3. Review & save
  */
 const SeedGeneratorDialog = {
   container: null,
@@ -9,9 +10,13 @@ const SeedGeneratorDialog = {
   instruction: '',
   generatedData: null,
   lastPrompt: null,
-  activeTab: 'instruction',  // instruction, prompt, paste, result
-  isGenerating: false,
-  llmProvider: null,
+  activeTab: 'instruction',  // instruction, prompt, result
+  // Validation state (populated by /api/seed/parse)
+  fkWarnings: [],
+  invalidRows: [],
+  validCount: 0,
+  conflicts: [],
+  selectedMode: 'merge',
 
   /**
    * Initialize the dialog
@@ -28,7 +33,7 @@ const SeedGeneratorDialog = {
     this.generatedData = null;
     this.lastPrompt = null;
     this.activeTab = 'instruction';
-    this.isGenerating = false;
+    this.resetValidation();
 
     // Load schema
     this.schema = await SchemaCache.getExtended(entityName);
@@ -42,17 +47,18 @@ const SeedGeneratorDialog = {
       this.instruction = '';
     }
 
-    // Load LLM provider info
-    try {
-      const resp = await fetch('/api/seed/generator-status');
-      const data = await resp.json();
-      // Only set provider if enabled (API key configured)
-      this.llmProvider = data.enabled ? data.provider : null;
-    } catch (e) {
-      this.llmProvider = null;
-    }
-
     this.render();
+  },
+
+  /**
+   * Reset validation state
+   */
+  resetValidation() {
+    this.fkWarnings = [];
+    this.invalidRows = [];
+    this.validCount = 0;
+    this.conflicts = [];
+    this.selectedMode = 'merge';
   },
 
   /**
@@ -88,14 +94,11 @@ const SeedGeneratorDialog = {
             <button class="generator-tab ${this.activeTab === 'instruction' ? 'active' : ''}" data-tab="instruction">
               1. Instruction
             </button>
-            <button class="generator-tab ${this.activeTab === 'prompt' ? 'active' : ''}" data-tab="prompt" ${!this.lastPrompt ? 'disabled' : ''}>
-              2. AI Prompt
-            </button>
-            <button class="generator-tab tab-paste ${this.activeTab === 'paste' ? 'active' : ''}" data-tab="paste" ${!this.lastPrompt ? 'disabled' : ''}>
-              3. Paste Response
+            <button class="generator-tab ${this.activeTab === 'prompt' ? 'active' : ''}" data-tab="prompt">
+              2. Prompt &amp; Paste
             </button>
             <button class="generator-tab ${this.activeTab === 'result' ? 'active' : ''} ${hasResult ? 'has-data' : ''}" data-tab="result" ${!hasResult ? 'disabled' : ''}>
-              4. Result ${hasResult ? `(${this.generatedData.length})` : ''}
+              3. Result ${hasResult ? `(${this.validCount}/${this.generatedData.length})` : ''}
             </button>
           </div>
 
@@ -128,16 +131,20 @@ const SeedGeneratorDialog = {
 
       case 'prompt':
         return `
-          <div class="tab-content-prompt">
-            <textarea id="llm-prompt-text" readonly rows="12">${this.escapeHtml(this.lastPrompt || '')}</textarea>
-          </div>
-        `;
-
-      case 'paste':
-        return `
-          <div class="tab-content-paste" id="paste-drop-zone">
-            <div class="paste-hint">Paste or drop JSON here</div>
-            <textarea id="ai-response-text" rows="10" placeholder="Paste the JSON array from your AI chat here..."></textarea>
+          <div class="tab-content-prompt-paste">
+            <div class="prompt-section">
+              <div class="prompt-section-header">
+                <span class="prompt-section-label">AI Prompt</span>
+                ${this.lastPrompt ? '<button class="btn-seed btn-small" data-action="copy-prompt">Copy</button>' : ''}
+              </div>
+              <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${this.escapeHtml(this.lastPrompt || '')}</textarea>
+            </div>
+            <div class="paste-section" id="paste-drop-zone">
+              <div class="paste-section-header">
+                <span class="paste-section-label">AI Response</span>
+              </div>
+              <textarea id="ai-response-text" rows="8" placeholder="Paste the JSON array from your AI chat here..."></textarea>
+            </div>
           </div>
         `;
 
@@ -147,6 +154,7 @@ const SeedGeneratorDialog = {
             <div class="result-content">
               ${this.renderResultContent()}
             </div>
+            ${this.renderValidationInfo()}
           </div>
         `;
 
@@ -170,24 +178,13 @@ const SeedGeneratorDialog = {
 
       case 'prompt':
         return `
-          <button class="btn-seed" data-action="copy-prompt">Copy Prompt</button>
-          ${this.llmProvider ? `
-          <button class="btn-seed" data-action="generate" ${this.isGenerating ? 'disabled' : ''}>
-            ${this.isGenerating ? 'Generating...' : `Ask ${this.llmProvider}`}
-          </button>
-          ` : ''}
-          <button class="btn-seed primary" data-action="goto-paste">Paste Response →</button>
-        `;
-
-      case 'paste':
-        return `
-          <button class="btn-seed primary" data-action="parse-response">Parse JSON</button>
+          <button class="btn-seed primary" data-action="parse-response">Parse &amp; Validate →</button>
         `;
 
       case 'result':
         return `
-          <button class="btn-seed" data-action="save-json">Save JSON</button>
-          <button class="btn-seed primary" data-action="save-and-load">Save & Load into DB</button>
+          <button class="btn-seed" data-action="save-json">Save only</button>
+          <button class="btn-seed primary" data-action="save-and-load">${hasResult && this.invalidRows.length > 0 ? `Save & Load ${this.validCount}` : 'Save & Load'}</button>
         `;
 
       default:
@@ -199,54 +196,69 @@ const SeedGeneratorDialog = {
    * Render the result content (table or placeholder)
    */
   renderResultContent() {
-    if (this.isGenerating) {
-      return '<div class="generating-spinner">Generating data...</div>';
-    }
-
     if (!this.generatedData) {
-      return '<p class="empty-result">Click "Generate" to create seed data based on the instruction.</p>';
+      return '<p class="empty-result">No data yet. Paste AI response in the Prompt & Paste tab.</p>';
     }
 
     if (this.generatedData.length === 0) {
-      return '<p class="empty-result">No data generated.</p>';
+      return '<p class="empty-result">No records found in response.</p>';
     }
 
     return this.renderResultTable();
   },
 
   /**
-   * Render the data as an HTML table
+   * Render the data as an HTML table with validation warnings
    */
   renderResultTable() {
     if (!this.generatedData || !this.schema) return '';
 
-    // Collect columns from actual data (shows what AI generated, including conceptual FK names)
+    // Build warning lookup: row -> field -> warning
+    const warningLookup = {};
+    for (const w of this.fkWarnings) {
+      if (!warningLookup[w.row]) warningLookup[w.row] = {};
+      warningLookup[w.row][w.field] = w;
+    }
+    const invalidRowSet = new Set(this.invalidRows);
+
+    // Collect columns from actual data
     const dataKeys = new Set();
     for (const record of this.generatedData) {
       Object.keys(record).forEach(k => {
-        // Exclude id (auto-generated) and internal columns
         if (k !== 'id' && !k.startsWith('_')) dataKeys.add(k);
       });
     }
 
     const columns = [...dataKeys];
-    const headerCells = columns.map(c => `<th>${c}</th>`).join('');
+    const headerCells = columns.map(c => `<th>${this.escapeHtml(c)}</th>`).join('');
 
-    const rows = this.generatedData.map(record => {
+    // Limit preview to first 50 rows
+    const previewRows = this.generatedData.slice(0, 50);
+
+    const rows = previewRows.map((record, idx) => {
+      const rowNum = idx + 1;
+      const rowWarnings = warningLookup[rowNum] || {};
+      const isInvalidRow = invalidRowSet.has(rowNum);
+
       const cells = columns.map(col => {
-        let value = record[col];
+        const value = record[col];
+        const warning = rowWarnings[col];
         if (value === null || value === undefined) {
           return '<td class="null-value">-</td>';
         }
-        // Truncate long values
         const strValue = String(value);
         const displayValue = strValue.length > 30 ? strValue.substring(0, 27) + '...' : strValue;
+        if (warning) {
+          return `<td class="fk-invalid" title="${this.escapeHtml(warning.message || '')}">${this.escapeHtml(displayValue)} ⚠</td>`;
+        }
         return `<td title="${this.escapeHtml(strValue)}">${this.escapeHtml(displayValue)}</td>`;
       }).join('');
-      return `<tr>${cells}</tr>`;
+
+      const rowClass = isInvalidRow ? 'class="invalid-row"' : '';
+      return `<tr ${rowClass}>${cells}</tr>`;
     }).join('');
 
-    return `
+    let html = `
       <div class="result-table-wrapper">
         <table class="seed-preview-table">
           <thead><tr>${headerCells}</tr></thead>
@@ -254,15 +266,81 @@ const SeedGeneratorDialog = {
         </table>
       </div>
     `;
+
+    if (this.generatedData.length > 50) {
+      html += `<div class="preview-truncated">... and ${this.generatedData.length - 50} more records</div>`;
+    }
+
+    return html;
+  },
+
+  /**
+   * Render validation info below the result table
+   */
+  renderValidationInfo() {
+    if (!this.generatedData || this.generatedData.length === 0) return '';
+
+    let html = '<div class="generator-validation">';
+
+    // Summary line
+    const total = this.generatedData.length;
+    const hasInvalid = this.invalidRows.length > 0;
+    if (hasInvalid) {
+      html += `<div class="validation-summary"><strong>${this.validCount} valid</strong> / ${total} total</div>`;
+    } else {
+      html += `<div class="validation-summary">${total} records — all valid</div>`;
+    }
+
+    // FK warnings
+    if (this.fkWarnings.length > 0) {
+      const uniqueWarnings = new Map();
+      for (const w of this.fkWarnings) {
+        const key = `${w.field}:${w.value}`;
+        if (!uniqueWarnings.has(key)) {
+          uniqueWarnings.set(key, w);
+        }
+      }
+
+      const warningLines = Array.from(uniqueWarnings.values())
+        .slice(0, 3)
+        .map(w => `"${this.escapeHtml(w.value)}" not found in ${this.escapeHtml(w.targetEntity)}`)
+        .join('<br>');
+
+      html += `<div class="warning-section"><div class="warning-icon">⚠</div><div class="warning-text">${warningLines}`;
+      if (uniqueWarnings.size > 3) {
+        html += `<br><span class="warning-more">... and ${uniqueWarnings.size - 3} more FK warnings</span>`;
+      }
+      html += '</div></div>';
+    }
+
+    // Conflict warnings with mode selector
+    if (this.conflicts.length > 0) {
+      const conflictCount = this.conflicts.length;
+      const totalBackRefs = this.conflicts.reduce((sum, c) => sum + c.backRefs, 0);
+
+      html += `
+        <div class="conflict-section">
+          <div class="conflict-header">
+            <span class="conflict-icon">🔗</span>
+            <span class="conflict-text">${conflictCount} record(s) would overwrite existing data with ${totalBackRefs} back-reference(s)</span>
+          </div>
+          <div class="conflict-mode-selector">
+            <label><input type="radio" name="gen-import-mode" value="merge" ${this.selectedMode === 'merge' ? 'checked' : ''}> <strong>Merge</strong> - Update existing, add new (preserves IDs)</label>
+            <label><input type="radio" name="gen-import-mode" value="skip_conflicts" ${this.selectedMode === 'skip_conflicts' ? 'checked' : ''}> <strong>Skip</strong> - Only add new records</label>
+            <label><input type="radio" name="gen-import-mode" value="replace" ${this.selectedMode === 'replace' ? 'checked' : ''}> <strong>Replace</strong> - Overwrite all (may break references!)</label>
+          </div>
+        </div>
+      `;
+    }
+
+    html += '</div>';
+    return html;
   },
 
   /**
    * Attach event handlers
    */
   attachEventHandlers() {
-    // Modal dialog: do NOT close on overlay click
-    // Dialog can only be closed via X button
-
     // Close button
     this.container.querySelectorAll('.modal-close').forEach(el => {
       el.addEventListener('click', () => this.close());
@@ -283,20 +361,9 @@ const SeedGeneratorDialog = {
       this.saveToMarkdown();
     });
 
-    // Build prompt and go to prompt tab
+    // Build prompt
     this.container.querySelector('[data-action="build-prompt"]')?.addEventListener('click', () => {
       this.buildPrompt();
-    });
-
-    // Generate via API
-    this.container.querySelector('[data-action="generate"]')?.addEventListener('click', () => {
-      this.generate();
-    });
-
-    // Go to paste tab
-    this.container.querySelector('[data-action="goto-paste"]')?.addEventListener('click', () => {
-      this.activeTab = 'paste';
-      this.render();
     });
 
     // Copy prompt to clipboard
@@ -304,14 +371,14 @@ const SeedGeneratorDialog = {
       this.copyPrompt();
     });
 
-    // Parse pasted AI response
+    // Parse & validate pasted AI response
     this.container.querySelector('[data-action="parse-response"]')?.addEventListener('click', () => {
-      this.parseResponse();
+      this.parseAndValidate();
     });
 
-    // Save JSON
+    // Save only
     this.container.querySelector('[data-action="save-json"]')?.addEventListener('click', () => {
-      this.saveJSON();
+      this.saveOnly();
     });
 
     // Save & Load
@@ -319,7 +386,7 @@ const SeedGeneratorDialog = {
       this.saveAndLoad();
     });
 
-    // Drag and drop for paste tab
+    // Drag and drop for paste area
     const dropZone = this.container.querySelector('#paste-drop-zone');
     if (dropZone) {
       dropZone.addEventListener('dragover', (e) => {
@@ -339,6 +406,13 @@ const SeedGeneratorDialog = {
         }
       });
     }
+
+    // Conflict mode selector
+    this.container.querySelectorAll('input[name="gen-import-mode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        this.selectedMode = e.target.value;
+      });
+    });
   },
 
   /**
@@ -379,7 +453,7 @@ const SeedGeneratorDialog = {
   },
 
   /**
-   * Build prompt without calling API
+   * Build prompt and switch to Prompt & Paste tab
    */
   async buildPrompt() {
     const instruction = this.getCurrentInstruction();
@@ -398,7 +472,7 @@ const SeedGeneratorDialog = {
 
       if (result.success) {
         this.lastPrompt = result.prompt;
-        this.activeTab = 'prompt';  // Switch to prompt tab
+        this.activeTab = 'prompt';
       } else {
         this.showMessage(result.error || 'Failed to build prompt', true);
       }
@@ -407,145 +481,6 @@ const SeedGeneratorDialog = {
     }
 
     this.render();
-  },
-
-  /**
-   * Generate seed data using LLM API
-   */
-  async generate() {
-    const instruction = this.getCurrentInstruction();
-    if (!instruction) {
-      this.showMessage('Please enter an instruction first', true);
-      return;
-    }
-
-    this.isGenerating = true;
-    this.generatedData = null;
-    this.render();
-
-    try {
-      const resp = await fetch(`/api/seed/generate/${this.entityName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction })
-      });
-      const result = await resp.json();
-      console.log('Generate result:', result); // Debug
-
-      this.isGenerating = false;
-
-      if (result.success) {
-        this.generatedData = result.data;
-        this.lastPrompt = result.prompt || null;
-        this.activeTab = 'result';  // Switch to result tab
-        this.showMessage(`Generated ${result.count} records`);
-      } else {
-        this.showMessage(result.error || 'Generation failed', true);
-      }
-    } catch (e) {
-      this.isGenerating = false;
-      this.showMessage(`Error: ${e.message}`, true);
-    }
-
-    this.render();
-  },
-
-  /**
-   * Save generated data to JSON file
-   */
-  async saveJSON() {
-    if (!this.generatedData) return;
-
-    try {
-      const resp = await fetch(`/api/seed/save/${this.entityName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: this.generatedData })
-      });
-      const result = await resp.json();
-
-      if (result.success) {
-        this.showMessage(`Saved to ${result.path}`);
-      } else {
-        this.showMessage(result.error || 'Failed to save', true);
-      }
-    } catch (e) {
-      this.showMessage(`Error: ${e.message}`, true);
-    }
-  },
-
-  /**
-   * Load generated data into database
-   */
-  async loadIntoDB() {
-    if (!this.generatedData) return;
-
-    // First save, then load
-    try {
-      // Save to file first
-      await fetch(`/api/seed/save/${this.entityName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: this.generatedData })
-      });
-
-      // Then load into DB
-      const resp = await fetch(`/api/seed/load/${this.entityName}`, {
-        method: 'POST'
-      });
-      const result = await resp.json();
-
-      if (result.success) {
-        this.showMessage(`Loaded ${result.loaded} records into database`);
-      } else {
-        this.showMessage(result.error || 'Failed to load', true);
-      }
-    } catch (e) {
-      this.showMessage(`Error: ${e.message}`, true);
-    }
-  },
-
-  /**
-   * Save JSON and load into DB
-   */
-  async saveAndLoad() {
-    if (!this.generatedData) return;
-
-    try {
-      // Save to file
-      const saveResp = await fetch(`/api/seed/save/${this.entityName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: this.generatedData })
-      });
-      const saveResult = await saveResp.json();
-
-      if (!saveResult.success) {
-        this.showMessage(saveResult.error || 'Failed to save', true);
-        return;
-      }
-
-      // Load into DB
-      const loadResp = await fetch(`/api/seed/load/${this.entityName}`, {
-        method: 'POST'
-      });
-      const loadResult = await loadResp.json();
-
-      if (loadResult.success) {
-        this.showMessage(`Saved and loaded ${loadResult.loaded} records`);
-        // Close dialog and refresh parent
-        setTimeout(() => {
-          this.close();
-          if (typeof SeedManager !== 'undefined' && SeedManager.loadStatus) {
-            SeedManager.loadStatus().then(() => SeedManager.render());
-          }
-        }, 1000);
-      } else {
-        this.showMessage(loadResult.error || 'Failed to load', true);
-      }
-    } catch (e) {
-      this.showMessage(`Error: ${e.message}`, true);
-    }
   },
 
   /**
@@ -571,54 +506,113 @@ const SeedGeneratorDialog = {
   },
 
   /**
-   * Parse pasted AI response JSON
+   * Parse pasted AI response and validate via server
    */
-  parseResponse() {
+  async parseAndValidate() {
     const textarea = this.container.querySelector('#ai-response-text');
     if (!textarea) return;
 
-    let text = textarea.value.trim();
+    const text = textarea.value.trim();
     if (!text) {
       this.showMessage('Please paste the AI response first', true);
       return;
     }
 
     try {
-      // Remove markdown code blocks if present
-      if (text.startsWith('```')) {
-        const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (match) {
-          text = match[1].trim();
-        } else {
-          text = text.replace(/^```(?:json)?\s*/, '');
-        }
-      }
+      const resp = await fetch(`/api/seed/parse/${this.entityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const result = await resp.json();
 
-      // Find JSON array
-      const arrayMatch = text.match(/\[[\s\S]*\]/);
-      if (!arrayMatch) {
-        if (text.includes('[') && !text.includes(']')) {
-          throw new Error('Response appears truncated. JSON array is incomplete.');
-        }
-        throw new Error('No valid JSON array found in response');
+      if (result.success) {
+        this.generatedData = result.records;
+        this.fkWarnings = result.warnings || [];
+        this.invalidRows = result.invalidRows || [];
+        this.validCount = result.validCount ?? result.count;
+        this.conflicts = result.conflicts || [];
+        this.selectedMode = this.conflicts.length > 0 ? 'merge' : 'replace';
+        this.activeTab = 'result';
+        this.showMessage(`Parsed ${result.count} records`);
+      } else {
+        this.showMessage(result.error || 'Parse failed', true);
       }
-
-      const data = JSON.parse(arrayMatch[0]);
-      if (!Array.isArray(data)) {
-        throw new Error('Response is not an array');
-      }
-
-      // Remove 'id' fields - they should be auto-generated
-      for (const record of data) {
-        delete record.id;
-      }
-
-      this.generatedData = data;
-      this.activeTab = 'result';  // Switch to result tab
-      this.showMessage(`Parsed ${data.length} records`);
-      this.render();
     } catch (e) {
-      this.showMessage(`Parse error: ${e.message}`, true);
+      this.showMessage(`Error: ${e.message}`, true);
+    }
+
+    this.render();
+  },
+
+  /**
+   * Save data to seed file only (without loading into database)
+   */
+  async saveOnly() {
+    if (!this.generatedData) return;
+
+    try {
+      const resp = await fetch(`/api/seed/upload/${this.entityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.generatedData)
+      });
+      const result = await resp.json();
+
+      if (result.success) {
+        this.showMessage('Saved to seed file');
+      } else {
+        this.showMessage(result.error || 'Failed to save', true);
+      }
+    } catch (e) {
+      this.showMessage(`Error: ${e.message}`, true);
+    }
+  },
+
+  /**
+   * Save to seed file and load into database
+   */
+  async saveAndLoad() {
+    if (!this.generatedData) return;
+
+    try {
+      // Step 1: Save to seed file
+      const saveResp = await fetch(`/api/seed/upload/${this.entityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.generatedData)
+      });
+      const saveResult = await saveResp.json();
+
+      if (!saveResult.success) {
+        this.showMessage(saveResult.error || 'Failed to save', true);
+        return;
+      }
+
+      // Step 2: Load into database
+      const loadResp = await fetch(`/api/seed/load/${this.entityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skipInvalid: true,
+          mode: this.conflicts.length > 0 ? this.selectedMode : 'replace'
+        })
+      });
+      const loadResult = await loadResp.json();
+
+      if (loadResult.success) {
+        this.showMessage(`Saved and loaded ${loadResult.loaded} records`);
+        setTimeout(() => {
+          this.close();
+          if (typeof SeedManager !== 'undefined' && SeedManager.loadStatus) {
+            SeedManager.loadStatus().then(() => SeedManager.render());
+          }
+        }, 1000);
+      } else {
+        this.showMessage(loadResult.error || 'Saved but failed to load', true);
+      }
+    } catch (e) {
+      this.showMessage(`Error: ${e.message}`, true);
     }
   },
 
@@ -629,7 +623,6 @@ const SeedGeneratorDialog = {
     const footer = this.container.querySelector('.modal-footer');
     if (!footer) return;
 
-    // Remove existing message
     const existing = footer.querySelector('.status-message');
     if (existing) existing.remove();
 
@@ -638,7 +631,6 @@ const SeedGeneratorDialog = {
     msg.textContent = message;
     footer.insertBefore(msg, footer.firstChild);
 
-    // Auto-remove after 3 seconds
     setTimeout(() => msg.remove(), 3000);
   },
 

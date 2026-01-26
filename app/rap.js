@@ -263,11 +263,12 @@ if (authEnabled) {
 }
 app.use(require('./server/routers/seed.router')(cfg));
 
-// LLM Seed Generator Router (admin only)
+// Prompt Builder Router (instruction + prompt routes)
+// Note: /api/seed/* routes are already protected by seed middleware above
 if (authEnabled) {
-    app.use('/api/generator', authMiddleware, requireRole('admin'));
+    app.use('/api/entity', authMiddleware, requireRole('admin'));
 }
-app.use(require('./server/routers/generator.router')(cfg));
+app.use(require('./server/routers/prompt.router')(cfg));
 
 // Export Router (PDF, CSV) - routes are under /api/entities, protection handled there
 app.use(require('./server/routers/export.router')(cfg));
