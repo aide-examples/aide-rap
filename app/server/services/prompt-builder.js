@@ -20,7 +20,9 @@ const SeedManager = require('../utils/SeedManager');
  */
 function buildPrompt(entityName, schema, instruction, existingData, contextData = {}, backRefData = {}) {
   // Filter out computed columns (DAILY, IMMEDIATE, HOURLY, ON_DEMAND annotations)
+  // Exception: computed FK columns are kept — they provide relationship context for the AI
   const isComputedColumn = (col) => {
+    if (col.foreignKey) return false;
     if (col.computed) return true;
     const desc = col.description || '';
     return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
