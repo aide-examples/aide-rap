@@ -91,21 +91,26 @@
         },
 
         /**
-         * Calculate self-reference arc geometry.
+         * Calculate self-reference semicircle geometry.
+         * Arc spans from half the box height (or first attr row) to the top of the box.
          * @param {Object} pos - Entity position {x, y}
          * @param {number} boxWidth - Box width (optional, defaults to BOX_WIDTH)
+         * @param {number} boxHeight - Box height (optional, for proportional sizing)
          */
-        getSelfReferenceArc(pos, boxWidth) {
-            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT, MIN_LOOP_RADIUS } = DiagramConstants;
+        getSelfReferenceArc(pos, boxWidth, boxHeight) {
+            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT } = DiagramConstants;
 
             const actualWidth = boxWidth || BOX_WIDTH;
             const startX = pos.x + actualWidth;
-            const startY = pos.y + HEADER_HEIGHT + 0.5 * ATTR_LINE_HEIGHT + 2;
             const endX = startX;
-            const endY = pos.y + HEADER_HEIGHT / 2;
+            const endY = pos.y;
+
+            // Start at half box height or first attribute row, whichever is lower
+            const attrRowY = pos.y + HEADER_HEIGHT + 0.5 * ATTR_LINE_HEIGHT + 2;
+            const startY = boxHeight ? Math.max(attrRowY, pos.y + boxHeight / 2) : attrRowY;
 
             const vertDist = startY - endY;
-            const radius = Math.max(vertDist / 2 + 10, MIN_LOOP_RADIUS);
+            const radius = vertDist / 2;
 
             return { startX, startY, endX, endY, radius };
         },
@@ -123,7 +128,7 @@
          * Generate SVG path for a self-reference arc.
          */
         getSelfReferenceArcPath(arc) {
-            return `M ${arc.startX} ${arc.startY} A ${arc.radius} ${arc.radius} 0 1 0 ${arc.endX} ${arc.endY}`;
+            return `M ${arc.startX} ${arc.startY} A ${arc.radius} ${arc.radius} 0 0 0 ${arc.endX} ${arc.endY}`;
         },
 
         /**

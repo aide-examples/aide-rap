@@ -172,25 +172,38 @@ function parseAreasFromTable(mdContent) {
 }
 
 /**
- * Extract [DEFAULT=x] annotation from type string
- * e.g., "MaintenanceCategory [DEFAULT=A]" -> { type: "MaintenanceCategory", default: "A" }
- * e.g., "int" -> { type: "int", default: null }
+ * Extract type annotations from type string
+ * Supported: [DEFAULT=x], [OPTIONAL]
+ * e.g., "MaintenanceCategory [DEFAULT=A]" -> { type: "MaintenanceCategory", default: "A", optional: false }
+ * e.g., "EngineType [OPTIONAL]" -> { type: "EngineType", default: null, optional: true }
+ * e.g., "int" -> { type: "int", default: null, optional: false }
  */
-function extractDefaultAnnotation(typeStr) {
-  const defaultMatch = typeStr.match(/\[DEFAULT=([^\]]+)\]/i);
+function extractTypeAnnotations(typeStr) {
+  let type = typeStr;
+  let defaultValue = null;
+  let optional = false;
+
+  const defaultMatch = type.match(/\[DEFAULT=([^\]]+)\]/i);
   if (defaultMatch) {
-    const cleanType = typeStr.replace(/\s*\[DEFAULT=[^\]]+\]/i, '').trim();
-    return { type: cleanType, default: defaultMatch[1].trim() };
+    defaultValue = defaultMatch[1].trim();
+    type = type.replace(/\s*\[DEFAULT=[^\]]+\]/i, '').trim();
   }
-  return { type: typeStr, default: null };
+
+  if (/\[OPTIONAL\]/i.test(type)) {
+    optional = true;
+    type = type.replace(/\s*\[OPTIONAL\]/i, '').trim();
+  }
+
+  return { type, default: defaultValue, optional };
 }
 
 /**
  * Parse a single entity markdown file
  * Format: | Attribute | Type | Description | Example |
  *
- * The Type column can include a [DEFAULT=x] annotation:
+ * The Type column can include annotations:
  *   | maintenance_category | MaintenanceCategory [DEFAULT=A] | Current category | B |
+ *   | engine_type | EngineType [OPTIONAL] | Reference | 10 |
  */
 function parseEntityFile(fileContent) {
   const lines = fileContent.split('\n');
@@ -255,15 +268,16 @@ function parseEntityFile(fileContent) {
       const parts = line.split('|').slice(1, -1).map(p => p.trim());
 
       if (parts.length >= 3) {
-        // Extract type name and [DEFAULT=x] annotation from Type column
-        const typeWithDefault = extractDefaultAnnotation(parts[1]);
+        // Extract type name and annotations from Type column
+        const typeInfo = extractTypeAnnotations(parts[1]);
 
         const attr = {
           name: parts[0],
-          type: extractTypeName(typeWithDefault.type),
-          explicitDefault: typeWithDefault.default,
+          type: extractTypeName(typeInfo.type),
+          explicitDefault: typeInfo.default,
           description: parts[2]
         };
+        if (typeInfo.optional) attr.optional = true;
         if (parts.length >= 4) {
           attr.example = parts[3];
         }
@@ -533,8 +547,8 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     const desc = attr.description || '';
     const example = attr.example || '';
 
-    // Determine if required (example is not 'null')
-    const isRequired = example.toLowerCase() !== 'null' && name !== 'id';
+    // Determine if required (example is not 'null' and not marked [OPTIONAL])
+    const isRequired = example.toLowerCase() !== 'null' && name !== 'id' && !attr.optional;
 
     // Parse constraints from description
     const constraints = parseConstraints(desc);

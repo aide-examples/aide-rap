@@ -85,6 +85,7 @@ body {
     cursor: move;
     user-select: none;
     font-size: 12px;
+    overflow: hidden;
 }
 .class-box:hover {
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -99,9 +100,20 @@ body {
     text-align: center;
     border-bottom: 1px solid #333;
 }
+.class-box.compact {
+    background-color: white;
+}
 .class-box.compact .header {
-    border-bottom: none;
-    padding: 6px 8px;
+    border-bottom: 1px solid #333;
+    padding: 4px 8px;
+    border-radius: 2px 2px 0 0;
+}
+.class-box.compact .description {
+    padding: 4px 8px;
+    font-size: 10px;
+    color: #555;
+    line-height: 16px;
+    overflow: hidden;
 }
 .class-box .attributes {
     padding: 4px 8px;

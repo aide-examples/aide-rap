@@ -16,7 +16,7 @@
         </label>
         <button id="viewLayout" class="secondary active">Layout</button>
         <label class="toggle-label">
-            <input type="checkbox" id="fitToContent">
+            <input type="checkbox" id="fitToContent" checked>
             <span>Fit to content</span>
         </label>
         <div class="spacer"></div>
@@ -46,7 +46,8 @@
 
         // Import constants from shared module
         const { BOX_WIDTH, BOX_HEIGHT_COMPACT, ATTR_LINE_HEIGHT, HEADER_HEIGHT, BOX_PADDING,
-                STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_LABEL } = DiagramConstants;
+                STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_LABEL,
+                OPTIONAL_DASH } = DiagramConstants;
 
         /**
          * Escape text for use in XML/SVG.
@@ -65,7 +66,7 @@
         let layout = null;
         let showDetailed = true;
         let isDirty = false;
-        let fitToContent = false;
+        let fitToContent = true;
 
         // Canvas for text measurement
         const measureCanvas = document.createElement('canvas');
@@ -77,29 +78,78 @@
             return measureCtx.measureText(text).width;
         }
 
+        // Word-wrap text into lines that fit within maxWidth
+        function wrapText(text, maxWidth, fontSize, fontFamily) {
+            const words = text.split(/\s+/).filter(Boolean);
+            if (words.length === 0) return [];
+            const lines = [];
+            let currentLine = words[0];
+            for (let i = 1; i < words.length; i++) {
+                const testLine = currentLine + ' ' + words[i];
+                if (measureText(testLine, fontSize, fontFamily) > maxWidth) {
+                    lines.push(currentLine);
+                    currentLine = words[i];
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            lines.push(currentLine);
+            return lines;
+        }
+
         // Calculate box width based on content
         function getBoxWidth(className) {
-            if (!fitToContent) {
-                return BOX_WIDTH;
+            const classDef = model.classes[className] || {};
+            const nameWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY) + 20;
+            const entityNames = Object.keys(model.classes);
+
+            // Calculate what detailed mode width would be
+            function calcDetailedWidth() {
+                if (!fitToContent) return BOX_WIDTH;
+                const attrs = getVisibleAttributes(className);
+                let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
+                for (const attr of attrs) {
+                    const cleanType = ConnectionCalculator.extractBaseType(attr.type);
+                    const attrText = entityNames.includes(cleanType)
+                        ? attr.name
+                        : `${attr.name}: ${cleanType}`;
+                    maxWidth = Math.max(maxWidth, measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY));
+                }
+                return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
             }
 
-            const classDef = model.classes[className] || {};
-            const attrs = getVisibleAttributes(className);
-
-            // Measure class name (header)
-            let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
-
-            // Measure all attributes
             if (showDetailed) {
-                for (const attr of attrs) {
-                    const attrText = `${attr.name}: ${attr.type}`;
-                    const attrWidth = measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY);
-                    maxWidth = Math.max(maxWidth, attrWidth);
+                return calcDetailedWidth();
+            }
+
+            // Compact mode: at least as wide as detailed view
+            const minWidth = calcDetailedWidth();
+            const description = classDef.description || '';
+            if (!description) return Math.max(nameWidth, minWidth);
+
+            const h = getBoxHeight(className);
+            const availableHeight = h - HEADER_HEIGHT - BOX_PADDING;
+            const maxLines = Math.max(1, Math.floor(availableHeight / ATTR_LINE_HEIGHT));
+            const textPadding = 20; // matches CSS: 8px padding * 2 + 1.5px border * 2
+
+            // Binary search for minimum width where description fits in maxLines
+            let lo = nameWidth;
+            let hi = 300;
+
+            const linesAtMax = wrapText(description, hi - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
+            if (linesAtMax.length > maxLines) return Math.max(hi, minWidth);
+
+            while (hi - lo > 2) {
+                const mid = Math.floor((lo + hi) / 2);
+                const lines = wrapText(description, mid - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
+                if (lines.length <= maxLines) {
+                    hi = mid;
+                } else {
+                    lo = mid;
                 }
             }
 
-            // Add padding (left + right)
-            return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
+            return Math.max(nameWidth, hi, minWidth);
         }
 
         // DOM elements
@@ -113,11 +163,8 @@
         const linkCardsPdf = document.getElementById('linkCardsPdf');
         const linkCardsDocx = document.getElementById('linkCardsDocx');
 
-        // Calculate box height based on visible attributes
+        // Calculate box height based on visible attributes (same for compact and detailed)
         function getBoxHeight(className) {
-            if (!showDetailed) {
-                return BOX_HEIGHT_COMPACT;
-            }
             const attrs = getVisibleAttributes(className);
             return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
         }
@@ -296,37 +343,27 @@
                         path.setAttribute('stroke-width', '1');
                         path.setAttribute('marker-end', 'url(#arrowhead)');
 
-                        let pathD, labelPos, textAnchor;
+                        // Dashed line for optional relationships
+                        if (/\[OPTIONAL\]/i.test(attr.type)) {
+                            path.setAttribute('stroke-dasharray', OPTIONAL_DASH);
+                        }
+
+                        let pathD;
 
                         if (className === baseType) {
-                            // Self-reference: arc from first attribute to header center
+                            // Self-reference semicircle
                             const boxWidth = getBoxWidth(className);
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, boxWidth);
+                            const bHeight = getBoxHeight(className);
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, boxWidth, bHeight);
                             pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
-                            labelPos = ConnectionCalculator.getSelfReferenceLabelPosition(arc);
-                            textAnchor = 'start';
                         } else {
                             // Normal connection
                             const conn = getConnectionPoint(className, baseType, i, positions);
                             pathD = ConnectionCalculator.getNormalConnectionPath(conn);
-                            labelPos = ConnectionCalculator.getNormalLabelPosition(conn);
-                            textAnchor = 'middle';
                         }
 
                         path.setAttribute('d', pathD);
                         svg.appendChild(path);
-
-                        // Draw attribute label
-                        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                        label.setAttribute('x', labelPos.x);
-                        label.setAttribute('y', labelPos.y);
-                        label.setAttribute('text-anchor', textAnchor);
-                        label.setAttribute('font-family', DiagramConstants.FONT_FAMILY);
-                        label.setAttribute('font-size', DiagramConstants.FONT_SIZE_LABEL);
-                        label.setAttribute('fill', '#666');
-                        label.setAttribute('font-style', 'italic');
-                        label.textContent = attr.name;
-                        svg.appendChild(label);
                     }
                 }
             }
@@ -343,20 +380,60 @@
             const positions = layout.classes || {};
             const entityNames = Object.keys(model.classes);
 
-            // Helper to get box height for a class
+            // Helper to get box height for a class (always attribute-based)
             function boxHeight(className) {
-                if (!detailed) return BOX_HEIGHT_COMPACT;
                 const attrs = ConnectionCalculator.getVisibleAttributes(
                     (model.classes[className] || {}).attributes, className
                 );
                 return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
             }
 
+            // Helper to get box width for a class
+            function boxWidth(className) {
+                if (detailed) return BOX_WIDTH;
+
+                // Compact mode: at least as wide as detailed view (BOX_WIDTH)
+                const classDef = model.classes[className] || {};
+                const description = classDef.description || '';
+                const nameWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY) + 20;
+
+                if (!description) return Math.max(nameWidth, BOX_WIDTH);
+
+                const h = boxHeight(className);
+                const availableHeight = h - HEADER_HEIGHT - BOX_PADDING;
+                const maxLines = Math.max(1, Math.floor(availableHeight / ATTR_LINE_HEIGHT));
+                const textPadding = 10;
+
+                let lo = nameWidth;
+                let hi = 300;
+
+                const linesAtMax = wrapText(description, hi - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
+                if (linesAtMax.length > maxLines) return Math.max(hi, BOX_WIDTH);
+
+                while (hi - lo > 2) {
+                    const mid = Math.floor((lo + hi) / 2);
+                    const lines = wrapText(description, mid - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
+                    if (lines.length <= maxLines) {
+                        hi = mid;
+                    } else {
+                        lo = mid;
+                    }
+                }
+
+                return Math.max(nameWidth, hi, BOX_WIDTH);
+            }
+
+            // Pre-compute widths for all entities
+            const widths = {};
+            for (const className of entityNames) {
+                widths[className] = boxWidth(className);
+            }
+
             // Calculate canvas dimensions
             let maxX = 400, maxY = 300;
             for (const className of entityNames) {
                 const pos = positions[className] || { x: 50, y: 50 };
-                maxX = Math.max(maxX, pos.x + BOX_WIDTH + 50);
+                maxX = Math.max(maxX, pos.x + widths[className] + 50);
                 maxY = Math.max(maxY, pos.y + boxHeight(className) + 50);
             }
 
@@ -368,12 +445,24 @@
                 '  <defs>',
                 '    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">',
                 '      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>',
-                '    </marker>',
-                '  </defs>',
-                `  <rect width="${width}" height="${height}" fill="white"/>`,
-                '',
-                '  <!-- Relationships -->'
+                '    </marker>'
             ];
+
+            // ClipPath defs for compact mode (header background clipping)
+            if (!detailed) {
+                for (const className of entityNames) {
+                    if (!(className in positions)) continue;
+                    const pos = positions[className];
+                    const h = boxHeight(className);
+                    const w = widths[className];
+                    parts.push(`    <clipPath id="clip-${escapeXml(className)}"><rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" rx="3"/></clipPath>`);
+                }
+            }
+
+            parts.push('  </defs>');
+            parts.push(`  <rect width="${width}" height="${height}" fill="white"/>`);
+            parts.push('');
+            parts.push('  <!-- Relationships -->');
 
             // Render relationships
             for (const className of entityNames) {
@@ -387,25 +476,27 @@
                     const baseType = ConnectionCalculator.extractBaseType(attr.type);
 
                     if (entityNames.includes(baseType)) {
-                        if (className === baseType) {
-                            // Self-reference arc
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos);
-                            const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
-                            const labelPos = ConnectionCalculator.getSelfReferenceLabelPosition(arc);
+                        const isOptional = /\[OPTIONAL\]/i.test(attr.type);
+                        const dashAttr = isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '';
 
-                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"/>`);
-                            parts.push(`  <text x="${labelPos.x}" y="${labelPos.y}" text-anchor="start" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_LABEL}" fill="#666" font-style="italic">${escapeXml(attr.name)}</text>`);
+                        if (className === baseType) {
+                            // Self-reference semicircle
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[className], boxHeight(className));
+                            const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
+
+                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
                         } else {
                             // Normal connection
                             const toPos = positions[baseType] || { x: 50, y: 50 };
                             const fromHeight = boxHeight(className);
                             const toHeight = boxHeight(baseType);
-                            const conn = ConnectionCalculator.getConnectionPoint(fromPos, toPos, fromHeight, toHeight, i, detailed);
+                            const conn = ConnectionCalculator.getConnectionPoint(
+                                fromPos, toPos, fromHeight, toHeight, i, detailed,
+                                widths[className], widths[baseType]
+                            );
                             const pathD = ConnectionCalculator.getNormalConnectionPath(conn);
-                            const labelPos = ConnectionCalculator.getNormalLabelPosition(conn);
 
-                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"/>`);
-                            parts.push(`  <text x="${labelPos.x}" y="${labelPos.y}" text-anchor="middle" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_LABEL}" fill="#666" font-style="italic">${escapeXml(attr.name)}</text>`);
+                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
                         }
                     }
                 }
@@ -422,25 +513,52 @@
                 const classDef = model.classes[className] || {};
                 const color = getColor(className);
                 const h = boxHeight(className);
+                const w = widths[className];
 
-                // Box rectangle
-                parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${BOX_WIDTH}" height="${h}" fill="${color}" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
-
-                // Class name
-                const textY = pos.y + (detailed ? HEADER_HEIGHT : BOX_HEIGHT_COMPACT) / 2 + 4;
-                parts.push(`  <text x="${pos.x + BOX_WIDTH / 2}" y="${textY}" text-anchor="middle" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_CLASS}" font-weight="bold">${escapeXml(className)}</text>`);
-
-                // Separator and attributes (detailed mode only)
                 if (detailed) {
-                    const sepY = pos.y + HEADER_HEIGHT;
-                    parts.push(`  <line x1="${pos.x}" y1="${sepY}" x2="${pos.x + BOX_WIDTH}" y2="${sepY}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+                    // Detailed mode: full area color background
+                    parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" fill="${color}" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
+                } else {
+                    // Compact mode: white body + colored header (clipped to rounded box)
+                    parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" fill="white" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
+                    parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${HEADER_HEIGHT}" fill="${color}" clip-path="url(#clip-${escapeXml(className)})"/>`);
+                }
 
+                // Class name (centered in header)
+                const textY = pos.y + HEADER_HEIGHT / 2 + 4;
+                parts.push(`  <text x="${pos.x + w / 2}" y="${textY}" text-anchor="middle" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_CLASS}" font-weight="bold">${escapeXml(className)}</text>`);
+
+                // Separator line
+                const sepY = pos.y + HEADER_HEIGHT;
+                parts.push(`  <line x1="${pos.x}" y1="${sepY}" x2="${pos.x + w}" y2="${sepY}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+
+                if (detailed) {
+                    // Detailed mode: attributes (FK attrs as bold name, others as name: type)
                     const visibleAttrs = ConnectionCalculator.getVisibleAttributes(classDef.attributes, className);
                     for (let i = 0; i < visibleAttrs.length; i++) {
                         const attr = visibleAttrs[i];
                         const attrY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
                         const cleanType = ConnectionCalculator.extractBaseType(attr.type);
-                        parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}">${escapeXml(attr.name)}: ${escapeXml(cleanType)}</text>`);
+                        if (entityNames.includes(cleanType)) {
+                            // FK attribute: bold name only
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold">${escapeXml(attr.name)}</text>`);
+                        } else {
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}">${escapeXml(attr.name)}: ${escapeXml(cleanType)}</text>`);
+                        }
+                    }
+                } else {
+                    // Compact mode: word-wrapped description text
+                    const description = classDef.description || '';
+                    if (description) {
+                        const textPadding = 5;
+                        const lines = wrapText(description, w - textPadding * 2, FONT_SIZE_ATTR, FONT_FAMILY);
+                        const availableLines = Math.max(1, Math.floor((h - HEADER_HEIGHT - BOX_PADDING) / ATTR_LINE_HEIGHT));
+                        const displayLines = lines.slice(0, availableLines);
+
+                        for (let i = 0; i < displayLines.length; i++) {
+                            const lineY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
+                            parts.push(`  <text x="${pos.x + textPadding}" y="${lineY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="#555">${escapeXml(displayLines[i])}</text>`);
+                        }
                     }
                 }
             }
@@ -466,23 +584,32 @@
 
         // Create a draggable class box element
         function createClassBox(className, classDef, pos) {
+            const entityNames = Object.keys(model.classes);
             const box = document.createElement('div');
             box.className = 'class-box' + (showDetailed ? '' : ' compact') + (fitToContent ? ' fit-content' : '');
             box.dataset.className = className;
             box.style.left = pos.x + 'px';
             box.style.top = pos.y + 'px';
-            box.style.backgroundColor = getColor(className);
             box.style.height = getBoxHeight(className) + 'px';
             box.style.width = getBoxWidth(className) + 'px';
+
+            if (showDetailed) {
+                // Detailed mode: full area color background
+                box.style.backgroundColor = getColor(className);
+            }
 
             // Header
             const header = document.createElement('div');
             header.className = 'header';
             header.textContent = className;
+            if (!showDetailed) {
+                // Compact mode: only header has area color
+                header.style.backgroundColor = getColor(className);
+            }
             box.appendChild(header);
 
-            // Attributes (in detailed view, sorted with self-refs first)
             if (showDetailed) {
+                // Detailed view: attributes (FK attrs shown as bold name only)
                 const attrs = getVisibleAttributes(className);
                 if (attrs.length > 0) {
                     const attrsDiv = document.createElement('div');
@@ -490,10 +617,26 @@
                     attrs.forEach(attr => {
                         const line = document.createElement('div');
                         line.className = 'attr-line';
-                        line.textContent = `${attr.name}: ${attr.type}`;
+                        const baseType = ConnectionCalculator.extractBaseType(attr.type);
+                        if (entityNames.includes(baseType)) {
+                            // FK attribute: bold name only
+                            line.textContent = attr.name;
+                            line.style.fontWeight = 'bold';
+                        } else {
+                            line.textContent = `${attr.name}: ${baseType}`;
+                        }
                         attrsDiv.appendChild(line);
                     });
                     box.appendChild(attrsDiv);
+                }
+            } else {
+                // Compact view: description text
+                const description = classDef.description || '';
+                if (description) {
+                    const descDiv = document.createElement('div');
+                    descDiv.className = 'description';
+                    descDiv.textContent = description;
+                    box.appendChild(descDiv);
                 }
             }
 

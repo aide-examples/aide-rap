@@ -22,7 +22,10 @@
         FONT_FAMILY: 'Arial, sans-serif',
         FONT_SIZE_CLASS: 12,
         FONT_SIZE_ATTR: 10,
-        FONT_SIZE_LABEL: 9
+        FONT_SIZE_LABEL: 9,
+
+        // Optional relationship styling
+        OPTIONAL_DASH: '6,3'
     };
 
     // Export as browser global

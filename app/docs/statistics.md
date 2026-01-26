@@ -2,7 +2,7 @@
 
 Lines of code statistics for the AIDE RAID project.
 
-*Generated: 2026-01-26 13:07*
+*Generated: 2026-01-26 14:22*
 
 ## External Dependencies
 
@@ -28,12 +28,12 @@ Lines of code statistics for the AIDE RAID project.
 
 | Category | LOC |
 |----------|----:|
-| Server (app/server) | 8341 |
+| Server (app/server) | 8355 |
 | Shared (app/shared) | 1632 |
-| Frontend (app/static) | 12029 |
+| Frontend (app/static) | 12192 |
 | Tools | 1466 |
 | Config (package.json etc.) | 52 |
-| **Subtotal** | **23520** |
+| **Subtotal** | **23697** |
 
 ## Systems
 
@@ -49,8 +49,8 @@ Lines of code statistics for the AIDE RAID project.
 | Component | Own Code |
 |-----------|----------|
 | AIDE-FRAME | 12777 |
-| AIDE-RAID Platform | 23520 |
+| AIDE-RAID Platform | 23697 |
 | Systems (all) | 2838 |
-| **Total Own Code** | **39135** |
+| **Total Own Code** | **39312** |
 
 *Note: node_modules contains third-party dependencies and is excluded from own code counts.*
