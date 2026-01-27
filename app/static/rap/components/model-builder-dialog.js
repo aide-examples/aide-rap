@@ -208,6 +208,10 @@ I need a library system with:
             case 'prompt':
                 return `
                     <div class="tab-content-prompt">
+                        <div class="prompt-section-header">
+                            <span class="prompt-section-label">AI Prompt</span>
+                            ${DomUtils.renderAILinks(!!this.prompt)}
+                        </div>
                         <textarea id="ai-prompt-text" readonly rows="12">${DomUtils.escapeHtml(this.prompt || '')}</textarea>
                     </div>
                 `;
@@ -288,7 +292,6 @@ SEEDING:
 
             case 'prompt':
                 return `
-                    <button class="btn-seed" data-action="copy-prompt">Copy Prompt</button>
                     <button class="btn-seed primary" data-action="goto-paste">Paste Response &rarr;</button>
                 `;
 
@@ -535,10 +538,11 @@ SEEDING:
             this.buildPrompt();
         });
 
-        // Copy prompt
-        this.container.querySelector('[data-action="copy-prompt"]')?.addEventListener('click', () => {
-            this.copyPrompt();
-        });
+        // Copy prompt + AI service links
+        DomUtils.attachAILinkHandlers(
+            this.container, () => this.prompt, '#ai-prompt-text',
+            (msg, err) => this.showMessage(msg, err)
+        );
 
         // Parse Mermaid
         this.container.querySelector('[data-action="parse-mermaid"]')?.addEventListener('click', () => {
@@ -582,50 +586,10 @@ SEEDING:
         }
 
         // Drag and drop for paste tab (supports file drops)
-        const dropZone = this.container.querySelector('#paste-drop-zone');
-        if (dropZone) {
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('drag-over');
-            });
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('drag-over');
-            });
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('drag-over');
-
-                // Check for dropped files first
-                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    const file = e.dataTransfer.files[0];
-                    // Accept .md, .txt, or any text file
-                    if (file.type.startsWith('text/') || file.name.endsWith('.md') || file.name.endsWith('.txt')) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const textarea = this.container.querySelector('#mermaid-response-text');
-                            if (textarea) {
-                                textarea.value = event.target.result;
-                                this.showMessage(`Loaded: ${file.name}`);
-                            }
-                        };
-                        reader.onerror = () => {
-                            this.showMessage('Failed to read file', true);
-                        };
-                        reader.readAsText(file);
-                    } else {
-                        this.showMessage('Please drop a .md or .txt file', true);
-                    }
-                    return;
-                }
-
-                // Fallback to text data
-                const text = e.dataTransfer.getData('text');
-                if (text) {
-                    const textarea = this.container.querySelector('#mermaid-response-text');
-                    if (textarea) textarea.value = text;
-                }
-            });
-        }
+        DomUtils.setupDropZone(this.container, '#paste-drop-zone', '#mermaid-response-text', {
+            allowFiles: true,
+            showMessage: (msg, err) => this.showMessage(msg, err)
+        });
     },
 
     /**
@@ -850,21 +814,8 @@ SEEDING:
      * Copy prompt to clipboard
      */
     async copyPrompt() {
-        if (!this.prompt) return;
-
-        try {
-            await navigator.clipboard.writeText(this.prompt);
-            this.showMessage('Prompt copied to clipboard');
-        } catch (e) {
-            const textarea = this.container.querySelector('#ai-prompt-text');
-            if (textarea) {
-                textarea.select();
-                document.execCommand('copy');
-                this.showMessage('Prompt copied to clipboard');
-            } else {
-                this.showMessage('Failed to copy', true);
-            }
-        }
+        DomUtils.copyToClipboard(this.container, this.prompt, '#ai-prompt-text',
+            (msg, err) => this.showMessage(msg, err));
     },
 
     /**
@@ -1034,18 +985,7 @@ SEEDING:
      * Show a status message
      */
     showMessage(message, isError = false) {
-        const footer = this.container.querySelector('.modal-footer');
-        if (!footer) return;
-
-        const existing = footer.querySelector('.status-message');
-        if (existing) existing.remove();
-
-        const msg = document.createElement('div');
-        msg.className = `status-message ${isError ? 'error' : 'success'}`;
-        msg.textContent = message;
-        footer.insertBefore(msg, footer.firstChild);
-
-        setTimeout(() => msg.remove(), 4000);
+        DomUtils.showMessage(this.container, message, isError, 4000);
     },
 
 };

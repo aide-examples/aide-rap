@@ -153,14 +153,7 @@ const SeedGeneratorDialog = {
             <div class="prompt-section">
               <div class="prompt-section-header">
                 <span class="prompt-section-label">AI Prompt</span>
-                ${this.lastPrompt ? `
-                  <span class="prompt-actions">
-                    <button class="btn-seed btn-small" data-action="copy-prompt">Copy</button>
-                    <a href="https://chatgpt.com/" target="chatgpt" class="ai-link ai-link-chatgpt" data-action="open-ai">GPT</a>
-                    <a href="https://claude.ai/new" target="claude" class="ai-link ai-link-claude" data-action="open-ai">Claude</a>
-                    <a href="https://gemini.google.com/app" target="gemini" class="ai-link ai-link-gemini" data-action="open-ai">Gemini</a>
-                  </span>
-                ` : ''}
+                ${DomUtils.renderAILinks(!!this.lastPrompt)}
               </div>
               <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${DomUtils.escapeHtml(this.lastPrompt || '')}</textarea>
             </div>
@@ -400,24 +393,11 @@ const SeedGeneratorDialog = {
       this.buildPrompt();
     });
 
-    // Copy prompt to clipboard
-    this.container.querySelector('[data-action="copy-prompt"]')?.addEventListener('click', () => {
-      this.copyPrompt();
-    });
-
-    // AI quick-links: copy prompt, then open/reuse named browser tab
-    this.container.querySelectorAll('[data-action="open-ai"]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (this.lastPrompt) {
-          navigator.clipboard.writeText(this.lastPrompt).catch(() => {
-            const textarea = this.container.querySelector('#llm-prompt-text');
-            if (textarea) { textarea.select(); document.execCommand('copy'); }
-          });
-        }
-        window.open(link.href, link.target);
-      });
-    });
+    // Copy prompt + AI service links
+    DomUtils.attachAILinkHandlers(
+      this.container, () => this.lastPrompt, '#llm-prompt-text',
+      (msg, err) => this.showMessage(msg, err)
+    );
 
     // Parse & validate pasted AI response
     this.container.querySelector('[data-action="parse-response"]')?.addEventListener('click', () => {
@@ -435,25 +415,7 @@ const SeedGeneratorDialog = {
     });
 
     // Drag and drop for paste area
-    const dropZone = this.container.querySelector('#paste-drop-zone');
-    if (dropZone) {
-      dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('drag-over');
-      });
-      dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('drag-over');
-      });
-      dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('drag-over');
-        const text = e.dataTransfer.getData('text');
-        if (text) {
-          const textarea = this.container.querySelector('#ai-response-text');
-          if (textarea) textarea.value = text;
-        }
-      });
-    }
+    DomUtils.setupDropZone(this.container, '#paste-drop-zone', '#ai-response-text');
 
     // Conflict mode selector
     this.container.querySelectorAll('input[name="gen-import-mode"]').forEach(radio => {
@@ -537,22 +499,8 @@ const SeedGeneratorDialog = {
    * Copy prompt to clipboard
    */
   async copyPrompt() {
-    if (!this.lastPrompt) return;
-
-    try {
-      await navigator.clipboard.writeText(this.lastPrompt);
-      this.showMessage('Prompt copied to clipboard');
-    } catch (e) {
-      // Fallback: select textarea content
-      const textarea = this.container.querySelector('#llm-prompt-text');
-      if (textarea) {
-        textarea.select();
-        document.execCommand('copy');
-        this.showMessage('Prompt copied to clipboard');
-      } else {
-        this.showMessage('Failed to copy', true);
-      }
-    }
+    DomUtils.copyToClipboard(this.container, this.lastPrompt, '#llm-prompt-text',
+      (msg, err) => this.showMessage(msg, err));
   },
 
   /**
@@ -692,18 +640,7 @@ const SeedGeneratorDialog = {
    * Show a status message
    */
   showMessage(message, isError = false) {
-    const footer = this.container.querySelector('.modal-footer');
-    if (!footer) return;
-
-    const existing = footer.querySelector('.status-message');
-    if (existing) existing.remove();
-
-    const msg = document.createElement('div');
-    msg.className = `status-message ${isError ? 'error' : 'success'}`;
-    msg.textContent = message;
-    footer.insertBefore(msg, footer.firstChild);
-
-    setTimeout(() => msg.remove(), 3000);
+    DomUtils.showMessage(this.container, message, isError);
   },
 
 };
