@@ -628,13 +628,18 @@ function loadEntity(entityName, lookups = null, options = {}) {
     return { loaded: 0, updated: 0, skipped: 0 };
   }
 
-  // Build lookups for FK resolution if not provided
+  // Build lookups for FK resolution if not provided (with seed file fallback)
   if (!lookups) {
     lookups = {};
-    // Build lookups for all referenced entities
     for (const fk of entity.foreignKeys) {
       if (!lookups[fk.references.entity]) {
-        lookups[fk.references.entity] = buildLabelLookup(fk.references.entity);
+        const dbLookup = buildLabelLookup(fk.references.entity);
+        if (Object.keys(dbLookup).length > 0) {
+          lookups[fk.references.entity] = dbLookup;
+        } else {
+          const { lookup: seedLookup } = buildLabelLookupFromSeed(fk.references.entity);
+          lookups[fk.references.entity] = seedLookup;
+        }
       }
     }
   }
@@ -672,6 +677,7 @@ function loadEntity(entityName, lookups = null, options = {}) {
   let loaded = 0;
   let updated = 0;
   let skipped = 0;
+  const errors = [];
 
   for (let i = 0; i < records.length; i++) {
     // Skip invalid records if requested
@@ -684,22 +690,25 @@ function loadEntity(entityName, lookups = null, options = {}) {
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
     const resolved = resolveConceptualFKs(entityName, record, lookups);
 
+    // SQLite3 cannot bind JS booleans — convert to 0/1
+    const toSqlValue = (v) => v === true ? 1 : v === false ? 0 : v ?? null;
+
     try {
       if (mode === 'replace') {
         // Original behavior: INSERT OR REPLACE (may change id)
-        const values = columns.map(col => resolved[col] ?? null);
+        const values = columns.map(col => toSqlValue(resolved[col]));
         insertReplace.run(...values);
         loaded++;
       } else if (mode === 'merge') {
         // MERGE: Update existing (preserve id), insert new
         const existingId = findExistingByUnique(entityName, resolved);
         if (existingId) {
-          const values = columnsWithoutId.map(col => resolved[col] ?? null);
+          const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
           values.push(existingId); // WHERE id = ?
           update.run(...values);
           updated++;
         } else {
-          const values = columnsWithoutId.map(col => resolved[col] ?? null);
+          const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
           insert.run(...values);
           loaded++;
         }
@@ -709,18 +718,21 @@ function loadEntity(entityName, lookups = null, options = {}) {
         if (existingId) {
           skipped++;
         } else {
-          const values = columnsWithoutId.map(col => resolved[col] ?? null);
+          const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
           insert.run(...values);
           loaded++;
         }
       }
     } catch (err) {
-      console.error(`Error loading ${entityName}:`, err.message);
+      console.error(`Error loading ${entityName} row ${i + 1}:`, err.message);
+      if (errors.length < 5) {
+        errors.push(`Row ${i + 1}: ${err.message}`);
+      }
       skipped++;
     }
   }
 
-  return { loaded, updated, skipped };
+  return { loaded, updated, skipped, errors };
 }
 
 /**

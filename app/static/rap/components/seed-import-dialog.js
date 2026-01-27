@@ -493,10 +493,14 @@ const SeedImportDialog = {
       const loadResult = await loadResponse.json();
 
       if (loadResult.success) {
-        this.hide();
-        // Refresh seed manager if open
-        if (typeof SeedManager !== 'undefined') {
-          SeedManager.refresh();
+        const hasErrors = loadResult.errors && loadResult.errors.length > 0;
+        if (hasErrors && loadResult.loaded === 0) {
+          this.showError(`Load failed: ${loadResult.errors[0]}`);
+        } else {
+          this.hide();
+          if (typeof SeedManager !== 'undefined') {
+            SeedManager.refresh();
+          }
         }
       } else {
         this.showError(loadResult.error || 'Saved but failed to load');

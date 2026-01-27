@@ -621,13 +621,19 @@ const SeedGeneratorDialog = {
       const loadResult = await loadResp.json();
 
       if (loadResult.success) {
-        this.showMessage(`Saved and loaded ${loadResult.loaded} records`);
-        setTimeout(() => {
-          this.close();
-          if (typeof SeedManager !== 'undefined' && SeedManager.loadStatus) {
-            SeedManager.loadStatus().then(() => SeedManager.render());
-          }
-        }, 1000);
+        const hasErrors = loadResult.errors && loadResult.errors.length > 0;
+        if (hasErrors && loadResult.loaded === 0) {
+          this.showMessage(`Load failed: ${loadResult.errors[0]}`, true);
+        } else {
+          const msg = `Saved and loaded ${loadResult.loaded} records`;
+          this.showMessage(hasErrors ? `${msg} (${loadResult.skipped} skipped)` : msg);
+          setTimeout(() => {
+            this.close();
+            if (typeof SeedManager !== 'undefined' && SeedManager.loadStatus) {
+              SeedManager.loadStatus().then(() => SeedManager.render());
+            }
+          }, 1000);
+        }
       } else {
         this.showMessage(loadResult.error || 'Saved but failed to load', true);
       }

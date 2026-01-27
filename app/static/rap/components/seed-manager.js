@@ -338,7 +338,10 @@ const SeedManager = {
         if (data.loaded > 0) parts.push(`${data.loaded} loaded`);
         if (data.updated > 0) parts.push(`${data.updated} updated`);
         if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
-        this.showMessage(`${entityName}: ${parts.join(', ') || 'no changes'}`);
+        const hasErrors = data.errors && data.errors.length > 0;
+        const isError = hasErrors && data.loaded === 0;
+        const msg = `${entityName}: ${parts.join(', ') || 'no changes'}`;
+        this.showMessage(hasErrors ? `${msg} — ${data.errors[0]}` : msg, isError);
         await this.loadStatus();
         this.render();
       } else {
