@@ -2,7 +2,7 @@
 
 Lines of code statistics for the AIDE RAID project.
 
-*Generated: 2026-01-27 13:41*
+*Generated: 2026-01-27 13:48*
 
 ## External Dependencies
 
@@ -39,10 +39,10 @@ Lines of code statistics for the AIDE RAID project.
 
 | System | Docs | Help | Config | Total |
 |--------|-----:|-----:|-------:|------:|
-| book_1 | 108 | 22 | 39 | 169 |
+| book_1 | 113 | 22 | 39 | 174 |
 | book_2 | 305 | 114 | 99 | 518 |
 | irma | 1123 | 118 | 967 | 2208 |
-| **Subtotal** | **1536** | **254** | **1105** | **2895** |
+| **Subtotal** | **1541** | **254** | **1105** | **2900** |
 
 ## Summary
 
@@ -50,7 +50,7 @@ Lines of code statistics for the AIDE RAID project.
 |-----------|----------|
 | AIDE-FRAME | 12872 |
 | AIDE-RAID Platform | 25618 |
-| Systems (all) | 2895 |
-| **Total Own Code** | **41385** |
+| Systems (all) | 2900 |
+| **Total Own Code** | **41390** |
 
 *Note: node_modules contains third-party dependencies and is excluded from own code counts.*
