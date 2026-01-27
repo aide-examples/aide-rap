@@ -403,6 +403,15 @@ function validateImport(entityName, records) {
   const uniqueCols = entity.columns.filter(c => c.unique).map(c => c.name);
   const compositeKeys = Object.entries(entity.uniqueKeys || {});
 
+  // Track seen values for intra-batch duplicate detection
+  const batchSeen = {};
+  for (const col of uniqueCols) {
+    batchSeen[col] = new Map(); // value -> first row number (1-based)
+  }
+  for (const [keyName] of compositeKeys) {
+    batchSeen[keyName] = new Map();
+  }
+
   // Validate each record
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
@@ -490,6 +499,43 @@ function validateImport(entityName, records) {
               message: `Composite key ${keyName} exists (id=${existingId}) with ${totalRefs} back-references`
             });
           }
+        }
+      }
+    }
+
+    // Check intra-batch duplicates (same unique value in multiple rows of this batch)
+    for (const col of uniqueCols) {
+      const val = record[col];
+      if (val !== null && val !== undefined) {
+        const key = String(val);
+        if (batchSeen[col].has(key)) {
+          warnings.push({
+            row: i + 1,
+            field: col,
+            value: val,
+            message: `Duplicate "${val}" in batch — same value in row ${batchSeen[col].get(key)}`
+          });
+          invalidRows.add(i + 1);
+        } else {
+          batchSeen[col].set(key, i + 1);
+        }
+      }
+    }
+
+    for (const [keyName, keyCols] of compositeKeys) {
+      const values = keyCols.map(c => record[c]);
+      if (values.every(v => v !== null && v !== undefined)) {
+        const key = keyCols.map((c, j) => `${c}:${values[j]}`).join('|');
+        if (batchSeen[keyName].has(key)) {
+          warnings.push({
+            row: i + 1,
+            field: keyName,
+            value: keyCols.map((c, j) => `${c}=${values[j]}`).join(', '),
+            message: `Duplicate composite key ${keyName} in batch — same values in row ${batchSeen[keyName].get(key)}`
+          });
+          invalidRows.add(i + 1);
+        } else {
+          batchSeen[keyName].set(key, i + 1);
         }
       }
     }
@@ -679,6 +725,9 @@ function loadEntity(entityName, lookups = null, options = {}) {
   let skipped = 0;
   const errors = [];
 
+  // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
+  const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
+
   for (let i = 0; i < records.length; i++) {
     // Skip invalid records if requested
     if (skipInvalid && invalidRows.has(i)) {
@@ -732,7 +781,18 @@ function loadEntity(entityName, lookups = null, options = {}) {
     }
   }
 
-  return { loaded, updated, skipped, errors };
+  // Detect silent replacements: INSERT OR REPLACE overwrites rows with same unique key
+  const afterCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
+  const netNew = afterCount - beforeCount;
+  const replaced = loaded > netNew ? loaded - netNew : 0;
+  if (replaced > 0) {
+    loaded = netNew;
+    if (errors.length < 5) {
+      errors.push(`${replaced} rows replaced existing rows (unique key collision)`);
+    }
+  }
+
+  return { loaded, updated, skipped, replaced, errors };
 }
 
 /**

@@ -1,0 +1,30 @@
+[
+  {
+    "name": "NaturalGas",
+    "unit_of_measure": "kWh"
+  },
+  {
+    "name": "DrinkWater",
+    "unit_of_measure": "m3"
+  },
+  {
+    "name": "WasteWater",
+    "unit_of_measure": "m3"
+  },
+  {
+    "name": "PowerFromGrid",
+    "unit_of_measure": "kWh"
+  },
+  {
+    "name": "PowerFromGridLP",
+    "unit_of_measure": "kWh"
+  },
+  {
+    "name": "PowerToGrid",
+    "unit_of_measure": "kWh"
+  },
+  {
+    "name": "PowerProduction",
+    "unit_of_measure": "kWh"
+  }
+]

@@ -67,16 +67,21 @@ function computeSchemaHash(schema) {
     types: {}
   };
 
-  // Hash entity structures
+  // Hash entity structures (columns + constraints)
   for (const entity of schema.orderedEntities) {
-    data.entities[entity.className] = entity.columns.map(c => ({
-      name: c.name,
-      type: c.type,
-      sqlType: c.sqlType,
-      required: c.required,
-      foreignKey: c.foreignKey?.references || null,
-      defaultValue: c.defaultValue
-    }));
+    data.entities[entity.className] = {
+      columns: entity.columns.map(c => ({
+        name: c.name,
+        type: c.type,
+        sqlType: c.sqlType,
+        required: c.required,
+        unique: c.unique || false,
+        foreignKey: c.foreignKey?.references || null,
+        defaultValue: c.defaultValue
+      })),
+      uniqueKeys: entity.uniqueKeys || {},
+      indexes: entity.indexes || {}
+    };
   }
 
   // Hash types

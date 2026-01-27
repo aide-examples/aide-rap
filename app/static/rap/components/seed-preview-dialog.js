@@ -248,8 +248,8 @@ const SeedPreviewDialog = {
     // Modal dialog: do NOT close on overlay click
     // Dialog can only be closed via X button
 
-    // Close button
-    this.modalElement.querySelectorAll('.modal-close').forEach(el => {
+    // Close buttons (X button + Cancel)
+    this.modalElement.querySelectorAll('[data-action="close"]').forEach(el => {
       el.addEventListener('click', () => this.hide());
     });
 

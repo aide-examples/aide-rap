@@ -1,0 +1,114 @@
+[
+  {
+    "serial_number": "G-88234-NG",
+    "location_description": "Basement Utility Room South",
+    "installation_date": "2021-03-15",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "NaturalGas"
+  },
+  {
+    "serial_number": "W-11223-DW",
+    "location_description": "Main Water Inlet Closet",
+    "installation_date": "2020-05-20",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "DrinkWater"
+  },
+  {
+    "serial_number": "S-99441-WW",
+    "location_description": "Outflow Monitoring Pit",
+    "installation_date": "2020-05-20",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "WasteWater"
+  },
+  {
+    "serial_number": "E-77662-PG",
+    "location_description": "Electrical Main Board A",
+    "installation_date": "2019-11-10",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "PowerFromGrid"
+  },
+  {
+    "serial_number": "E-77663-PLP",
+    "location_description": "Low Power Circuit Panel B",
+    "installation_date": "2022-01-14",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "PowerFromGridLP"
+  },
+  {
+    "serial_number": "E-77664-TG",
+    "location_description": "Inverter Feed-in Point",
+    "installation_date": "2022-08-30",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "PowerToGrid"
+  },
+  {
+    "serial_number": "E-77665-PP",
+    "location_description": "Solar Array Terminal",
+    "installation_date": "2022-08-30",
+    "is_active": true,
+    "building": "Kurhaus Bad Nauheim",
+    "resource_type": "PowerProduction"
+  },
+  {
+    "serial_number": "G-55112-NG",
+    "location_description": "External Meter Box West",
+    "installation_date": "2018-06-12",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "NaturalGas"
+  },
+  {
+    "serial_number": "W-33445-DW",
+    "location_description": "Ground Floor Service Room",
+    "installation_date": "2018-06-12",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "DrinkWater"
+  },
+  {
+    "serial_number": "S-44556-WW",
+    "location_description": "Lower Level Drainage Hub",
+    "installation_date": "2018-06-12",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "WasteWater"
+  },
+  {
+    "serial_number": "E-22334-PG",
+    "location_description": "Main Switchgear Room",
+    "installation_date": "2017-09-05",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "PowerFromGrid"
+  },
+  {
+    "serial_number": "E-22335-PLP",
+    "location_description": "Auxiliary Power Panel",
+    "installation_date": "2023-04-10",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "PowerFromGridLP"
+  },
+  {
+    "serial_number": "E-22336-TG",
+    "location_description": "Grid Connection Point",
+    "installation_date": "2023-04-10",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "PowerToGrid"
+  },
+  {
+    "serial_number": "E-22337-PP",
+    "location_description": "CHP Unit Output",
+    "installation_date": "2023-04-10",
+    "is_active": true,
+    "building": "Sprudelhof",
+    "resource_type": "PowerProduction"
+  }
+]

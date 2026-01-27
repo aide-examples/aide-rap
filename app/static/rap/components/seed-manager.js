@@ -301,6 +301,15 @@ const SeedManager = {
   },
 
   /**
+   * Refresh status + re-render, then show message (render replaces innerHTML, so message must come last)
+   */
+  async refreshAndMessage(message, isError = false) {
+    await this.loadStatus();
+    this.render();
+    this.showMessage(message, isError);
+  },
+
+  /**
    * Show status message
    */
   showMessage(message, isError = false) {
@@ -308,16 +317,16 @@ const SeedManager = {
     if (!footer) return;
 
     // Remove existing message
-    const existing = footer.querySelector('.status-message');
+    const existing = this.container.querySelector('.status-message');
     if (existing) existing.remove();
 
     const msg = document.createElement('div');
     msg.className = `status-message ${isError ? 'error' : 'success'}`;
     msg.textContent = message;
-    footer.insertBefore(msg, footer.firstChild);
+    footer.parentNode.insertBefore(msg, footer);
 
-    // Auto-remove after 3 seconds
-    setTimeout(() => msg.remove(), 3000);
+    // Auto-remove (longer for errors so users can read them)
+    setTimeout(() => msg.remove(), isError ? 8000 : 3000);
   },
 
   /**
@@ -338,12 +347,10 @@ const SeedManager = {
         if (data.loaded > 0) parts.push(`${data.loaded} loaded`);
         if (data.updated > 0) parts.push(`${data.updated} updated`);
         if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
+        if (data.replaced > 0) parts.push(`${data.replaced} replaced`);
         const hasErrors = data.errors && data.errors.length > 0;
-        const isError = hasErrors && data.loaded === 0;
         const msg = `${entityName}: ${parts.join(', ') || 'no changes'}`;
-        this.showMessage(hasErrors ? `${msg} — ${data.errors[0]}` : msg, isError);
-        await this.loadStatus();
-        this.render();
+        await this.refreshAndMessage(hasErrors ? `${msg} — ${data.errors[0]}` : msg, hasErrors);
       } else {
         this.showMessage(data.error || 'Failed to load', true);
       }
@@ -361,9 +368,7 @@ const SeedManager = {
       const data = await response.json();
 
       if (data.success) {
-        this.showMessage(`Cleared ${data.deleted} records from ${entityName}`);
-        await this.loadStatus();
-        this.render();
+        await this.refreshAndMessage(`Cleared ${data.deleted} records from ${entityName}`);
       } else {
         this.showMessage(data.error || 'Failed to clear', true);
       }
@@ -382,9 +387,14 @@ const SeedManager = {
 
       if (data.success) {
         const loaded = Object.values(data.results).filter(r => r.loaded > 0).length;
-        this.showMessage(`Loaded seed data for ${loaded} entities`);
-        await this.loadStatus();
-        this.render();
+        const errorEntities = Object.entries(data.results)
+          .filter(([, r]) => r.error || (r.errors && r.errors.length > 0))
+          .map(([name, r]) => `${name}: ${r.error || r.errors[0]}`);
+        if (errorEntities.length > 0) {
+          await this.refreshAndMessage(`Loaded ${loaded} entities — ${errorEntities.join('; ')}`, true);
+        } else {
+          await this.refreshAndMessage(`Loaded seed data for ${loaded} entities`);
+        }
       } else {
         this.showMessage(data.error || 'Failed to load all', true);
       }
@@ -404,9 +414,7 @@ const SeedManager = {
       const data = await response.json();
 
       if (data.success) {
-        this.showMessage('Cleared all entity data');
-        await this.loadStatus();
-        this.render();
+        await this.refreshAndMessage('Cleared all entity data');
       } else {
         this.showMessage(data.error || 'Failed to clear all', true);
       }
@@ -426,9 +434,15 @@ const SeedManager = {
       const data = await response.json();
 
       if (data.success) {
-        this.showMessage('Reset complete: cleared and reloaded all data');
-        await this.loadStatus();
-        this.render();
+        const loadResults = data.loaded || {};
+        const errorEntities = Object.entries(loadResults)
+          .filter(([, r]) => r.error || (r.errors && r.errors.length > 0))
+          .map(([name, r]) => `${name}: ${r.error || r.errors[0]}`);
+        if (errorEntities.length > 0) {
+          await this.refreshAndMessage(`Reset done — ${errorEntities.join('; ')}`, true);
+        } else {
+          await this.refreshAndMessage('Reset complete: cleared and reloaded all data');
+        }
       } else {
         this.showMessage(data.error || 'Failed to reset', true);
       }
@@ -457,9 +471,7 @@ const SeedManager = {
       const response = await fetch('/api/seed/backup', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
-        this.showMessage(`Backup created: ${data.totalRecords} records`);
-        await this.loadStatus();
-        this.render();
+        await this.refreshAndMessage(`Backup created: ${data.totalRecords} records`);
       } else {
         this.showMessage(data.error || 'Backup failed', true);
       }
@@ -478,9 +490,7 @@ const SeedManager = {
       const data = await response.json();
       if (data.success) {
         const loaded = Object.values(data.results).filter(r => r.loaded > 0).length;
-        this.showMessage(`Restored data for ${loaded} entities from backup`);
-        await this.loadStatus();
-        this.render();
+        await this.refreshAndMessage(`Restored data for ${loaded} entities from backup`);
       } else {
         this.showMessage(data.error || 'Restore failed', true);
       }
@@ -525,9 +535,7 @@ const SeedManager = {
       const response = await fetch('/api/seed/reinitialize', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
-        this.showMessage(data.message);
-        await this.loadStatus();
-        this.render();
+        await this.refreshAndMessage(data.message);
       } else {
         this.showMessage(data.error || 'Reinitialize failed', true);
       }

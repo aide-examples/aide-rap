@@ -496,6 +496,8 @@ const SeedImportDialog = {
         const hasErrors = loadResult.errors && loadResult.errors.length > 0;
         if (hasErrors && loadResult.loaded === 0) {
           this.showError(`Load failed: ${loadResult.errors[0]}`);
+        } else if (hasErrors) {
+          this.showError(loadResult.errors[0]);
         } else {
           this.hide();
           if (typeof SeedManager !== 'undefined') {

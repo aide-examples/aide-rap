@@ -625,8 +625,11 @@ const SeedGeneratorDialog = {
         if (hasErrors && loadResult.loaded === 0) {
           this.showMessage(`Load failed: ${loadResult.errors[0]}`, true);
         } else {
-          const msg = `Saved and loaded ${loadResult.loaded} records`;
-          this.showMessage(hasErrors ? `${msg} (${loadResult.skipped} skipped)` : msg);
+          const parts = [`${loadResult.loaded} loaded`];
+          if (loadResult.replaced > 0) parts.push(`${loadResult.replaced} replaced`);
+          if (loadResult.skipped > 0) parts.push(`${loadResult.skipped} skipped`);
+          const msg = `Saved: ${parts.join(', ')}`;
+          this.showMessage(hasErrors ? `${msg} — ${loadResult.errors[0]}` : msg, hasErrors);
           setTimeout(() => {
             this.close();
             if (typeof SeedManager !== 'undefined' && SeedManager.loadStatus) {

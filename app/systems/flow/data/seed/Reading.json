@@ -1,0 +1,422 @@
+[
+  {
+    "value": 12450,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "G-88234-NG"
+  },
+  {
+    "value": 15600,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "G-88234-NG"
+  },
+  {
+    "value": 18950,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "G-88234-NG"
+  },
+  {
+    "value": 22100,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "G-88234-NG"
+  },
+  {
+    "value": 25400,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "G-88234-NG"
+  },
+  {
+    "value": 850,
+    "reading_at": "2021-12-31",
+    "source": "Automated",
+    "meter_id": "W-11223-DW"
+  },
+  {
+    "value": 1120,
+    "reading_at": "2022-12-31",
+    "source": "Automated",
+    "meter_id": "W-11223-DW"
+  },
+  {
+    "value": 1390,
+    "reading_at": "2023-12-31",
+    "source": "Automated",
+    "meter_id": "W-11223-DW"
+  },
+  {
+    "value": 1665,
+    "reading_at": "2024-12-31",
+    "source": "Automated",
+    "meter_id": "W-11223-DW"
+  },
+  {
+    "value": 1940,
+    "reading_at": "2025-12-31",
+    "source": "Automated",
+    "meter_id": "W-11223-DW"
+  },
+  {
+    "value": 3200,
+    "reading_at": "2021-12-31",
+    "source": "Estimated",
+    "meter_id": "S-99441-WW"
+  },
+  {
+    "value": 6500,
+    "reading_at": "2022-12-31",
+    "source": "Estimated",
+    "meter_id": "S-99441-WW"
+  },
+  {
+    "value": 9800,
+    "reading_at": "2023-12-31",
+    "source": "Estimated",
+    "meter_id": "S-99441-WW"
+  },
+  {
+    "value": 13100,
+    "reading_at": "2024-12-31",
+    "source": "Estimated",
+    "meter_id": "S-99441-WW"
+  },
+  {
+    "value": 16450,
+    "reading_at": "2025-12-31",
+    "source": "Estimated",
+    "meter_id": "S-99441-WW"
+  },
+  {
+    "value": 4200,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "E-77662-PG"
+  },
+  {
+    "value": 8450,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "E-77662-PG"
+  },
+  {
+    "value": 12700,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "E-77662-PG"
+  },
+  {
+    "value": 16900,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "E-77662-PG"
+  },
+  {
+    "value": 21200,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "E-77662-PG"
+  },
+  {
+    "value": 5100,
+    "reading_at": "2021-12-31",
+    "source": "Automated",
+    "meter_id": "E-77663-PLP"
+  },
+  {
+    "value": 10250,
+    "reading_at": "2022-12-31",
+    "source": "Automated",
+    "meter_id": "E-77663-PLP"
+  },
+  {
+    "value": 15400,
+    "reading_at": "2023-12-31",
+    "source": "Automated",
+    "meter_id": "E-77663-PLP"
+  },
+  {
+    "value": 20550,
+    "reading_at": "2024-12-31",
+    "source": "Automated",
+    "meter_id": "E-77663-PLP"
+  },
+  {
+    "value": 25700,
+    "reading_at": "2025-12-31",
+    "source": "Automated",
+    "meter_id": "E-77663-PLP"
+  },
+  {
+    "value": 4000,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "E-77664-TG"
+  },
+  {
+    "value": 8100,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "E-77664-TG"
+  },
+  {
+    "value": 12250,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "E-77664-TG"
+  },
+  {
+    "value": 16400,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "E-77664-TG"
+  },
+  {
+    "value": 20550,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "E-77664-TG"
+  },
+  {
+    "value": 3800,
+    "reading_at": "2021-12-31",
+    "source": "Estimated",
+    "meter_id": "E-77665-PP"
+  },
+  {
+    "value": 7650,
+    "reading_at": "2022-12-31",
+    "source": "Estimated",
+    "meter_id": "E-77665-PP"
+  },
+  {
+    "value": 11500,
+    "reading_at": "2023-12-31",
+    "source": "Estimated",
+    "meter_id": "E-77665-PP"
+  },
+  {
+    "value": 15400,
+    "reading_at": "2024-12-31",
+    "source": "Estimated",
+    "meter_id": "E-77665-PP"
+  },
+  {
+    "value": 19300,
+    "reading_at": "2025-12-31",
+    "source": "Estimated",
+    "meter_id": "E-77665-PP"
+  },
+  {
+    "value": 11000,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "G-55112-NG"
+  },
+  {
+    "value": 14200,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "G-55112-NG"
+  },
+  {
+    "value": 17450,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "G-55112-NG"
+  },
+  {
+    "value": 20600,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "G-55112-NG"
+  },
+  {
+    "value": 23850,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "G-55112-NG"
+  },
+  {
+    "value": 920,
+    "reading_at": "2021-12-31",
+    "source": "Automated",
+    "meter_id": "W-33445-DW"
+  },
+  {
+    "value": 1190,
+    "reading_at": "2022-12-31",
+    "source": "Automated",
+    "meter_id": "W-33445-DW"
+  },
+  {
+    "value": 1460,
+    "reading_at": "2023-12-31",
+    "source": "Automated",
+    "meter_id": "W-33445-DW"
+  },
+  {
+    "value": 1735,
+    "reading_at": "2024-12-31",
+    "source": "Automated",
+    "meter_id": "W-33445-DW"
+  },
+  {
+    "value": 2010,
+    "reading_at": "2025-12-31",
+    "source": "Automated",
+    "meter_id": "W-33445-DW"
+  },
+  {
+    "value": 4500,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "S-44556-WW"
+  },
+  {
+    "value": 7800,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "S-44556-WW"
+  },
+  {
+    "value": 11100,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "S-44556-WW"
+  },
+  {
+    "value": 14400,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "S-44556-WW"
+  },
+  {
+    "value": 17750,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "S-44556-WW"
+  },
+  {
+    "value": 4100,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "E-22334-PG"
+  },
+  {
+    "value": 8300,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "E-22334-PG"
+  },
+  {
+    "value": 12500,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "E-22334-PG"
+  },
+  {
+    "value": 16750,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "E-22334-PG"
+  },
+  {
+    "value": 20950,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "E-22334-PG"
+  },
+  {
+    "value": 5000,
+    "reading_at": "2021-12-31",
+    "source": "Automated",
+    "meter_id": "E-22335-PLP"
+  },
+  {
+    "value": 10100,
+    "reading_at": "2022-12-31",
+    "source": "Automated",
+    "meter_id": "E-22335-PLP"
+  },
+  {
+    "value": 15200,
+    "reading_at": "2023-12-31",
+    "source": "Automated",
+    "meter_id": "E-22335-PLP"
+  },
+  {
+    "value": 20350,
+    "reading_at": "2024-12-31",
+    "source": "Automated",
+    "meter_id": "E-22335-PLP"
+  },
+  {
+    "value": 25450,
+    "reading_at": "2025-12-31",
+    "source": "Automated",
+    "meter_id": "E-22335-PLP"
+  },
+  {
+    "value": 3950,
+    "reading_at": "2021-12-31",
+    "source": "Manual",
+    "meter_id": "E-22336-TG"
+  },
+  {
+    "value": 8050,
+    "reading_at": "2022-12-31",
+    "source": "Manual",
+    "meter_id": "E-22336-TG"
+  },
+  {
+    "value": 12100,
+    "reading_at": "2023-12-31",
+    "source": "Manual",
+    "meter_id": "E-22336-TG"
+  },
+  {
+    "value": 16200,
+    "reading_at": "2024-12-31",
+    "source": "Manual",
+    "meter_id": "E-22336-TG"
+  },
+  {
+    "value": 20300,
+    "reading_at": "2025-12-31",
+    "source": "Manual",
+    "meter_id": "E-22336-TG"
+  },
+  {
+    "value": 3700,
+    "reading_at": "2021-12-31",
+    "source": "Estimated",
+    "meter_id": "E-22337-PP"
+  },
+  {
+    "value": 7500,
+    "reading_at": "2022-12-31",
+    "source": "Estimated",
+    "meter_id": "E-22337-PP"
+  },
+  {
+    "value": 11350,
+    "reading_at": "2023-12-31",
+    "source": "Estimated",
+    "meter_id": "E-22337-PP"
+  },
+  {
+    "value": 15200,
+    "reading_at": "2024-12-31",
+    "source": "Estimated",
+    "meter_id": "E-22337-PP"
+  },
+  {
+    "value": 19100,
+    "reading_at": "2025-12-31",
+    "source": "Estimated",
+    "meter_id": "E-22337-PP"
+  }
+]
