@@ -188,5 +188,52 @@ module.exports = function(cfg) {
         }
     });
 
+    // Reinitialize: re-read DataModel.md, rebuild schema, tables, views
+    router.post('/api/seed/reinitialize', (req, res) => {
+        try {
+            const { reinitialize } = require('../config/database');
+            const ComputedFieldService = require('../services/ComputedFieldService');
+
+            const result = reinitialize();
+
+            // Re-run computed field setup
+            ComputedFieldService.applyDefaults();
+            ComputedFieldService.runAll();
+            ComputedFieldService.stopScheduler();
+            ComputedFieldService.scheduleDailyRun();
+
+            // Re-initialize SeedManager with fresh schema
+            SeedManager.init(cfg.paths.seed);
+
+            res.json({ success: true, message: `Reinitialized with ${result.entities} entities` });
+        } catch (e) {
+            console.error('Failed to reinitialize:', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    // Backup all entity data to JSON files
+    router.post('/api/seed/backup', (req, res) => {
+        try {
+            const result = SeedManager.backupAll();
+            const totalRecords = Object.values(result.entities).reduce((sum, n) => sum + n, 0);
+            res.json({ success: true, totalRecords, entities: result.entities });
+        } catch (e) {
+            console.error('Failed to create backup:', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    // Restore all entity data from backup files
+    router.post('/api/seed/restore-backup', (req, res) => {
+        try {
+            const results = SeedManager.restoreBackup();
+            res.json({ success: true, results });
+        } catch (e) {
+            console.error('Failed to restore backup:', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
     return router;
 };

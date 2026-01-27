@@ -35,6 +35,14 @@ function getSeedDir() {
 }
 
 /**
+ * Get the backup directory (sibling of seed directory)
+ * @returns {string} - The backup directory path
+ */
+function getBackupDir() {
+  return path.join(path.dirname(getSeedDir()), 'backup');
+}
+
+/**
  * Get database and schema from the database module
  */
 function getDbAndSchema() {
@@ -208,6 +216,8 @@ function getStatus() {
   const { db, schema } = getDbAndSchema();
   const entities = [];
 
+  const backupDir = getBackupDir();
+
   for (const entity of schema.orderedEntities) {
     const rowCount = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get().count;
     const seedFile = `${entity.className}.json`;
@@ -226,12 +236,17 @@ function getStatus() {
       }
     }
 
+    // Count backup records
+    const backupPath = path.join(backupDir, seedFile);
+    const backupTotal = countSeedFile(backupPath);
+
     entities.push({
       name: entity.className,
       tableName: entity.tableName,
       rowCount,
       seedTotal,      // Total records in seed file
-      seedValid       // Valid records (can be loaded)
+      seedValid,      // Valid records (can be loaded)
+      backupTotal     // Total records in backup file
     });
   }
 
@@ -802,9 +817,132 @@ function uploadEntity(entityName, jsonData) {
   return { uploaded: records.length, file: `${entityName}.json` };
 }
 
+/**
+ * Backup all entity data to JSON files in the backup directory.
+ * Exports current DB content (using conceptual FK names for portability).
+ * @returns {object} - { entities: { name: count }, backupDir }
+ */
+function backupAll() {
+  const { db, schema } = getDbAndSchema();
+  const backupDir = getBackupDir();
+
+  // Ensure backup directory exists
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+  }
+
+  const results = {};
+
+  for (const entity of schema.orderedEntities) {
+    const rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+
+    if (rows.length === 0) {
+      // Remove existing backup file if entity is empty
+      const backupPath = path.join(backupDir, `${entity.className}.json`);
+      if (fs.existsSync(backupPath)) {
+        fs.unlinkSync(backupPath);
+      }
+      results[entity.className] = 0;
+      continue;
+    }
+
+    // Convert FK IDs to label values for portability
+    const exportRows = rows.map(row => {
+      const exported = { ...row };
+      delete exported.id; // Don't export auto-increment IDs
+
+      for (const fk of entity.foreignKeys) {
+        const idValue = row[fk.column];
+        if (idValue === null || idValue === undefined) continue;
+
+        // Look up label for this FK value
+        const refEntity = schema.entities[fk.references.entity];
+        if (!refEntity) continue;
+
+        const labelCol = refEntity.columns.find(c => c.ui?.label);
+        if (!labelCol) continue;
+
+        try {
+          const refRow = db.prepare(
+            `SELECT ${labelCol.name} FROM ${refEntity.tableName} WHERE id = ?`
+          ).get(idValue);
+
+          if (refRow && refRow[labelCol.name]) {
+            // Use conceptual name with label value
+            exported[fk.displayName] = refRow[labelCol.name];
+            delete exported[fk.column];
+          }
+        } catch {
+          // Keep numeric ID if lookup fails
+        }
+      }
+
+      // Remove computed columns (they are auto-calculated)
+      for (const col of entity.columns) {
+        if (col.computed && !col.foreignKey) {
+          delete exported[col.name];
+        }
+      }
+
+      return exported;
+    });
+
+    const backupPath = path.join(backupDir, `${entity.className}.json`);
+    fs.writeFileSync(backupPath, JSON.stringify(exportRows, null, 2));
+    results[entity.className] = exportRows.length;
+  }
+
+  return { entities: results, backupDir };
+}
+
+/**
+ * Restore all entity data from backup JSON files.
+ * Similar to loadAll but reads from backup/ instead of seed/.
+ * @returns {object} - Results per entity
+ */
+function restoreBackup() {
+  const { schema } = getDbAndSchema();
+  const backupDir = getBackupDir();
+
+  if (!fs.existsSync(backupDir)) {
+    throw new Error('No backup directory found');
+  }
+
+  // Clear all data first
+  clearAll();
+
+  const results = {};
+  const lookups = {};
+
+  // Temporarily point seed dir to backup dir for loadEntity
+  const originalSeedDir = SEED_DIR;
+  SEED_DIR = backupDir;
+
+  try {
+    for (const entity of schema.orderedEntities) {
+      const backupFile = path.join(backupDir, `${entity.className}.json`);
+      if (fs.existsSync(backupFile)) {
+        try {
+          const result = loadEntity(entity.className, lookups, { mode: 'replace' });
+          results[entity.className] = result;
+          lookups[entity.className] = buildLabelLookup(entity.className);
+        } catch (err) {
+          results[entity.className] = { error: err.message };
+        }
+      }
+    }
+  } finally {
+    // Restore original seed dir
+    SEED_DIR = originalSeedDir;
+  }
+
+  return results;
+}
+
 module.exports = {
   init,
   getSeedDir,
+  getBackupDir,
   getStatus,
   validateImport,
   loadEntity,
@@ -815,6 +953,8 @@ module.exports = {
   uploadEntity,
   buildLabelLookup,
   countSeedConflicts,
+  backupAll,
+  restoreBackup,
   // Export getter for path (for testing and external access)
   get SEED_DIR() { return getSeedDir(); }
 };

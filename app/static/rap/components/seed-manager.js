@@ -187,6 +187,7 @@ const SeedManager = {
     const rows = this.entities.map((e, idx) => {
       const hasSeeds = e.seedTotal !== null && e.seedTotal > 0;
       const hasInvalid = hasSeeds && e.seedValid !== null && e.seedValid < e.seedTotal;
+      const hasBackup = e.backupTotal !== null && e.backupTotal > 0;
 
       // Display format: "5 / 8" if there are invalid records, otherwise just the total
       let seedDisplay = '--';
@@ -198,11 +199,14 @@ const SeedManager = {
         }
       }
 
+      const backupDisplay = hasBackup ? String(e.backupTotal) : '--';
+
       return `
         <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}">
           <td class="level">${idx + 1}</td>
           <td class="entity-name">${e.name}</td>
           <td class="seed-count">${seedDisplay}</td>
+          <td class="backup-count">${backupDisplay}</td>
           <td class="row-count">${e.rowCount}</td>
         </tr>
       `;
@@ -222,7 +226,8 @@ const SeedManager = {
                 <tr>
                   <th>#</th>
                   <th>Entity</th>
-                  <th>Seed Available</th>
+                  <th>Seed</th>
+                  <th>Backup</th>
                   <th>DB Rows</th>
                 </tr>
               </thead>
@@ -234,9 +239,12 @@ const SeedManager = {
           <div class="modal-footer">
             <button class="btn-seed btn-new-system" title="Create a new AIDE RAP system">+ New System</button>
             <span class="footer-spacer"></span>
+            <button class="btn-seed btn-backup" title="Backup all DB data to JSON files">Backup</button>
+            <button class="btn-seed btn-restore" title="Restore all data from backup files">Restore</button>
             <button class="btn-seed btn-load-all">Load All</button>
             <button class="btn-seed btn-clear-all">Clear All</button>
             <button class="btn-seed btn-reset-all">Reset All</button>
+            <button class="btn-seed btn-reinit" title="Re-read data model and rebuild schema">Reinitialize</button>
           </div>
         </div>
       </div>
@@ -275,6 +283,9 @@ const SeedManager = {
     this.container.querySelector('.btn-load-all')?.addEventListener('click', () => this.loadAll());
     this.container.querySelector('.btn-clear-all')?.addEventListener('click', () => this.clearAll());
     this.container.querySelector('.btn-reset-all')?.addEventListener('click', () => this.resetAll());
+    this.container.querySelector('.btn-backup')?.addEventListener('click', () => this.backupAll());
+    this.container.querySelector('.btn-restore')?.addEventListener('click', () => this.restoreBackup());
+    this.container.querySelector('.btn-reinit')?.addEventListener('click', () => this.reinitialize());
     this.container.querySelector('.btn-new-system')?.addEventListener('click', () => this.openModelBuilder());
   },
 
@@ -421,6 +432,93 @@ const SeedManager = {
       await SeedGeneratorDialog.open(entityName);
     } else {
       this.showMessage('Generator dialog not loaded', true);
+    }
+  },
+
+  /**
+   * Backup all entity data to JSON files
+   */
+  async backupAll() {
+    try {
+      const response = await fetch('/api/seed/backup', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        this.showMessage(`Backup created: ${data.totalRecords} records`);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Backup failed', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Restore all entity data from backup files
+   */
+  async restoreBackup() {
+    if (!confirm('Restore from backup? This clears all current data and loads from backup files.')) return;
+    try {
+      const response = await fetch('/api/seed/restore-backup', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        const loaded = Object.values(data.results).filter(r => r.loaded > 0).length;
+        this.showMessage(`Restored data for ${loaded} entities from backup`);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Restore failed', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Reinitialize: re-read data model, rebuild schema/tables/views.
+   * Two-step confirm: warn about data loss, offer backup first.
+   */
+  async reinitialize() {
+    // Step 1: Warn about potential data loss
+    const proceed = confirm(
+      'Reinitialize re-reads the data model and rebuilds the database schema.\n\n' +
+      'If the schema changed significantly, existing data may be lost.\n' +
+      'Data can be restored from seed or backup files.\n\n' +
+      'Continue?'
+    );
+    if (!proceed) return;
+
+    // Step 2: Offer backup
+    const doBackup = confirm('Create a backup of current data before reinitializing?');
+    if (doBackup) {
+      try {
+        const backupRes = await fetch('/api/seed/backup', { method: 'POST' });
+        const backupData = await backupRes.json();
+        if (!backupData.success) {
+          this.showMessage('Backup failed: ' + (backupData.error || 'unknown error'), true);
+          return;
+        }
+        this.showMessage(`Backup created: ${backupData.totalRecords} records`);
+      } catch (err) {
+        this.showMessage('Backup failed: ' + err.message, true);
+        return;
+      }
+    }
+
+    // Step 3: Reinitialize
+    try {
+      const response = await fetch('/api/seed/reinitialize', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        this.showMessage(data.message);
+        await this.loadStatus();
+        this.render();
+      } else {
+        this.showMessage(data.error || 'Reinitialize failed', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
     }
   },
 

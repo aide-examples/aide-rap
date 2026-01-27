@@ -19,6 +19,9 @@ const { parseAllUserViews, generateUserViewSQL } = require('../utils/UserViewGen
 let db = null;
 let schema = null;
 let storedViewsConfig = null;
+let storedDbPath = null;
+let storedDataModelPath = null;
+let storedEnabledEntities = null;
 
 /**
  * Check if table exists
@@ -124,6 +127,99 @@ function saveSchemaHash(hash) {
 }
 
 /**
+ * Auto-backup all entity data before dropping tables on schema change.
+ * Converts FK IDs to label values for portability across schema rebuilds.
+ * Only runs when there is existing data and schema has changed.
+ */
+function autoBackupBeforeDrop(orderedEntities) {
+  const backupDir = path.join(path.dirname(storedDbPath), 'backup');
+
+  let totalRecords = 0;
+  const entityData = {};
+
+  // Collect data from existing tables (with FK label resolution)
+  for (const entity of orderedEntities) {
+    if (!tableExists(entity.tableName)) continue;
+
+    try {
+      const rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+      if (rows.length === 0) continue;
+
+      const exportRows = rows.map(row => {
+        const exported = { ...row };
+        delete exported.id;
+
+        // Convert FK IDs to label values
+        for (const fk of entity.foreignKeys) {
+          const idValue = row[fk.column];
+          if (idValue === null || idValue === undefined) continue;
+
+          const refEntity = schema.entities[fk.references.entity];
+          if (!refEntity || !tableExists(refEntity.tableName)) continue;
+
+          const labelCol = refEntity.columns.find(c => c.ui?.label);
+          if (!labelCol) continue;
+
+          try {
+            const refRow = db.prepare(
+              `SELECT ${labelCol.name} FROM ${refEntity.tableName} WHERE id = ?`
+            ).get(idValue);
+
+            if (refRow && refRow[labelCol.name]) {
+              exported[fk.displayName] = refRow[labelCol.name];
+              delete exported[fk.column];
+            }
+          } catch {
+            // Keep numeric ID if lookup fails
+          }
+        }
+
+        // Remove computed columns
+        for (const col of entity.columns) {
+          if (col.computed && !col.foreignKey) {
+            delete exported[col.name];
+          }
+        }
+
+        return exported;
+      });
+
+      entityData[entity.className] = exportRows;
+      totalRecords += exportRows.length;
+    } catch (err) {
+      logger.warn(`Auto-backup: could not read ${entity.tableName}`, { error: err.message });
+    }
+  }
+
+  if (totalRecords === 0) {
+    logger.info('Auto-backup: no data to backup');
+    return;
+  }
+
+  // Write backup files
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+  }
+
+  for (const [className, records] of Object.entries(entityData)) {
+    const filePath = path.join(backupDir, `${className}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(records, null, 2));
+  }
+
+  // Clean up backup files for entities with no data
+  for (const entity of orderedEntities) {
+    if (!entityData[entity.className]) {
+      const filePath = path.join(backupDir, `${entity.className}.json`);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+  }
+
+  logger.info(`Auto-backup: saved ${totalRecords} records from ${Object.keys(entityData).length} entities before schema drop`);
+}
+
+/**
  * Drop all entity tables and views (in reverse dependency order)
  */
 function dropAllTables(orderedEntities) {
@@ -225,6 +321,12 @@ function createUserViews(viewsConfig) {
  * @param {Array} [viewsConfig] - Optional user view definitions from config
  */
 function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
+  // Store params for reinitialize()
+  storedDbPath = dbPath;
+  storedDataModelPath = dataModelPath;
+  storedEnabledEntities = enabledEntities;
+  storedViewsConfig = viewsConfig || [];
+
   // Ensure data directory exists
   const dataDir = path.dirname(dbPath);
   if (!fs.existsSync(dataDir)) {
@@ -236,9 +338,6 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
   db.pragma('foreign_keys = OFF'); // Disable during setup
 
   logger.info('Database opened', { path: dbPath });
-
-  // Store views config for forceRebuild
-  storedViewsConfig = viewsConfig || [];
 
   // Generate schema from DataModel.md
   schema = generateSchema(dataModelPath, enabledEntities);
@@ -255,6 +354,8 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
   if (storedHash !== currentHash) {
     if (storedHash) {
       logger.info('Schema changed - recreating all tables');
+      // Auto-backup existing data before dropping tables
+      autoBackupBeforeDrop(schema.orderedEntities);
     } else {
       logger.info('Initial schema setup');
     }
@@ -339,12 +440,42 @@ function forceRebuild() {
   logger.info('Schema rebuilt', { tables: schema.orderedEntities.length });
 }
 
+/**
+ * Reinitialize database and schema from scratch.
+ * Re-reads DataModel.md, rebuilds types, tables, and views.
+ * Safe to call at runtime (closes existing connection first).
+ */
+function reinitialize() {
+  if (!storedDbPath || !storedDataModelPath) {
+    throw new Error('Cannot reinitialize: database was never initialized');
+  }
+
+  const { resetTypeRegistry } = require('../../shared/types/TypeRegistry');
+
+  // Close existing connection
+  if (db) {
+    db.close();
+    db = null;
+    schema = null;
+  }
+
+  // Reset TypeRegistry singleton to avoid accumulated types
+  resetTypeRegistry();
+
+  // Re-run full initialization
+  initDatabase(storedDbPath, storedDataModelPath, storedEnabledEntities, storedViewsConfig);
+
+  logger.info('Database reinitialized', { entities: schema.orderedEntities.length });
+  return { success: true, entities: schema.orderedEntities.length };
+}
+
 module.exports = {
   initDatabase,
   getDatabase,
   getSchema,
   closeDatabase,
   forceRebuild,
+  reinitialize,
   tableExists,
   viewExists
 };
