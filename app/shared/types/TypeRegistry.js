@@ -27,7 +27,7 @@ class TypeRegistry {
     /**
      * Built-in type names
      */
-    this.builtInTypes = ['int', 'string', 'date', 'boolean'];
+    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean'];
 
     /**
      * Built-in type definitions
@@ -50,6 +50,12 @@ class TypeRegistry {
         sqlType: 'TEXT',
         jsType: 'string',
         validation: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+      },
+      bool: {
+        kind: 'builtin',
+        sqlType: 'INTEGER',
+        jsType: 'boolean',
+        validation: { type: 'boolean' }
       },
       boolean: {
         kind: 'builtin',

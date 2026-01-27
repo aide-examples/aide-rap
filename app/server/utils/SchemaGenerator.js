@@ -32,6 +32,7 @@ const TYPE_MAP = {
   int: { sqlType: 'INTEGER', jsType: 'number', validation: { type: 'number' } },
   string: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string' } },
   date: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
+  bool: { sqlType: 'INTEGER', jsType: 'boolean', validation: { type: 'boolean' } },
   boolean: { sqlType: 'INTEGER', jsType: 'boolean', validation: { type: 'boolean' } }
 };
 

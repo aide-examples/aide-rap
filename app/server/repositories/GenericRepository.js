@@ -52,27 +52,31 @@ function getEntityMeta(entityName) {
 }
 
 /**
- * Enrich a record with _display fields for enum types
+ * Enrich a record: convert SQLite types (boolean 0/1 → true/false)
+ * and add _display fields for enum types.
  * @param {string} entityName - Entity name
  * @param {Object} record - Database record
- * @returns {Object} - Enriched record with _display fields
+ * @returns {Object} - Enriched record
  */
-function enrichWithEnumDisplay(entityName, record) {
+function enrichRecord(entityName, record) {
   const entity = getEntityMeta(entityName);
-
-  // Skip if no enum fields
-  if (!entity.enumFields || Object.keys(entity.enumFields).length === 0) {
-    return record;
-  }
-
-  const typeRegistry = getTypeRegistry();
   const enriched = { ...record };
 
-  for (const [fieldName, enumInfo] of Object.entries(entity.enumFields)) {
-    const value = record[fieldName];
-    if (value !== null && value !== undefined) {
-      const displayValue = typeRegistry.toExternal(enumInfo.typeName, value, entityName);
-      enriched[`${fieldName}_display`] = displayValue;
+  // Convert boolean columns from SQLite INTEGER (0/1) to JS boolean
+  for (const col of entity.columns) {
+    if (col.jsType === 'boolean' && enriched[col.name] !== null && enriched[col.name] !== undefined) {
+      enriched[col.name] = enriched[col.name] !== 0;
+    }
+  }
+
+  // Add _display fields for enum types
+  if (entity.enumFields && Object.keys(entity.enumFields).length > 0) {
+    const typeRegistry = getTypeRegistry();
+    for (const [fieldName, enumInfo] of Object.entries(entity.enumFields)) {
+      const value = record[fieldName];
+      if (value !== null && value !== undefined) {
+        enriched[`${fieldName}_display`] = typeRegistry.toExternal(enumInfo.typeName, value, entityName);
+      }
     }
   }
 
@@ -86,14 +90,7 @@ function enrichWithEnumDisplay(entityName, record) {
  * @returns {Array} - Enriched records
  */
 function enrichRecords(entityName, records) {
-  const entity = getEntityMeta(entityName);
-
-  // Skip if no enum fields
-  if (!entity.enumFields || Object.keys(entity.enumFields).length === 0) {
-    return records;
-  }
-
-  return records.map(record => enrichWithEnumDisplay(entityName, record));
+  return records.map(record => enrichRecord(entityName, record));
 }
 
 /**
@@ -241,7 +238,7 @@ function findById(entityName, id, enrich = true) {
   }
 
   // Enrich with enum display values (unless disabled for internal use)
-  return enrich ? enrichWithEnumDisplay(entityName, row) : row;
+  return enrich ? enrichRecord(entityName, row) : row;
 }
 
 /**
@@ -620,6 +617,6 @@ module.exports = {
   getEntityMeta,
   getValidator,
   ensureValidationRules,
-  enrichWithEnumDisplay,
+  enrichRecord,
   enrichRecords
 };
