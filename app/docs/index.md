@@ -434,6 +434,7 @@ See [Seed Data Reference](seed-data.md) for technical details.
 - [x] **Row-Click Navigation** – Jump from view row to base entity edit form
 - [x] **Back-Reference Columns** – Inbound FK subqueries (`Entity<fk(params).column`), COUNT/LIST/scalar, FK-following within subquery
 - [x] **Aggregation** – COUNT and GROUP_CONCAT (LIST) via back-reference columns
+- [ ] **View-Guided Tree** – Render User View columns as hierarchical tree (FK paths become expandable branches, leaves show only view-selected attributes). Usefulness TBD.
 
 See [Views Configuration](procedures/views-config.md) for syntax details.
 

@@ -137,6 +137,7 @@ const server = new HttpServer({
         pwa: cfg.pwa && cfg.pwa.enabled ? cfg.pwa : null,
         docsEditable: cfg.docsEditable,
         helpEditable: cfg.helpEditable,
+        viewerHooks: '/static/rap/viewer-hooks.js',
         // Point docs to system-specific directory
         docsDir: cfg.paths.docs,
         // Add RAP platform docs as separate root
