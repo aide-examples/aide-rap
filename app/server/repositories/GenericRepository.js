@@ -94,6 +94,18 @@ function enrichRecords(entityName, records) {
 }
 
 /**
+ * Convert boolean values to SQLite INTEGER (0/1) in-place.
+ * better-sqlite3 cannot bind JS booleans directly.
+ */
+function convertBooleansForSql(entity, data) {
+  for (const col of entity.columns) {
+    if (col.jsType === 'boolean' && data[col.name] !== undefined && data[col.name] !== null) {
+      data[col.name] = data[col.name] ? 1 : 0;
+    }
+  }
+}
+
+/**
  * Handle SQLite errors and convert to appropriate error types
  */
 function handleSqliteError(err, entityName, operation, data = {}) {
@@ -250,6 +262,7 @@ function create(entityName, data) {
 
   // Validate and transform
   const validated = validator.validate(entityName, data);
+  convertBooleansForSql(entity, validated);
 
   // Build INSERT statement
   const columns = entity.columns
@@ -285,6 +298,7 @@ function update(entityName, id, data) {
 
   // Validate and transform
   const validated = validator.validate(entityName, data);
+  convertBooleansForSql(entity, validated);
 
   // Build UPDATE statement
   const columns = entity.columns
@@ -449,6 +463,11 @@ function getExtendedSchemaInfo(entityName) {
         foreignKey: fkInfo,
         ui: col.ui || null
       };
+
+      // Include default value if present (for form pre-population)
+      if (col.defaultValue !== null && col.defaultValue !== undefined) {
+        colInfo.defaultValue = col.defaultValue;
+      }
 
       // Add custom type info if present
       if (col.customType) {

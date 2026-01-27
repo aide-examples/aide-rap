@@ -599,6 +599,15 @@
     color: #888;
 }
 
+/* Boolean checkbox (override form-input full-width/padding) */
+.form-input.form-checkbox {
+    width: auto;
+    padding: 0;
+    cursor: pointer;
+    transform: scale(1.2);
+    margin: 4px 0;
+}
+
 /* FK Combobox (searchable input for large FK lists) */
 .form-input.fk-combobox {
     width: 100%;

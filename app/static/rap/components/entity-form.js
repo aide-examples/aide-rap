@@ -274,6 +274,20 @@ const EntityForm = {
       `;
     }
 
+    // Boolean fields: render as checkbox
+    if (col.type === 'boolean') {
+      const checked = displayValue === true || displayValue === 'true' || displayValue === 1;
+      return `
+        <input type="checkbox"
+               class="form-input form-checkbox"
+               id="field-${col.name}"
+               name="${col.name}"
+               value="1"
+               ${checked ? 'checked' : ''}
+               ${disabled}>
+      `;
+    }
+
     return `
       <input type="${inputType}"
              class="form-input"
@@ -327,6 +341,10 @@ const EntityForm = {
       if (key === 'id') return; // Skip id
 
       const col = colMap[key];
+
+      // Skip boolean fields — handled separately below (unchecked checkboxes are absent from FormData)
+      if (col && col.type === 'boolean') return;
+
       const input = form.querySelector(`[name="${key}"]`);
 
       if (value === '') {
@@ -352,6 +370,18 @@ const EntityForm = {
         data[key] = value;
       }
     });
+
+    // Boolean fields: read checkbox state directly (unchecked checkboxes are excluded from FormData)
+    if (this.currentSchema) {
+      for (const col of this.currentSchema.columns) {
+        if (col.type === 'boolean' && col.name !== 'id') {
+          const checkbox = form.querySelector(`#field-${col.name}`);
+          if (checkbox) {
+            data[col.name] = checkbox.checked;
+          }
+        }
+      }
+    }
 
     return data;
   },

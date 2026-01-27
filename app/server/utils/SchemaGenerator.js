@@ -272,11 +272,22 @@ function parseEntityFile(fileContent) {
         // Extract type name and annotations from Type column
         const typeInfo = extractTypeAnnotations(parts[1]);
 
+        // Fallback: extract [DEFAULT=x] from Description column if not in Type column
+        let explicitDefault = typeInfo.default;
+        let desc = parts[2];
+        if (!explicitDefault) {
+          const descDefaultMatch = desc.match(/\[DEFAULT=([^\]]+)\]/i);
+          if (descDefaultMatch) {
+            explicitDefault = descDefaultMatch[1].trim();
+            desc = desc.replace(/\s*\[DEFAULT=[^\]]+\]/i, '').trim();
+          }
+        }
+
         const attr = {
           name: parts[0],
           type: extractTypeName(typeInfo.type),
-          explicitDefault: typeInfo.default,
-          description: parts[2]
+          explicitDefault,
+          description: desc
         };
         if (typeInfo.optional) attr.optional = true;
         if (parts.length >= 4) {
