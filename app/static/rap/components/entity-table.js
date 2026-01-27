@@ -112,7 +112,8 @@ const EntityTable = {
         : ' <span class="sort-hint">&#8645;</span>';
 
       const headerLabel = DomUtils.splitCamelCase(col.label).replace(/[_ ]/g, '<br>');
-      html += `<th class="sortable" data-column="${col.key}">
+      const bgStyle = col.areaColor ? ` style="background-color: ${col.areaColor}"` : '';
+      html += `<th class="sortable" data-column="${col.key}"${bgStyle}>
         ${headerLabel}${sortIcon}
       </th>`;
     }

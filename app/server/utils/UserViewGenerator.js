@@ -103,7 +103,8 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
       joins: [],
       selectExpr: `b.${col.name}`,
       label: titleCase(col.displayName || col.name),
-      jsType: col.jsType || 'string'
+      jsType: col.jsType || 'string',
+      entityName: baseEntityName
     };
   }
 
@@ -167,7 +168,8 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
     joins,
     selectExpr: `${lastAlias}.${col.name}`,
     label: titleCase(col.displayName || col.name),
-    jsType: col.jsType || 'string'
+    jsType: col.jsType || 'string',
+    entityName: currentEntity.className
   };
 }
 
@@ -274,6 +276,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
   let targetSelectExpr;
   let targetLabel;
   let targetJsType;
+  let resolvedEntityName = refEntityName;
   const internalJoins = [];
 
   if (tailPath) {
@@ -345,6 +348,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
       targetSelectExpr = `${currentAlias}.${col.name}`;
       targetLabel = titleCase(col.displayName || col.name);
       targetJsType = col.jsType || 'string';
+      resolvedEntityName = currentEntity.className;
     }
   }
 
@@ -410,7 +414,8 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
     joins: [],
     selectExpr,
     label,
-    jsType
+    jsType,
+    entityName: resolvedEntityName
   };
 }
 
@@ -489,13 +494,20 @@ function parseAllUserViews(viewsConfig, schema) {
           ? parsed.omit
           : (parsed.path.includes('.') ? 'null' : undefined);
 
+        // Look up area color for the entity this column belongs to
+        const colEntity = schema.entities[resolved.entityName];
+        const colAreaColor = colEntity
+          ? (schema.areas[colEntity.area]?.color || '#f5f5f5')
+          : '#f5f5f5';
+
         parsedView.columns.push({
           path: parsed.path,
           label,
           jsType: resolved.jsType,
           selectExpr: resolved.selectExpr,
           sqlAlias: label,
-          omit
+          omit,
+          areaColor: colAreaColor
         });
 
         // Collect joins

@@ -61,6 +61,7 @@ module.exports = function() {
         columns: view.columns.map(c => {
           const col = { key: c.sqlAlias, label: c.label, type: c.jsType };
           if (c.omit !== undefined) col.omit = c.omit;
+          if (c.areaColor) col.areaColor = c.areaColor;
           return col;
         })
       });

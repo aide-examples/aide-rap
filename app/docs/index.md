@@ -140,6 +140,31 @@ Define read-only views in `config.json` that join data across entities via FK ch
 - Full column filtering and sorting, same as entity tables
 - Row click jumps to the base entity's edit form
 
+**Back-Reference Columns** pull data from child entities that point *to* the base entity via FK — implemented as correlated SQL subqueries:
+
+```json
+{
+    "name": "Engine Overview",
+    "base": "Engine",
+    "columns": [
+        "serial_number AS ESN",
+        "type.designation AS Type",
+        "EngineAllocation<engine(COUNT) AS Allocations",
+        "EngineEvent<engine(COUNT) AS Events OMIT 0",
+        "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+    ]
+}
+```
+
+Syntax: `Entity<fk_field(params).column`
+
+| Part | Description | Example |
+|------|-------------|---------|
+| `Entity` | Child entity with FK to base | `EngineAllocation` |
+| `<fk_field` | FK column pointing to base (without `_id`) | `<engine` |
+| `(params)` | Comma-separated: `COUNT`, `LIST`, `WHERE col=val`, `ORDER BY col`, `LIMIT n` | `(WHERE end_date=null, LIMIT 1)` |
+| `.column` | Target column, supports FK-chain dot-paths | `.aircraft.registration` |
+
 See [Views Configuration](procedures/views-config.md) for the full syntax reference.
 
 ### Context Menu Actions
@@ -319,7 +344,7 @@ Views    Extended Schema
 | Type Validation | Code annotations | Markdown patterns |
 | Seed Data | Manual JSON files | AI-generated from descriptions |
 | Relationship Navigation | Flat lists | Infinite-depth tree with cycle detection |
-| Cross-Entity Views | Custom SQL or reporting tools | Config-driven dot-notation FK joins |
+| Cross-Entity Views | Custom SQL or reporting tools | Config-driven dot-notation FK joins + back-reference subqueries |
 | Entity Grouping | Folder structure | Color-coded areas in UI |
 
 ---
@@ -403,8 +428,8 @@ See [Seed Data Reference](seed-data.md) for technical details.
 - [x] **Cross-Entity Views** – Dot-notation FK paths, SQL view materialization, separate dropdown
 - [x] **OMIT Value Suppression** – Per-column `OMIT <value>`, FK default `OMIT null`
 - [x] **Row-Click Navigation** – Jump from view row to base entity edit form
-- [ ] Back-reference columns (one-to-many joins)
-- [ ] Aggregation (GROUP BY, COUNT)
+- [x] **Back-Reference Columns** – Inbound FK subqueries (`Entity<fk(params).column`), COUNT/LIST/scalar, FK-following within subquery
+- [x] **Aggregation** – COUNT and GROUP_CONCAT (LIST) via back-reference columns
 
 See [Views Configuration](procedures/views-config.md) for syntax details.
 

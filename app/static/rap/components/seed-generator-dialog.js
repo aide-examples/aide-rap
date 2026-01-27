@@ -405,15 +405,17 @@ const SeedGeneratorDialog = {
       this.copyPrompt();
     });
 
-    // AI quick-links: copy prompt before navigating
+    // AI quick-links: copy prompt, then open/reuse named browser tab
     this.container.querySelectorAll('[data-action="open-ai"]').forEach(link => {
-      link.addEventListener('click', () => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
         if (this.lastPrompt) {
           navigator.clipboard.writeText(this.lastPrompt).catch(() => {
             const textarea = this.container.querySelector('#llm-prompt-text');
             if (textarea) { textarea.select(); document.execCommand('copy'); }
           });
         }
+        window.open(link.href, link.target);
       });
     });
 

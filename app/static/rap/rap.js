@@ -42,7 +42,6 @@
     // Initialize Framework Status Widget (Footer)
     if (typeof StatusWidget !== 'undefined') {
       StatusWidget.init('#status-widget', {
-        showRestart: false,
         showUpdate: true,
         showInstall: true,
         showLayoutToggle: false,

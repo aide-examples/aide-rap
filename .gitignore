@@ -11,8 +11,12 @@ aide-frame
 app/logs/
 app/systems/*/logs/
 
-# Databases (generated at runtime)
+# Databases and backups (generated at runtime)
 app/systems/*/data/*.sqlite
+app/systems/*/data/backup/
+
+# Archives
+*.zip
 
 # Generated documentation artifacts
 app/systems/*/docs/requirements/DataModel-diagram*.svg
