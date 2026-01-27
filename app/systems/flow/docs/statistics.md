@@ -2,7 +2,7 @@
 
 Lines of code for the **flow** system.
 
-*Generated: 2026-01-27 23:09*
+*Generated: 2026-01-27 23:47*
 
 ## Documentation
 
@@ -17,13 +17,13 @@ Lines of code for the **flow** system.
 
 | Category | LOC |
 |----------|----:|
-| config.json | 23 |
+| config.json | 24 |
 | DataModel.yaml | 0 |
 | DataModel-layout.json | 23 |
-| **Subtotal** | **46** |
+| **Subtotal** | **47** |
 
 ## Total
 
 | Category | LOC |
 |----------|----:|
-| **System Total** | **179** |
+| **System Total** | **180** |

@@ -446,26 +446,15 @@ function forceRebuild() {
 }
 
 /**
- * Reinitialize database and schema from scratch.
- * Re-reads DataModel.md, rebuilds types, tables, and views.
- * Safe to call at runtime (closes existing connection first).
+ * Reinitialize views from markdown.
+ * Re-reads Views.md and recreates all views (entity + user views).
+ * Preserves all table data — does NOT touch tables or schema.
+ * For DataModel.md / Types.md changes, use forceRebuild() or restart the server.
  */
 function reinitialize() {
-  if (!storedDbPath || !storedDataModelPath) {
+  if (!db || !schema || !storedDataModelPath) {
     throw new Error('Cannot reinitialize: database was never initialized');
   }
-
-  const { resetTypeRegistry } = require('../../shared/types/TypeRegistry');
-
-  // Close existing connection
-  if (db) {
-    db.close();
-    db = null;
-    schema = null;
-  }
-
-  // Reset TypeRegistry singleton to avoid accumulated types
-  resetTypeRegistry();
 
   // Re-read views from Views.md (so view changes take effect without restart)
   const requirementsDir = path.dirname(storedDataModelPath);
@@ -476,10 +465,11 @@ function reinitialize() {
     logger.info('Views reloaded from markdown');
   }
 
-  // Re-run full initialization
-  initDatabase(storedDbPath, storedDataModelPath, storedEnabledEntities, storedViewsConfig);
+  // Refresh views only — preserves all table data
+  createAllViews(schema.orderedEntities);
+  createUserViews(storedViewsConfig);
 
-  logger.info('Database reinitialized', { entities: schema.orderedEntities.length });
+  logger.info('Database reinitialized (views refreshed)', { entities: schema.orderedEntities.length });
   return { success: true, entities: schema.orderedEntities.length };
 }
 
