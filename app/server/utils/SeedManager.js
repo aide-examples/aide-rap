@@ -250,6 +250,37 @@ function getStatus() {
     });
   }
 
+  // Pass 2: Compute FK readiness
+  const statusMap = {};
+  for (const e of entities) {
+    statusMap[e.name] = e;
+  }
+
+  for (const entity of schema.orderedEntities) {
+    const status = statusMap[entity.className];
+    const deps = [];
+    const missing = [];
+
+    for (const fk of entity.foreignKeys) {
+      const target = fk.references.entity;
+      if (target === entity.className) continue; // Skip self-references
+      if (!deps.includes(target)) deps.push(target);
+
+      const targetStatus = statusMap[target];
+      if (targetStatus) {
+        const hasData = targetStatus.rowCount > 0;
+        const hasSeed = targetStatus.seedTotal !== null && targetStatus.seedTotal > 0;
+        if (!hasData && !hasSeed && !missing.includes(target)) {
+          missing.push(target);
+        }
+      }
+    }
+
+    status.dependencies = deps;
+    status.missingDeps = missing;
+    status.ready = missing.length === 0;
+  }
+
   return { entities };
 }
 

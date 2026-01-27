@@ -184,7 +184,8 @@ const SeedManager = {
   render() {
     if (!this.container || !this.isOpen) return;
 
-    const rows = this.entities.map((e, idx) => {
+    const sorted = [...this.entities].sort((a, b) => a.name.localeCompare(b.name));
+    const rows = sorted.map((e) => {
       const hasSeeds = e.seedTotal !== null && e.seedTotal > 0;
       const hasInvalid = hasSeeds && e.seedValid !== null && e.seedValid < e.seedTotal;
       const hasBackup = e.backupTotal !== null && e.backupTotal > 0;
@@ -201,9 +202,19 @@ const SeedManager = {
 
       const backupDisplay = hasBackup ? String(e.backupTotal) : '--';
 
+      // Dependency readiness dot
+      let depDot = '';
+      if (e.dependencies && e.dependencies.length > 0) {
+        if (e.ready) {
+          depDot = '<span class="dep-dot dep-ready" title="Dependencies satisfied">&#9679;</span>';
+        } else {
+          depDot = `<span class="dep-dot dep-missing" title="Missing: ${e.missingDeps.join(', ')}">&#9679;</span>`;
+        }
+      }
+
       return `
         <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}">
-          <td class="level">${idx + 1}</td>
+          <td class="dep-status">${depDot}</td>
           <td class="entity-name">${e.name}</td>
           <td class="seed-count">${seedDisplay}</td>
           <td class="backup-count">${backupDisplay}</td>
@@ -220,11 +231,11 @@ const SeedManager = {
             <button class="modal-close" data-action="close">&times;</button>
           </div>
           <div class="modal-body">
-            <p class="order-hint">Entities sorted by dependency (load top-to-bottom, clear bottom-to-top). Right-click for actions.</p>
+            <p class="order-hint"><span class="dep-dot dep-ready">&#9679;</span> dependencies satisfied &nbsp; <span class="dep-dot dep-missing">&#9679;</span> missing reference data &nbsp;&mdash;&nbsp; Right-click for actions.</p>
             <table class="seed-table">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th></th>
                   <th>Entity</th>
                   <th>Seed</th>
                   <th>Backup</th>

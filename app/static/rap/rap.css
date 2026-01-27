@@ -1675,11 +1675,22 @@
     color: #1e293b;
 }
 
-.seed-table .level {
+.seed-table .dep-status {
     text-align: center;
-    font-family: monospace;
-    color: #94a3b8;
     width: 30px;
+}
+
+.dep-dot {
+    font-size: 28px;
+    cursor: default;
+}
+
+.dep-dot.dep-ready {
+    color: #3b82f6;
+}
+
+.dep-dot.dep-missing {
+    color: #ef4444;
 }
 
 .seed-table .row-count,
