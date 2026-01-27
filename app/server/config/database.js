@@ -22,6 +22,7 @@ let storedViewsConfig = null;
 let storedDbPath = null;
 let storedDataModelPath = null;
 let storedEnabledEntities = null;
+let storedConfigPath = null;
 
 /**
  * Check if table exists
@@ -324,13 +325,15 @@ function createUserViews(viewsConfig) {
  * @param {string} dataModelPath - Path to DataModel.md
  * @param {string[]} enabledEntities - List of entity names to enable
  * @param {Array} [viewsConfig] - Optional user view definitions from config
+ * @param {string} [configPath] - Path to config.json (for re-reading on reinitialize)
  */
-function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
+function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, configPath) {
   // Store params for reinitialize()
   storedDbPath = dbPath;
   storedDataModelPath = dataModelPath;
   storedEnabledEntities = enabledEntities;
   storedViewsConfig = viewsConfig || [];
+  storedConfigPath = configPath || null;
 
   // Ensure data directory exists
   const dataDir = path.dirname(dbPath);
@@ -467,8 +470,19 @@ function reinitialize() {
   // Reset TypeRegistry singleton to avoid accumulated types
   resetTypeRegistry();
 
+  // Re-read views from config.json (so view changes take effect without restart)
+  if (storedConfigPath && fs.existsSync(storedConfigPath)) {
+    try {
+      const freshConfig = JSON.parse(fs.readFileSync(storedConfigPath, 'utf-8'));
+      storedViewsConfig = freshConfig.views || [];
+      logger.info('Config reloaded', { path: storedConfigPath });
+    } catch (e) {
+      logger.warn('Failed to reload config, using cached views', { error: e.message });
+    }
+  }
+
   // Re-run full initialization
-  initDatabase(storedDbPath, storedDataModelPath, storedEnabledEntities, storedViewsConfig);
+  initDatabase(storedDbPath, storedDataModelPath, storedEnabledEntities, storedViewsConfig, storedConfigPath);
 
   logger.info('Database reinitialized', { entities: schema.orderedEntities.length });
   return { success: true, entities: schema.orderedEntities.length };

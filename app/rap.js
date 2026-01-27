@@ -224,7 +224,8 @@ if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0)
         appDir: APP_DIR,
         enabledEntities,
         paths: cfg.paths,
-        viewsConfig: cfg.views || []
+        viewsConfig: cfg.views || [],
+        configPath: path.join(cfg.systemDir, 'config.json')
     });
 }
 
