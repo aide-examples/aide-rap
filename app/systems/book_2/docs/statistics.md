@@ -2,28 +2,28 @@
 
 Lines of code for the **book_2** system.
 
-*Generated: 2026-01-27 22:38*
+*Generated: 2026-01-27 23:09*
 
 ## Documentation
 
 | Category | LOC |
 |----------|----:|
 | Entity Classes (classes/*.md) | 169 |
-| Other Docs (requirements/*.md) | 56 |
+| Other Docs (requirements/*.md) | 70 |
 | Help | 114 |
-| **Subtotal** | **339** |
+| **Subtotal** | **353** |
 
 ## Configuration
 
 | Category | LOC |
 |----------|----:|
-| config.json | 48 |
+| config.json | 33 |
 | DataModel.yaml | 0 |
 | DataModel-layout.json | 51 |
-| **Subtotal** | **99** |
+| **Subtotal** | **84** |
 
 ## Total
 
 | Category | LOC |
 |----------|----:|
-| **System Total** | **438** |
+| **System Total** | **437** |

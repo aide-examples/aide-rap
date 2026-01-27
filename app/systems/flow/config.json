@@ -20,28 +20,5 @@
       "line2_color": "#ffffff",
       "line2_size": 0.38
     }
-  },
-  "crud": {
-    "enabledEntities": [
-      "Building",
-      "Meter",
-      "Reading",
-      "ResourceType"
-    ]
-  },
-  "views": [
-    {
-      "name": "Readings by Resource",
-      "base": "Reading",
-      "columns": [
-        "meter.resource_type.name as Resource",
-        "meter.resource_type.unit_of_measure as Unit",
-        "meter.serial_number as Meter",
-        "meter.building.name as Building",
-        "value",
-        "reading_at",
-        "source"
-      ]
-    }
-  ]
+  }
 }

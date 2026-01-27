@@ -22,7 +22,6 @@ let storedViewsConfig = null;
 let storedDbPath = null;
 let storedDataModelPath = null;
 let storedEnabledEntities = null;
-let storedConfigPath = null;
 
 /**
  * Check if table exists
@@ -324,16 +323,14 @@ function createUserViews(viewsConfig) {
  * @param {string} dbPath - Path to SQLite database file
  * @param {string} dataModelPath - Path to DataModel.md
  * @param {string[]} enabledEntities - List of entity names to enable
- * @param {Array} [viewsConfig] - Optional user view definitions from config
- * @param {string} [configPath] - Path to config.json (for re-reading on reinitialize)
+ * @param {Array} [viewsConfig] - Optional user view definitions
  */
-function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, configPath) {
+function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
   // Store params for reinitialize()
   storedDbPath = dbPath;
   storedDataModelPath = dataModelPath;
   storedEnabledEntities = enabledEntities;
   storedViewsConfig = viewsConfig || [];
-  storedConfigPath = configPath || null;
 
   // Ensure data directory exists
   const dataDir = path.dirname(dbPath);
@@ -470,19 +467,17 @@ function reinitialize() {
   // Reset TypeRegistry singleton to avoid accumulated types
   resetTypeRegistry();
 
-  // Re-read views from config.json (so view changes take effect without restart)
-  if (storedConfigPath && fs.existsSync(storedConfigPath)) {
-    try {
-      const freshConfig = JSON.parse(fs.readFileSync(storedConfigPath, 'utf-8'));
-      storedViewsConfig = freshConfig.views || [];
-      logger.info('Config reloaded', { path: storedConfigPath });
-    } catch (e) {
-      logger.warn('Failed to reload config, using cached views', { error: e.message });
-    }
+  // Re-read views from Views.md (so view changes take effect without restart)
+  const requirementsDir = path.dirname(storedDataModelPath);
+  const UISpecLoader = require('../utils/UISpecLoader');
+  const mdViews = UISpecLoader.loadViewsConfig(requirementsDir);
+  if (mdViews) {
+    storedViewsConfig = mdViews;
+    logger.info('Views reloaded from markdown');
   }
 
   // Re-run full initialization
-  initDatabase(storedDbPath, storedDataModelPath, storedEnabledEntities, storedViewsConfig, storedConfigPath);
+  initDatabase(storedDbPath, storedDataModelPath, storedEnabledEntities, storedViewsConfig);
 
   logger.info('Database reinitialized', { entities: schema.orderedEntities.length });
   return { success: true, entities: schema.orderedEntities.length };

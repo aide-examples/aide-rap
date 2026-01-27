@@ -194,9 +194,14 @@ function protectRoute(...roles) {
 // 7b. BACKEND INITIALIZATION (CRUD API)
 // =============================================================================
 
-if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0) {
+const UISpecLoader = require('./server/utils/UISpecLoader');
+const mdCrud = UISpecLoader.loadCrudConfig(cfg.paths.docs);
+const mdViews = UISpecLoader.loadViewsConfig(cfg.paths.docs);
+const enabledEntitiesRaw = mdCrud || [];
+
+if (enabledEntitiesRaw.length > 0) {
     // Filter out area separator comments (entries starting with 20 dashes)
-    const enabledEntities = cfg.crud.enabledEntities.filter(e => !e.startsWith('--------------------'));
+    const enabledEntities = enabledEntitiesRaw.filter(e => !e.startsWith('--------------------'));
 
     // Protect CRUD routes based on HTTP method
     if (authEnabled) {
@@ -224,8 +229,7 @@ if (cfg.crud && cfg.crud.enabledEntities && cfg.crud.enabledEntities.length > 0)
         appDir: APP_DIR,
         enabledEntities,
         paths: cfg.paths,
-        viewsConfig: cfg.views || [],
-        configPath: path.join(cfg.systemDir, 'config.json')
+        viewsConfig: mdViews || []
     });
 }
 

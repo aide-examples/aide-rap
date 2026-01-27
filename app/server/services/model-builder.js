@@ -282,6 +282,7 @@ function generateSystem(systemName, displayName, description, entities, seedingI
         path.join(systemDir, 'docs'),
         path.join(systemDir, 'docs', 'requirements'),
         path.join(systemDir, 'docs', 'requirements', 'classes'),
+        path.join(systemDir, 'docs', 'requirements', 'ui'),
         path.join(systemDir, 'help')
     ];
 
@@ -294,6 +295,19 @@ function generateSystem(systemName, displayName, description, entities, seedingI
     fs.writeFileSync(
         path.join(systemDir, 'config.json'),
         JSON.stringify(config, null, 2)
+    );
+
+    // Generate Crud.md (entity list for CRUD UI)
+    const crudContent = generateCrudMd(entities);
+    fs.writeFileSync(
+        path.join(systemDir, 'docs', 'requirements', 'ui', 'Crud.md'),
+        crudContent
+    );
+
+    // Generate Views.md (empty, no views initially)
+    fs.writeFileSync(
+        path.join(systemDir, 'docs', 'requirements', 'ui', 'Views.md'),
+        '# Views\n'
     );
 
     // Generate entity class files
@@ -340,11 +354,24 @@ function generateSystem(systemName, displayName, description, entities, seedingI
             'config.json',
             'docs/index.md',
             'docs/requirements/DataModel.md',
+            'docs/requirements/ui/Crud.md',
+            'docs/requirements/ui/Views.md',
             ...entities.map(e => `docs/requirements/classes/${e.name}.md`),
             ...entities.map(e => `data/seed/${e.name}.json`),
             'help/index.md'
         ]
     };
+}
+
+/**
+ * Generate Crud.md content from entity list
+ */
+function generateCrudMd(entities) {
+    let content = '# CRUD\n\n';
+    for (const entity of entities) {
+        content += `- ${entity.name}\n`;
+    }
+    return content;
 }
 
 /**
@@ -376,9 +403,6 @@ function generateConfig(systemName, displayName, description, entities, port, th
                 line2_size: 0.38
             }
         },
-        crud: {
-            enabledEntities: entities.map(e => e.name)
-        }
     };
 }
 
@@ -646,6 +670,7 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
         path.join(systemDir, 'docs'),
         path.join(systemDir, 'docs', 'requirements'),
         path.join(systemDir, 'docs', 'requirements', 'classes'),
+        path.join(systemDir, 'docs', 'requirements', 'ui'),
         path.join(systemDir, 'help')
     ];
 
@@ -676,15 +701,22 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
                 line2_color: '#ffffff',
                 line2_size: 0.38
             }
-        },
-        crud: {
-            enabledEntities: []
         }
     };
 
     fs.writeFileSync(
         path.join(systemDir, 'config.json'),
         JSON.stringify(config, null, 2)
+    );
+
+    // Generate empty Crud.md and Views.md
+    fs.writeFileSync(
+        path.join(systemDir, 'docs', 'requirements', 'ui', 'Crud.md'),
+        '# CRUD\n'
+    );
+    fs.writeFileSync(
+        path.join(systemDir, 'docs', 'requirements', 'ui', 'Views.md'),
+        '# Views\n'
     );
 
     return {
@@ -833,19 +865,26 @@ function importEntities(systemName, entities, seedingInstructions, mode, areas =
         imported.push(entity.name);
     }
 
-    // Update config.json with entity list
-    const configPath = path.join(systemDir, 'config.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-
     // Get final entity list from classes directory
     const finalEntities = fs.readdirSync(classesDir)
         .filter(f => f.endsWith('.md'))
         .map(f => f.replace('.md', ''));
 
-    config.crud = config.crud || {};
-    config.crud.enabledEntities = finalEntities;
+    // Update Crud.md with entity list
+    const uiDir = path.join(systemDir, 'docs', 'requirements', 'ui');
+    fs.mkdirSync(uiDir, { recursive: true });
+    const crudContent = generateCrudMd(finalEntities.map(name => ({ name })));
+    fs.writeFileSync(path.join(uiDir, 'Crud.md'), crudContent);
 
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    // Ensure Views.md exists
+    const viewsMdPath = path.join(uiDir, 'Views.md');
+    if (!fs.existsSync(viewsMdPath)) {
+        fs.writeFileSync(viewsMdPath, '# Views\n');
+    }
+
+    // Load config for metadata
+    const configPath = path.join(systemDir, 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
     // Regenerate DataModel.md (with areas and descriptions)
     const allEntities = entities.filter(e => finalEntities.includes(e.name));

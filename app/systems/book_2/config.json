@@ -30,20 +30,5 @@
       "line2_color": "#ffffff",
       "line2_size": 0.38
     }
-  },
-  "crud": {
-    "enabledEntities": [
-      "Author",
-      "Book",
-      "BookAuthor",
-      "Country",
-      "Edition",
-      "Editor",
-      "Language",
-      "Publisher",
-      "Translation",
-      "Translator",
-      "TranslatorLanguage"
-    ]
   }
 }

@@ -57,14 +57,15 @@ if (!fs.existsSync(SYSTEM_DIR)) {
   process.exit(1);
 }
 
-const CONFIG_PATH = path.join(SYSTEM_DIR, 'config.json');
 const DATA_MODEL_PATH = path.join(SYSTEM_DIR, 'docs', 'requirements', 'DataModel.md');
 const DB_PATH = path.join(SYSTEM_DIR, 'data', 'rap.sqlite');
 const SEED_DIR = path.join(SYSTEM_DIR, 'data', 'seed');
 
-// Load config
-const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
-const enabledEntities = (config.crud?.enabledEntities || []).filter(e => !e.startsWith('--------------------'));
+// Load CRUD config from markdown
+const UISpecLoader = require(path.join(APP_DIR, 'server', 'utils', 'UISpecLoader'));
+const REQUIREMENTS_DIR = path.join(SYSTEM_DIR, 'docs', 'requirements');
+const mdCrud = UISpecLoader.loadCrudConfig(REQUIREMENTS_DIR);
+const enabledEntities = (mdCrud || []).filter(e => !e.startsWith('--------------------'));
 
 // Initialize database
 const { initDatabase, getDatabase, resetTable, closeDatabase } = require(path.join(APP_DIR, 'server', 'config', 'database'));
