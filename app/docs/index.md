@@ -204,11 +204,12 @@ When in Tree View mode, PDF export captures the currently expanded structure:
 The Admin menu opens a dedicated interface for managing seed data across all entities:
 
 **Entity Overview Table:**
-- Shows all entities in dependency order
+- Shows all entities in dependency order (load top-to-bottom, clear bottom-to-top)
+- **Seed** – Record count in seed file (or `--` if none); shows `valid / total` when some records have unresolved FKs
+- **Backup** – Record count in backup file (or `--` if none)
 - **DB Rows** – Current record count in database
-- **Seed Available** – Record count in seed file (or `--` if none)
 
-**Context Menu Actions** (right-click on entity row):
+**Context Menu Actions** (click or right-click on entity row):
 - **Import...** – Open import dialog (paste or drag & drop JSON/CSV)
 - **Export...** – Download seed file as JSON or CSV
 - **Generate...** – Open AI generator dialog
@@ -223,9 +224,12 @@ The Admin menu opens a dedicated interface for managing seed data across all ent
 - **FK validation** – Warns about unresolved foreign key references
 
 **Bulk Operations:**
-- **Load All** – Load all available seed files
+- **Backup** – Export all DB data to `data/backup/` as JSON (with FK label resolution)
+- **Restore** – Clear DB and reload from backup files
+- **Load All** – Load all available seed files (merge mode)
 - **Clear All** – Clear all database tables
 - **Reset All** – Clear then reload all seed data
+- **Reinitialize** – Re-read DataModel.md and rebuild database schema without server restart. Two-step confirmation: warns about data loss, then offers backup before proceeding. See [Schema Migration](procedures/schema-migration.md) for details.
 
 ---
 

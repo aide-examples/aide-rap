@@ -157,16 +157,77 @@ Entity Markdown          AI Assistant
 
 ---
 
+## Backup & Restore
+
+### Directory Structure
+
+```
+app/systems/<system>/data/
+├── seed/              ← Hand-crafted or AI-generated seed files
+│   ├── Aircraft.json
+│   └── Engine.json
+├── backup/            ← Auto or manual backup of current DB state
+│   ├── Aircraft.json
+│   └── Engine.json
+└── rap.sqlite         ← SQLite database (gitignored)
+```
+
+### Backup Format
+
+Backup files use the **same JSON format** as seed files — FK values stored as label strings for portability:
+
+```json
+[
+  {
+    "registration": "D-ABAA",
+    "serial_number": "MSN1501",
+    "type": "Airbus A319-112",
+    "current_operator": "Lufthansa"
+  }
+]
+```
+
+Auto-increment `id` fields and computed columns are excluded.
+
+### Auto-Backup
+
+When `initDatabase()` detects a schema hash change, it **automatically backs up all entity data** before dropping tables. This runs on:
+
+- **Server startup** (if DataModel.md changed since last run)
+- **Reinitialize** (in-app button triggers `reinitialize()` → `initDatabase()`)
+
+The auto-backup converts FK IDs to label values using the still-existing reference tables, ensuring labels resolve correctly even after schema rebuild.
+
+### Manual Backup
+
+The **Backup** button in the Admin Seed Manager exports all current DB data to `data/backup/`. This overwrites any existing backup files. Empty entities have their backup file removed.
+
+### Restore
+
+The **Restore** button clears all tables and reloads from `data/backup/` in dependency order. FK labels are resolved against the freshly loaded reference data.
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/seed/backup` | POST | Export all DB data to backup directory |
+| `/api/seed/restore-backup` | POST | Clear DB, reload from backup files |
+| `/api/seed/reinitialize` | POST | Re-read DataModel.md, rebuild schema (auto-backup if changed) |
+
+---
+
 ## Files
 
 | File | Role |
 |------|------|
-| `app/server/utils/SeedManager.js` | Core: load, validate, resolve FKs, conflict detection |
+| `app/server/utils/SeedManager.js` | Core: load, validate, resolve FKs, backup, restore |
+| `app/server/config/database.js` | Schema init, hash comparison, auto-backup, reinitialize |
 | `app/server/services/prompt-builder.js` | Build AI prompts, parse responses, load FK/context data |
-| `app/server/routers/seed.router.js` | REST API for seed operations |
+| `app/server/routers/seed.router.js` | REST API for seed, backup, restore, reinitialize |
 | `app/server/routers/prompt.router.js` | REST API for prompt building and response parsing |
 | `app/static/rap/components/seed-manager.js` | UI: entity overview, context menu, bulk operations |
 | `app/static/rap/components/seed-generator-dialog.js` | UI: instruction → prompt → paste → review workflow |
 | `app/static/rap/components/seed-preview-dialog.js` | UI: load preview with conflict detection, export |
 | `app/static/rap/components/seed-import-dialog.js` | UI: paste/drop JSON or CSV, validate, save |
 | `app/systems/*/data/seed/*.json` | Seed data files (one per entity) |
+| `app/systems/*/data/backup/*.json` | Backup data files (auto or manual, gitignored) |
