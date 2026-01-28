@@ -434,9 +434,11 @@ See [Seed Data Reference](seed-data.md) for technical details.
 - [x] **Row-Click Navigation** – Jump from view row to base entity edit form
 - [x] **Back-Reference Columns** – Inbound FK subqueries (`Entity<fk(params).column`), COUNT/LIST/scalar, FK-following within subquery
 - [x] **Aggregation** – COUNT and GROUP_CONCAT (LIST) via back-reference columns
+- [x] **Filter Dialogs** – Pre-load filters for large datasets with text input (LIKE), dropdown (exact match), or date extraction (year/month)
 - [ ] **View-Guided Tree** – Render User View columns as hierarchical tree (FK paths become expandable branches, leaves show only view-selected attributes). Usefulness TBD.
 
 See [Views Configuration](procedures/views-config.md) for syntax details.
+See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configuration.
 
 ### UI Enhancements
 - [ ] Keyboard shortcuts (arrow keys, Enter for details)
@@ -455,3 +457,10 @@ See [Views Configuration](procedures/views-config.md) for syntax details.
 
 - [IRMA User Guide](/help) – How to use the demonstration application
 - [aide-frame Repository](https://github.com/aide-examples/aide-frame) – The underlying framework
+
+## Procedures
+
+- [Views Configuration](procedures/views-config.md) – Cross-entity join views with dot-notation FK paths
+- [Filter Dialogs](procedures/filter-dialogs.md) – Pre-load filters for large datasets (required/prefilter, text/dropdown/year/month, AND logic)
+- [Schema Migration](procedures/schema-migration.md) – Reinitialize database schema without server restart
+- [Seed Data](seed-data.md) – Import, export, and AI-generate test data

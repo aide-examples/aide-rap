@@ -68,6 +68,22 @@ const ApiClient = {
   },
 
   /**
+   * Get distinct values for a column (for prefilter dropdowns)
+   * @param {string} entityName - Entity name
+   * @param {string} columnPath - Column path (e.g., "meter" or "reading_at")
+   * @param {string} type - Extraction type: 'select' (default), 'year', or 'month'
+   */
+  async getDistinctValues(entityName, columnPath, type = 'select') {
+    const params = new URLSearchParams();
+    if (type && type !== 'select') params.set('type', type);
+    const queryString = params.toString();
+    const url = queryString
+      ? `${this.baseUrl}/${entityName}/distinct/${encodeURIComponent(columnPath)}?${queryString}`
+      : `${this.baseUrl}/${entityName}/distinct/${encodeURIComponent(columnPath)}`;
+    return this.request(url);
+  },
+
+  /**
    * Get all records for an entity type
    * @param {string} entityName
    * @param {Object} options - { filter, sort, order, limit, offset }
@@ -160,6 +176,22 @@ const ApiClient = {
    */
   async getViewSchema(viewName) {
     return this.request(`/api/views/${encodeURIComponent(viewName)}/schema`);
+  },
+
+  /**
+   * Get distinct values for a view column (for prefilter dropdowns)
+   * @param {string} viewName - View display name
+   * @param {string} columnName - Column label or sqlAlias
+   * @param {string} type - Extraction type: 'select' (default), 'year', or 'month'
+   */
+  async getViewDistinctValues(viewName, columnName, type = 'select') {
+    const params = new URLSearchParams();
+    if (type && type !== 'select') params.set('type', type);
+    const queryString = params.toString();
+    const url = queryString
+      ? `/api/views/${encodeURIComponent(viewName)}/distinct/${encodeURIComponent(columnName)}?${queryString}`
+      : `/api/views/${encodeURIComponent(viewName)}/distinct/${encodeURIComponent(columnName)}`;
+    return this.request(url);
   },
 };
 

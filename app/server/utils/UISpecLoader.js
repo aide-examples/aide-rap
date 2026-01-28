@@ -29,33 +29,74 @@ const SEPARATOR_PREFIX = '-------------------- ';
 
 /**
  * Load CRUD entity list from Crud.md.
+ * Supports optional options in parentheses:
+ *   - `- EntityName (prefilter: field1, field2)` — optional filter dialog when large
+ *   - `- EntityName (required: field1)` — always show filter dialog
+ *   - `- EntityName (required: field1:select)` — always show filter dialog with dropdown
+ *   - `- EntityName (required: field1, prefilter: field2)` — both
+ * Field suffix `:select` = dropdown, no suffix = text input (LIKE)
  * @param {string} requirementsDir - Path to requirements/ directory
- * @returns {string[]|null} Array of entity names and separators, or null if not found
+ * @returns {{entities: string[], prefilters: Object, requiredFilters: Object}|null}
  */
 function loadCrudConfig(requirementsDir) {
   const mdPath = path.join(requirementsDir, 'ui', 'Crud.md');
   if (!fs.existsSync(mdPath)) return null;
 
   const content = fs.readFileSync(mdPath, 'utf-8');
-  const result = [];
+  const entities = [];
+  const prefilters = {}; // { entityName: ['field1', 'field2:select'] }
+  const requiredFilters = {}; // { entityName: ['field1', 'field2:select'] }
 
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
 
     // H2 = section separator
     if (trimmed.startsWith('## ')) {
-      result.push(SEPARATOR_PREFIX + trimmed.substring(3).trim());
+      entities.push(SEPARATOR_PREFIX + trimmed.substring(3).trim());
       continue;
     }
 
-    // Bullet item = entity name
+    // Bullet item = entity name, optionally with options in parentheses
     if (trimmed.startsWith('- ')) {
-      const entity = trimmed.substring(2).trim();
-      if (entity) result.push(entity);
+      let entityPart = trimmed.substring(2).trim();
+
+      // Check for options in parentheses: `- EntityName (option: values, ...)`
+      const parenMatch = entityPart.match(/^(.+?)\s*\((.+)\)$/);
+      if (parenMatch) {
+        const entityName = parenMatch[1].trim();
+        const optionsStr = parenMatch[2];
+
+        // Parse options: "required: field1:select, prefilter: field2"
+        // Split by known keywords (required: and prefilter:)
+        const requiredMatch = optionsStr.match(/required:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:prefilter:|$)|$)/i);
+        const prefilterMatch = optionsStr.match(/prefilter:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:required:|$)|$)/i);
+
+        if (entityName) {
+          entities.push(entityName);
+
+          if (requiredMatch) {
+            // Allow field:select syntax - only exclude standalone colons (like "required:")
+            const fields = requiredMatch[1].split(',').map(f => f.trim()).filter(f => f && f !== ':');
+            if (fields.length > 0) {
+              requiredFilters[entityName] = fields;
+            }
+          }
+
+          if (prefilterMatch) {
+            // Allow field:select syntax - only exclude standalone colons
+            const fields = prefilterMatch[1].split(',').map(f => f.trim()).filter(f => f && f !== ':');
+            if (fields.length > 0) {
+              prefilters[entityName] = fields;
+            }
+          }
+        }
+      } else if (entityPart) {
+        entities.push(entityPart);
+      }
     }
   }
 
-  return result;
+  return { entities, prefilters, requiredFilters };
 }
 
 /**

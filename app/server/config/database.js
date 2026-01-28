@@ -22,6 +22,8 @@ let storedViewsConfig = null;
 let storedDbPath = null;
 let storedDataModelPath = null;
 let storedEnabledEntities = null;
+let storedEntityPrefilters = null;
+let storedRequiredFilters = null;
 
 /**
  * Check if table exists
@@ -324,13 +326,17 @@ function createUserViews(viewsConfig) {
  * @param {string} dataModelPath - Path to DataModel.md
  * @param {string[]} enabledEntities - List of entity names to enable
  * @param {Array} [viewsConfig] - Optional user view definitions
+ * @param {Object} [entityPrefilters] - Prefilter fields per entity { entityName: ['field1', 'field2'] }
+ * @param {Object} [requiredFilters] - Required filter fields per entity { entityName: ['field1'] }
  */
-function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig) {
+function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters) {
   // Store params for reinitialize()
   storedDbPath = dbPath;
   storedDataModelPath = dataModelPath;
   storedEnabledEntities = enabledEntities;
   storedViewsConfig = viewsConfig || [];
+  storedEntityPrefilters = entityPrefilters || {};
+  storedRequiredFilters = requiredFilters || {};
 
   // Ensure data directory exists
   const dataDir = path.dirname(dbPath);
@@ -411,6 +417,22 @@ function getSchema() {
 }
 
 /**
+ * Get entity prefilters
+ * @returns {Object} Map of entity name to prefilter field array
+ */
+function getEntityPrefilters() {
+  return storedEntityPrefilters || {};
+}
+
+/**
+ * Get required filters (always show filter dialog)
+ * @returns {Object} Map of entity name to required filter field array
+ */
+function getRequiredFilters() {
+  return storedRequiredFilters || {};
+}
+
+/**
  * Close database connection
  */
 function closeDatabase() {
@@ -477,6 +499,8 @@ module.exports = {
   initDatabase,
   getDatabase,
   getSchema,
+  getEntityPrefilters,
+  getRequiredFilters,
   closeDatabase,
   forceRebuild,
   reinitialize,

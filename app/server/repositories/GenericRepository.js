@@ -7,7 +7,7 @@
  * - FK constraint error handling
  */
 
-const { getDatabase, getSchema } = require('../config/database');
+const { getDatabase, getSchema, getEntityPrefilters, getRequiredFilters } = require('../config/database');
 const { ObjectValidator } = require('../../shared/validation');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const ColumnUtils = require('../../static/rap/utils/ColumnUtils');
@@ -147,35 +147,71 @@ function findAll(entityName, options = {}) {
   let sql = `SELECT * FROM ${viewName}`;
   const params = [];
 
-  // Filter: supports two formats:
-  // 1. "column:value" - exact match on a specific column (e.g., "type_id:5")
-  // 2. "text" - LIKE search across all string columns
+  // Filter: supports multiple formats joined with && (AND):
+  // 1. "column:value" - exact match on entity column (e.g., "type_id:5")
+  // 2. "~column:value" - LIKE match on any view column (e.g., "~meter_label:Gas")
+  // 3. "=column:value" - exact match on any view column (e.g., "=meter_label:Wasser")
+  // 4. "@Ycolumn:value" - year filter using strftime (e.g., "@Yreading_at:2024")
+  // 5. "@Mcolumn:value" - month filter using strftime (e.g., "@Mreading_at:2024-03")
+  // 6. "text" - LIKE search across all string columns
+  // Multiple filters can be joined with && for AND logic
   if (options.filter) {
-    const colonMatch = options.filter.match(/^(\w+):(.+)$/);
+    const filterParts = options.filter.split('&&');
+    const conditions = [];
 
-    if (colonMatch) {
-      // Exact match on specific column
-      const [, columnName, value] = colonMatch;
-      const validColumn = entity.columns.find(c => c.name === columnName);
+    for (const part of filterParts) {
+      const trimmedPart = part.trim();
+      if (!trimmedPart) continue;
 
-      if (validColumn) {
-        sql += ` WHERE ${columnName} = ?`;
-        // Convert to number if it's an int column
-        const paramValue = validColumn.jsType === 'number' ? parseInt(value, 10) : value;
-        params.push(paramValue);
+      // Check filter prefix type
+      const yearMatch = trimmedPart.match(/^@Y(.+?):(.+)$/);
+      const monthMatch = trimmedPart.match(/^@M(.+?):(.+)$/);
+      const likeMatch = trimmedPart.match(/^~(.+?):(.+)$/);
+      const exactViewMatch = trimmedPart.match(/^=(.+?):(.+)$/);
+      const colonMatch = trimmedPart.match(/^([^~=@].+?):(.+)$/);
+
+      if (yearMatch) {
+        const [, columnName, value] = yearMatch;
+        conditions.push(`strftime('%Y', "${columnName}") = ?`);
+        params.push(value);
+      } else if (monthMatch) {
+        const [, columnName, value] = monthMatch;
+        conditions.push(`strftime('%Y-%m', "${columnName}") = ?`);
+        params.push(value);
+      } else if (exactViewMatch) {
+        const [, columnName, value] = exactViewMatch;
+        conditions.push(`"${columnName}" = ?`);
+        params.push(value);
+      } else if (likeMatch) {
+        const [, columnName, value] = likeMatch;
+        conditions.push(`"${columnName}" LIKE ?`);
+        params.push(`%${value}%`);
+      } else if (colonMatch) {
+        const [, columnName, value] = colonMatch;
+        const validColumn = entity.columns.find(c => c.name === columnName);
+
+        if (validColumn) {
+          conditions.push(`${columnName} = ?`);
+          const paramValue = validColumn.jsType === 'number' ? parseInt(value, 10) : value;
+          params.push(paramValue);
+        }
+      } else {
+        // LIKE search across string columns
+        const stringColumns = entity.columns
+          .filter(c => c.jsType === 'string' && c.name !== 'id')
+          .map(c => c.name);
+
+        if (stringColumns.length > 0) {
+          const textConditions = stringColumns.map(col => `${col} LIKE ?`);
+          conditions.push(`(${textConditions.join(' OR ')})`);
+          const filterValue = `%${trimmedPart}%`;
+          params.push(...stringColumns.map(() => filterValue));
+        }
       }
-    } else {
-      // LIKE search across string columns
-      const stringColumns = entity.columns
-        .filter(c => c.jsType === 'string' && c.name !== 'id')
-        .map(c => c.name);
+    }
 
-      if (stringColumns.length > 0) {
-        const filterConditions = stringColumns.map(col => `${col} LIKE ?`);
-        sql += ` WHERE (${filterConditions.join(' OR ')})`;
-        const filterValue = `%${options.filter}%`;
-        params.push(...stringColumns.map(() => filterValue));
-      }
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(' AND ')}`;
     }
   }
 
@@ -504,7 +540,11 @@ function getExtendedSchemaInfo(entityName) {
     }),
     validationRules: entity.validationRules,
     // Include enumFields for client-side value formatting
-    enumFields: entity.enumFields || {}
+    enumFields: entity.enumFields || {},
+    // Include prefilter fields for large dataset filtering
+    prefilter: getEntityPrefilters()[entityName] || null,
+    // Include required filter fields (always show dialog)
+    requiredFilter: getRequiredFilters()[entityName] || null
   };
 }
 
@@ -620,6 +660,77 @@ function getBackReferences(entityName, id) {
 }
 
 /**
+ * Get distinct values for a column (for prefilter dropdowns)
+ * Supports:
+ *   - Simple FK field: "meter" → uses "meter_label" from view
+ *   - Regular column: "status" → uses "status" from view
+ *   - Nested FK path: "meter.building" → uses "meter_building" (not fully supported)
+ *   - Date extraction: type='year' → extracts distinct years, type='month' → distinct year-months
+ */
+function getDistinctValues(entityName, columnPath, extractType = 'select') {
+  const entity = getEntityMeta(entityName);
+  const db = getDatabase();
+  const viewName = entity.tableName + '_view';
+
+  // Determine the view column name
+  let column;
+
+  // Check if this is an FK field (has _id column in entity)
+  const fkColumn = entity.columns.find(c => c.name === columnPath + '_id');
+
+  if (fkColumn) {
+    // FK field like "meter" → view has "meter_label"
+    column = columnPath + '_label';
+  } else if (columnPath.includes('.')) {
+    // Nested path like "meter.building" → try "meter_building"
+    column = columnPath.replace(/\./g, '_');
+  } else {
+    // Regular column
+    column = columnPath;
+  }
+
+  try {
+    let sql, valueKey;
+    if (extractType === 'year') {
+      // Extract distinct years from date column
+      sql = `SELECT DISTINCT strftime('%Y', "${column}") as year FROM ${viewName} WHERE "${column}" IS NOT NULL ORDER BY year DESC`;
+      valueKey = 'year';
+    } else if (extractType === 'month') {
+      // Extract distinct year-months from date column
+      sql = `SELECT DISTINCT strftime('%Y-%m', "${column}") as month FROM ${viewName} WHERE "${column}" IS NOT NULL ORDER BY month DESC`;
+      valueKey = 'month';
+    } else {
+      // Default: distinct values
+      sql = `SELECT DISTINCT "${column}" FROM ${viewName} WHERE "${column}" IS NOT NULL ORDER BY "${column}"`;
+      valueKey = column;
+    }
+
+    const rows = db.prepare(sql).all();
+    return rows.map(r => r[valueKey]);
+  } catch (e) {
+    // Fallback: try without _label suffix
+    try {
+      let sql, valueKey;
+      if (extractType === 'year') {
+        sql = `SELECT DISTINCT strftime('%Y', "${columnPath}") as year FROM ${viewName} WHERE "${columnPath}" IS NOT NULL ORDER BY year DESC`;
+        valueKey = 'year';
+      } else if (extractType === 'month') {
+        sql = `SELECT DISTINCT strftime('%Y-%m', "${columnPath}") as month FROM ${viewName} WHERE "${columnPath}" IS NOT NULL ORDER BY month DESC`;
+        valueKey = 'month';
+      } else {
+        sql = `SELECT DISTINCT "${columnPath}" FROM ${viewName} WHERE "${columnPath}" IS NOT NULL ORDER BY "${columnPath}"`;
+        valueKey = columnPath;
+      }
+      const rows = db.prepare(sql).all();
+      return rows.map(r => r[valueKey]);
+    } catch (e2) {
+      console.error(`Failed to get distinct values for ${entityName}.${columnPath}:`, e2.message);
+      return [];
+    }
+  }
+}
+
+/**
  * Get validator instance (for service layer)
  */
 function getValidator() {
@@ -638,6 +749,7 @@ module.exports = {
   getEnabledEntities,
   getEnabledEntitiesWithAreas,
   getBackReferences,
+  getDistinctValues,
   getEntityMeta,
   getValidator,
   ensureValidationRules,

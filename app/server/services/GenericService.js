@@ -140,6 +140,16 @@ function getEnabledEntitiesWithAreas() {
   return repository.getEnabledEntitiesWithAreas();
 }
 
+/**
+ * Get distinct values for a column (for prefilter dropdowns)
+ * @param {string} entityName - Entity name
+ * @param {string} columnPath - Column path
+ * @param {string} extractType - 'select' (default), 'year', or 'month'
+ */
+function getDistinctValues(entityName, columnPath, extractType = 'select') {
+  return repository.getDistinctValues(entityName, columnPath, extractType);
+}
+
 module.exports = {
   listEntities,
   getEntity,
@@ -152,5 +162,6 @@ module.exports = {
   getEnabledEntitiesWithAreas,
   getBackReferences,
   batchCreate,
-  runInTransaction
+  runInTransaction,
+  getDistinctValues
 };

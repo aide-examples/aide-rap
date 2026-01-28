@@ -60,16 +60,65 @@ module.exports = function() {
         color: view.color,
         columns: view.columns.map(c => {
           const col = { key: c.sqlAlias, label: c.label, type: c.jsType };
+          if (c.path) col.path = c.path; // Original column path for prefilter matching
           if (c.omit !== undefined) col.omit = c.omit;
           if (c.areaColor) col.areaColor = c.areaColor;
           if (c.calculated) col.calculated = c.calculated;
           if (c.autoHidden) col.autoHidden = c.autoHidden;
           return col;
         }),
-        ...(view.calculator ? { calculator: view.calculator } : {})
+        ...(view.calculator ? { calculator: view.calculator } : {}),
+        ...(view.prefilter ? { prefilter: view.prefilter } : {})
       });
     } catch (err) {
       logger.error('Failed to get view schema', { error: err.message });
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/views/:name/distinct/:column - Get distinct values for a column
+   * Query params:
+   *   type: 'select' (default), 'year', or 'month' - extraction mode for date columns
+   */
+  router.get('/api/views/:name/distinct/:column', (req, res) => {
+    try {
+      const view = findView(req.params.name);
+      if (!view) {
+        return res.status(404).json({ error: `View "${req.params.name}" not found` });
+      }
+
+      const db = getDatabase();
+      const colName = req.params.column;
+      const extractType = req.query.type || 'select';
+
+      // Find column by sqlAlias or label
+      const col = view.columns.find(c => c.sqlAlias === colName || c.label === colName);
+      if (!col) {
+        return res.status(404).json({ error: `Column "${colName}" not found in view` });
+      }
+
+      let sql, valueKey;
+      if (extractType === 'year') {
+        // Extract distinct years from date column
+        sql = `SELECT DISTINCT strftime('%Y', "${col.sqlAlias}") as year FROM ${view.sqlName} WHERE "${col.sqlAlias}" IS NOT NULL ORDER BY year DESC`;
+        valueKey = 'year';
+      } else if (extractType === 'month') {
+        // Extract distinct year-months from date column
+        sql = `SELECT DISTINCT strftime('%Y-%m', "${col.sqlAlias}") as month FROM ${view.sqlName} WHERE "${col.sqlAlias}" IS NOT NULL ORDER BY month DESC`;
+        valueKey = 'month';
+      } else {
+        // Default: distinct values
+        sql = `SELECT DISTINCT "${col.sqlAlias}" FROM ${view.sqlName} WHERE "${col.sqlAlias}" IS NOT NULL ORDER BY "${col.sqlAlias}"`;
+        valueKey = col.sqlAlias;
+      }
+
+      const rows = db.prepare(sql).all();
+      const values = rows.map(r => r[valueKey]);
+
+      res.json({ values, column: col.sqlAlias, label: col.label, extractType });
+    } catch (err) {
+      logger.error('Failed to get distinct values', { view: req.params.name, error: err.message });
       res.status(500).json({ error: err.message });
     }
   });
@@ -97,27 +146,67 @@ module.exports = function() {
       let sql = `SELECT * FROM ${view.sqlName}`;
       const params = [];
 
-      // Filter
+      // Filter - supports multiple filters joined with && (AND)
       if (filter) {
-        const colonMatch = filter.match(/^(.+?):(.+)$/);
+        const filterParts = filter.split('&&');
+        const conditions = [];
 
-        if (colonMatch) {
-          const [, colLabel, value] = colonMatch;
-          // Validate column exists
-          const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
-          if (col) {
-            sql += ` WHERE "${col.sqlAlias}" LIKE ?`;
-            params.push(`%${value}%`);
+        for (const part of filterParts) {
+          const trimmedPart = part.trim();
+          if (!trimmedPart) continue;
+
+          // Check filter prefix type:
+          // @Y = year filter (strftime year extraction)
+          // @M = month filter (strftime year-month extraction)
+          // ~ = LIKE match
+          // (none) = exact match
+          const yearMatch = trimmedPart.match(/^@Y(.+?):(.+)$/);
+          const monthMatch = trimmedPart.match(/^@M(.+?):(.+)$/);
+          const likeMatch = trimmedPart.match(/^~(.+?):(.+)$/);
+          const exactMatch = trimmedPart.match(/^([^~@].+?):(.+)$/);
+
+          if (yearMatch) {
+            const [, colLabel, value] = yearMatch;
+            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
+            if (col) {
+              conditions.push(`strftime('%Y', "${col.sqlAlias}") = ?`);
+              params.push(value);
+            }
+          } else if (monthMatch) {
+            const [, colLabel, value] = monthMatch;
+            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
+            if (col) {
+              conditions.push(`strftime('%Y-%m', "${col.sqlAlias}") = ?`);
+              params.push(value);
+            }
+          } else if (likeMatch) {
+            const [, colLabel, value] = likeMatch;
+            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
+            if (col) {
+              conditions.push(`"${col.sqlAlias}" LIKE ?`);
+              params.push(`%${value}%`);
+            }
+          } else if (exactMatch) {
+            const [, colLabel, value] = exactMatch;
+            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
+            if (col) {
+              conditions.push(`"${col.sqlAlias}" = ?`);
+              params.push(value);
+            }
+          } else {
+            // Global LIKE search across all text columns
+            const textCols = view.columns.filter(c => c.jsType === 'string');
+            if (textCols.length > 0) {
+              const textConditions = textCols.map(c => `"${c.sqlAlias}" LIKE ?`);
+              conditions.push(`(${textConditions.join(' OR ')})`);
+              const filterValue = `%${trimmedPart}%`;
+              params.push(...textCols.map(() => filterValue));
+            }
           }
-        } else {
-          // Global LIKE search across all text columns
-          const textCols = view.columns.filter(c => c.jsType === 'string');
-          if (textCols.length > 0) {
-            const conditions = textCols.map(c => `"${c.sqlAlias}" LIKE ?`);
-            sql += ` WHERE (${conditions.join(' OR ')})`;
-            const filterValue = `%${filter}%`;
-            params.push(...textCols.map(() => filterValue));
-          }
+        }
+
+        if (conditions.length > 0) {
+          sql += ` WHERE ${conditions.join(' AND ')}`;
         }
       }
 

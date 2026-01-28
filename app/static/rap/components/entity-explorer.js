@@ -23,6 +23,380 @@ const EntityExplorer = {
   selectedId: null,
   viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
 
+  // Pagination state
+  totalRecords: 0,
+  isLoadingMore: false,
+  hasMore: false,
+  scrollObserver: null,
+  currentFilter: '',
+  currentSort: null,
+  currentOrder: null,
+  prefilterFields: null, // Array of column paths for prefilter dialog (shown when large)
+  requiredFilterFields: null, // Array of column paths for required filter dialog (always shown)
+  paginationConfig: null, // { threshold, pageSize } from config.json
+  prefilterValues: {}, // { columnPath: selectedValue } for active prefilters
+
+  /**
+   * Get pagination config from server
+   */
+  async getPaginationConfig() {
+    if (this.paginationConfig) return this.paginationConfig;
+    try {
+      const resp = await fetch('/api/config/pagination');
+      if (resp.ok) {
+        this.paginationConfig = await resp.json();
+      } else {
+        this.paginationConfig = { threshold: 500, pageSize: 200 };
+      }
+    } catch (e) {
+      this.paginationConfig = { threshold: 500, pageSize: 200 };
+    }
+    return this.paginationConfig;
+  },
+
+  /**
+   * Parse prefilter field spec: "field", "field:select", "field:year", "field:month"
+   * @returns {{ field: string, type: 'text'|'select'|'year'|'month' }}
+   */
+  parsePrefilterField(fieldSpec) {
+    const match = fieldSpec.match(/^(.+?):(\w+)$/);
+    if (match) {
+      return { field: match[1], type: match[2] };
+    }
+    return { field: fieldSpec, type: 'text' };
+  },
+
+  /**
+   * Show prefilter dialog before loading data
+   * Returns selected filter values or null if cancelled
+   * Supports text input (LIKE matching) and select dropdown (exact match)
+   * @param {string} contextName - Entity or view name for display
+   * @param {string[]} prefilterFields - Array of field specs like "field" or "field:select"
+   * @param {Object} options - { isView: boolean, viewName: string, viewSchema: object }
+   */
+  async showPrefilterDialog(contextName, prefilterFields, options = {}) {
+    // Build dialog HTML
+    const dialogId = 'prefilter-dialog';
+    let existing = document.getElementById(dialogId);
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('dialog');
+    dialog.id = dialogId;
+    dialog.className = 'prefilter-dialog';
+
+    // Parse field specs and prepare data
+    const parsedFields = [];
+    for (const fieldSpec of prefilterFields) {
+      const { field, type } = this.parsePrefilterField(fieldSpec);
+      const fieldLabel = field.split('.').pop().replace(/_/g, ' ').replace(/\bid\b/i, '').trim() || field;
+      const capitalizedLabel = fieldLabel.charAt(0).toUpperCase() + fieldLabel.slice(1);
+
+      const fieldData = { field, type, label: capitalizedLabel, options: [] };
+
+      // For select, year, or month type, fetch distinct values
+      if (type === 'select' || type === 'year' || type === 'month') {
+        try {
+          if (options.isView && options.viewName) {
+            // Find the view column that matches this prefilter path
+            // e.g., prefilter "meter.resource_type" → view column "resource" (from "meter.resource_type.name as resource")
+            const viewCol = this.findViewColumnForPrefilter(field, options.viewSchema);
+            if (viewCol) {
+              const result = await ApiClient.getViewDistinctValues(options.viewName, viewCol.key, type);
+              fieldData.options = result.values || [];
+              fieldData.viewColumn = viewCol.key; // Store actual column name for filtering
+            }
+          } else {
+            // Entity mode - get distinct values from entity (uses field_label column)
+            const result = await ApiClient.getDistinctValues(contextName, field, type);
+            fieldData.options = result || [];
+            // For entities with year/month, the column is the date field itself
+            if (type === 'year' || type === 'month') {
+              fieldData.entityColumn = field;
+            } else {
+              // For select: the label column is field_label (e.g., "meter" → "meter_label")
+              fieldData.entityColumn = field.replace(/\./g, '_') + '_label';
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to get distinct values for ${field}:`, e);
+        }
+      }
+
+      parsedFields.push(fieldData);
+    }
+
+    // Build field inputs
+    let fieldsHtml = '<div class="prefilter-fields">';
+    for (const f of parsedFields) {
+      if ((f.type === 'select' || f.type === 'year' || f.type === 'month') && f.options.length > 0) {
+        // Dropdown for select, year, or month
+        const colAttr = f.viewColumn ? `data-view-column="${f.viewColumn}"` : (f.entityColumn ? `data-entity-column="${f.entityColumn}"` : '');
+        const typeLabel = f.type === 'year' ? ' (Year)' : (f.type === 'month' ? ' (Month)' : '');
+        fieldsHtml += `
+          <div class="prefilter-field">
+            <label>${f.label}${typeLabel}</label>
+            <select data-field="${f.field}" data-type="${f.type}" ${colAttr} class="prefilter-select">
+              <option value="">-- All --</option>
+              ${f.options.map(v => `<option value="${DomUtils.escapeHtml(String(v))}">${DomUtils.escapeHtml(String(v))}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      } else {
+        // Text input
+        fieldsHtml += `
+          <div class="prefilter-field">
+            <label>${f.label}</label>
+            <input type="text" data-field="${f.field}" data-type="text" class="prefilter-input"
+                   placeholder="Enter text to match...">
+          </div>
+        `;
+      }
+    }
+    fieldsHtml += '</div>';
+
+    dialog.innerHTML = `
+      <div class="prefilter-header">
+        <h3>Filter ${contextName}</h3>
+        <p>${parsedFields.some(f => f.type === 'select') ? 'Select values to filter by' : 'Enter text to filter by (matches label field)'}</p>
+      </div>
+      ${fieldsHtml}
+      <div class="prefilter-actions">
+        <button type="button" class="btn-secondary" data-action="skip">Load All</button>
+        <button type="button" class="btn-primary" data-action="apply">Apply Filter</button>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Show dialog and wait for user action
+    const inputs = dialog.querySelectorAll('.prefilter-input, .prefilter-select');
+
+    return new Promise((resolve) => {
+      dialog.showModal();
+
+      // Focus first input/select
+      if (inputs.length > 0) {
+        inputs[0].focus();
+      }
+
+      // Allow Enter to submit
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          dialog.querySelector('[data-action="apply"]').click();
+        }
+      });
+
+      dialog.querySelector('[data-action="skip"]').addEventListener('click', () => {
+        dialog.close();
+        dialog.remove();
+        resolve(null); // No filter, load all
+      });
+
+      dialog.querySelector('[data-action="apply"]').addEventListener('click', () => {
+        const filters = {};
+        for (const input of inputs) {
+          const value = input.value.trim();
+          if (value) {
+            filters[input.dataset.field] = {
+              value,
+              type: input.dataset.type,
+              viewColumn: input.dataset.viewColumn || null,
+              entityColumn: input.dataset.entityColumn || null
+            };
+          }
+        }
+        dialog.close();
+        dialog.remove();
+        resolve(Object.keys(filters).length > 0 ? filters : null);
+      });
+
+      dialog.addEventListener('close', () => {
+        dialog.remove();
+        resolve(null);
+      });
+    });
+  },
+
+  /**
+   * Find the view column that corresponds to a prefilter path
+   * e.g., prefilter "meter.resource_type" matches column with path "meter.resource_type.name"
+   */
+  findViewColumnForPrefilter(prefilterPath, viewSchema) {
+    if (!viewSchema?.columns) return null;
+
+    // Look for a column whose source path starts with the prefilter path
+    // e.g., prefilter "meter.resource_type" matches column path "meter.resource_type.name"
+    for (const col of viewSchema.columns) {
+      if (col.path && col.path.startsWith(prefilterPath + '.')) {
+        return col;
+      }
+      // Also match exact path
+      if (col.path === prefilterPath) {
+        return col;
+      }
+    }
+
+    // Fallback: match by key containing the last part of the path
+    const lastPart = prefilterPath.split('.').pop();
+    for (const col of viewSchema.columns) {
+      if (col.key.toLowerCase().includes(lastPart.toLowerCase().replace(/_/g, ''))) {
+        return col;
+      }
+    }
+    return null;
+  },
+
+  /**
+   * Build filter string from prefilter values
+   * For text type: Uses ~ prefix for LIKE matching on FK label columns
+   * For select type: Uses exact match on view/entity column
+   * For year type: Uses @Y prefix for strftime year extraction
+   * For month type: Uses @M prefix for strftime year-month extraction
+   * @param {Object} prefilterValues - { field: { value, type, viewColumn, entityColumn } }
+   * @param {boolean} isView - Whether this is for a view (uses viewColumn) or entity (uses entityColumn)
+   */
+  buildPrefilterString(prefilterValues, isView = false) {
+    if (!prefilterValues || Object.keys(prefilterValues).length === 0) return '';
+    const parts = [];
+    for (const [field, info] of Object.entries(prefilterValues)) {
+      // Handle old format (string value) for backwards compat
+      const value = typeof info === 'string' ? info : info.value;
+      const type = typeof info === 'string' ? 'text' : info.type;
+      const viewColumn = typeof info === 'object' ? info.viewColumn : null;
+      const entityColumn = typeof info === 'object' ? info.entityColumn : null;
+
+      // Determine the column name
+      const colName = viewColumn || entityColumn || field.replace(/\./g, '_') + '_label';
+
+      if (type === 'year') {
+        // Year filter: @Y prefix for strftime year extraction
+        parts.push(`@Y${colName}:${value}`);
+      } else if (type === 'month') {
+        // Month filter: @M prefix for strftime year-month extraction
+        parts.push(`@M${colName}:${value}`);
+      } else if (type === 'select' && viewColumn) {
+        // Exact match on view column (Views mode)
+        parts.push(`${viewColumn}:${value}`);
+      } else if (type === 'select' && entityColumn) {
+        // Exact match on entity label column (Entity mode with :select)
+        // Use = prefix for exact match on view column
+        parts.push(`=${entityColumn}:${value}`);
+      } else if (isView && viewColumn) {
+        // LIKE match on view column
+        parts.push(`~${viewColumn}:${value}`);
+      } else {
+        // Entity mode: FK label columns are named field_label
+        const colNameText = field.replace(/\./g, '_') + '_label';
+        // Use ~ prefix for LIKE matching
+        parts.push(`~${colNameText}:${value}`);
+      }
+    }
+    // Join multiple filters with AND (using && separator)
+    return parts.join('&&');
+  },
+
+  /**
+   * Setup IntersectionObserver for infinite scroll
+   */
+  setupScrollObserver() {
+    if (this.scrollObserver) {
+      this.scrollObserver.disconnect();
+    }
+
+    const sentinel = document.getElementById('scroll-sentinel');
+    if (!sentinel) return;
+
+    this.scrollObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && this.hasMore && !this.isLoadingMore) {
+          this.loadMoreRecords();
+        }
+      },
+      { root: this.tableContainer, threshold: 0.1 }
+    );
+
+    this.scrollObserver.observe(sentinel);
+  },
+
+  /**
+   * Load more records for infinite scroll
+   */
+  async loadMoreRecords() {
+    if (this.isLoadingMore || !this.hasMore) return;
+
+    this.isLoadingMore = true;
+    this.showLoadingIndicator(true);
+
+    try {
+      const config = await this.getPaginationConfig();
+      const offset = this.records.length;
+      const options = {
+        limit: config.pageSize,
+        offset: offset
+      };
+
+      // Add current filter/sort
+      if (this.currentFilter) options.filter = this.currentFilter;
+      if (this.currentSort) options.sort = this.currentSort;
+      if (this.currentOrder) options.order = this.currentOrder;
+
+      let result;
+      if (this.currentView) {
+        result = await ApiClient.getViewData(this.currentView.name, options);
+      } else {
+        result = await ApiClient.getAll(this.currentEntity, options);
+      }
+
+      const newRecords = result.data || [];
+      this.records = this.records.concat(newRecords);
+      this.hasMore = this.records.length < this.totalRecords;
+
+      // Execute calculated fields on new records
+      if (!this.currentView) {
+        await this.executeCalculatedFields();
+      }
+
+      // Re-render table with all records
+      if (this.currentView) {
+        const viewSchema = await ApiClient.getViewSchema(this.currentView.name);
+        await EntityTable.loadView(this.currentView.name, viewSchema, this.records);
+      } else {
+        await EntityTable.loadEntity(this.currentEntity, this.records);
+      }
+
+      this.updateRecordStatus();
+
+      // Re-setup observer after table re-render
+      this.setupScrollObserver();
+    } catch (err) {
+      console.error('Failed to load more records:', err);
+      DomUtils.toastError(`Load error: ${err.message}`);
+    } finally {
+      this.isLoadingMore = false;
+      this.showLoadingIndicator(false);
+    }
+  },
+
+  /**
+   * Show/hide loading indicator at bottom of table
+   */
+  showLoadingIndicator(show) {
+    let indicator = document.getElementById('pagination-loading');
+    if (show) {
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'pagination-loading';
+        indicator.className = 'pagination-loading';
+        indicator.innerHTML = '<span class="spinner"></span> Loading more...';
+        this.tableContainer.appendChild(indicator);
+      }
+      indicator.style.display = 'flex';
+    } else if (indicator) {
+      indicator.style.display = 'none';
+    }
+  },
+
   async init() {
     this.selector = document.getElementById('entity-selector');
     this.selectorTrigger = this.selector.querySelector('.entity-selector-trigger');
@@ -273,6 +647,8 @@ const EntityExplorer = {
     if (!entityName) {
       this.currentEntity = null;
       this.records = [];
+      this.prefilterFields = null;
+      this.requiredFilterFields = null;
       this.renderCurrentView();
       this.updateRecordStatus();
       DetailPanel.clear();
@@ -281,6 +657,16 @@ const EntityExplorer = {
 
     this.currentEntity = entityName;
     this.selectedId = null;
+
+    // Get prefilter and requiredFilter fields from extended schema
+    try {
+      const schema = await SchemaCache.getExtended(entityName);
+      this.prefilterFields = schema.prefilter || null;
+      this.requiredFilterFields = schema.requiredFilter || null;
+    } catch (e) {
+      this.prefilterFields = null;
+      this.requiredFilterFields = null;
+    }
 
     await this.loadRecords();
     DetailPanel.clear();
@@ -291,6 +677,7 @@ const EntityExplorer = {
     this.currentEntity = null;
     this.selectedId = null;
     this.records = [];
+    this.prefilterFields = null;
 
     // Force table view, hide tree buttons
     this.btnViewTreeH.style.display = 'none';
@@ -300,11 +687,29 @@ const EntityExplorer = {
 
     DetailPanel.clear();
 
-    // Load view data
+    // Load view data with optional prefilter
     try {
-      const result = await ApiClient.getViewData(viewName);
-      this.records = result.data || [];
       const viewSchema = await ApiClient.getViewSchema(viewName);
+      this.prefilterFields = viewSchema.prefilter || null;
+
+      // Check if we need prefilter dialog (for views with prefilter configured)
+      // View prefilters always show dialog (like required filter for entities)
+      let filter = '';
+      if (this.prefilterFields && this.prefilterFields.length > 0) {
+        const prefilterResult = await this.showPrefilterDialog(viewName, this.prefilterFields, {
+          isView: true,
+          viewName: viewName,
+          viewSchema: viewSchema
+        });
+        if (prefilterResult && Object.keys(prefilterResult).length > 0) {
+          this.prefilterValues = prefilterResult;
+          filter = this.buildPrefilterString(prefilterResult, true);
+        }
+      }
+
+      const options = filter ? { filter } : {};
+      const result = await ApiClient.getViewData(viewName, options);
+      this.records = result.data || [];
 
       // Normalize keys: add lowercase aliases for calculated field compatibility
       // View columns may be titlecased (Value, Usage), but calculation code uses lowercase (value, usage)
@@ -350,19 +755,75 @@ const EntityExplorer = {
     }
   },
 
-  async loadRecords(filter = '') {
+  async loadRecords(filter = '', options = {}) {
     if (!this.currentEntity) return;
 
+    // Reset pagination state
+    this.currentFilter = filter;
+    this.currentSort = options.sort || null;
+    this.currentOrder = options.order || null;
+    this.records = [];
+    this.hasMore = false;
+    this.totalRecords = 0;
+
     try {
-      const options = filter ? { filter } : {};
-      const result = await ApiClient.getAll(this.currentEntity, options);
+      const config = await this.getPaginationConfig();
+
+      // First, get total count with limit=0
+      const countOptions = { limit: 0 };
+      if (filter) countOptions.filter = filter;
+      const countResult = await ApiClient.getAll(this.currentEntity, countOptions);
+      this.totalRecords = countResult.total || 0;
+
+      // Check if we need filter dialog:
+      // 1. requiredFilter: always show dialog (regardless of record count)
+      // 2. prefilter: only show dialog when dataset is large
+      const hasRequired = this.requiredFilterFields && this.requiredFilterFields.length > 0;
+      const hasPrefilter = this.prefilterFields && this.prefilterFields.length > 0;
+      const isLargeDataset = this.totalRecords > config.threshold;
+
+      if (!filter && (hasRequired || (hasPrefilter && isLargeDataset))) {
+        // Combine required and prefilter fields for the dialog
+        const dialogFields = hasRequired ? this.requiredFilterFields : this.prefilterFields;
+        const prefilterResult = await this.showPrefilterDialog(this.currentEntity, dialogFields);
+        if (prefilterResult && Object.keys(prefilterResult).length > 0) {
+          this.prefilterValues = prefilterResult;
+          const prefilterStr = this.buildPrefilterString(prefilterResult);
+          // Reload with prefilter
+          return this.loadRecords(prefilterStr, options);
+        }
+        // User skipped filter - continue loading (with pagination if large)
+      }
+
+      // Determine if we need pagination
+      const needsPagination = this.totalRecords > config.threshold;
+
+      const loadOptions = {};
+      if (filter) loadOptions.filter = filter;
+      if (options.sort) loadOptions.sort = options.sort;
+      if (options.order) loadOptions.order = options.order;
+
+      if (needsPagination) {
+        // Load first page only
+        loadOptions.limit = config.pageSize;
+        loadOptions.offset = 0;
+      }
+
+      const result = await ApiClient.getAll(this.currentEntity, loadOptions);
       this.records = result.data || [];
+      this.hasMore = needsPagination && this.records.length < this.totalRecords;
 
       // Execute [CALCULATED] fields from entity schema
       await this.executeCalculatedFields();
 
       this.renderCurrentView();
       this.updateRecordStatus();
+
+      // Setup infinite scroll if paginated
+      if (needsPagination && this.viewMode === 'table') {
+        // Defer to allow DOM to settle
+        setTimeout(() => this.setupScrollObserver(), 100);
+      }
     } catch (err) {
       console.error('Failed to load records:', err);
       this.records = [];
@@ -373,6 +834,16 @@ const EntityExplorer = {
         this.treeContainer.innerHTML = message;
       }
     }
+  },
+
+  /**
+   * Reload records with new filter/sort (server-side)
+   */
+  async reloadWithFilter(filter, sort, order) {
+    this.currentFilter = filter;
+    this.currentSort = sort;
+    this.currentOrder = order;
+    await this.loadRecords(filter, { sort, order });
   },
 
   setViewMode(mode) {

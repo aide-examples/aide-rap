@@ -1,6 +1,9 @@
 # CRUD
 
-- Building
+## Metering
 - Meter
-- Reading
+- Reading (required: meter)
+
+## Static Data
 - ResourceType
+- Building

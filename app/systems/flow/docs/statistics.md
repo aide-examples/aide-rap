@@ -2,28 +2,28 @@
 
 Lines of code for the **flow** system.
 
-*Generated: 2026-01-28 14:58*
+*Generated: 2026-01-28 18:10*
 
 ## Documentation
 
 | Category | LOC |
 |----------|----:|
 | Entity Classes (classes/*.md) | 70 |
-| Other Docs (requirements/*.md) | 88 |
+| Other Docs (requirements/*.md) | 137 |
 | Help | 34 |
-| **Subtotal** | **192** |
+| **Subtotal** | **241** |
 
 ## Configuration
 
 | Category | LOC |
 |----------|----:|
-| config.json | 24 |
+| config.json | 28 |
 | DataModel.yaml | 0 |
 | DataModel-layout.json | 23 |
-| **Subtotal** | **47** |
+| **Subtotal** | **51** |
 
 ## Total
 
 | Category | LOC |
 |----------|----:|
-| **System Total** | **239** |
+| **System Total** | **292** |

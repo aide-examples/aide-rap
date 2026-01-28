@@ -90,6 +90,23 @@ router.get('/:entity/schema/extended', validateEntity, (req, res, next) => {
 });
 
 /**
+ * GET /api/entities/:entity/distinct/:column - Get distinct values for a column (for prefilter dropdowns)
+ * Query params:
+ *   type: 'select' (default), 'year', or 'month' - extraction mode for date columns
+ */
+router.get('/:entity/distinct/:column', validateEntity, (req, res, next) => {
+  try {
+    const { entity, column } = req.params;
+    const extractType = req.query.type || 'select';
+    const values = service.getDistinctValues(entity, column, extractType);
+
+    res.json(values);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/entities/:entity/:id/references - Get back-references to this record
  */
 router.get('/:entity/:id/references', validateEntity, (req, res, next) => {
