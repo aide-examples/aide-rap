@@ -383,14 +383,13 @@ const SeedGeneratorDialog = {
       });
     });
 
-    // Save to markdown
-    this.container.querySelector('[data-action="save-to-md"]')?.addEventListener('click', () => {
-      this.saveToMarkdown();
-    });
-
-    // Build prompt
-    this.container.querySelector('[data-action="build-prompt"]')?.addEventListener('click', () => {
-      this.buildPrompt();
+    // Attach all data-action handlers
+    DomUtils.attachDataActionHandlers(this.container, {
+      'save-to-md': () => this.saveToMarkdown(),
+      'build-prompt': () => this.buildPrompt(),
+      'parse-response': () => this.parseAndValidate(),
+      'save-json': () => this.saveOnly(),
+      'save-and-load': () => this.saveAndLoad(),
     });
 
     // Copy prompt + AI service links
@@ -399,29 +398,12 @@ const SeedGeneratorDialog = {
       (msg, err) => this.showMessage(msg, err)
     );
 
-    // Parse & validate pasted AI response
-    this.container.querySelector('[data-action="parse-response"]')?.addEventListener('click', () => {
-      this.parseAndValidate();
-    });
-
-    // Save only
-    this.container.querySelector('[data-action="save-json"]')?.addEventListener('click', () => {
-      this.saveOnly();
-    });
-
-    // Save & Load
-    this.container.querySelector('[data-action="save-and-load"]')?.addEventListener('click', () => {
-      this.saveAndLoad();
-    });
-
     // Drag and drop for paste area
     DomUtils.setupDropZone(this.container, '#paste-drop-zone', '#ai-response-text');
 
     // Conflict mode selector
-    this.container.querySelectorAll('input[name="gen-import-mode"]').forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        this.selectedMode = e.target.value;
-      });
+    DomUtils.attachRadioGroupHandler(this.container, 'gen-import-mode', (value) => {
+      this.selectedMode = value;
     });
   },
 

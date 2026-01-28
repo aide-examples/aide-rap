@@ -484,58 +484,24 @@ SEEDING:
             });
         });
 
-        // System selection
-        this.container.querySelector('[data-action="select-system"]')?.addEventListener('click', () => {
-            this.selectSystem();
-        });
-
-        // Delete system
-        this.container.querySelector('[data-action="delete-system"]')?.addEventListener('click', () => {
-            this.deleteSystem();
-        });
-
-        // Update footer when dropdown changes (to show/hide delete button)
-        this.container.querySelector('#system-select')?.addEventListener('change', () => {
-            // Re-render footer to show/hide delete button
-            const footer = this.container.querySelector('.modal-footer');
-            if (footer) {
-                footer.innerHTML = this.renderFooterButtons();
-                // Re-attach delete handler
-                this.container.querySelector('[data-action="delete-system"]')?.addEventListener('click', () => {
-                    this.deleteSystem();
-                });
-                this.container.querySelector('[data-action="select-system"]')?.addEventListener('click', () => {
-                    this.selectSystem();
-                });
-            }
-        });
-
-        // Navigation buttons
-        this.container.querySelector('[data-action="goto-select"]')?.addEventListener('click', () => {
+        // Helper for tab navigation
+        const gotoTab = (tab) => {
             this.saveCurrentTabData();
-            this.activeTab = 'select';
+            this.activeTab = tab;
             this.render();
-        });
+        };
 
-        this.container.querySelector('[data-action="goto-info"]')?.addEventListener('click', () => {
-            this.saveCurrentTabData();
-            this.activeTab = 'info';
-            this.render();
-        });
-
-        this.container.querySelector('[data-action="save-info"]')?.addEventListener('click', () => {
-            this.saveSystemInfo();
-        });
-
-        this.container.querySelector('[data-action="goto-paste"]')?.addEventListener('click', () => {
-            this.saveCurrentTabData();
-            this.activeTab = 'paste';
-            this.render();
-        });
-
-        // Build prompt
-        this.container.querySelector('[data-action="build-prompt"]')?.addEventListener('click', () => {
-            this.buildPrompt();
+        // Attach all data-action handlers at once
+        DomUtils.attachDataActionHandlers(this.container, {
+            'select-system': () => this.selectSystem(),
+            'delete-system': () => this.deleteSystem(),
+            'goto-select': () => gotoTab('select'),
+            'goto-info': () => gotoTab('info'),
+            'save-info': () => this.saveSystemInfo(),
+            'goto-paste': () => gotoTab('paste'),
+            'build-prompt': () => this.buildPrompt(),
+            'parse-mermaid': () => this.parseMermaid(),
+            'import-entities': () => this.importEntities(),
         });
 
         // Copy prompt + AI service links
@@ -544,21 +510,21 @@ SEEDING:
             (msg, err) => this.showMessage(msg, err)
         );
 
-        // Parse Mermaid
-        this.container.querySelector('[data-action="parse-mermaid"]')?.addEventListener('click', () => {
-            this.parseMermaid();
-        });
-
-        // Import entities
-        this.container.querySelector('[data-action="import-entities"]')?.addEventListener('click', () => {
-            this.importEntities();
+        // Update footer when dropdown changes (to show/hide delete button)
+        this.container.querySelector('#system-select')?.addEventListener('change', () => {
+            const footer = this.container.querySelector('.modal-footer');
+            if (footer) {
+                footer.innerHTML = this.renderFooterButtons();
+                DomUtils.attachDataActionHandlers(this.container, {
+                    'delete-system': () => this.deleteSystem(),
+                    'select-system': () => this.selectSystem(),
+                });
+            }
         });
 
         // Import mode radio buttons
-        this.container.querySelectorAll('input[name="import-mode"]').forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                this.importMode = e.target.value;
-            });
+        DomUtils.attachRadioGroupHandler(this.container, 'import-mode', (value) => {
+            this.importMode = value;
         });
 
         // Area layout toggle

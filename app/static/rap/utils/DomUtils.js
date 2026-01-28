@@ -183,6 +183,46 @@ const DomUtils = {
     });
   },
 
+  // ---------------------------------------------------------------------------
+  // Event binding helpers (reduce repetitive querySelector + addEventListener)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Attach click handlers for elements with data-action attributes
+   * @param {Element} container - Container to search within
+   * @param {Object} handlers - Map of action names to callbacks: { 'save': () => {...}, 'cancel': () => {...} }
+   */
+  attachDataActionHandlers(container, handlers) {
+    Object.entries(handlers).forEach(([action, callback]) => {
+      container.querySelector(`[data-action="${action}"]`)?.addEventListener('click', callback);
+    });
+  },
+
+  /**
+   * Attach change handlers to a radio button group
+   * @param {Element} container - Container to search within
+   * @param {string} radioName - The name attribute of the radio group
+   * @param {Function} callback - Called with the selected value on change
+   */
+  attachRadioGroupHandler(container, radioName, callback) {
+    container.querySelectorAll(`input[name="${radioName}"]`).forEach(radio => {
+      radio.addEventListener('change', (e) => callback(e.target.value));
+    });
+  },
+
+  /**
+   * Convert camelCase to dash-case (for CSS property names)
+   * @param {string} str - e.g. "backgroundColor"
+   * @returns {string} - e.g. "background-color"
+   */
+  camelToDashCase(str) {
+    return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+  },
+
+  // ---------------------------------------------------------------------------
+  // Drag-and-drop helpers
+  // ---------------------------------------------------------------------------
+
   /**
    * Set up drag-and-drop on a drop zone
    * @param {object} [options] - { allowFiles, fileExtensions, showMessage }
