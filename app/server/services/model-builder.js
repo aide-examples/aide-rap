@@ -11,6 +11,73 @@ const SYSTEMS_DIR = path.join(__dirname, '../../systems');
 const MIN_PORT = 18360;
 
 /**
+ * Build complete config.json object with all standard fields
+ */
+function buildFullConfig(systemName, displayName, description, port, themeColor) {
+    const color = themeColor || '#2563eb';
+    // Shorten system name for icon text (max 6 chars for readability)
+    const iconText = systemName.length <= 6 ? systemName : systemName.substring(0, 6);
+
+    return {
+        port,
+        log_level: 'INFO',
+        titleHtml: `<img src='/icons/${systemName}_logo.svg' alt='${systemName}' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>${displayName}</span>`,
+        auth: {
+            enabled: true,
+            passwords: {
+                admin: '$2b$10$NZ/wiqzblmaxQJklCdcGuuw5.2b1O0gGsBnBUmI.C0a4JLHeSZY5.',
+                user: '',
+                guest: ''
+            },
+            sessionSecret: `${systemName}-session-secret-change-in-production`,
+            sessionTimeout: 86400
+        },
+        pagination: {
+            threshold: 100,
+            pageSize: 100
+        },
+        layout: {
+            default: 'page-fill',
+            allow_toggle: false
+        },
+        docsEditable: true,
+        helpEditable: true,
+        pwa: {
+            enabled: true,
+            name: `AIDE RAP [${systemName}]`,
+            short_name: systemName,
+            description: description || displayName,
+            theme_color: color,
+            background_color: '#f5f5f5',
+            icon192: '/icons/icon-192.svg',
+            icon512: '/icons/icon-512.svg',
+            icon: {
+                outputDir: 'system',
+                background: color,
+                line1_text: 'aide',
+                line1_color: '#94a3b8',
+                line1_size: 0.25,
+                line2_text: iconText,
+                line2_color: '#ffffff',
+                line2_size: 0.38
+            }
+        }
+    };
+}
+
+/**
+ * Generate system logo SVG
+ */
+function generateLogoSvg(themeColor) {
+    const color = themeColor || '#2563eb';
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+  <rect width="28" height="28" rx="4" fill="${color}"/>
+  <text x="14" y="18" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">A</text>
+</svg>
+`;
+}
+
+/**
  * Build enriched prompt from user's design brief
  */
 function buildPrompt(systemName, displayName, description, designBrief) {
@@ -378,32 +445,7 @@ function generateCrudMd(entities) {
  * Generate config.json content
  */
 function generateConfig(systemName, displayName, description, entities, port, themeColor) {
-    const color = themeColor || '#2563eb';
-
-    return {
-        port,
-        log_level: 'INFO',
-        docsEditable: true,
-        helpEditable: true,
-        pwa: {
-            enabled: true,
-            name: `AIDE RAP [${systemName}]`,
-            short_name: systemName,
-            description: description || displayName,
-            theme_color: color,
-            background_color: '#f5f5f5',
-            icon192: '/static/icons/icon-192.svg',
-            icon512: '/static/icons/icon-512.svg',
-            icon: {
-                background: color,
-                line1_text: 'aide',
-                line1_color: '#94a3b8',
-                line2_text: systemName.substring(0, 8),
-                line2_color: '#ffffff',
-                line2_size: 0.38
-            }
-        },
-    };
+    return buildFullConfig(systemName, displayName, description, port, themeColor);
 }
 
 /**
@@ -662,7 +704,7 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
 
     const port = findNextPort();
 
-    // Create directory structure
+    // Create directory structure (including icons/)
     const dirs = [
         systemDir,
         path.join(systemDir, 'data'),
@@ -671,42 +713,26 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
         path.join(systemDir, 'docs', 'requirements'),
         path.join(systemDir, 'docs', 'requirements', 'classes'),
         path.join(systemDir, 'docs', 'requirements', 'ui'),
-        path.join(systemDir, 'help')
+        path.join(systemDir, 'help'),
+        path.join(systemDir, 'icons')
     ];
 
     for (const dir of dirs) {
         fs.mkdirSync(dir, { recursive: true });
     }
 
-    // Generate minimal config.json (no entities yet)
-    const config = {
-        port,
-        log_level: 'INFO',
-        docsEditable: true,
-        helpEditable: true,
-        pwa: {
-            enabled: true,
-            name: `AIDE RAP [${systemName}]`,
-            short_name: systemName,
-            description: description || displayName,
-            theme_color: themeColor || '#2563eb',
-            background_color: '#f5f5f5',
-            icon192: '/static/icons/icon-192.svg',
-            icon512: '/static/icons/icon-512.svg',
-            icon: {
-                background: themeColor || '#2563eb',
-                line1_text: 'aide',
-                line1_color: '#94a3b8',
-                line2_text: systemName.substring(0, 8),
-                line2_color: '#ffffff',
-                line2_size: 0.38
-            }
-        }
-    };
+    // Generate complete config.json with all standard fields
+    const config = buildFullConfig(systemName, displayName, description, port, themeColor);
 
     fs.writeFileSync(
         path.join(systemDir, 'config.json'),
         JSON.stringify(config, null, 2)
+    );
+
+    // Generate system logo SVG
+    fs.writeFileSync(
+        path.join(systemDir, 'icons', `${systemName}_logo.svg`),
+        generateLogoSvg(themeColor)
     );
 
     // Generate empty Crud.md and Views.md
