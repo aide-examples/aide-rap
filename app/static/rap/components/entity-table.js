@@ -98,7 +98,7 @@ const EntityTable = {
       return;
     }
 
-    const columns = this.currentViewConfig.columns.filter(c => !c.hidden);
+    const columns = this.currentViewConfig.columns.filter(c => !c.hidden && !c.autoHidden);
     const sortedRecords = this.getViewSortedRecords(columns);
 
     let html = '<div class="entity-table-wrapper"><table class="entity-table">';
@@ -140,7 +140,14 @@ const EntityTable = {
       const isSelected = record.id === this.selectedId;
       const rowClass = isSelected ? 'selected' : (i % 2 === 1 ? 'zebra' : '');
 
-      html += `<tr class="${rowClass}" data-id="${record.id}">`;
+      // Row-level styling (e.g., row._rowStyle = { backgroundColor: '#fff' })
+      const rowStyle = record._rowStyle;
+      const rowStyleAttr = rowStyle
+        ? ` style="${Object.entries(rowStyle).map(([k,v]) =>
+            `${k.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}:${v}`).join(';')}"`
+        : '';
+
+      html += `<tr class="${rowClass}"${rowStyleAttr} data-id="${record.id}">`;
       for (const col of columns) {
         const value = record[col.key];
         let displayValue = '';
@@ -152,7 +159,9 @@ const EntityTable = {
           displayValue = DomUtils.escapeHtml(String(value));
         }
         // Calculator cell styles (e.g., row._cellStyles = { colKey: { backgroundColor: '#fff' } })
-        const cellStyle = record._cellStyles?.[col.key];
+        // Support both titlecased key (e.g., 'Usage') and snake_case key (e.g., 'usage')
+        const snakeCaseKey = col.key.toLowerCase().replace(/ /g, '_');
+        const cellStyle = record._cellStyles?.[col.key] || record._cellStyles?.[snakeCaseKey];
         const styleAttr = cellStyle
           ? ` style="${Object.entries(cellStyle).map(([k,v]) =>
               `${k.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}:${v}`).join(';')}"`

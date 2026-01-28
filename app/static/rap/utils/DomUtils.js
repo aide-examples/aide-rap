@@ -5,6 +5,64 @@
  */
 const DomUtils = {
   /**
+   * Show a toast notification (non-intrusive, auto-dismissing)
+   * @param {string} message - The message to show
+   * @param {string} type - 'info', 'success', 'warning', 'error'
+   * @param {number} duration - Time in ms before auto-dismiss (0 = sticky)
+   */
+  toast(message, type = 'info', duration = 4000) {
+    // Create container if needed
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.style.cssText = `
+        position: fixed; top: 10px; right: 10px; z-index: 10000;
+        display: flex; flex-direction: column; gap: 8px; max-width: 400px;
+      `;
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    const colors = {
+      info: '#2196F3',
+      success: '#4CAF50',
+      warning: '#FF9800',
+      error: '#f44336'
+    };
+    toast.style.cssText = `
+      background: ${colors[type] || colors.info}; color: white;
+      padding: 12px 16px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-size: 14px; line-height: 1.4; cursor: pointer;
+      animation: toast-slide-in 0.3s ease-out;
+    `;
+    toast.textContent = message;
+    toast.onclick = () => toast.remove();
+
+    // Add animation style if not present
+    if (!document.getElementById('toast-styles')) {
+      const style = document.createElement('style');
+      style.id = 'toast-styles';
+      style.textContent = `
+        @keyframes toast-slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      `;
+      document.head.appendChild(style);
+    }
+
+    container.appendChild(toast);
+    if (duration > 0) {
+      setTimeout(() => toast.remove(), duration);
+    }
+  },
+
+  /**
+   * Shorthand for error toast
+   */
+  toastError(message, duration = 6000) {
+    DomUtils.toast(message, 'error', duration);
+  },
+
+  /**
    * Escape HTML special characters to prevent XSS
    */
   escapeHtml(text) {

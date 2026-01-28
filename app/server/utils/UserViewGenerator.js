@@ -527,6 +527,53 @@ function parseAllUserViews(viewsConfig, schema) {
 
     parsedView.joins = Array.from(joinMap.values());
 
+    // Auto-add dependencies for [CALCULATED] fields
+    const addedDeps = new Set();
+    for (const col of [...parsedView.columns]) {  // Iterate over copy to allow modification
+      // Only check simple column names (not FK paths) in base entity
+      if (!col.path.includes('.') && !col.path.includes('<')) {
+        const baseCol = baseEntity.columns.find(c => c.name === col.path);
+        if (baseCol?.calculated?.depends) {
+          for (const dep of baseCol.calculated.depends) {
+            // Skip if dependency is already in view or already added
+            const alreadyInView = parsedView.columns.some(c =>
+              c.path === dep || c.path === dep.replace('_id', '') // Handle FK notation
+            );
+            if (!alreadyInView && !addedDeps.has(dep)) {
+              addedDeps.add(dep);
+              // Resolve the dependency column
+              try {
+                const resolved = resolveColumnPath(dep, entry.base, schema);
+                parsedView.columns.push({
+                  path: dep,
+                  label: resolved.label,
+                  jsType: resolved.jsType,
+                  selectExpr: resolved.selectExpr,
+                  sqlAlias: dep,  // Use original column name as key for calculation compatibility
+                  autoHidden: true,  // Mark as auto-added for calculated field
+                  areaColor: areaColor
+                });
+                // Add joins if needed
+                for (const join of resolved.joins) {
+                  if (!joinMap.has(join.alias)) {
+                    joinMap.set(join.alias, join);
+                  }
+                }
+              } catch (err) {
+                logger.warn(`View "${entry.name}": failed to auto-add dependency "${dep}"`, {
+                  error: err.message
+                });
+              }
+            }
+          }
+          // Also attach the calculated definition to the column for client-side execution
+          col.calculated = baseCol.calculated;
+        }
+      }
+    }
+    // Update joins after adding dependencies
+    parsedView.joins = Array.from(joinMap.values());
+
     if (parsedView.columns.length > 0) {
       views.push(parsedView);
       groups.push({ type: 'view', name: entry.name, color: areaColor });

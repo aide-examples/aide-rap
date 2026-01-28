@@ -125,6 +125,94 @@ function parseComputedAnnotation(description) {
 }
 
 /**
+ * Parse [CALCULATED] annotation from description
+ * Returns true if the field is a calculated field (client-side)
+ */
+function parseCalculatedAnnotation(description) {
+  return /\[CALCULATED\]/i.test(description);
+}
+
+/**
+ * Parse ## Calculations section from entity markdown content
+ * Looks for ### fieldName subsections with:
+ *   - **Depends on:** field1, field2  (required fields for calculation)
+ *   - **Sort:** field1, field2        (required sort order)
+ *   - ```js ... ```                   (calculation code)
+ *
+ * Returns: { fieldName: { code, depends: [...], sort: [...] }, ... }
+ */
+function parseCalculationsSection(fileContent) {
+  const result = {};
+  const lines = fileContent.split('\n');
+  let inCalcSection = false;
+  let currentField = null;
+  let currentCalc = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Detect ## Calculations section
+    if (trimmed === '## Calculations') {
+      inCalcSection = true;
+      continue;
+    }
+
+    // Exit on another ## section
+    if (inCalcSection && trimmed.startsWith('## ') && trimmed !== '## Calculations') {
+      break;
+    }
+
+    if (!inCalcSection) continue;
+
+    // Detect ### fieldName subsection
+    if (trimmed.startsWith('### ')) {
+      // Save previous calculation if any
+      if (currentField && currentCalc) {
+        result[currentField] = currentCalc;
+      }
+      currentField = trimmed.substring(4).trim();
+      currentCalc = { code: '', depends: [], sort: [] };
+      continue;
+    }
+
+    if (!currentField) continue;
+
+    // Parse **Depends on:** field1, field2
+    const dependsMatch = trimmed.match(/^\*\*Depends on:\*\*\s*(.+)$/i);
+    if (dependsMatch) {
+      currentCalc.depends = dependsMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      continue;
+    }
+
+    // Parse **Sort:** field1, field2
+    const sortMatch = trimmed.match(/^\*\*Sort:\*\*\s*(.+)$/i);
+    if (sortMatch) {
+      currentCalc.sort = sortMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      continue;
+    }
+
+    // Parse ```js code block
+    if (trimmed === '```js') {
+      const jsLines = [];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '```') {
+        jsLines.push(lines[i]);
+        i++;
+      }
+      currentCalc.code = jsLines.join('\n').trim();
+    }
+  }
+
+  // Save last calculation
+  if (currentField && currentCalc) {
+    result[currentField] = currentCalc;
+  }
+
+  return result;
+}
+
+/**
  * Decode HTML entities
  */
 function decodeHtmlEntities(text) {
@@ -298,10 +386,14 @@ function parseEntityFile(fileContent) {
     }
   }
 
+  // Parse ## Calculations section for [CALCULATED] fields
+  const calculations = parseCalculationsSection(fileContent);
+
   return {
     className,
     description,
-    attributes
+    attributes,
+    calculations
   };
 }
 
@@ -326,7 +418,8 @@ function parseEntityDescriptions(mdContent, mdPath) {
         if (parsed) {
           classes[parsed.className] = {
             description: parsed.description,
-            attributes: parsed.attributes
+            attributes: parsed.attributes,
+            calculations: parsed.calculations
           };
         }
       }
@@ -615,6 +708,12 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     // Parse computed field annotation (DAILY, IMMEDIATE, etc.)
     const computedRule = parseComputedAnnotation(desc);
 
+    // Parse [CALCULATED] annotation for client-side calculated fields
+    const isCalculated = parseCalculatedAnnotation(desc);
+    const calculatedDef = isCalculated && classDef.calculations?.[name]
+      ? classDef.calculations[name]
+      : null;
+
     // Calculate default value (skip for id and foreign keys)
     let defaultValue = null;
     if (name !== 'id' && !foreignKey) {
@@ -654,6 +753,10 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
 
     if (computedRule) {
       column.computed = computedRule;
+    }
+
+    if (calculatedDef) {
+      column.calculated = calculatedDef;
     }
 
     columns.push(column);

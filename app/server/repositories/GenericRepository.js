@@ -479,6 +479,11 @@ function getExtendedSchemaInfo(entityName) {
         colInfo.enumValues = entity.enumFields[col.name].values;
       }
 
+      // Add calculated field info (client-side computation)
+      if (col.calculated) {
+        colInfo.calculated = col.calculated;
+      }
+
       return colInfo;
     }),
     ui: {

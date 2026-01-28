@@ -306,13 +306,39 @@ const EntityExplorer = {
       this.records = result.data || [];
       const viewSchema = await ApiClient.getViewSchema(viewName);
 
-      // Calculator: run client-side JS transform from Views.md
+      // Normalize keys: add lowercase aliases for calculated field compatibility
+      // View columns may be titlecased (Value, Usage), but calculation code uses lowercase (value, usage)
+      this.normalizeRecordKeys(viewSchema);
+
+      // Execute [CALCULATED] fields from entity columns that are in the view
+      const calcCols = viewSchema.columns.filter(c => c.calculated);
+      for (const col of calcCols) {
+        try {
+          const fn = new Function('data', col.calculated.code);
+          fn(this.records);
+          // Copy calculated value from lowercase key back to titlecased view key
+          const lowercaseKey = col.key.toLowerCase().replace(/ /g, '_');
+          if (lowercaseKey !== col.key) {
+            for (const record of this.records) {
+              if (record[lowercaseKey] !== undefined) {
+                record[col.key] = record[lowercaseKey];
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Calculation error for ${col.key}:`, e);
+          DomUtils.toastError(`Calculation error [${col.key}]: ${e.message}`);
+        }
+      }
+
+      // Calculator: run client-side JS transform from Views.md (styling, etc.)
       if (viewSchema.calculator) {
         try {
           const fn = new Function('data', 'schema', viewSchema.calculator);
           fn(this.records, viewSchema);
         } catch (e) {
           console.error(`Calculator error in view "${viewName}":`, e);
+          DomUtils.toastError(`Calculator error [${viewName}]: ${e.message}`);
         }
       }
 
@@ -331,6 +357,10 @@ const EntityExplorer = {
       const options = filter ? { filter } : {};
       const result = await ApiClient.getAll(this.currentEntity, options);
       this.records = result.data || [];
+
+      // Execute [CALCULATED] fields from entity schema
+      await this.executeCalculatedFields();
+
       this.renderCurrentView();
       this.updateRecordStatus();
     } catch (err) {
@@ -622,6 +652,65 @@ const EntityExplorer = {
     const record = this.records.find(r => r.id === recordId);
     if (record) {
       DetailPanel.showEditForm(entityName, record);
+    }
+  },
+
+  /**
+   * Normalize record keys: add lowercase aliases for calculated field compatibility
+   * View columns may use titlecased keys (Value, Usage), but calculation code uses lowercase (value, usage)
+   */
+  normalizeRecordKeys(viewSchema) {
+    if (!this.records.length) return;
+
+    // Build a mapping from potential titlecased/aliased keys to lowercase equivalents
+    // For columns where key differs from expected lowercase name
+    const keyMap = {};
+    for (const col of viewSchema.columns) {
+      const key = col.key;
+      const lowercase = key.toLowerCase().replace(/ /g, '_');
+      if (key !== lowercase) {
+        keyMap[key] = lowercase;
+      }
+      // Also handle the case where key ends with :N suffix (auto-hidden columns)
+      const colonMatch = key.match(/^(.+?):\d+$/);
+      if (colonMatch) {
+        const baseName = colonMatch[1].toLowerCase() + '_id';
+        keyMap[key] = baseName;
+      }
+    }
+
+    // Add lowercase aliases to each record
+    for (const record of this.records) {
+      for (const [origKey, newKey] of Object.entries(keyMap)) {
+        if (record[origKey] !== undefined && record[newKey] === undefined) {
+          record[newKey] = record[origKey];
+        }
+      }
+    }
+  },
+
+  /**
+   * Execute [CALCULATED] fields defined in entity schema
+   * These are client-side computations defined in Entity.md ## Calculations
+   */
+  async executeCalculatedFields() {
+    if (!this.currentEntity || this.records.length === 0) return;
+
+    try {
+      const schema = await SchemaCache.getExtended(this.currentEntity);
+      const calcFields = schema.columns.filter(c => c.calculated);
+
+      for (const field of calcFields) {
+        try {
+          const fn = new Function('data', field.calculated.code);
+          fn(this.records);
+        } catch (e) {
+          console.error(`Calculation error for ${this.currentEntity}.${field.name}:`, e);
+          DomUtils.toastError(`Calculation error [${this.currentEntity}.${field.name}]: ${e.message}`);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to execute calculated fields:', e);
     }
   },
 

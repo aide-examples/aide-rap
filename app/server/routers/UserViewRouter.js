@@ -62,6 +62,8 @@ module.exports = function() {
           const col = { key: c.sqlAlias, label: c.label, type: c.jsType };
           if (c.omit !== undefined) col.omit = c.omit;
           if (c.areaColor) col.areaColor = c.areaColor;
+          if (c.calculated) col.calculated = c.calculated;
+          if (c.autoHidden) col.autoHidden = c.autoHidden;
           return col;
         }),
         ...(view.calculator ? { calculator: view.calculator } : {})
