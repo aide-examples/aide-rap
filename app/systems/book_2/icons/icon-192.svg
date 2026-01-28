@@ -1,6 +1,6 @@
-<!-- aide-icon-hash: ecd64c2306a3 -->
+<!-- aide-icon-hash: 1202a9ed6f1b -->
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
   <rect width="192" height="192" fill="#eb7d24"/>
   <text x="96" y="67" font-family="Arial, Helvetica, sans-serif" font-size="48" font-style="italic" fill="#94a3b8" text-anchor="middle">aide</text>
-  <text x="96" y="134" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="bold" fill="#ffffff" text-anchor="middle">book_2</text>
+  <text x="96" y="134" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="bold" fill="#ffffff" text-anchor="middle">pub</text>
 </svg>
