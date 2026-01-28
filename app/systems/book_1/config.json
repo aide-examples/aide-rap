@@ -1,6 +1,7 @@
 {
   "port": 18360,
   "log_level": "INFO",
+  "titleHtml": "<img src='/icons/book_1_logo.svg' alt='book_1' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>Authors &amp; Books</span>",
   "auth": {
     "enabled": true,
     "passwords": {
@@ -10,6 +11,14 @@
     },
     "sessionSecret": "book1-session-secret-change-in-production",
     "sessionTimeout": 86400
+  },
+  "pagination": {
+    "threshold": 100,
+    "pageSize": 100
+  },
+  "layout": {
+    "default": "page-fill",
+    "allow_toggle": false
   },
   "docsEditable": true,
   "helpEditable": true,
@@ -27,6 +36,7 @@
       "background": "#59eb24",
       "line1_text": "aide",
       "line1_color": "#94a3b8",
+      "line1_size": 0.25,
       "line2_text": "book_1",
       "line2_color": "#ffffff",
       "line2_size": 0.38

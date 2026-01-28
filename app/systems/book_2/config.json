@@ -1,6 +1,7 @@
 {
   "port": 18361,
   "log_level": "INFO",
+  "titleHtml": "<img src='/icons/book_2_logo.svg' alt='book_2' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>Publishing &amp; Translation</span>",
   "auth": {
     "enabled": true,
     "passwords": {
@@ -10,7 +11,15 @@
     },
     "sessionSecret": "book2-session-secret-change-in-production",
     "sessionTimeout": 86400
-  },  
+  },
+  "pagination": {
+    "threshold": 100,
+    "pageSize": 100
+  },
+  "layout": {
+    "default": "page-fill",
+    "allow_toggle": false
+  },
   "docsEditable": true,
   "helpEditable": true,
   "pwa": {
@@ -27,6 +36,7 @@
       "background": "#eb7d24",
       "line1_text": "aide",
       "line1_color": "#94a3b8",
+      "line1_size": 0.25,
       "line2_text": "book_2",
       "line2_color": "#ffffff",
       "line2_size": 0.38

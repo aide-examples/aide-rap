@@ -1,11 +1,25 @@
 {
   "port": 18362,
   "log_level": "INFO",
+  "titleHtml": "<img src='/icons/flow_logo.png' alt='FLOW' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'> &rArr; Water, Gas, Power ..</span>",
+  "auth": {
+    "enabled": false,
+    "passwords": {
+      "admin": "",
+      "user": "",
+      "guest": ""
+    },
+    "sessionSecret": "flow-session-secret-change-in-production",
+    "sessionTimeout": 86400
+  },
   "pagination": {
     "threshold": 100,
     "pageSize": 100
   },
-  "titleHtml": "<img src='/icons/flow_logo.png' alt='FLOW' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'> &rArr; Water, Gas, Power ..</span>", 
+  "layout": {
+    "default": "page-fill",
+    "allow_toggle": false
+  },
   "docsEditable": true,
   "helpEditable": true,
   "pwa": {
@@ -22,6 +36,7 @@
       "background": "#2563eb",
       "line1_text": "aide",
       "line1_color": "#94a3b8",
+      "line1_size": 0.25,
       "line2_text": "flow",
       "line2_color": "#ffffff",
       "line2_size": 0.38
