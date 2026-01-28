@@ -470,7 +470,8 @@ function parseAllUserViews(viewsConfig, schema) {
       group: currentGroup,
       columns: [],
       joins: [],
-      calculator: entry.calculator || null
+      calculator: entry.calculator || null,
+      prefilter: entry.prefilter || null
     };
 
     // Deduplicate joins by alias

@@ -1,6 +1,10 @@
 {
   "port": 18362,
   "log_level": "INFO",
+  "pagination": {
+    "threshold": 100,
+    "pageSize": 100
+  },
   "titleHtml": "<img src='/icons/flow_logo.png' alt='FLOW' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'> &rArr; Water, Gas, Power ..</span>", 
   "docsEditable": true,
   "helpEditable": true,

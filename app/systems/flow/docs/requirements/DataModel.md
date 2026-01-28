@@ -6,15 +6,22 @@
 
 Entity definitions are stored in separate files under [classes/](classes/).
 
-### AIDE RAP [flow]
-<div style="background-color: #E8F4E8; padding: 10px;">
+### Metering
+<div style="background-color: #D6E4F0; padding: 10px;">
 
 | Entity | Description |
 |--------|-------------|
-| [Building](classes/Building.md) | 3 attributes |
-| [ResourceType](classes/ResourceType.md) | 2 attributes |
-| [Meter](classes/Meter.md) | 6 attributes |
-| [Reading](classes/Reading.md) | 4 attributes |
+| [Meter](classes/Meter.md) | Metering device at a location |
+| [Reading](classes/Reading.md) | Meter reading value |
+</div>
+
+### Static Data
+<div style="background-color: #D9EAD3; padding: 10px;">
+
+| Entity | Description |
+|--------|-------------|
+| [Building](classes/Building.md) | Building location |
+| [ResourceType](classes/ResourceType.md) | Type of resource (water, gas, electricity) |
 </div>
 
 ## Class Diagram

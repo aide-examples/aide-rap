@@ -170,7 +170,10 @@ const EntityTable = {
       }
       html += '</tr>';
     }
-    html += '</tbody></table></div>';
+    html += '</tbody></table>';
+    // Scroll sentinel for infinite scroll
+    html += '<div id="scroll-sentinel" class="scroll-sentinel"></div>';
+    html += '</div>';
 
     this.container.innerHTML = html;
     this.attachViewEventListeners(columns);
@@ -522,7 +525,10 @@ const EntityTable = {
 
       html += '</tr>';
     }
-    html += '</tbody></table></div>';
+    html += '</tbody></table>';
+    // Scroll sentinel for infinite scroll
+    html += '<div id="scroll-sentinel" class="scroll-sentinel"></div>';
+    html += '</div>';
 
     this.container.innerHTML = html;
 

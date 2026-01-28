@@ -19,20 +19,22 @@ const logger = require('./utils/logger');
  * @param {Object} config - Configuration object
  * @param {string} config.appDir - Application directory
  * @param {string[]} config.enabledEntities - List of enabled entity names
+ * @param {Object} config.entityPrefilters - Prefilter fields per entity { entityName: ['field1', 'field2'] }
+ * @param {Object} config.requiredFilters - Required filter fields per entity { entityName: ['field1'] }
  * @param {Object} config.paths - System-specific paths
  * @param {string} config.paths.data - Data directory
  * @param {string} config.paths.docs - Docs/requirements directory
  * @param {string} config.paths.database - Database filename
  */
 function init(app, config) {
-  const { appDir, enabledEntities, paths, viewsConfig } = config;
+  const { appDir, enabledEntities, entityPrefilters, requiredFilters, paths, viewsConfig } = config;
 
   // Paths (use config paths if provided, fallback to legacy paths)
   const dbPath = paths ? path.join(paths.data, paths.database) : path.join(appDir, 'data', 'rap.sqlite');
   const dataModelPath = paths ? path.join(paths.docs, 'DataModel.md') : path.join(appDir, 'docs', 'requirements', 'DataModel.md');
 
   // Initialize database
-  initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig);
+  initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters);
 
   // Middleware (before routes)
   app.use(correlationId);
