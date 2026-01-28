@@ -2548,6 +2548,11 @@
     color: white;
 }
 
+.ai-link-copilot {
+    background: linear-gradient(135deg, #0078D4, #7B68EE);
+    color: white;
+}
+
 /* FK dependency warning */
 .fk-dependency-warning {
     padding: 8px 12px;

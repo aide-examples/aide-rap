@@ -1,5 +1,5 @@
 #!/bin/bash
-# LOC Statistics Generator for AIDE RAID
+# LOC Statistics Generator for AIDE RAP
 #
 # Usage:
 #   ./tools/loc-stats.sh [--markdown]                    # Project-wide stats
@@ -154,7 +154,7 @@ fi
 # PROJECT-WIDE STATS
 # ============================================================================
 
-# AIDE-RAID Platform
+# AIDE-RAP Platform
 server_loc=$(count_loc "$PROJECT_ROOT/app/server" "*.js")
 shared_loc=$(count_loc "$PROJECT_ROOT/app/shared" "*.js")
 
@@ -248,7 +248,7 @@ if [ "$MARKDOWN_MODE" = true ]; then
     cat << EOF
 # Codebase Statistics
 
-Lines of code statistics for the AIDE RAID project.
+Lines of code statistics for the AIDE RAP project.
 
 *Generated: $(date '+%Y-%m-%d %H:%M')*
 
@@ -256,7 +256,7 @@ Lines of code statistics for the AIDE RAID project.
 
 | Package | LOC |
 |---------|----:|
-| node_modules (RAID) | $(format_num ${node_modules_loc:-0}) |
+| node_modules (RAP) | $(format_num ${node_modules_loc:-0}) |
 | node_modules (FRAME) | $(format_num ${frame_node_modules:-0}) |
 | **Total Dependencies** | **$(format_num $total_deps)** |
 
@@ -280,7 +280,7 @@ EOF
     fi
 
     cat << EOF
-## AIDE-RAID Platform
+## AIDE-RAP Platform
 
 | Category | LOC |
 |----------|----:|
@@ -309,7 +309,7 @@ EOF
 | Component | Own Code |
 |-----------|----------|
 | AIDE-FRAME | $(format_num $frame_own) |
-| AIDE-RAID Platform | $(format_num $platform_own) |
+| AIDE-RAP Platform | $(format_num $platform_own) |
 | Systems (all) | $(format_num $systems_total) |
 | **Total Own Code** | **$(format_num $total_own)** |
 
@@ -327,7 +327,7 @@ else
     echo "  Own Code:     $(format_num $frame_own)"
     echo ""
 
-    echo -e "${BOLD}AIDE-RAID Platform${RESET}"
+    echo -e "${BOLD}AIDE-RAP Platform${RESET}"
     echo "  Server:       $(format_num $server_loc)"
     echo "  Shared:       $(format_num $shared_loc)"
     echo "  Frontend:     $(format_num $frontend_total)"

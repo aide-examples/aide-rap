@@ -145,7 +145,7 @@ const DomUtils = {
   },
 
   /**
-   * Render AI service links (Copy + GPT/Claude/Gemini) for a prompt header
+   * Render AI service links (Copy + GPT/Claude/Gemini/Copilot) for a prompt header
    */
   renderAILinks(hasPrompt) {
     if (!hasPrompt) return '';
@@ -155,6 +155,7 @@ const DomUtils = {
         <a href="https://chatgpt.com/" target="chatgpt" class="ai-link ai-link-chatgpt" data-action="open-ai">GPT</a>
         <a href="https://claude.ai/new" target="claude" class="ai-link ai-link-claude" data-action="open-ai">Claude</a>
         <a href="https://gemini.google.com/app" target="gemini" class="ai-link ai-link-gemini" data-action="open-ai">Gemini</a>
+        <a href="https://copilot.microsoft.com/" target="copilot" class="ai-link ai-link-copilot" data-action="open-ai">Copilot</a>
       </span>
     `;
   },
