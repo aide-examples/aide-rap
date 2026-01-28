@@ -91,6 +91,7 @@ const cfg = args.applyCommonArgs(opts, {
     configDefaults: DEFAULT_CONFIG,
     configSearchPaths: [path.join(SYSTEM_DIR, 'config.json')],
     appDir: APP_DIR,
+    systemDir: SYSTEM_DIR,
 });
 
 // Override paths from config if specified

@@ -20,9 +20,10 @@
     "description": "A minimal model for authors and books",
     "theme_color": "#59eb24",
     "background_color": "#f5f5f5",
-    "icon192": "/static/icons/icon-192.svg",
-    "icon512": "/static/icons/icon-512.svg",
+    "icon192": "/icons/icon-192.svg",
+    "icon512": "/icons/icon-512.svg",
     "icon": {
+      "outputDir": "system",
       "background": "#59eb24",
       "line1_text": "aide",
       "line1_color": "#94a3b8",

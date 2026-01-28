@@ -15,9 +15,10 @@
     "description": "metering your flow of gas, water and electricity",
     "theme_color": "#2563eb",
     "background_color": "#f5f5f5",
-    "icon192": "/static/icons/icon-192.svg",
-    "icon512": "/static/icons/icon-512.svg",
+    "icon192": "/icons/icon-192.svg",
+    "icon512": "/icons/icon-512.svg",
     "icon": {
+      "outputDir": "system",
       "background": "#2563eb",
       "line1_text": "aide",
       "line1_color": "#94a3b8",
