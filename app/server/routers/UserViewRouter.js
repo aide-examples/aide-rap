@@ -63,7 +63,8 @@ module.exports = function() {
           if (c.omit !== undefined) col.omit = c.omit;
           if (c.areaColor) col.areaColor = c.areaColor;
           return col;
-        })
+        }),
+        ...(view.calculator ? { calculator: view.calculator } : {})
       });
     } catch (err) {
       logger.error('Failed to get view schema', { error: err.message });

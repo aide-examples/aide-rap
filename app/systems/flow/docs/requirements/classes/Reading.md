@@ -9,4 +9,4 @@
 
 ## Data Generator
 
-Generate for each Meter in the list Readings for the last day of the latest 5 years. The values should be logical, i.e. increase form year to year. Think of a household wit7h 4 people when creating the readings
+Generate for each Meter in the list Readings for the last day of the latest 5 years. The values should be logical, i.e. increase form year to year. Think of a household with 4 people when creating the readings

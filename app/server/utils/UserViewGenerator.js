@@ -469,7 +469,8 @@ function parseAllUserViews(viewsConfig, schema) {
       color: areaColor,
       group: currentGroup,
       columns: [],
-      joins: []
+      joins: [],
+      calculator: entry.calculator || null
     };
 
     // Deduplicate joins by alias

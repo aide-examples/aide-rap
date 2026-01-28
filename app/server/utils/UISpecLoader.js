@@ -16,6 +16,10 @@
  *   ```json                → view definition (base, columns)
  *   { "base": "...", "columns": [...] }
  *   ```
+ *   ```js                  → optional calculator (client-side JS)
+ *   schema.columns.push({ key: 'x', label: 'X', type: 'number' });
+ *   for (const row of data) { row.x = ...; }
+ *   ```
  */
 
 const fs = require('fs');
@@ -67,6 +71,7 @@ function loadViewsConfig(requirementsDir) {
   const lines = content.split('\n');
   const result = [];
   let currentViewName = null;
+  let lastViewObj = null;
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -75,16 +80,18 @@ function loadViewsConfig(requirementsDir) {
     if (trimmed.startsWith('## ')) {
       result.push(SEPARATOR_PREFIX + trimmed.substring(3).trim());
       currentViewName = null;
+      lastViewObj = null;
       continue;
     }
 
     // H3 = view name
     if (trimmed.startsWith('### ')) {
       currentViewName = trimmed.substring(4).trim();
+      lastViewObj = null;
       continue;
     }
 
-    // JSON code block start
+    // JSON code block = view definition
     if (trimmed === '```json' && currentViewName) {
       const jsonLines = [];
       i++;
@@ -97,11 +104,28 @@ function loadViewsConfig(requirementsDir) {
         const viewDef = JSON.parse(jsonLines.join('\n'));
         viewDef.name = currentViewName;
         result.push(viewDef);
+        lastViewObj = viewDef;
       } catch (e) {
         console.error(`Failed to parse view "${currentViewName}" in ${mdPath}: ${e.message}`);
       }
 
       currentViewName = null;
+      continue;
+    }
+
+    // JS code block = calculator (attaches to preceding view)
+    if (trimmed === '```js' && lastViewObj) {
+      const jsLines = [];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '```') {
+        jsLines.push(lines[i]);
+        i++;
+      }
+      const jsCode = jsLines.join('\n').trim();
+      if (jsCode) {
+        lastViewObj.calculator = jsCode;
+      }
+      lastViewObj = null;
     }
   }
 

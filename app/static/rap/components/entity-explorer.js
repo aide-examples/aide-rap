@@ -305,6 +305,17 @@ const EntityExplorer = {
       const result = await ApiClient.getViewData(viewName);
       this.records = result.data || [];
       const viewSchema = await ApiClient.getViewSchema(viewName);
+
+      // Calculator: run client-side JS transform from Views.md
+      if (viewSchema.calculator) {
+        try {
+          const fn = new Function('data', 'schema', viewSchema.calculator);
+          fn(this.records, viewSchema);
+        } catch (e) {
+          console.error(`Calculator error in view "${viewName}":`, e);
+        }
+      }
+
       await EntityTable.loadView(viewName, viewSchema, this.records);
       this.updateRecordStatus(this.records.length);
     } catch (err) {

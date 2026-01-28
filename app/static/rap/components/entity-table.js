@@ -98,7 +98,7 @@ const EntityTable = {
       return;
     }
 
-    const columns = this.currentViewConfig.columns;
+    const columns = this.currentViewConfig.columns.filter(c => !c.hidden);
     const sortedRecords = this.getViewSortedRecords(columns);
 
     let html = '<div class="entity-table-wrapper"><table class="entity-table">';
@@ -151,7 +151,13 @@ const EntityTable = {
         } else {
           displayValue = DomUtils.escapeHtml(String(value));
         }
-        html += `<td>${displayValue}</td>`;
+        // Calculator cell styles (e.g., row._cellStyles = { colKey: { backgroundColor: '#fff' } })
+        const cellStyle = record._cellStyles?.[col.key];
+        const styleAttr = cellStyle
+          ? ` style="${Object.entries(cellStyle).map(([k,v]) =>
+              `${k.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}:${v}`).join(';')}"`
+          : '';
+        html += `<td${styleAttr}>${displayValue}</td>`;
       }
       html += '</tr>';
     }
