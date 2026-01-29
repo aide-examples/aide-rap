@@ -2,12 +2,21 @@
  * GenericService - Business logic layer for entity operations
  *
  * Provides transaction control and additional business logic
- * on top of GenericRepository
+ * on top of GenericRepository.
+ *
+ * Emits events via EventBus for extensibility:
+ *   entity:create:before (entityName, data)
+ *   entity:create:after  (entityName, record)
+ *   entity:update:before (entityName, id, data)
+ *   entity:update:after  (entityName, record)
+ *   entity:delete:before (entityName, id)
+ *   entity:delete:after  (entityName, id)
  */
 
 const { getDatabase } = require('../config/database');
 const repository = require('../repositories/GenericRepository');
 const logger = require('../utils/logger');
+const eventBus = require('../utils/EventBus');
 
 /**
  * Run operations within a transaction
@@ -47,41 +56,68 @@ function getEntity(entityName, id, correlationId = null) {
 
 /**
  * Create a new entity
+ * Emits: entity:create:before, entity:create:after
  */
 function createEntity(entityName, data, correlationId = null) {
   const log = correlationId ? logger.withCorrelation(correlationId) : logger;
 
   log.debug(`Creating ${entityName}`, { data });
 
-  return runInTransaction(() => {
+  // Before hook (can throw to abort)
+  eventBus.emit('entity:create:before', entityName, data);
+
+  const result = runInTransaction(() => {
     return repository.create(entityName, data);
   });
+
+  // After hook (informational)
+  eventBus.emit('entity:create:after', entityName, result);
+
+  return result;
 }
 
 /**
  * Update an existing entity
+ * Emits: entity:update:before, entity:update:after
  */
 function updateEntity(entityName, id, data, correlationId = null) {
   const log = correlationId ? logger.withCorrelation(correlationId) : logger;
 
   log.debug(`Updating ${entityName}`, { id, data });
 
-  return runInTransaction(() => {
+  // Before hook (can throw to abort)
+  eventBus.emit('entity:update:before', entityName, id, data);
+
+  const result = runInTransaction(() => {
     return repository.update(entityName, id, data);
   });
+
+  // After hook (informational)
+  eventBus.emit('entity:update:after', entityName, result);
+
+  return result;
 }
 
 /**
  * Delete an entity
+ * Emits: entity:delete:before, entity:delete:after
  */
 function deleteEntity(entityName, id, correlationId = null) {
   const log = correlationId ? logger.withCorrelation(correlationId) : logger;
 
   log.debug(`Deleting ${entityName}`, { id });
 
-  return runInTransaction(() => {
+  // Before hook (can throw to abort)
+  eventBus.emit('entity:delete:before', entityName, id);
+
+  const result = runInTransaction(() => {
     return repository.remove(entityName, id);
   });
+
+  // After hook (informational)
+  eventBus.emit('entity:delete:after', entityName, id);
+
+  return result;
 }
 
 /**
@@ -118,19 +154,28 @@ function getBackReferences(entityName, id, correlationId = null) {
 
 /**
  * Batch create multiple records (within transaction)
+ * Emits: entity:batch:before, entity:batch:after
  */
 function batchCreate(entityName, records, correlationId = null) {
   const log = correlationId ? logger.withCorrelation(correlationId) : logger;
 
   log.debug(`Batch creating ${records.length} ${entityName} records`);
 
-  return runInTransaction(() => {
+  // Before hook (can throw to abort)
+  eventBus.emit('entity:batch:before', entityName, records);
+
+  const result = runInTransaction(() => {
     const created = [];
     for (const data of records) {
       created.push(repository.create(entityName, data));
     }
     return created;
   });
+
+  // After hook (informational)
+  eventBus.emit('entity:batch:after', entityName, result);
+
+  return result;
 }
 
 /**

@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const eventBus = require('../utils/EventBus');
 const { generateSchema, generateCreateTableSQL, generateViewSQL } = require('../utils/SchemaGenerator');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const { parseAllUserViews, generateUserViewSQL } = require('../utils/UserViewGenerator');
@@ -534,6 +535,7 @@ function checkSchemaChanged() {
  * Updates the cached schema without rebuilding database tables.
  * Note: This only updates the in-memory schema. Table structure is NOT changed.
  * Use forceRebuild() if you need to apply schema changes to the database.
+ * Emits: schema:reload:before, schema:reload:after
  * @returns {{ success: boolean, hash: string, warning?: string }}
  */
 function reloadSchema() {
@@ -542,6 +544,9 @@ function reloadSchema() {
   }
 
   const oldHash = computeSchemaHash(schema);
+
+  // Before hook (can throw to abort)
+  eventBus.emit('schema:reload:before', schema);
 
   // Re-parse markdown
   schema = generateSchema(storedDataModelPath, storedEnabledEntities);
@@ -565,6 +570,9 @@ function reloadSchema() {
   const warning = oldHash !== newHash
     ? 'Schema changed. Restart server or use forceRebuild() to apply changes to database tables.'
     : undefined;
+
+  // After hook (informational)
+  eventBus.emit('schema:reload:after', schema, { oldHash, newHash, changed: oldHash !== newHash });
 
   return { success: true, hash: newHash, warning };
 }
