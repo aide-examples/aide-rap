@@ -47,7 +47,7 @@
         // Import constants from shared module
         const { BOX_WIDTH, BOX_HEIGHT_COMPACT, ATTR_LINE_HEIGHT, HEADER_HEIGHT, BOX_PADDING,
                 STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_LABEL,
-                OPTIONAL_DASH } = DiagramConstants;
+                OPTIONAL_DASH, READONLY_DASH } = DiagramConstants;
 
         /**
          * Escape text for use in XML/SVG.
@@ -76,6 +76,28 @@
         function measureText(text, fontSize, fontFamily) {
             measureCtx.font = `${fontSize}px ${fontFamily}`;
             return measureCtx.measureText(text).width;
+        }
+
+        // Truncate text to fit within maxWidth, adding ellipsis if needed
+        function truncateText(text, maxWidth, fontSize, fontFamily) {
+            const textWidth = measureText(text, fontSize, fontFamily);
+            if (textWidth <= maxWidth) return text;
+
+            const ellipsis = '...';
+            const ellipsisWidth = measureText(ellipsis, fontSize, fontFamily);
+            const availableWidth = maxWidth - ellipsisWidth;
+
+            // Binary search for max characters that fit
+            let lo = 0, hi = text.length;
+            while (hi - lo > 1) {
+                const mid = Math.floor((lo + hi) / 2);
+                if (measureText(text.substring(0, mid), fontSize, fontFamily) <= availableWidth) {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            return text.substring(0, lo) + ellipsis;
         }
 
         // Word-wrap text into lines that fit within maxWidth
@@ -343,8 +365,10 @@
                         path.setAttribute('stroke-width', '1');
                         path.setAttribute('marker-end', 'url(#arrowhead)');
 
-                        // Dashed line for optional relationships
-                        if (/\[OPTIONAL\]/i.test(attr.type)) {
+                        // Dashed/dotted line for optional or readonly relationships
+                        if (/\[READONLY\]/i.test(attr.description || '')) {
+                            path.setAttribute('stroke-dasharray', READONLY_DASH);
+                        } else if (/\[OPTIONAL\]/i.test(attr.type)) {
                             path.setAttribute('stroke-dasharray', OPTIONAL_DASH);
                         }
 
@@ -388,27 +412,47 @@
                 return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
             }
 
-            // Helper to get box width for a class
+            // Helper to get box width for a class (matches getBoxWidth logic)
             function boxWidth(className) {
-                if (detailed) return BOX_WIDTH;
-
-                // Compact mode: at least as wide as detailed view (BOX_WIDTH)
                 const classDef = model.classes[className] || {};
-                const description = classDef.description || '';
                 const nameWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY) + 20;
 
-                if (!description) return Math.max(nameWidth, BOX_WIDTH);
+                // Calculate detailed mode width
+                function calcDetailedWidth() {
+                    if (!fitToContent) return BOX_WIDTH;
+                    const attrs = ConnectionCalculator.getVisibleAttributes(
+                        (model.classes[className] || {}).attributes, className
+                    );
+                    let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
+                    for (const attr of attrs) {
+                        const cleanType = ConnectionCalculator.extractBaseType(attr.type);
+                        const attrText = entityNames.includes(cleanType)
+                            ? attr.name
+                            : `${attr.name}: ${cleanType}`;
+                        maxWidth = Math.max(maxWidth, measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY));
+                    }
+                    return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
+                }
+
+                if (detailed) {
+                    return calcDetailedWidth();
+                }
+
+                // Compact mode: at least as wide as detailed view
+                const minWidth = calcDetailedWidth();
+                const description = classDef.description || '';
+                if (!description) return Math.max(nameWidth, minWidth);
 
                 const h = boxHeight(className);
                 const availableHeight = h - HEADER_HEIGHT - BOX_PADDING;
                 const maxLines = Math.max(1, Math.floor(availableHeight / ATTR_LINE_HEIGHT));
-                const textPadding = 10;
+                const textPadding = 20;
 
                 let lo = nameWidth;
                 let hi = 300;
 
                 const linesAtMax = wrapText(description, hi - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
-                if (linesAtMax.length > maxLines) return Math.max(hi, BOX_WIDTH);
+                if (linesAtMax.length > maxLines) return Math.max(hi, minWidth);
 
                 while (hi - lo > 2) {
                     const mid = Math.floor((lo + hi) / 2);
@@ -420,7 +464,7 @@
                     }
                 }
 
-                return Math.max(nameWidth, hi, BOX_WIDTH);
+                return Math.max(nameWidth, hi, minWidth);
             }
 
             // Pre-compute widths for all entities
@@ -430,15 +474,21 @@
             }
 
             // Calculate canvas dimensions
-            let maxX = 400, maxY = 300;
+            let maxX = 400, entitiesMaxY = 0;
             for (const className of entityNames) {
                 const pos = positions[className] || { x: 50, y: 50 };
                 maxX = Math.max(maxX, pos.x + widths[className] + 50);
-                maxY = Math.max(maxY, pos.y + boxHeight(className) + 50);
+                entitiesMaxY = Math.max(entitiesMaxY, pos.y + boxHeight(className));
             }
 
+            // Calculate legend height (areas + possibly global types + header + padding)
+            const numAreas = Object.keys(model.areas || {}).length;
+            const hasGlobalTypes = Object.keys(model.globalTypes || {}).length > 0;
+            const legendRows = numAreas + (hasGlobalTypes ? 1 : 0);
+            const legendHeight = 30 + legendRows * 20 + 20; // header + rows + bottom padding
+
             const width = maxX;
-            const height = maxY;
+            const height = entitiesMaxY + 40 + legendHeight; // 40px gap between entities and legend
 
             const parts = [
                 `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
@@ -477,7 +527,10 @@
 
                     if (entityNames.includes(baseType)) {
                         const isOptional = /\[OPTIONAL\]/i.test(attr.type);
-                        const dashAttr = isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '';
+                        const isReadonly = /\[READONLY\]/i.test(attr.description || '');
+                        const dashAttr = isReadonly
+                            ? ` stroke-dasharray="${READONLY_DASH}"`
+                            : (isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '');
 
                         if (className === baseType) {
                             // Self-reference semicircle
@@ -535,15 +588,19 @@
                 if (detailed) {
                     // Detailed mode: attributes (FK attrs as bold name, others as name: type)
                     const visibleAttrs = ConnectionCalculator.getVisibleAttributes(classDef.attributes, className);
+                    const maxTextWidth = w - 10; // 5px padding on each side
                     for (let i = 0; i < visibleAttrs.length; i++) {
                         const attr = visibleAttrs[i];
                         const attrY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
                         const cleanType = ConnectionCalculator.extractBaseType(attr.type);
                         if (entityNames.includes(cleanType)) {
                             // FK attribute: bold name only
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold">${escapeXml(attr.name)}</text>`);
+                            const displayText = fitToContent ? attr.name : truncateText(attr.name, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold">${escapeXml(displayText)}</text>`);
                         } else {
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}">${escapeXml(attr.name)}: ${escapeXml(cleanType)}</text>`);
+                            const fullText = `${attr.name}: ${cleanType}`;
+                            const displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}">${escapeXml(displayText)}</text>`);
                         }
                     }
                 } else {
@@ -566,16 +623,67 @@
             // Legend
             parts.push('');
             parts.push('  <!-- Legend -->');
+
+            // Collect types by area
+            const typesByArea = {};
+            for (const [className, classDef] of Object.entries(model.classes || {})) {
+                if (classDef.types && Object.keys(classDef.types).length > 0) {
+                    const area = classDef.area || 'unknown';
+                    if (!typesByArea[area]) typesByArea[area] = [];
+                    for (const typeName of Object.keys(classDef.types)) {
+                        typesByArea[area].push(typeName);
+                    }
+                }
+            }
+
+            // Global types (gray)
+            const globalTypeNames = Object.keys(model.globalTypes || {});
+
             let legendX = 20;
-            let legendY = height - 120;
+            let legendY = entitiesMaxY + 50; // Start below entity area with gap
+            const typesStartX = 160; // Start X for types column
+            const typeBoxWidth = 10;
+            const typeBoxHeight = 10;
+            const typeSpacing = 5;
+
             parts.push(`  <text x="${legendX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Areas:</text>`);
+            parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Types:</text>`);
             legendY += 20;
+
             for (const [areaId, areaDef] of Object.entries(model.areas || {})) {
                 const areaColor = areaDef.color || '#FFFFFF';
                 const areaName = areaDef.name || areaId;
+
+                // Area box and name
                 parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
                 parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
+
+                // Types for this area (on the same row)
+                const areaTypes = typesByArea[areaId] || [];
+                let typeX = typesStartX;
+                for (const typeName of areaTypes) {
+                    const textWidth = measureText(typeName, 9, FONT_FAMILY);
+                    parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
+                    parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
+                    typeX += textWidth + 6 + typeSpacing;
+                }
+
                 legendY += 20;
+            }
+
+            // Global types row (gray)
+            if (globalTypeNames.length > 0) {
+                const grayColor = '#E0E0E0';
+                parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${grayColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+                parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">Global</text>`);
+
+                let typeX = typesStartX;
+                for (const typeName of globalTypeNames) {
+                    const textWidth = measureText(typeName, 9, FONT_FAMILY);
+                    parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${grayColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
+                    parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
+                    typeX += textWidth + 6 + typeSpacing;
+                }
             }
 
             parts.push('</svg>');

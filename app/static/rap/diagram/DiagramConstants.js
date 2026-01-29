@@ -25,7 +25,10 @@
         FONT_SIZE_LABEL: 9,
 
         // Optional relationship styling
-        OPTIONAL_DASH: '6,3'
+        OPTIONAL_DASH: '6,3',
+
+        // Readonly/computed relationship styling (dotted)
+        READONLY_DASH: '2,2'
     };
 
     // Export as browser global
