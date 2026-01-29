@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const { TypeParser } = require('../../shared/types/TypeParser');
+const { parseAreasFromTable } = require('../../../tools/parse-datamodel');
 
 // Shared TypeParser instance for extracting type names from markdown links
 const typeParserInstance = new TypeParser();
@@ -241,42 +242,6 @@ function decodeHtmlEntities(text) {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
-}
-
-/**
- * Parse the Areas from Entity Descriptions section
- * Format: ### AreaName followed by <div style="background-color: #COLOR"> and entity table
- */
-function parseAreasFromTable(mdContent) {
-  const areas = {};
-  const classToArea = {};
-
-  // Match ### AreaName followed by <div style="background-color: #COLOR"> and entity table
-  const areaPattern = /###\s+([^\n]+)\n<div[^>]*style="[^"]*background-color:\s*(#[0-9A-Fa-f]{6})[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
-  let match;
-
-  while ((match = areaPattern.exec(mdContent)) !== null) {
-    const areaName = match[1].trim();
-    const color = match[2];
-    const tableContent = match[3];
-
-    const areaKey = areaName.toLowerCase().replace(/ /g, '_').replace(/&/g, 'and');
-
-    areas[areaKey] = {
-      name: areaName,
-      color: color
-    };
-
-    // Extract entity names from markdown links: [EntityName](classes/EntityName.md)
-    const entityPattern = /\[([^\]]+)\]\(classes\/[^)]+\.md\)/g;
-    let entityMatch;
-    while ((entityMatch = entityPattern.exec(tableContent)) !== null) {
-      const className = entityMatch[1].trim();
-      classToArea[className] = areaKey;
-    }
-  }
-
-  return { areas, classToArea };
 }
 
 /**
