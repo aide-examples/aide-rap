@@ -106,22 +106,41 @@ function parseUIAnnotations(description) {
 /**
  * Parse computed field annotation from description
  * Supported: [DAILY=Entity[condition].field], [IMMEDIATE=...], [HOURLY=...], [ON_DEMAND=...]
- * Example: [DAILY=EngineMount[removed_date=null OR removed_date>TODAY].aircraft]
- * Returns: { schedule: 'DAILY', sourceEntity: 'EngineMount', condition: '...', targetField: 'aircraft' }
+ *
+ * Condition can be:
+ * - Boolean expression: exit_date=null OR exit_date>TODAY
+ * - Aggregate function: MAX(end_date), MIN(start_date)
+ *
+ * Examples:
+ * - [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator]
+ * - [DAILY=EngineAllocation[MAX(end_date)].aircraft]
+ *
+ * Returns: { schedule, sourceEntity, condition, targetField, aggregate?, aggregateField? }
  */
 function parseComputedAnnotation(description) {
   // Match [SCHEDULE=Entity[condition].field]
-  const match = description.match(/\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=(\w+)\[([^\]]+)\]\.(\w+)\]/i);
+  const match = description.match(/\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND|ONCHANGE)=(\w+)\[([^\]]+)\]\.(\w+)\]/i);
   if (!match) {
     return null;
   }
 
-  return {
+  const condition = match[3];
+  const result = {
     schedule: match[1].toUpperCase(),
     sourceEntity: match[2],
-    condition: match[3],
+    condition,
     targetField: match[4]
   };
+
+  // Check for aggregate function: MAX(field) or MIN(field)
+  const aggMatch = condition.match(/^(MAX|MIN)\((\w+)\)$/i);
+  if (aggMatch) {
+    result.aggregate = aggMatch[1].toUpperCase();
+    result.aggregateField = aggMatch[2];
+    result.condition = null; // No WHERE condition, just ORDER BY
+  }
+
+  return result;
 }
 
 /**

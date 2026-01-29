@@ -97,13 +97,19 @@ The SchemaGenerator automatically creates:
 
 ### Computed Fields
 
-Computed fields are not stored in the database:
+Computed fields are stored in the database but calculated automatically:
 
 ```markdown
-| current_aircraft | Aircraft | [READONLY] [DAILY=EngineMount[removed_date=null].aircraft] | 1001 |
+# Boolean filter: find record matching condition
+| current_operator | Operator | [READONLY] [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator] | 5 |
+
+# Aggregate function: find record with MAX/MIN value
+| latest_aircraft | Aircraft | [READONLY] [DAILY=EngineAllocation[MAX(end_date)].aircraft] | 1 |
 ```
 
-These don't require `ALTER TABLE` - they are calculated at runtime.
+These require `ALTER TABLE ADD COLUMN` but values are computed by ComputedFieldService.
+
+See [ComputedReferences.md](../systems/irma/docs/requirements/ComputedReferences.md) for full syntax.
 
 ### Seed Data
 

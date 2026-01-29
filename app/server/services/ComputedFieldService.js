@@ -73,6 +73,11 @@ function conditionToSQL(condition, alias = '') {
 /**
  * Build SQL UPDATE statement for a computed field
  * Only updates rows where the value actually changes (avoids false "updated" counts)
+ *
+ * Supports two modes:
+ * 1. Condition mode: [exit_date=null OR exit_date>TODAY] → WHERE clause
+ * 2. Aggregate mode: [MAX(end_date)] → ORDER BY clause (NULL = highest priority)
+ *
  * @param {Object} field - { entity, column, rule }
  * @returns {string} SQL UPDATE statement
  */
@@ -86,16 +91,38 @@ function buildUpdateSQL(field) {
   const sourceField = rule.targetField + '_id'; // aircraft -> aircraft_id
   const linkField = toSnakeCase(entity.className) + '_id'; // Engine -> engine_id
 
-  // Build condition SQL
-  const conditionSQL = conditionToSQL(rule.condition, 'src');
+  let whereClause;
+  let orderByClause;
+
+  if (rule.aggregate) {
+    // Aggregate mode: MAX(field) or MIN(field)
+    // Implicit NOT NULL filter on target field (derived from FK type)
+    whereClause = `src.${linkField} = ${targetTable}.id
+      AND src.${sourceField} IS NOT NULL`;
+
+    if (rule.aggregate === 'MAX') {
+      // MAX: NULL values have highest priority (= current/active), then descending
+      orderByClause = `CASE WHEN src.${rule.aggregateField} IS NULL THEN 1 ELSE 0 END DESC,
+      src.${rule.aggregateField} DESC`;
+    } else {
+      // MIN: Non-NULL values first, then ascending
+      orderByClause = `CASE WHEN src.${rule.aggregateField} IS NULL THEN 1 ELSE 0 END ASC,
+      src.${rule.aggregateField} ASC`;
+    }
+  } else {
+    // Condition mode: boolean expression
+    const conditionSQL = conditionToSQL(rule.condition, 'src');
+    whereClause = `src.${linkField} = ${targetTable}.id
+      AND (${conditionSQL})`;
+    orderByClause = 'src.id DESC';
+  }
 
   // Subquery to compute the new value
   const subquery = `(
     SELECT src.${sourceField}
     FROM ${sourceTable} src
-    WHERE src.${linkField} = ${targetTable}.id
-      AND (${conditionSQL})
-    ORDER BY src.id DESC
+    WHERE ${whereClause}
+    ORDER BY ${orderByClause}
     LIMIT 1
   )`;
 
