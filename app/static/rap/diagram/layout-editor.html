@@ -686,6 +686,17 @@
                 }
             }
 
+            // Watermark in bottom right corner (aligned with legend start)
+            parts.push('');
+            parts.push('  <!-- Watermark -->');
+            const wmX = width - 15;
+            const wmYBase = entitiesMaxY + 50; // Same as legend start
+            const today = new Date().toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+            parts.push(`  <text x="${wmX}" y="${wmYBase}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Artificial Intelligence for Development Engineers <tspan fill="#0066cc">(http://github.com/aide-examples)</tspan></text>`);
+            parts.push(`  <text x="${wmX}" y="${wmYBase + 14}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Rapid Application Prototype</text>`);
+            parts.push(`  <text x="${wmX}" y="${wmYBase + 28}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">IRMA : Intelligent Repair and Maintenance in Aviation</text>`);
+            parts.push(`  <text x="${wmX}" y="${wmYBase + 42}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Frankfurt, ${today}</text>`);
+
             parts.push('</svg>');
             return parts.join('\n');
         }
