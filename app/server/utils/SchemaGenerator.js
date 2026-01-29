@@ -861,8 +861,10 @@ function buildDependencyOrder(entities) {
     sorted.push(node);
 
     for (const [name, dependencies] of Object.entries(deps)) {
-      if (dependencies.includes(node)) {
-        inDegree[name]--;
+      // Count how many times this node appears in dependencies (e.g., ExchangeRate has Currency twice)
+      const count = dependencies.filter(d => d === node).length;
+      if (count > 0) {
+        inDegree[name] -= count;
         if (inDegree[name] === 0 && !sorted.includes(name)) {
           queue.push(name);
         }
