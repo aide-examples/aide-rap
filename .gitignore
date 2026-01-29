@@ -7,6 +7,9 @@ app/config.json
 releases/
 aide-frame
 
+# External systems (symlinked from separate repos)
+app/systems/irma
+
 # Logs
 app/logs/
 app/systems/*/logs/
