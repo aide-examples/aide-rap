@@ -39,37 +39,60 @@ The generic RAP engine transforms Markdown-based data models into complete appli
 
 Concrete applications built on AIDE RAP. Each system defines its own entities, relationships, and seed data:
 
-- **IRMA** – *Intelligent Repair and Maintenance in Aviation* – manages aircraft fleet data, operators, and maintenance records
-- **Book** – A simple publishing system with authors and books
+- **Book** – A simple publishing system with authors and books (included)
+- **IRMA** – *Intelligent Repair and Maintenance in Aviation* – manages aircraft fleet data, operators, and maintenance records (private repository, requires separate access)
 
 You can create your own system by adding a folder under `app/systems/`.
 
 ---
 
-## Quick Start
+## Installation
+
+### Basic Installation (Public Demo Systems)
 
 ```bash
-# Clone the repository
+# Clone repositories
 git clone https://github.com/aide-examples/aide-rap.git
-
-# Clone the aide-frame repository
-# This is necessary because aide-rap uses aide-frame internally
-# and aide-frame is stored in a separate repository
 git clone https://github.com/aide-examples/aide-frame.git
 
-# Create symlink
+# Create symlink for aide-frame
 cd aide-rap
 ln -s ../aide-frame aide-frame
 
 # Install and run
 npm install
-./run -s irma -p 18354  # Start IRMA system
-./run -s book -p 18352  # Start Book system on different port
+./run -s book_1 -p 18352
 ```
 
-Open http://localhost:18354
+Available demo systems: `book_1`, `book_2`, `flow`
 
-# Install as PWA if you like
+### Installation with Private System
+
+If you have access to a private system repository (e.g., IRMA):
+
+```bash
+# Clone all repositories
+git clone https://github.com/aide-examples/aide-rap.git
+git clone https://github.com/aide-examples/aide-frame.git
+git clone git@github.com:YOUR_ORG/aide-irma.git  # Private - requires access
+
+# Create symlinks
+cd aide-rap
+ln -s ../aide-frame aide-frame
+ln -s ../aide-irma app/systems/irma
+
+# Install and run
+npm install
+./run -s irma -p 18354
+```
+
+### Create Your Own System
+
+Start aide-rap with a demo system and use the **Model Builder** (`/about` → Model Builder tab) to create a new system with AI assistance.
+
+---
+
+Open http://localhost:18354 — install as PWA if you like
 
 ---
 
@@ -98,8 +121,10 @@ aide-rap/
 │   ├── shared/               # Isomorphic code (validation, types)
 │   ├── static/rap/           # Frontend (HTML, CSS, JS)
 │   └── systems/              # Multi-system support
-│       ├── irma/             # IRMA aviation system
-│       └── book/             # Book demo system
+│       ├── book_1/           # Book demo system
+│       ├── book_2/           # Book with translations
+│       ├── flow/             # Flow demo system
+│       └── irma -> (symlink) # Private systems via symlink
 ├── tools/                    # CLI utilities
 └── aide-frame/               # Framework (symlink)
 ```
