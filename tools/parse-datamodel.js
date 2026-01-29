@@ -38,12 +38,27 @@ function parseAreasFromTable(mdContent) {
             color: color
         };
 
-        // Extract entity names from markdown links: [EntityName](classes/EntityName.md)
-        const entityPattern = /\[([^\]]+)\]\(classes\/[^)]+\.md\)/g;
-        let entityMatch;
-        while ((entityMatch = entityPattern.exec(tableContent)) !== null) {
-            const className = entityMatch[1].trim();
-            classToArea[className] = areaKey;
+        // Extract entity names from table rows
+        // Supports both: [EntityName](classes/EntityName.md) and plain EntityName
+        const tableRows = tableContent.match(/\|\s*([^|]+)\s*\|[^|]+\|/g) || [];
+        for (const row of tableRows) {
+            // Skip header row
+            if (row.includes('Entity') && row.includes('Description')) continue;
+            if (row.includes('---')) continue;
+
+            const cellMatch = row.match(/\|\s*([^|]+)\s*\|/);
+            if (cellMatch) {
+                let entityName = cellMatch[1].trim();
+                // Handle markdown link format: [EntityName](classes/EntityName.md)
+                const linkMatch = entityName.match(/\[([^\]]+)\]/);
+                if (linkMatch) {
+                    entityName = linkMatch[1].trim();
+                }
+                // Only accept PascalCase names (entity names)
+                if (entityName && /^[A-Z][a-zA-Z0-9]*$/.test(entityName)) {
+                    classToArea[entityName] = areaKey;
+                }
+            }
         }
     }
 

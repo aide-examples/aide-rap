@@ -113,19 +113,19 @@
             }
         }
 
-        // --- Linkify table cells (priority: entity > internal type > external type)
+        // --- Linkify table cells and list items (priority: entity > internal type > external type)
         const isTypesDoc = docPath === typesDocPath;
 
-        container.querySelectorAll('td').forEach(td => {
-            if (td.querySelector('a')) return;
-            const text = td.textContent;
+        function processElement(el) {
+            if (el.querySelector('a')) return;
+            const text = el.textContent.trim();
             if (!text || text.length < 2) return;
 
             // 1. Entity name → link to entity documentation page
             for (const { name, path } of docNames) {
                 if (name === currentName) continue;
                 if (text === name || text.startsWith(name + ' ')) {
-                    linkify(td, text, name, '?doc=' + path,
+                    linkify(el, el.textContent, name, '?doc=' + path,
                         () => loadDoc(path));
                     return;
                 }
@@ -134,7 +134,7 @@
             // 2. Internal type → anchor in current page
             for (const { name, anchor } of internalTypes) {
                 if (text === name || text.startsWith(name + ' ')) {
-                    linkify(td, text, name, '#' + anchor,
+                    linkify(el, el.textContent, name, '#' + anchor,
                         () => scrollToAnchor(anchor));
                     return;
                 }
@@ -145,10 +145,10 @@
                 for (const { name, anchor } of externalTypes) {
                     if (text === name || text.startsWith(name + ' ')) {
                         if (isTypesDoc) {
-                            linkify(td, text, name, '#' + anchor,
+                            linkify(el, el.textContent, name, '#' + anchor,
                                 () => scrollToAnchor(anchor));
                         } else {
-                            linkify(td, text, name,
+                            linkify(el, el.textContent, name,
                                 '?doc=' + typesDocPath + '#' + anchor,
                                 () => loadDoc(typesDocPath, '#' + anchor));
                         }
@@ -156,6 +156,12 @@
                     }
                 }
             }
-        });
+        }
+
+        // Process table cells
+        container.querySelectorAll('td').forEach(processElement);
+
+        // Process list items (for entity lists in Crud.md etc.)
+        container.querySelectorAll('li').forEach(processElement);
     };
 })();
