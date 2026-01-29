@@ -345,9 +345,10 @@ function parseEntityFile(fileContent) {
   const attributes = [];
 
   // Parse entity-local types and register them
+  let localTypes = {};
   const typesSection = typeParserInstance._extractTypesSection(fileContent);
   if (typesSection) {
-    const localTypes = typeParserInstance._parseTypesContent(typesSection, `entity:${className}`);
+    localTypes = typeParserInstance._parseTypesContent(typesSection, `entity:${className}`);
     // Types are automatically registered in TypeRegistry by _parseTypesContent
   }
 
@@ -430,7 +431,8 @@ function parseEntityFile(fileContent) {
     className,
     description,
     attributes,
-    calculations
+    calculations,
+    localTypes
   };
 }
 
@@ -456,7 +458,8 @@ function parseEntityDescriptions(mdContent, mdPath) {
           classes[parsed.className] = {
             description: parsed.description,
             attributes: parsed.attributes,
-            calculations: parsed.calculations
+            calculations: parsed.calculations,
+            localTypes: parsed.localTypes
           };
         }
       }
@@ -850,7 +853,8 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     indexes,
     foreignKeys,
     enumFields,
-    ui: entityUI
+    ui: entityUI,
+    localTypes: classDef.localTypes || {}
   };
 }
 

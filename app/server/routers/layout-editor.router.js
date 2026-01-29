@@ -24,7 +24,8 @@ function schemaToModel(schema) {
                 name: col.displayName || col.name,
                 type: col.foreignKey ? col.foreignKey.entity : col.type,
                 description: col.description || ''
-            }))
+            })),
+            types: entity.localTypes || {}
         };
     }
 

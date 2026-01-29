@@ -180,8 +180,9 @@ class TypeParser {
               };
             }
           }
-          // Enum types with ### header
-          else if (currentSection === 'enum' && currentTypeName) {
+          // Enum types with ### header (Internal/External/Description table)
+          // Note: This can appear under any section (even ## Pattern Types) - the table format determines the type
+          else if (currentTypeName && tableHeaders.includes('internal') && tableHeaders.includes('external')) {
             const enumValue = this._parseEnumRow(cells, tableHeaders);
             if (enumValue) {
               currentEnumValues.push(enumValue);
@@ -223,7 +224,9 @@ class TypeParser {
   _flushCurrentType(section, name, enumValues, description, scope, types) {
     if (!name) return;
 
-    if (section === 'enum' && enumValues.length > 0) {
+    // Register enum if we have values - table format determines type, not section
+    // (enums with Internal/External columns can appear under ## Pattern Types)
+    if (enumValues.length > 0) {
       this.registry.registerEnum(name, enumValues, scope);
       types[name] = {
         kind: 'enum',
