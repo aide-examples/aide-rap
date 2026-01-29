@@ -54,8 +54,10 @@ function buildPrompt(entityName, schema, instruction, existingData, contextData 
     if (records && records.length > 0) {
       fkSummary[refEntity] = records.map(r => {
         let label = null;
-        if (labelFields && labelFields.length > 0) {
-          label = r[labelFields[0]];
+        // labelFields can be object {primary, secondary} or array [field1, field2]
+        const primaryField = labelFields?.primary || (Array.isArray(labelFields) ? labelFields[0] : null);
+        if (primaryField) {
+          label = r[primaryField];
         }
         if (!label) {
           label = r.name || r.title || r.designation || r.registration || r.serial_number || r.icao_code || `#${r.id}`;
@@ -349,13 +351,17 @@ function loadBackReferenceData(entityName, getDatabase, fullSchema) {
     try {
       const records = db.prepare(`SELECT * FROM ${refEntityDef.tableName}`).all();
       if (records && records.length > 0) {
-        const labelFields = refEntityDef.ui?.labelFields || [];
+        // labelFields can be object {primary, secondary} or array
+        const labelFieldsObj = refEntityDef.ui?.labelFields;
+        const labelFieldsArr = labelFieldsObj?.primary
+          ? [labelFieldsObj.primary, labelFieldsObj.secondary].filter(Boolean)
+          : (Array.isArray(labelFieldsObj) ? labelFieldsObj : []);
         const fallbackFields = ['name', 'title', 'designation', 'serial_number', 'registration', 'icao_code'];
 
         backRefData[rel.entity] = {
           records: records.map(r => {
             let label = null;
-            for (const field of [...labelFields, ...fallbackFields]) {
+            for (const field of [...labelFieldsArr, ...fallbackFields]) {
               if (r[field]) {
                 label = r[field];
                 break;
