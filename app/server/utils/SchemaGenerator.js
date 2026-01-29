@@ -776,6 +776,16 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     }
   }
 
+  // Extract entity-level labelFields from column UI annotations
+  const labelCol = columns.find(c => c.ui?.label);
+  const label2Col = columns.find(c => c.ui?.label2);
+  const entityUI = {
+    labelFields: {
+      primary: labelCol?.name || null,
+      secondary: label2Col?.name || null
+    }
+  };
+
   return {
     className,
     tableName,
@@ -786,7 +796,8 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     uniqueKeys,
     indexes,
     foreignKeys,
-    enumFields
+    enumFields,
+    ui: entityUI
   };
 }
 
