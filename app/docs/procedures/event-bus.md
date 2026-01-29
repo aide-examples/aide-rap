@@ -54,6 +54,47 @@ unsubscribe(); // removes handler
 | `schema:reload:before` | `(oldSchema)` | Before schema reload |
 | `schema:reload:after` | `(newSchema, { oldHash, newHash, changed })` | After schema reload |
 
+### Backup Events (database.js)
+
+| Event | Arguments | Description |
+|-------|-----------|-------------|
+| `db:backup:before` | `({ path, reason })` | Before backup starts |
+| `db:backup:after` | `({ path, totalRecords, entityCount })` | After backup completes |
+
+### Computed Field Events (ComputedFieldService)
+
+| Event | Arguments | Description |
+|-------|-----------|-------------|
+| `computed:run:after` | `({ entityName, fieldName, updated, errors, duration })` | After computed field run |
+| `computed:scheduled` | `({ nextRun, inMs })` | Daily run scheduled |
+| `computed:defaults:after` | `({ entityName, updated, errors })` | After defaults applied |
+
+### Seed Events (SeedManager)
+
+| Event | Arguments | Description |
+|-------|-----------|-------------|
+| `seed:load:before` | `(entityName, recordCount)` | Before loading entity seeds |
+| `seed:load:after` | `(entityName, { inserted, errors })` | After loading entity seeds |
+| `seed:loadAll:before` | `(entityNames)` | Before loading all seeds |
+| `seed:loadAll:after` | `({ results, totalInserted, totalErrors })` | After all seeds loaded |
+| `seed:resolve:warning` | `({ entityName, field, value, targetEntity })` | FK resolution warning |
+
+### Auth Events (auth.router)
+
+| Event | Arguments | Description |
+|-------|-----------|-------------|
+| `auth:login:after` | `({ role, ip })` | Successful login |
+| `auth:login:failed` | `({ role, reason, ip })` | Failed login attempt |
+| `auth:logout:after` | `({ role, ip })` | User logged out |
+
+### Export Events (export.router)
+
+| Event | Arguments | Description |
+|-------|-----------|-------------|
+| `export:start` | `({ format, entity, recordCount/nodeCount })` | Export started |
+| `export:complete` | `({ format, entity, recordCount/nodeCount, size? })` | Export completed |
+| `export:error` | `({ format, entity, error })` | Export failed |
+
 ## Event Naming Convention
 
 ```

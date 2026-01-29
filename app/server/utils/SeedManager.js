@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const eventBus = require('./EventBus');
 
 // Module-level seed directory (configured via init())
 let SEED_DIR = null;
@@ -173,6 +174,7 @@ function resolveConceptualFKs(entityName, record, lookups) {
         delete resolved[conceptualName];
       } else {
         console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
+        eventBus.emit('seed:resolve:warning', { entityName, field: conceptualName, value: labelValue, targetEntity });
       }
     }
     // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
@@ -186,6 +188,7 @@ function resolveConceptualFKs(entityName, record, lookups) {
         resolved[technicalName] = resolvedId;
       } else {
         console.warn(`  Warning: Could not resolve ${technicalName}="${labelValue}" for ${entityName}`);
+        eventBus.emit('seed:resolve:warning', { entityName, field: technicalName, value: labelValue, targetEntity });
       }
     }
   }
@@ -674,6 +677,9 @@ function loadEntity(entityName, lookups = null, options = {}) {
     return { loaded: 0, updated: 0, skipped: 0 };
   }
 
+  // Emit before event
+  eventBus.emit('seed:load:before', entityName, records.length);
+
   // Build lookups for FK resolution if not provided (with seed file fallback)
   if (!lookups) {
     lookups = {};
@@ -792,7 +798,12 @@ function loadEntity(entityName, lookups = null, options = {}) {
     }
   }
 
-  return { loaded, updated, skipped, replaced, errors };
+  const result = { loaded, updated, skipped, replaced, errors };
+
+  // Emit after event
+  eventBus.emit('seed:load:after', entityName, result);
+
+  return result;
 }
 
 /**
@@ -833,6 +844,14 @@ function loadAll() {
   // Build lookups incrementally as entities are loaded (for FK resolution)
   const lookups = {};
 
+  // Collect entities with seed files
+  const entitiesToLoad = schema.orderedEntities
+    .filter(e => fs.existsSync(path.join(getSeedDir(), `${e.className}.json`)))
+    .map(e => e.className);
+
+  // Emit before event
+  eventBus.emit('seed:loadAll:before', entitiesToLoad);
+
   // Load in dependency order
   for (const entity of schema.orderedEntities) {
     const seedFile = path.join(getSeedDir(), `${entity.className}.json`);
@@ -848,6 +867,9 @@ function loadAll() {
       }
     }
   }
+
+  // Emit after event
+  eventBus.emit('seed:loadAll:after', results);
 
   return results;
 }

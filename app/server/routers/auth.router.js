@@ -1,9 +1,11 @@
 /**
  * Authentication Router
  * Handles login, logout, and session management
+ * Emits: auth:login:after, auth:login:failed, auth:logout:after
  */
 const express = require('express');
 const bcrypt = require('bcrypt');
+const eventBus = require('../utils/EventBus');
 
 module.exports = function(cfg) {
     const router = express.Router();
@@ -75,6 +77,7 @@ module.exports = function(cfg) {
 
             const valid = await bcrypt.compare(password || '', hash);
             if (!valid) {
+                eventBus.emit('auth:login:failed', { role, reason: 'invalid_password', ip: req.ip });
                 return res.status(401).json({ error: 'Invalid password' });
             }
         } else {
@@ -82,6 +85,7 @@ module.exports = function(cfg) {
             if (hash) {
                 const valid = await bcrypt.compare(password || '', hash);
                 if (!valid) {
+                    eventBus.emit('auth:login:failed', { role, reason: 'invalid_password', ip: req.ip });
                     return res.status(401).json({ error: 'Invalid password' });
                 }
             }
@@ -103,6 +107,9 @@ module.exports = function(cfg) {
             sameSite: 'strict'
         });
 
+        // Emit success event
+        eventBus.emit('auth:login:after', { role, ip: req.ip });
+
         res.json({ success: true, role });
     });
 
@@ -111,7 +118,19 @@ module.exports = function(cfg) {
      * Clears session cookie
      */
     router.post('/api/auth/logout', (req, res) => {
+        // Get role before clearing cookie
+        const session = req.signedCookies?.['rap-session'];
+        let role = null;
+        try {
+            const sessionData = typeof session === 'string' ? JSON.parse(session) : session;
+            role = sessionData?.role;
+        } catch { /* ignore */ }
+
         res.clearCookie('rap-session');
+
+        // Emit logout event
+        eventBus.emit('auth:logout:after', { role, ip: req.ip });
+
         res.json({ success: true });
     });
 

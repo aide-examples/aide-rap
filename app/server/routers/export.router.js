@@ -1,6 +1,7 @@
 /**
- * Export Router (PDF, CSV)
- * Routes: /api/entities/:entity/export-pdf, export-tree-pdf, export-csv
+ * Export Router (PDF, CSV, DOCX)
+ * Routes: /api/entities/:entity/export-pdf, export-tree-pdf, export-csv, export-docx
+ * Emits: export:start, export:complete, export:error
  */
 
 const express = require('express');
@@ -10,6 +11,7 @@ const PDFDocument = require('pdfkit');
 
 const PrintService = require('../services/PrintService');
 const CsvService = require('../services/CsvService');
+const eventBus = require('../utils/EventBus');
 
 /**
  * Generate Entity Cards PDF for printing and cutting out.
@@ -464,6 +466,9 @@ function createRouter(cfg) {
 
     // Export entity table to PDF
     router.post('/api/entities/:entity/export-pdf', (req, res) => {
+        const entity = req.params.entity;
+        const format = 'pdf';
+
         try {
             const { title, columns, records, entityColor, filters } = req.body;
 
@@ -471,20 +476,28 @@ function createRouter(cfg) {
                 return res.status(400).json({ error: 'columns and records arrays are required' });
             }
 
+            eventBus.emit('export:start', { format, entity, recordCount: records.length });
+
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}.pdf"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${entity}.pdf"`);
 
             const printService = new PrintService();
             printService.generatePdf({ title, columns, records, entityColor, filters }, res);
 
+            eventBus.emit('export:complete', { format, entity, recordCount: records.length });
+
         } catch (error) {
             console.error('PDF generation error:', error);
+            eventBus.emit('export:error', { format, entity, error: error.message });
             res.status(500).json({ error: 'PDF generation failed' });
         }
     });
 
     // Export tree view to PDF (hierarchical format)
     router.post('/api/entities/:entity/export-tree-pdf', (req, res) => {
+        const entity = req.params.entity;
+        const format = 'tree-pdf';
+
         try {
             const { title, nodes, entityColor } = req.body;
 
@@ -492,20 +505,28 @@ function createRouter(cfg) {
                 return res.status(400).json({ error: 'nodes array is required' });
             }
 
+            eventBus.emit('export:start', { format, entity, nodeCount: nodes.length });
+
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}_tree.pdf"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${entity}_tree.pdf"`);
 
             const printService = new PrintService();
             printService.generateTreePdf({ title, nodes, entityColor }, res);
 
+            eventBus.emit('export:complete', { format, entity, nodeCount: nodes.length });
+
         } catch (error) {
             console.error('Tree PDF generation error:', error);
+            eventBus.emit('export:error', { format, entity, error: error.message });
             res.status(500).json({ error: 'PDF generation failed' });
         }
     });
 
     // Export entity table to CSV
     router.post('/api/entities/:entity/export-csv', (req, res) => {
+        const entity = req.params.entity;
+        const format = 'csv';
+
         try {
             const { columns, records } = req.body;
 
@@ -513,20 +534,28 @@ function createRouter(cfg) {
                 return res.status(400).json({ error: 'columns and records arrays are required' });
             }
 
+            eventBus.emit('export:start', { format, entity, recordCount: records.length });
+
             res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-            res.setHeader('Content-Disposition', `attachment; filename="${req.params.entity}.csv"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${entity}.csv"`);
 
             const csvService = new CsvService();
             csvService.generateCsv({ columns, records }, res);
 
+            eventBus.emit('export:complete', { format, entity, recordCount: records.length });
+
         } catch (error) {
             console.error('CSV generation error:', error);
+            eventBus.emit('export:error', { format, entity, error: error.message });
             res.status(500).json({ error: 'CSV generation failed' });
         }
     });
 
     // Export entity table to DOCX (Word)
     router.post('/api/entities/:entity/export-docx', async (req, res) => {
+        const entity = req.params.entity;
+        const format = 'docx';
+
         try {
             const { title, columns, records, entityColor, filters } = req.body;
 
@@ -534,22 +563,30 @@ function createRouter(cfg) {
                 return res.status(400).json({ error: 'columns and records arrays are required' });
             }
 
+            eventBus.emit('export:start', { format, entity, recordCount: records.length });
+
             const printService = new PrintService();
             const buffer = await printService.generateDocx({ title, columns, records, entityColor, filters });
 
-            const filename = (title || req.params.entity).replace(/[^a-z0-9]/gi, '_');
+            const filename = (title || entity).replace(/[^a-z0-9]/gi, '_');
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}.docx"`);
             res.send(buffer);
 
+            eventBus.emit('export:complete', { format, entity, recordCount: records.length, size: buffer.length });
+
         } catch (error) {
             console.error('DOCX generation error:', error);
+            eventBus.emit('export:error', { format, entity, error: error.message });
             res.status(500).json({ error: 'DOCX generation failed' });
         }
     });
 
     // Export tree view to DOCX (Word)
     router.post('/api/entities/:entity/export-tree-docx', async (req, res) => {
+        const entity = req.params.entity;
+        const format = 'tree-docx';
+
         try {
             const { title, nodes, entityColor, layout } = req.body;
 
@@ -557,16 +594,21 @@ function createRouter(cfg) {
                 return res.status(400).json({ error: 'nodes array is required' });
             }
 
+            eventBus.emit('export:start', { format, entity, nodeCount: nodes.length });
+
             const printService = new PrintService();
             const buffer = await printService.generateTreeDocx({ title, nodes, entityColor, layout });
 
-            const filename = (title || `${req.params.entity}_tree`).replace(/[^a-z0-9]/gi, '_');
+            const filename = (title || `${entity}_tree`).replace(/[^a-z0-9]/gi, '_');
             res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}.docx"`);
             res.send(buffer);
 
+            eventBus.emit('export:complete', { format, entity, nodeCount: nodes.length, size: buffer.length });
+
         } catch (error) {
             console.error('Tree DOCX generation error:', error);
+            eventBus.emit('export:error', { format, entity, error: error.message });
             res.status(500).json({ error: 'DOCX generation failed' });
         }
     });

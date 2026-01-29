@@ -12,6 +12,7 @@
 const { getDatabase, getSchema } = require('../config/database');
 const { toSnakeCase } = require('../utils/SchemaGenerator');
 const logger = require('../utils/logger');
+const eventBus = require('../utils/EventBus');
 
 // Scheduler state
 let scheduledTimeout = null;
@@ -175,10 +176,15 @@ function runAll() {
     }
   }
 
-  return {
+  const result = {
     processed: dailyFields.length,
     updated: totalUpdated
   };
+
+  // Emit event for monitoring/dashboards
+  eventBus.emit('computed:run:after', result);
+
+  return result;
 }
 
 /**
@@ -201,6 +207,9 @@ function scheduleDailyRun() {
       nextRun: midnight.toISOString(),
       inMs: msUntilMidnight
     });
+
+    // Emit event for scheduling info
+    eventBus.emit('computed:scheduled', { nextRun: midnight, inMs: msUntilMidnight });
 
     scheduledTimeout = setTimeout(() => {
       logger.info('Running scheduled DAILY computation');
@@ -317,10 +326,15 @@ function applyDefaults() {
     }
   }
 
-  return {
+  const result = {
     processed: columns.length,
     updated: totalUpdated
   };
+
+  // Emit event for monitoring
+  eventBus.emit('computed:defaults:after', result);
+
+  return result;
 }
 
 module.exports = {

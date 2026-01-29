@@ -138,9 +138,13 @@ function saveSchemaHash(hash) {
  * Auto-backup all entity data before dropping tables on schema change.
  * Converts FK IDs to label values for portability across schema rebuilds.
  * Only runs when there is existing data and schema has changed.
+ * Emits: db:backup:before, db:backup:after
  */
 function autoBackupBeforeDrop(orderedEntities) {
   const backupDir = path.join(path.dirname(storedDbPath), 'backup');
+
+  // Emit before event
+  eventBus.emit('db:backup:before', { path: backupDir, reason: 'schema-change' });
 
   let totalRecords = 0;
   const entityData = {};
@@ -225,6 +229,13 @@ function autoBackupBeforeDrop(orderedEntities) {
   }
 
   logger.info(`Auto-backup: saved ${totalRecords} records from ${Object.keys(entityData).length} entities before schema drop`);
+
+  // Emit after event
+  eventBus.emit('db:backup:after', {
+    path: backupDir,
+    totalRecords,
+    entityCount: Object.keys(entityData).length
+  });
 }
 
 /**
