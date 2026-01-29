@@ -28,7 +28,6 @@ paths.init(APP_DIR);
 // 3. APP IMPORTS
 // =============================================================================
 
-const parseDatamodel = require(path.join(TOOLS_DIR, 'parse-datamodel'));
 const backend = require('./server');
 const cookieParser = require('cookie-parser');
 
@@ -275,7 +274,6 @@ const { generateEntityCardsPDF, generateEntityCardsDocx } = require('./server/ro
 // Layout Editor Router
 app.use(require('./server/routers/layout-editor.router')(cfg, {
     appDir: APP_DIR,
-    parseDatamodel,
     generateEntityCardsPDF,
     generateEntityCardsDocx
 }));
@@ -307,6 +305,12 @@ if (authEnabled) {
     app.use('/api/model-builder', authMiddleware, requireRole('admin'));
 }
 app.use(require('./server/routers/model-builder.router')(cfg));
+
+// Schema Router (check changes, reload schema) - admin only
+if (authEnabled) {
+    app.use('/api/schema', authMiddleware, requireRole('admin'));
+}
+app.use(require('./server/routers/schema.router')(cfg));
 
 // =============================================================================
 // 8. START SERVER

@@ -18,11 +18,15 @@ After installation, `.drawio` files can be edited directly in VS Code.
 
 ## Architecture
 
-**Single Source of Truth:** `DataModel.md`
+**Single Source of Truth:** `DataModel.md` → `SchemaGenerator.js` → `getSchema()`
 
 ```
-DataModel.md          →  parse-datamodel.js  →  DataModel.yaml
-(readable docs)                                  (generated)
+DataModel.md + classes/*.md
+(readable docs)
+     ↓
+SchemaGenerator.js (server startup)
+     ↓
+getSchema() → Cached Schema → All Consumers (CRUD, Layout-Editor, etc.)
      +
 layout.drawio         →  extract-layout.js   →  layout.json
 (visual layout)                                  (positions)
@@ -134,14 +138,6 @@ Relationships are automatically detected from attributes!
 ---
 
 ## Scripts
-
-### parse-datamodel.js
-
-Parses DataModel.md and generates DataModel.yaml.
-
-```bash
-node tools/parse-datamodel.js
-```
 
 ### extract-layout.js
 

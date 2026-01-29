@@ -1,21 +1,74 @@
 /**
  * SchemaGenerator - Parse DataModel.md and generate SQL schema + validation rules
  *
- * Extends the parsing logic from tools/parse-datamodel.js to generate:
+ * Single source of truth for the metamodel. Generates:
  * - SQL DDL for table creation
  * - Validation rules for ObjectValidator
  * - Foreign key relationships
  * - UNIQUE constraints and indexes
+ * - Area mappings for UI
  */
 
 const fs = require('fs');
 const path = require('path');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const { TypeParser } = require('../../shared/types/TypeParser');
-const { parseAreasFromTable } = require('../../../tools/parse-datamodel');
 
 // Shared TypeParser instance for extracting type names from markdown links
 const typeParserInstance = new TypeParser();
+
+/**
+ * Parse the Areas from Entity Descriptions section in DataModel.md.
+ * Format: ### AreaName followed by <div style="background-color: #COLOR"> and entity table
+ * @param {string} mdContent - Markdown content
+ * @returns {Object} - { areas: {}, classToArea: {} }
+ */
+function parseAreasFromTable(mdContent) {
+  const areas = {};
+  const classToArea = {};
+
+  // Match ### AreaName followed by <div style="background-color: #COLOR"> and entity table
+  const areaPattern = /###\s+([^\n]+)\n<div[^>]*style="[^"]*background-color:\s*(#[0-9A-Fa-f]{6})[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
+  let match;
+
+  while ((match = areaPattern.exec(mdContent)) !== null) {
+    const areaName = match[1].trim();
+    const color = match[2];
+    const tableContent = match[3];
+
+    const areaKey = areaName.toLowerCase().replace(/ /g, '_').replace(/&/g, 'and');
+
+    areas[areaKey] = {
+      name: areaName,
+      color: color
+    };
+
+    // Extract entity names from table rows
+    // Supports both: [EntityName](classes/EntityName.md) and plain EntityName
+    const tableRows = tableContent.match(/\|\s*([^|]+)\s*\|[^|]+\|/g) || [];
+    for (const row of tableRows) {
+      // Skip header row
+      if (row.includes('Entity') && row.includes('Description')) continue;
+      if (row.includes('---')) continue;
+
+      const cellMatch = row.match(/\|\s*([^|]+)\s*\|/);
+      if (cellMatch) {
+        let entityName = cellMatch[1].trim();
+        // Handle markdown link format: [EntityName](classes/EntityName.md)
+        const linkMatch = entityName.match(/\[([^\]]+)\]/);
+        if (linkMatch) {
+          entityName = linkMatch[1].trim();
+        }
+        // Only accept PascalCase names (entity names)
+        if (entityName && /^[A-Z][a-zA-Z0-9]*$/.test(entityName)) {
+          classToArea[entityName] = areaKey;
+        }
+      }
+    }
+  }
+
+  return { areas, classToArea };
+}
 
 /**
  * Extract type name from potential markdown link
@@ -1041,12 +1094,31 @@ function generateSchema(mdPath, enabledEntities = null) {
     }
   }
 
+  // Build relationships as flat list (for Layout-Editor diagram)
+  const relationships = [];
+  for (const entity of Object.values(entities)) {
+    for (const fk of entity.foreignKeys) {
+      relationships.push({
+        from: entity.className,
+        to: fk.references.entity,
+        column: fk.column,
+        displayName: fk.displayName
+      });
+    }
+  }
+
+  // Get global types from TypeRegistry (for Layout-Editor)
+  const typeRegistry = getTypeRegistry();
+  const globalTypes = typeRegistry.getAllTypes ? typeRegistry.getAllTypes() : {};
+
   return {
     areas,
     entities,
     orderedEntities,
     inverseRelationships,
-    enabledEntities: enabledEntities || Object.keys(entities)  // Preserve config order
+    enabledEntities: enabledEntities || Object.keys(entities),  // Preserve config order
+    relationships,  // Flat FK list for diagrams
+    globalTypes     // Type definitions for display
   };
 }
 

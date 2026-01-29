@@ -6,10 +6,39 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { getSchema } = require('../config/database');
+
+/**
+ * Transform schema format to model format expected by Layout-Editor.
+ * Schema: { entities: { Name: { columns, foreignKeys, ... } } }
+ * Model:  { classes: { Name: { description, attributes: [...] } } }
+ */
+function schemaToModel(schema) {
+    const classes = {};
+
+    for (const [name, entity] of Object.entries(schema.entities)) {
+        classes[name] = {
+            description: entity.description || '',
+            area: entity.area,
+            attributes: entity.columns.map(col => ({
+                name: col.displayName || col.name,
+                type: col.foreignKey ? col.foreignKey.entity : col.type,
+                description: col.description || ''
+            }))
+        };
+    }
+
+    return {
+        areas: schema.areas,
+        classes,
+        relationships: schema.relationships || [],
+        globalTypes: schema.globalTypes || {}
+    };
+}
 
 module.exports = function(cfg, options = {}) {
     const router = express.Router();
-    const { appDir, parseDatamodel, generateEntityCardsPDF, generateEntityCardsDocx } = options;
+    const { appDir, generateEntityCardsPDF, generateEntityCardsDocx } = options;
 
     // Layout Editor page
     router.get('/layout-editor', (req, res) => {
@@ -48,18 +77,11 @@ module.exports = function(cfg, options = {}) {
             docName = path.basename(docName).replace(/\.md$/i, '');
 
             const docsDir = cfg.paths.docs;
-            const mdPath = path.join(docsDir, `${docName}.md`);
             const layoutPath = path.join(docsDir, `${docName}-layout.json`);
 
-            if (!fs.existsSync(mdPath)) {
-                return res.status(404).json({
-                    success: false,
-                    error: `Document not found: ${docName}.md`
-                });
-            }
-
-            // Parse model from markdown
-            const model = parseDatamodel.parseDatamodel(mdPath);
+            // Get model from cached schema (single source of truth)
+            const schema = getSchema();
+            const model = schemaToModel(schema);
 
             // Load or create layout
             let layout = { classes: {}, canvas: { width: 1200, height: 900 } };

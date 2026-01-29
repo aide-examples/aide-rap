@@ -26,6 +26,7 @@
         <a id="linkCardsPdf" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Cards.pdf</a>
         <a id="linkCardsDocx" href="#" target="_blank" style="color: #aaa; font-size: 12px; display: none;">Cards.docx</a>
         <button id="saveBtn">Save</button>
+        <button id="reloadModelBtn" class="secondary" style="display: none;">↻ Reload Model</button>
         <span class="status" id="status"></span>
         <a href="/" class="back-link" id="backLink">BACK</a>
     </div>
@@ -178,6 +179,7 @@
         const docSelect = document.getElementById('docSelect');
         const canvas = document.getElementById('canvas');
         const saveBtn = document.getElementById('saveBtn');
+        const reloadModelBtn = document.getElementById('reloadModelBtn');
         const statusEl = document.getElementById('status');
         const viewLayoutBtn = document.getElementById('viewLayout');
         const linkCompact = document.getElementById('linkCompact');
@@ -270,9 +272,72 @@
                 linkCardsDocx.style.display = 'inline';
 
                 renderCanvas();
+
+                // Check for model changes after loading
+                await checkForModelChanges();
             } catch (e) {
                 console.error('Failed to load document:', e);
                 canvas.innerHTML = `<div class="loading">Error: ${e.message}</div>`;
+            }
+        }
+
+        /**
+         * Check if the data model has changed since server startup.
+         * Shows a dialog if changes are detected.
+         */
+        async function checkForModelChanges() {
+            try {
+                const resp = await fetch('/api/schema/check-changes');
+                const { changed } = await resp.json();
+
+                if (changed) {
+                    // Show reload button
+                    reloadModelBtn.style.display = 'inline-block';
+                    reloadModelBtn.classList.add('highlight');
+
+                    // Alert user
+                    const reload = confirm(
+                        'Das Datenmodell hat sich geändert.\n\n' +
+                        'Möchten Sie das Modell neu laden?\n' +
+                        '(Alternativ: "↻ Reload Model" Button verwenden)'
+                    );
+
+                    if (reload) {
+                        await reloadModel();
+                    }
+                } else {
+                    reloadModelBtn.style.display = 'none';
+                }
+            } catch (e) {
+                console.warn('Could not check for model changes:', e);
+            }
+        }
+
+        /**
+         * Reload the schema from markdown files and refresh the editor.
+         */
+        async function reloadModel() {
+            statusEl.textContent = 'Reloading model...';
+            try {
+                const resp = await fetch('/api/schema/reload', { method: 'POST' });
+                const result = await resp.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Reload failed');
+                }
+
+                // Reload current document to get fresh model
+                if (currentDoc) {
+                    await loadDocument(currentDoc);
+                }
+
+                reloadModelBtn.style.display = 'none';
+                reloadModelBtn.classList.remove('highlight');
+                statusEl.textContent = 'Model reloaded';
+                setTimeout(() => { if (!isDirty) statusEl.textContent = ''; }, 2000);
+            } catch (e) {
+                console.error('Model reload failed:', e);
+                statusEl.textContent = 'Error: ' + e.message;
             }
         }
 
@@ -872,6 +937,7 @@
         // Event listeners
         docSelect.addEventListener('change', () => loadDocument(docSelect.value));
         saveBtn.addEventListener('click', saveLayout);
+        reloadModelBtn.addEventListener('click', reloadModel);
         viewLayoutBtn.addEventListener('click', toggleDetailedView);
 
         // Fit to content toggle

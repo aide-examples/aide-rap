@@ -495,10 +495,87 @@ function reinitialize() {
   return { success: true, entities: schema.orderedEntities.length };
 }
 
+/**
+ * Get the current schema hash.
+ * Used by Layout-Editor to detect changes.
+ */
+function getSchemaHash() {
+  if (!schema) {
+    throw new Error('Schema not loaded');
+  }
+  return computeSchemaHash(schema);
+}
+
+/**
+ * Check if the markdown files have changed since last schema load.
+ * Parses markdown fresh and compares hashes.
+ * @returns {{ changed: boolean, currentHash: string, freshHash: string }}
+ */
+function checkSchemaChanged() {
+  if (!schema || !storedDataModelPath) {
+    throw new Error('Schema not loaded');
+  }
+
+  const currentHash = computeSchemaHash(schema);
+
+  // Parse markdown fresh (without affecting cached schema)
+  const freshSchema = generateSchema(storedDataModelPath, storedEnabledEntities);
+  const freshHash = computeSchemaHash(freshSchema);
+
+  return {
+    changed: currentHash !== freshHash,
+    currentHash,
+    freshHash
+  };
+}
+
+/**
+ * Reload schema from markdown files.
+ * Updates the cached schema without rebuilding database tables.
+ * Note: This only updates the in-memory schema. Table structure is NOT changed.
+ * Use forceRebuild() if you need to apply schema changes to the database.
+ * @returns {{ success: boolean, hash: string, warning?: string }}
+ */
+function reloadSchema() {
+  if (!db || !storedDataModelPath) {
+    throw new Error('Cannot reload schema: database was never initialized');
+  }
+
+  const oldHash = computeSchemaHash(schema);
+
+  // Re-parse markdown
+  schema = generateSchema(storedDataModelPath, storedEnabledEntities);
+  const newHash = computeSchemaHash(schema);
+
+  // Also reload views
+  const requirementsDir = path.dirname(storedDataModelPath);
+  const UISpecLoader = require('../utils/UISpecLoader');
+  const mdViews = UISpecLoader.loadViewsConfig(requirementsDir);
+  if (mdViews) {
+    storedViewsConfig = mdViews;
+  }
+
+  // Refresh views with new schema
+  createAllViews(schema.orderedEntities);
+  createUserViews(storedViewsConfig);
+
+  logger.info('Schema reloaded from markdown', { oldHash, newHash });
+
+  // Warn if schema changed (table structure might be out of sync)
+  const warning = oldHash !== newHash
+    ? 'Schema changed. Restart server or use forceRebuild() to apply changes to database tables.'
+    : undefined;
+
+  return { success: true, hash: newHash, warning };
+}
+
 module.exports = {
   initDatabase,
   getDatabase,
   getSchema,
+  getSchemaHash,
+  checkSchemaChanged,
+  reloadSchema,
   getEntityPrefilters,
   getRequiredFilters,
   closeDatabase,
