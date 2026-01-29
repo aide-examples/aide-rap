@@ -1112,8 +1112,15 @@ function generateSchema(mdPath, enabledEntities = null) {
   }
 
   // Get global types from TypeRegistry (for Layout-Editor)
+  // Filter out entity-scoped types (they're already in entity.localTypes)
   const typeRegistry = getTypeRegistry();
-  const globalTypes = typeRegistry.getAllTypes ? typeRegistry.getAllTypes() : {};
+  const allTypes = typeRegistry.getAllTypes ? typeRegistry.getAllTypes() : {};
+  const globalTypes = {};
+  for (const [key, value] of Object.entries(allTypes)) {
+    if (!key.startsWith('entity:')) {
+      globalTypes[key] = value;
+    }
+  }
 
   return {
     areas,
