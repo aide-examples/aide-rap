@@ -41,4 +41,18 @@ class UniqueConstraintError extends ConflictError {
   }
 }
 
-module.exports = { ConflictError, ForeignKeyConstraintError, UniqueConstraintError };
+/**
+ * VersionConflictError - When OCC version check fails (concurrent modification)
+ * Used to return the current record state so client can show diff or retry
+ */
+class VersionConflictError extends ConflictError {
+  constructor(entityType, id, expectedVersion, currentRecord) {
+    super(`${entityType} #${id} was modified by another user (expected version ${expectedVersion}, current ${currentRecord.version})`);
+    this.entityType = entityType;
+    this.id = id;
+    this.expectedVersion = expectedVersion;
+    this.currentRecord = currentRecord;
+  }
+}
+
+module.exports = { ConflictError, ForeignKeyConstraintError, UniqueConstraintError, VersionConflictError };

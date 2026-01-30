@@ -3,7 +3,7 @@
  * Handles all errors and sends appropriate responses
  */
 const logger = require('../utils/logger');
-const { AppError } = require('../errors');
+const { AppError, VersionConflictError } = require('../errors');
 const { ValidationError } = require('../../shared/validation');
 
 function errorHandler(err, req, res, next) {
@@ -43,6 +43,19 @@ function errorHandler(err, req, res, next) {
     errorCode = 'VALIDATION_ERROR';
     errorMessage = err.message;
     errorDetails = err.errors; // Array of field errors
+  }
+
+  // Handle VersionConflictError specially (OCC)
+  if (err instanceof VersionConflictError) {
+    statusCode = 409;
+    errorCode = 'VERSION_CONFLICT';
+    errorMessage = err.message;
+    errorDetails = {
+      entityType: err.entityType,
+      id: err.id,
+      expectedVersion: err.expectedVersion,
+      currentRecord: err.currentRecord
+    };
   }
 
   // Standardized error response format

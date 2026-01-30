@@ -79,17 +79,22 @@ function createEntity(entityName, data, correlationId = null) {
 /**
  * Update an existing entity
  * Emits: entity:update:before, entity:update:after
+ * @param {string} entityName - Entity name
+ * @param {number} id - Record ID
+ * @param {Object} data - Update data
+ * @param {number|null} expectedVersion - Expected version for OCC (null = skip check)
+ * @param {string|null} correlationId - Request correlation ID
  */
-function updateEntity(entityName, id, data, correlationId = null) {
+function updateEntity(entityName, id, data, expectedVersion = null, correlationId = null) {
   const log = correlationId ? logger.withCorrelation(correlationId) : logger;
 
-  log.debug(`Updating ${entityName}`, { id, data });
+  log.debug(`Updating ${entityName}`, { id, data, expectedVersion });
 
   // Before hook (can throw to abort)
   eventBus.emit('entity:update:before', entityName, id, data);
 
   const result = runInTransaction(() => {
-    return repository.update(entityName, id, data);
+    return repository.update(entityName, id, data, expectedVersion);
   });
 
   // After hook (informational)

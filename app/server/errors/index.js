@@ -4,7 +4,7 @@
 const AppError = require('./AppError');
 const { ValidationError, InvalidInputError, SchemaValidationError } = require('./ValidationError');
 const { NotFoundError, EntityNotFoundError } = require('./NotFoundError');
-const { ConflictError, ForeignKeyConstraintError, UniqueConstraintError } = require('./ConflictError');
+const { ConflictError, ForeignKeyConstraintError, UniqueConstraintError, VersionConflictError } = require('./ConflictError');
 
 module.exports = {
   // Base
@@ -22,5 +22,6 @@ module.exports = {
   // Conflict (409)
   ConflictError,
   ForeignKeyConstraintError,
-  UniqueConstraintError
+  UniqueConstraintError,
+  VersionConflictError
 };
