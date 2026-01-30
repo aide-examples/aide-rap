@@ -11,15 +11,18 @@ fi
 
 cd "$SCRIPT_DIR/.."
 
-echo "Packing aide-rap + aide-frame..."
+echo "Packing aide-rap ..."
 echo "Output: $OUTPUT_FILE"
 
 zip -r "$OUTPUT_FILE" \
     aide-rap \
-    aide-frame \
     -x "*.git*" \
     -x "*node_modules*" \
     -x "*.log" \
-    -x "*/logs/*"
+    -x "*/logs/*" \
+    -x "*.sqlite" \
+    -x "*.sqlite-shm" \
+    -x "*.sqlite-wal" \
+    -x "*/backup/*"
 
 echo "Done: $(du -h "$OUTPUT_FILE" | cut -f1)"

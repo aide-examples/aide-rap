@@ -29,3 +29,4 @@ app/systems/*/docs/requirements/EntityCards.docx
 
 # Claude Code session data
 .claude/
+irmadb
