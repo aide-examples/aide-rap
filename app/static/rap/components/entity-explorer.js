@@ -947,6 +947,20 @@ const EntityExplorer = {
 
       // Hide edit/delete buttons for readonly entities
       const actionsHtml = isReadonly ? '' : `
+          <div class="entity-row-actions">
+            <button class="btn-row-action btn-edit" data-id="${record.id}" title="Edit">&#9998;</button>
+            <button class="btn-row-action danger btn-delete" data-id="${record.id}" title="Delete">&#128465;</button>
+          </div>`;
+
+      return `
+        <div class="entity-row ${isSelected ? 'selected' : ''}" data-id="${record.id}">
+          <div class="entity-row-content">
+            <div class="entity-row-title">${DomUtils.escapeHtml(String(title))}</div>
+            <div class="entity-row-subtitle">${DomUtils.escapeHtml(String(subtitle))}</div>
+          </div>
+          ${actionsHtml}
+        </div>
+      `;
     }).join('');
 
     // Add event listeners
