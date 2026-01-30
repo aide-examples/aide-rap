@@ -79,6 +79,149 @@ const EntityForm = {
 
     // Load FK dropdown options asynchronously
     await this.loadFKDropdowns();
+
+    // Initialize media field handlers
+    this.initMediaFields();
+  },
+
+  /**
+   * Initialize media field drag-drop and upload handlers
+   */
+  initMediaFields() {
+    const mediaFields = document.querySelectorAll('.media-field');
+
+    mediaFields.forEach(field => {
+      const fieldName = field.dataset.field;
+      const hiddenInput = field.querySelector('.media-value');
+      const preview = field.querySelector('.media-preview');
+      const dropzone = field.querySelector('.media-dropzone');
+      const fileInput = field.querySelector('.media-file-input');
+      const removeBtn = field.querySelector('.media-remove');
+      const thumbnail = field.querySelector('.media-thumbnail');
+      const filenameSpan = field.querySelector('.media-filename');
+
+      // Load filename if value exists
+      if (hiddenInput.value) {
+        this.loadMediaMetadata(hiddenInput.value, filenameSpan);
+      }
+
+      // Drag & drop handlers
+      if (dropzone) {
+        dropzone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+          dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+          if (e.dataTransfer.files.length > 0) {
+            this.uploadMediaFile(e.dataTransfer.files[0], field);
+          }
+        });
+
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', () => {
+          if (fileInput.files.length > 0) {
+            this.uploadMediaFile(fileInput.files[0], field);
+            fileInput.value = '';
+          }
+        });
+      }
+
+      // Remove button
+      if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+          hiddenInput.value = '';
+          preview.classList.add('hidden');
+          dropzone.classList.remove('hidden');
+          thumbnail.src = '';
+          filenameSpan.textContent = '';
+          this.checkDirty();
+        });
+      }
+    });
+  },
+
+  /**
+   * Load media metadata and update filename display
+   */
+  async loadMediaMetadata(mediaId, filenameSpan) {
+    try {
+      const response = await fetch(`/api/media/${mediaId}`);
+      if (response.ok) {
+        const data = await response.json();
+        filenameSpan.textContent = data.originalName || mediaId;
+      }
+    } catch (err) {
+      console.warn('Could not load media metadata:', err);
+    }
+  },
+
+  /**
+   * Upload a media file and update the field
+   */
+  async uploadMediaFile(file, fieldElement) {
+    const hiddenInput = fieldElement.querySelector('.media-value');
+    const preview = fieldElement.querySelector('.media-preview');
+    const dropzone = fieldElement.querySelector('.media-dropzone');
+    const thumbnail = fieldElement.querySelector('.media-thumbnail');
+    const filenameSpan = fieldElement.querySelector('.media-filename');
+
+    // Show uploading state
+    dropzone.innerHTML = '<span class="uploading">Uploading...</span>';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/media', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Upload failed');
+      }
+
+      // Success - update field
+      hiddenInput.value = result.id;
+      filenameSpan.textContent = result.originalName;
+
+      if (result.thumbnailUrl) {
+        thumbnail.src = result.thumbnailUrl;
+        thumbnail.classList.remove('media-thumb-fallback');
+      } else {
+        thumbnail.src = '/icons/file.svg';
+        thumbnail.classList.add('media-thumb-fallback');
+      }
+
+      preview.classList.remove('hidden');
+      dropzone.classList.add('hidden');
+      this.checkDirty();
+
+    } catch (err) {
+      console.error('Media upload error:', err);
+      dropzone.innerHTML = `<span class="error">Error: ${err.message}</span>`;
+      setTimeout(() => {
+        dropzone.innerHTML = '<span>Datei hierher ziehen oder klicken</span><input type="file" class="media-file-input">';
+        // Reattach file input handler
+        const newFileInput = dropzone.querySelector('.media-file-input');
+        newFileInput.addEventListener('change', () => {
+          if (newFileInput.files.length > 0) {
+            this.uploadMediaFile(newFileInput.files[0], fieldElement);
+            newFileInput.value = '';
+          }
+        });
+      }, 3000);
+    }
   },
 
   // Threshold for switching from dropdown to searchable combobox
@@ -233,6 +376,7 @@ const EntityForm = {
     if (col.customType === 'mail') return 'email';
     if (col.customType === 'url') return 'url';
     if (col.customType === 'json') return 'textarea';
+    if (col.customType === 'media') return 'media';
     // Legacy checks
     if (col.type === 'number') return 'number';
     if (col.name.includes('date')) return 'date';
@@ -312,6 +456,32 @@ const EntityForm = {
                   name="${col.name}"
                   rows="6"
                   ${disabled}>${DomUtils.escapeHtml(jsonValue)}</textarea>
+      `;
+    }
+
+    // Media fields: file upload with preview
+    if (col.customType === 'media') {
+      const mediaId = displayValue || '';
+      const hasValue = mediaId && mediaId.length > 0;
+      return `
+        <div class="media-field" data-field="${col.name}">
+          <input type="hidden"
+                 class="form-input media-value"
+                 id="field-${col.name}"
+                 name="${col.name}"
+                 value="${DomUtils.escapeHtml(mediaId)}">
+          <div class="media-preview ${hasValue ? '' : 'hidden'}">
+            <img class="media-thumbnail"
+                 src="${hasValue ? `/api/media/${mediaId}/thumbnail` : ''}"
+                 onerror="this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+            <span class="media-filename"></span>
+            <button type="button" class="media-remove btn-icon" ${disabled} title="Entfernen">&times;</button>
+          </div>
+          <div class="media-dropzone ${hasValue ? 'hidden' : ''}" ${isReadonly ? 'style="display:none"' : ''}>
+            <span>Datei hierher ziehen oder klicken</span>
+            <input type="file" class="media-file-input">
+          </div>
+        </div>
       `;
     }
 

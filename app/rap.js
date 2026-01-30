@@ -80,6 +80,7 @@ const systemPaths = {
     docs: path.join(SYSTEM_DIR, 'docs', 'requirements'),
     data: path.join(SYSTEM_DIR, 'data'),
     seed: path.join(SYSTEM_DIR, 'data', 'seed'),
+    media: path.join(SYSTEM_DIR, 'data', 'media'),
     logs: path.join(SYSTEM_DIR, 'logs'),
     help: path.join(SYSTEM_DIR, 'help'),
     database: 'rap.sqlite'
@@ -100,6 +101,7 @@ if (cfg.paths) {
     if (cfg.paths.seed) systemPaths.seed = path.isAbsolute(cfg.paths.seed) ? cfg.paths.seed : path.join(SYSTEM_DIR, cfg.paths.seed);
     if (cfg.paths.logs) systemPaths.logs = path.isAbsolute(cfg.paths.logs) ? cfg.paths.logs : path.join(SYSTEM_DIR, cfg.paths.logs);
     if (cfg.paths.help) systemPaths.help = path.isAbsolute(cfg.paths.help) ? cfg.paths.help : path.join(SYSTEM_DIR, cfg.paths.help);
+    if (cfg.paths.media) systemPaths.media = path.isAbsolute(cfg.paths.media) ? cfg.paths.media : path.join(SYSTEM_DIR, cfg.paths.media);
     if (cfg.paths.database) systemPaths.database = cfg.paths.database;
 }
 

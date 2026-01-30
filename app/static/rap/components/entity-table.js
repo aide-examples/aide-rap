@@ -515,6 +515,14 @@ const EntityTable = {
           const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
           const truncated = jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
           html += `<td class="json-cell" title="${DomUtils.escapeHtml(jsonStr)}">${DomUtils.escapeHtml(truncated)}</td>`;
+        } else if (col.customType === 'media' && value) {
+          // Media: Thumbnail link
+          html += `<td class="media-cell">
+            <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="Datei oeffnen">
+              <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"
+                   onerror="this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+            </a>
+          </td>`;
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const displayValue = value != null

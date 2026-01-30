@@ -382,6 +382,45 @@ function createUserViews(viewsConfig) {
 }
 
 /**
+ * Initialize media tables (system tables for file storage)
+ * Called after entity tables are created
+ */
+function initMediaTables() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _media (
+      id TEXT PRIMARY KEY,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      extension TEXT,
+      width INTEGER,
+      height INTEGER,
+      has_thumbnail INTEGER DEFAULT 0,
+      uploaded_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _media_refs (
+      media_id TEXT NOT NULL,
+      entity_name TEXT NOT NULL,
+      entity_id INTEGER NOT NULL,
+      field_name TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (media_id, entity_name, entity_id, field_name),
+      FOREIGN KEY (media_id) REFERENCES _media(id) ON DELETE CASCADE
+    )
+  `);
+
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_media_created ON _media(created_at)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_media_refs_entity ON _media_refs(entity_name, entity_id)`);
+
+  logger.debug('Media tables initialized');
+}
+
+/**
  * Initialize database
  * @param {string} dbPath - Path to SQLite database file
  * @param {string} dataModelPath - Path to DataModel.md
@@ -454,6 +493,9 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entit
 
   // Migrate: ensure system columns exist and have values
   migrateSystemColumns(schema.orderedEntities);
+
+  // Initialize media storage tables
+  initMediaTables();
 
   // Enable foreign keys for runtime
   db.pragma('foreign_keys = ON');

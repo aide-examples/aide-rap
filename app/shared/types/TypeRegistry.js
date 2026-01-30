@@ -27,7 +27,7 @@ class TypeRegistry {
     /**
      * Built-in type names
      */
-    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail'];
+    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media'];
 
     /**
      * Built-in type definitions
@@ -89,6 +89,17 @@ class TypeRegistry {
           pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
           patternDescription: 'Valid email address',
           patternExample: 'user@example.com'
+        }
+      },
+      media: {
+        kind: 'builtin',
+        sqlType: 'TEXT',
+        jsType: 'string',
+        validation: {
+          type: 'string',
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+          patternDescription: 'Media reference (UUID)',
+          patternExample: '550e8400-e29b-41d4-a716-446655440000'
         }
       }
     };

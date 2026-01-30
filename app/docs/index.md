@@ -70,6 +70,7 @@ Validation happens identically on frontend (for UX) and backend (for integrity).
 | `json` | TEXT | Valid JSON | Pretty-printed code block |
 | `url` | TEXT | http(s):// URL | Clickable link |
 | `mail` | TEXT | Valid email | Mailto link |
+| `media` | TEXT (UUID) | Valid media reference | Thumbnail/download link |
 
 Example usage:
 ```markdown
@@ -78,6 +79,56 @@ Example usage:
 | website | url | Company website |
 | contact | mail | Support email |
 | metadata | json | Additional data |
+| attachment | media | Uploaded file |
+```
+
+### Media Store
+
+Upload and manage files attached to entities. Files are stored in the filesystem with metadata in SQLite.
+
+**Features:**
+- Drag & drop file upload in entity forms
+- Automatic thumbnail generation for images
+- Directory hashing for scalability (256 buckets based on UUID prefix)
+- Manifest files as safety net for database recovery
+- Reference tracking to prevent orphaned files
+
+**Storage Structure:**
+```
+system/data/media/
+  originals/
+    a5/                        # First 2 hex chars of UUID
+      a5f3e2d1-...-....pdf
+      manifest.json            # Safety net: original filenames, metadata
+    b2/
+      ...
+  thumbnails/
+    a5/
+      a5f3e2d1-..._thumb.jpg
+```
+
+**API Endpoints:**
+```
+POST   /api/media              # Upload single file
+POST   /api/media/bulk         # Upload multiple files (max 20)
+GET    /api/media              # List all media (paginated)
+GET    /api/media/:id          # Get metadata
+GET    /api/media/:id/file     # Download/view file
+GET    /api/media/:id/thumbnail # Get thumbnail (images only)
+DELETE /api/media/:id          # Delete (admin, if unreferenced)
+POST   /api/media/cleanup      # Remove orphaned files (admin)
+POST   /api/media/rebuild-index # Rebuild DB from manifests (admin)
+```
+
+**Configuration** (optional in `config.json`):
+```json
+{
+  "media": {
+    "maxFileSize": "50MB",
+    "maxBulkFiles": 20,
+    "allowedTypes": ["image/*", "application/pdf", ".doc", ".docx"]
+  }
+}
 ```
 
 ### Color-Coded Areas of Competence

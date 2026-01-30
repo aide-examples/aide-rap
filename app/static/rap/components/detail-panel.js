@@ -149,6 +149,17 @@ const DetailPanel = {
         } catch {
           displayValue = `<pre class="json-value">${DomUtils.escapeHtml(String(value))}</pre>`;
         }
+      } else if (col.customType === 'media' && value) {
+        // Media: Thumbnail and download link
+        displayValue = `
+          <div class="media-display">
+            <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" class="media-link">
+              <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-small"
+                   onerror="this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+              <span class="media-view-text">Datei oeffnen</span>
+            </a>
+          </div>
+        `;
       } else {
         // Use ValueFormatter to convert enum internal->external
         displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, schema));

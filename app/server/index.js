@@ -11,8 +11,10 @@ const { initDatabase, closeDatabase } = require('./config/database');
 const { correlationId, requestLogger, errorHandler } = require('./middleware');
 const GenericCrudRouter = require('./routers/GenericCrudRouter');
 const AuditRouter = require('./routers/audit.router');
+const mediaRouter = require('./routers/media.router');
 const ComputedFieldService = require('./services/ComputedFieldService');
 const AuditService = require('./services/AuditService');
+const MediaService = require('./services/MediaService');
 const logger = require('./utils/logger');
 
 /**
@@ -41,6 +43,10 @@ function init(app, config) {
   // Initialize audit trail (after database)
   AuditService.init();
 
+  // Initialize media service (after database)
+  const mediaPath = paths?.media || path.join(paths?.data || path.join(appDir, 'data'), 'media');
+  const mediaService = new MediaService(mediaPath, config);
+
   // Middleware (before routes)
   app.use(correlationId);
   app.use(requestLogger);
@@ -48,12 +54,16 @@ function init(app, config) {
   // JSON body parser for API routes
   app.use('/api/entities', express.json());
   app.use('/api/audit', express.json());
+  app.use('/api/media', express.json());
 
   // Mount CRUD router
   app.use('/api/entities', GenericCrudRouter);
 
   // Mount Audit router (readonly system entity)
   app.use('/api/audit', AuditRouter);
+
+  // Mount Media router (file upload/management)
+  app.use('/api/media', mediaRouter(mediaService, config));
 
   // Error handler (after routes)
   app.use('/api', errorHandler);
