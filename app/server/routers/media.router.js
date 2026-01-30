@@ -302,6 +302,11 @@ module.exports = function(mediaService, cfg) {
           error: { code: 'FILE_TOO_LARGE', message: err.message }
         });
       }
+      if (err.message.includes('HTML page')) {
+        return res.status(400).json({
+          error: { code: 'INVALID_CONTENT_TYPE', message: err.message }
+        });
+      }
       next(err);
     }
   });

@@ -537,7 +537,7 @@ const EntityTable = {
           html += `<td class="media-cell">
             <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="Datei oeffnen">
               <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"
-                   onerror="this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+                   onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
             </a>
           </td>`;
         } else {

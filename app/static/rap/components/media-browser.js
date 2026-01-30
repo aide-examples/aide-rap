@@ -141,7 +141,7 @@ const MediaBrowser = {
           <div class="media-browser-thumb">
             <a href="/api/media/${media.id}/file" target="_blank" rel="noopener">
               <img src="${thumbnailSrc}" alt="${this.escapeHtml(media.originalName)}"
-                   onerror="this.src='/icons/file.svg'">
+                   onerror="this.onerror=null; this.src='/icons/file.svg'">
             </a>
           </div>
           <div class="media-browser-info">

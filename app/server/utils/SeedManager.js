@@ -86,7 +86,9 @@ async function resolveMediaUrls(entityName, record) {
     if (isValidUrl(value)) {
       try {
         console.log(`  Fetching media URL for ${col.name}: ${value.substring(0, 50)}...`);
-        const result = await mediaService.uploadFromUrl(value, 'seed');
+        // Pass media constraints from schema (e.g., maxWidth, maxHeight from [DIMENSION=800x600])
+        const constraints = col.media || null;
+        const result = await mediaService.uploadFromUrl(value, 'seed', constraints);
         resolved[col.name] = result.id;
         console.log(`  -> Stored as ${result.id}`);
       } catch (err) {
@@ -1000,6 +1002,10 @@ function clearAll() {
   }
 
   db.pragma('foreign_keys = ON');
+
+  // Emit event so MediaService can clear media files
+  eventBus.emit('seed:clearAll:after', results);
+
   return results;
 }
 
@@ -1121,6 +1127,9 @@ function backupAll() {
     results[entity.className] = exportRows.length;
   }
 
+  // Emit event so MediaService can backup media files
+  eventBus.emit('seed:backup:after', { backupDir, results });
+
   return { entities: results, backupDir };
 }
 
@@ -1137,8 +1146,21 @@ async function restoreBackup() {
     throw new Error('No backup directory found');
   }
 
-  // Clear all data first
-  clearAll();
+  // Emit event so MediaService can restore media files BEFORE clearing
+  // (clearAll would delete media files, but we want to restore from backup)
+  eventBus.emit('seed:restore:before', { backupDir });
+
+  // Clear all entity data (media already handled by restore:before)
+  const { db } = getDbAndSchema();
+  db.pragma('foreign_keys = OFF');
+  for (const entity of [...schema.orderedEntities].reverse()) {
+    try {
+      db.prepare(`DELETE FROM ${entity.tableName}`).run();
+    } catch (err) {
+      // Ignore errors
+    }
+  }
+  db.pragma('foreign_keys = ON');
 
   const results = {};
   const lookups = {};

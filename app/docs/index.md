@@ -110,6 +110,7 @@ system/data/media/
 **API Endpoints:**
 ```
 POST   /api/media              # Upload single file
+POST   /api/media/from-url     # Upload from URL (server fetches)
 POST   /api/media/bulk         # Upload multiple files (max 20)
 GET    /api/media              # List all media (paginated)
 GET    /api/media/:id          # Get metadata
@@ -129,6 +130,43 @@ POST   /api/media/rebuild-index # Rebuild DB from manifests (admin)
     "allowedTypes": ["image/*", "application/pdf", ".doc", ".docx"]
   }
 }
+```
+
+**Field-Level Constraints:**
+
+Control individual media fields with annotations:
+
+| Annotation | Description | Example |
+|------------|-------------|---------|
+| `[SIZE=50MB]` | Max file size (B, KB, MB, GB) | `[SIZE=10MB]` |
+| `[DIMENSION=800x600]` | Max image dimensions | `[DIMENSION=1920x1080]` |
+| `[MAXWIDTH=800]` | Max image width only | `[MAXWIDTH=1200]` |
+| `[MAXHEIGHT=600]` | Max image height only | `[MAXHEIGHT=800]` |
+| `[DURATION=5min]` | Max audio/video duration (sec, min, h) | `[DURATION=30sec]` |
+
+Example usage in DataModel.md:
+```markdown
+## Employee
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| photo | media | Profile picture [DIMENSION=400x400] [SIZE=2MB] |
+| contract | media | Employment contract [SIZE=10MB] |
+| intro_video | media | Introduction video [DURATION=2min] |
+```
+
+Images exceeding dimension constraints are automatically scaled down, preserving aspect ratio. Size and duration constraints trigger validation errors if exceeded.
+
+**URL-based Media Seeding:**
+
+Seed files can reference media by URL. The system automatically fetches and stores the files:
+```json
+[
+  {
+    "code": "USD",
+    "name": "US Dollar",
+    "bills": "https://example.com/usd-bills.jpg"
+  }
+]
 ```
 
 ### Color-Coded Areas of Competence

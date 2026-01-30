@@ -243,6 +243,11 @@ class MediaService {
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const mimeType = contentType.split(';')[0].trim();
 
+    // Reject HTML pages (user probably dropped an article link instead of an image link)
+    if (mimeType === 'text/html' || mimeType === 'application/xhtml+xml') {
+      throw new Error('URL returned HTML page instead of media file. Please use a direct link to the image/file.');
+    }
+
     // Try to extract filename from Content-Disposition header or URL
     let filename = 'downloaded';
     const contentDisposition = response.headers.get('content-disposition');
@@ -519,7 +524,22 @@ class MediaService {
             if (entry.refs && Array.isArray(entry.refs)) {
               for (const ref of entry.refs) {
                 try {
-                  MediaRepository.addReference(id, ref.entity, ref.id, ref.field);
+                  // Resolve entity ID: prefer label lookup (schema-resilient), fall back to stored id
+                  let entityId = ref.id;
+                  if (ref.label) {
+                    const resolvedId = this.getEntityIdByLabel(ref.entity, ref.label);
+                    if (resolvedId) {
+                      entityId = resolvedId;
+                    } else {
+                      logger.debug('Could not resolve label to ID, skipping ref', {
+                        mediaId: id, entity: ref.entity, label: ref.label
+                      });
+                      continue;
+                    }
+                  }
+                  if (entityId) {
+                    MediaRepository.addReference(id, ref.entity, entityId, ref.field);
+                  }
                 } catch (refErr) {
                   // Ignore duplicate reference errors
                   if (!refErr.message.includes('UNIQUE constraint')) {
@@ -664,6 +684,84 @@ class MediaService {
     eventBus.on('seed:load:after', (entityName, result) => {
       this.updateEntityMediaRefs(entityName);
     });
+
+    // Clear all media files when seed data is cleared
+    eventBus.on('seed:clearAll:after', (results) => {
+      this.clearAll();
+      logger.info('Media files cleared along with entity data');
+    });
+
+    // Backup media files when entity data is backed up
+    eventBus.on('seed:backup:after', ({ backupDir }) => {
+      this.backupTo(backupDir);
+    });
+
+    // Restore media files when entity data is restored
+    eventBus.on('seed:restore:before', ({ backupDir }) => {
+      this.restoreFrom(backupDir);
+    });
+  }
+
+  /**
+   * Backup media originals to backup directory
+   * @param {string} backupDir - Backup directory path
+   */
+  backupTo(backupDir) {
+    const mediaBackupDir = path.join(backupDir, 'media');
+
+    // Remove existing media backup
+    if (fs.existsSync(mediaBackupDir)) {
+      fs.rmSync(mediaBackupDir, { recursive: true, force: true });
+    }
+
+    // Copy originals directory (includes manifests)
+    if (fs.existsSync(this.originalsPath)) {
+      fs.cpSync(this.originalsPath, mediaBackupDir, { recursive: true });
+      logger.info('Media files backed up', { dir: mediaBackupDir });
+    }
+  }
+
+  /**
+   * Restore media originals from backup directory
+   * @param {string} backupDir - Backup directory path
+   */
+  restoreFrom(backupDir) {
+    const mediaBackupDir = path.join(backupDir, 'media');
+
+    if (!fs.existsSync(mediaBackupDir)) {
+      logger.debug('No media backup found, skipping restore');
+      return;
+    }
+
+    // Clear current media
+    this.clearAll();
+
+    // Copy backup to originals
+    fs.cpSync(mediaBackupDir, this.originalsPath, { recursive: true });
+
+    // Rebuild index from manifests
+    this.rebuildIndex();
+
+    logger.info('Media files restored from backup');
+  }
+
+  /**
+   * Clear all media files and database records
+   * Used when resetting all entity data
+   */
+  clearAll() {
+    // Clear database tables
+    MediaRepository.clearAll();
+
+    // Delete all files in originals and thumbnails directories
+    if (fs.existsSync(this.originalsPath)) {
+      fs.rmSync(this.originalsPath, { recursive: true, force: true });
+      fs.mkdirSync(this.originalsPath, { recursive: true });
+    }
+    if (fs.existsSync(this.thumbnailsPath)) {
+      fs.rmSync(this.thumbnailsPath, { recursive: true, force: true });
+      fs.mkdirSync(this.thumbnailsPath, { recursive: true });
+    }
   }
 
   /**
@@ -739,7 +837,66 @@ class MediaService {
   }
 
   /**
+   * Get the LABEL column value for an entity record
+   * Uses the column marked with [LABEL] in the schema
+   * @param {string} entityName - Entity class name
+   * @param {number} entityId - Entity record ID
+   * @returns {string|null} Label value or null
+   */
+  getEntityLabelValue(entityName, entityId) {
+    const { getSchema, getDatabase } = require('../config/database');
+
+    try {
+      const schema = getSchema();
+      const db = getDatabase();
+      const entity = schema.entities[entityName];
+      if (!entity) return null;
+
+      // Find the LABEL column
+      const labelCol = entity.columns.find(c => c.ui?.label);
+      if (!labelCol) return null;
+
+      // Query the label value
+      const row = db.prepare(`SELECT ${labelCol.name} FROM ${entity.tableName} WHERE id = ?`).get(entityId);
+      return row ? row[labelCol.name] : null;
+    } catch (err) {
+      logger.debug('Could not get entity label value', { entityName, entityId, error: err.message });
+      return null;
+    }
+  }
+
+  /**
+   * Get the entity ID by its LABEL value
+   * Used when restoring refs from manifest that store label values
+   * @param {string} entityName - Entity class name
+   * @param {string} labelValue - Label value to look up
+   * @returns {number|null} Entity ID or null
+   */
+  getEntityIdByLabel(entityName, labelValue) {
+    const { getSchema, getDatabase } = require('../config/database');
+
+    try {
+      const schema = getSchema();
+      const db = getDatabase();
+      const entity = schema.entities[entityName];
+      if (!entity) return null;
+
+      // Find the LABEL column
+      const labelCol = entity.columns.find(c => c.ui?.label);
+      if (!labelCol) return null;
+
+      // Query by label value
+      const row = db.prepare(`SELECT id FROM ${entity.tableName} WHERE ${labelCol.name} = ?`).get(labelValue);
+      return row ? row.id : null;
+    } catch (err) {
+      logger.debug('Could not get entity ID by label', { entityName, labelValue, error: err.message });
+      return null;
+    }
+  }
+
+  /**
    * Add reference info to manifest file
+   * Stores the LABEL value instead of ID for schema resilience
    * @param {string} mediaId - Media UUID
    * @param {string} entityName - Entity class name
    * @param {number} entityId - Entity record ID
@@ -755,23 +912,46 @@ class MediaService {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       if (!manifest[mediaId]) return;
 
+      // Get label value for the entity (schema-resilient identifier)
+      const labelValue = this.getEntityLabelValue(entityName, entityId);
+
       // Initialize or update refs array
       if (!manifest[mediaId].refs) {
         manifest[mediaId].refs = [];
       }
 
-      // Check if this ref already exists
-      const existingRef = manifest[mediaId].refs.find(
-        r => r.entity === entityName && r.id === entityId && r.field === fieldName
-      );
+      // Check if this ref already exists (by label if available, otherwise by entity+field+id)
+      const existingRefIndex = manifest[mediaId].refs.findIndex(r => {
+        if (r.entity !== entityName || r.field !== fieldName) return false;
+        // Match by label if both have it, otherwise by id
+        if (labelValue && r.label) return r.label === labelValue;
+        if (r.id !== undefined) return r.id === entityId;
+        return false;
+      });
 
-      if (!existingRef) {
-        manifest[mediaId].refs.push({
+      if (existingRefIndex === -1) {
+        // New ref - add it
+        const refEntry = {
           entity: entityName,
-          id: entityId,
           field: fieldName
-        });
+        };
+        // Prefer label over id for schema resilience
+        if (labelValue) {
+          refEntry.label = labelValue;
+        } else {
+          refEntry.id = entityId;
+        }
+        manifest[mediaId].refs.push(refEntry);
         fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      } else {
+        // Existing ref - migrate from id to label format if needed
+        const existingRef = manifest[mediaId].refs[existingRefIndex];
+        if (labelValue && existingRef.id !== undefined && !existingRef.label) {
+          // Upgrade: remove id, add label
+          delete existingRef.id;
+          existingRef.label = labelValue;
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+        }
       }
     } catch (err) {
       logger.debug('Could not update manifest with ref', { mediaId, error: err.message });
@@ -780,6 +960,7 @@ class MediaService {
 
   /**
    * Remove reference from manifest file
+   * Handles both label-based and id-based refs
    * @param {string} mediaId - Media UUID
    * @param {string} entityName - Entity class name
    * @param {number} entityId - Entity record ID
@@ -794,9 +975,18 @@ class MediaService {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       if (!manifest[mediaId] || !manifest[mediaId].refs) return;
 
-      manifest[mediaId].refs = manifest[mediaId].refs.filter(
-        r => !(r.entity === entityName && r.id === entityId)
-      );
+      // Get label value to match label-based refs
+      const labelValue = this.getEntityLabelValue(entityName, entityId);
+
+      // Filter out refs matching by either id or label
+      manifest[mediaId].refs = manifest[mediaId].refs.filter(r => {
+        if (r.entity !== entityName) return true;
+        // Match by label if ref has label and we have a label value
+        if (r.label && labelValue) return r.label !== labelValue;
+        // Match by id for legacy refs
+        if (r.id) return r.id !== entityId;
+        return true;
+      });
 
       fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     } catch (err) {

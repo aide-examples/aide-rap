@@ -563,7 +563,7 @@ const EntityForm = {
           <div class="media-preview ${hasValue ? '' : 'hidden'}">
             <img class="media-thumbnail"
                  src="${hasValue ? `/api/media/${mediaId}/thumbnail` : ''}"
-                 onerror="this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+                 onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
             <span class="media-filename"></span>
             <button type="button" class="media-remove btn-icon" ${disabled} title="Entfernen">&times;</button>
           </div>
