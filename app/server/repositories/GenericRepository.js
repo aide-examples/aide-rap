@@ -626,9 +626,11 @@ function getEntityCounts() {
 /**
  * Get list of all enabled entities with area info and record counts
  * Preserves the order from config.json enabledEntities
+ * Includes system entities (like AuditTrail) at the end
  */
 function getEnabledEntitiesWithAreas() {
   const schema = getSchema();
+  const db = getDatabase();
   const counts = getEntityCounts();
   const entities = [];
 
@@ -651,7 +653,29 @@ function getEnabledEntitiesWithAreas() {
     });
   }
 
-  return { entities, areas: schema.areas };
+  // Add system entities (AuditTrail)
+  try {
+    const auditCount = db.prepare('SELECT COUNT(*) as count FROM _audit_trail').get();
+    entities.push({
+      name: 'AuditTrail',
+      area: 'system',
+      areaName: 'System',
+      areaColor: '#9ca3af',
+      count: auditCount?.count || 0,
+      system: true,
+      readonly: true
+    });
+  } catch (err) {
+    // _audit_trail table may not exist yet
+  }
+
+  // Include system area in areas
+  const areas = {
+    ...schema.areas,
+    system: { name: 'System', color: '#9ca3af' }
+  };
+
+  return { entities, areas };
 }
 
 /**

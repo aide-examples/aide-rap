@@ -19,6 +19,7 @@ const EntityExplorer = {
   btnViewTreeV: null,
   currentEntity: null,
   currentView: null, // null = entity mode, object = view mode { name, base, color }
+  entityMetadata: {}, // Map of entity name -> { readonly, system, ... }
   records: [],
   selectedId: null,
   viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
@@ -484,6 +485,15 @@ const EntityExplorer = {
     try {
       const { entities, areas } = await ApiClient.getEntityTypes();
 
+      // Store entity metadata for readonly/system checks
+      this.entityMetadata = {};
+      entities.forEach(e => {
+        this.entityMetadata[e.name] = {
+          readonly: e.readonly || false,
+          system: e.system || false
+        };
+      });
+
       // Group entities by area
       const grouped = {};
       entities.forEach(e => {
@@ -918,27 +928,25 @@ const EntityExplorer = {
     this.renderListWithSchema();
   },
 
+  /**
+   * Check if current entity is readonly (system entity)
+   */
+  isCurrentEntityReadonly() {
+    return this.entityMetadata[this.currentEntity]?.readonly === true;
+  },
+
   async renderListWithSchema() {
     const schema = await SchemaCache.getExtended(this.currentEntity);
     const labelFields = this.getLabelFields(schema);
+    const isReadonly = this.isCurrentEntityReadonly();
 
     this.list.innerHTML = this.records.map(record => {
       const title = labelFields.primary ? record[labelFields.primary] || `#${record.id}` : `#${record.id}`;
       const subtitle = labelFields.secondary ? record[labelFields.secondary] : `ID: ${record.id}`;
       const isSelected = record.id === this.selectedId;
 
-      return `
-        <div class="entity-row ${isSelected ? 'selected' : ''}" data-id="${record.id}">
-          <div class="entity-row-content">
-            <div class="entity-row-title">${DomUtils.escapeHtml(String(title))}</div>
-            <div class="entity-row-subtitle">${DomUtils.escapeHtml(String(subtitle))}</div>
-          </div>
-          <div class="entity-row-actions">
-            <button class="btn-row-action btn-edit" data-id="${record.id}" title="Edit">&#9998;</button>
-            <button class="btn-row-action danger btn-delete" data-id="${record.id}" title="Delete">&#128465;</button>
-          </div>
-        </div>
-      `;
+      // Hide edit/delete buttons for readonly entities
+      const actionsHtml = isReadonly ? '' : `
     }).join('');
 
     // Add event listeners

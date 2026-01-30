@@ -90,11 +90,14 @@ const ContextMenu = {
     // Check if user has write access (not a guest)
     const hasWriteAccess = window.currentUser && ['user', 'admin', 'master'].includes(window.currentUser.role);
 
-    // Enable/disable write actions based on role
+    // Check if entity is readonly (system entity like AuditTrail)
+    const isReadonly = EntityExplorer.entityMetadata[context.entity]?.readonly === true;
+
+    // Enable/disable write actions based on role and readonly status
     ['new', 'edit', 'delete'].forEach(action => {
       const item = this.menu.querySelector(`[data-action="${action}"]`);
       if (item) {
-        if (hasWriteAccess) {
+        if (hasWriteAccess && !isReadonly) {
           item.classList.remove('disabled');
         } else {
           item.classList.add('disabled');

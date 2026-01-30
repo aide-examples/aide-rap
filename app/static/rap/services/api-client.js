@@ -5,6 +5,17 @@ const ApiClient = {
   baseUrl: '/api/entities',
 
   /**
+   * Get the correct API base URL for an entity
+   * System entities like AuditTrail have their own endpoints
+   */
+  getEntityUrl(entityName) {
+    if (entityName === 'AuditTrail') {
+      return '/api/audit';
+    }
+    return `${this.baseUrl}/${entityName}`;
+  },
+
+  /**
    * Make a fetch request with error handling
    */
   async request(url, options = {}) {
@@ -50,21 +61,21 @@ const ApiClient = {
    * Get schema for an entity type
    */
   async getSchema(entityName) {
-    return this.request(`${this.baseUrl}/${entityName}/schema`);
+    return this.request(`${this.getEntityUrl(entityName)}/schema`);
   },
 
   /**
    * Get extended schema with UI metadata
    */
   async getExtendedSchema(entityName) {
-    return this.request(`${this.baseUrl}/${entityName}/schema/extended`);
+    return this.request(`${this.getEntityUrl(entityName)}/schema/extended`);
   },
 
   /**
    * Get back-references to a specific record
    */
   async getBackReferences(entityName, id) {
-    return this.request(`${this.baseUrl}/${entityName}/${id}/references`);
+    return this.request(`${this.getEntityUrl(entityName)}/${id}/references`);
   },
 
   /**
@@ -77,9 +88,10 @@ const ApiClient = {
     const params = new URLSearchParams();
     if (type && type !== 'select') params.set('type', type);
     const queryString = params.toString();
+    const baseUrl = this.getEntityUrl(entityName);
     const url = queryString
-      ? `${this.baseUrl}/${entityName}/distinct/${encodeURIComponent(columnPath)}?${queryString}`
-      : `${this.baseUrl}/${entityName}/distinct/${encodeURIComponent(columnPath)}`;
+      ? `${baseUrl}/distinct/${encodeURIComponent(columnPath)}?${queryString}`
+      : `${baseUrl}/distinct/${encodeURIComponent(columnPath)}`;
     return this.request(url);
   },
 
@@ -97,9 +109,8 @@ const ApiClient = {
     if (options.offset) params.set('offset', options.offset);
 
     const queryString = params.toString();
-    const url = queryString
-      ? `${this.baseUrl}/${entityName}?${queryString}`
-      : `${this.baseUrl}/${entityName}`;
+    const baseUrl = this.getEntityUrl(entityName);
+    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
 
     return this.request(url);
   },
@@ -108,14 +119,14 @@ const ApiClient = {
    * Get a single record by ID
    */
   async getById(entityName, id) {
-    return this.request(`${this.baseUrl}/${entityName}/${id}`);
+    return this.request(`${this.getEntityUrl(entityName)}/${id}`);
   },
 
   /**
    * Create a new record
    */
   async create(entityName, data) {
-    return this.request(`${this.baseUrl}/${entityName}`, {
+    return this.request(this.getEntityUrl(entityName), {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -133,7 +144,7 @@ const ApiClient = {
     if (version !== null) {
       headers['If-Match'] = `"${entityName}:${id}:${version}"`;
     }
-    return this.request(`${this.baseUrl}/${entityName}/${id}`, {
+    return this.request(`${this.getEntityUrl(entityName)}/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(data),
@@ -144,7 +155,7 @@ const ApiClient = {
    * Delete a record
    */
   async delete(entityName, id) {
-    return this.request(`${this.baseUrl}/${entityName}/${id}`, {
+    return this.request(`${this.getEntityUrl(entityName)}/${id}`, {
       method: 'DELETE',
     });
   },

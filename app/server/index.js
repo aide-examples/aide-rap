@@ -10,6 +10,7 @@ const express = require('express');
 const { initDatabase, closeDatabase } = require('./config/database');
 const { correlationId, requestLogger, errorHandler } = require('./middleware');
 const GenericCrudRouter = require('./routers/GenericCrudRouter');
+const AuditRouter = require('./routers/audit.router');
 const ComputedFieldService = require('./services/ComputedFieldService');
 const AuditService = require('./services/AuditService');
 const logger = require('./utils/logger');
@@ -46,9 +47,13 @@ function init(app, config) {
 
   // JSON body parser for API routes
   app.use('/api/entities', express.json());
+  app.use('/api/audit', express.json());
 
   // Mount CRUD router
   app.use('/api/entities', GenericCrudRouter);
+
+  // Mount Audit router (readonly system entity)
+  app.use('/api/audit', AuditRouter);
 
   // Error handler (after routes)
   app.use('/api', errorHandler);
