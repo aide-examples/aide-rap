@@ -19,13 +19,17 @@ const ApiClient = {
    * Make a fetch request with error handling
    */
   async request(url, options = {}) {
-    const defaultOptions = {
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
     };
 
-    const response = await fetch(url, { ...defaultOptions, ...options });
+    // Merge headers properly (don't overwrite Content-Type)
+    const mergedOptions = {
+      ...options,
+      headers: { ...defaultHeaders, ...options.headers },
+    };
+
+    const response = await fetch(url, mergedOptions);
 
     // Handle 401 Unauthorized - session expired or not authenticated
     if (response.status === 401) {
