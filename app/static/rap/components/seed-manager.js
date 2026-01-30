@@ -348,9 +348,23 @@ const SeedManager = {
         if (data.updated > 0) parts.push(`${data.updated} updated`);
         if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
         if (data.replaced > 0) parts.push(`${data.replaced} replaced`);
-        const hasErrors = data.errors && data.errors.length > 0;
-        const msg = `${entityName}: ${parts.join(', ') || 'no changes'}`;
-        await this.refreshAndMessage(hasErrors ? `${msg} — ${data.errors[0]}` : msg, hasErrors);
+
+        const hasDbErrors = data.errors && data.errors.length > 0;
+        const hasMediaErrors = data.mediaErrors && data.mediaErrors.length > 0;
+        const hasErrors = hasDbErrors || hasMediaErrors;
+
+        let msg = `${entityName}: ${parts.join(', ') || 'no changes'}`;
+
+        // Add error details
+        if (hasDbErrors) {
+          msg += ` — ${data.errors[0]}`;
+        }
+        if (hasMediaErrors) {
+          const mediaMsg = data.mediaErrors.map(e => `row ${e.row}: ${e.field} - ${e.error}`).join('; ');
+          msg += ` — Media: ${mediaMsg}`;
+        }
+
+        await this.refreshAndMessage(msg, hasErrors);
       } else {
         this.showMessage(data.error || 'Failed to load', true);
       }
@@ -390,11 +404,23 @@ const SeedManager = {
         const errorEntities = Object.entries(data.results)
           .filter(([, r]) => r.error || (r.errors && r.errors.length > 0))
           .map(([name, r]) => `${name}: ${r.error || r.errors[0]}`);
+
+        // Collect media errors from all entities
+        const mediaErrors = Object.entries(data.results)
+          .filter(([, r]) => r.mediaErrors && r.mediaErrors.length > 0)
+          .flatMap(([name, r]) => r.mediaErrors.map(e => `${name} row ${e.row}: ${e.field} - ${e.error}`));
+
+        const messages = [];
+        messages.push(`Loaded seed data for ${loaded} entities`);
         if (errorEntities.length > 0) {
-          await this.refreshAndMessage(`Loaded ${loaded} entities — ${errorEntities.join('; ')}`, true);
-        } else {
-          await this.refreshAndMessage(`Loaded seed data for ${loaded} entities`);
+          messages.push(`Errors: ${errorEntities.join('; ')}`);
         }
+        if (mediaErrors.length > 0) {
+          messages.push(`Media download failed: ${mediaErrors.join('; ')}`);
+        }
+
+        const hasErrors = errorEntities.length > 0 || mediaErrors.length > 0;
+        await this.refreshAndMessage(messages.join(' — '), hasErrors);
       } else {
         this.showMessage(data.error || 'Failed to load all', true);
       }
@@ -438,11 +464,22 @@ const SeedManager = {
         const errorEntities = Object.entries(loadResults)
           .filter(([, r]) => r.error || (r.errors && r.errors.length > 0))
           .map(([name, r]) => `${name}: ${r.error || r.errors[0]}`);
+
+        // Collect media errors
+        const mediaErrors = Object.entries(loadResults)
+          .filter(([, r]) => r.mediaErrors && r.mediaErrors.length > 0)
+          .flatMap(([name, r]) => r.mediaErrors.map(e => `${name} row ${e.row}: ${e.field} - ${e.error}`));
+
+        const messages = ['Reset complete'];
         if (errorEntities.length > 0) {
-          await this.refreshAndMessage(`Reset done — ${errorEntities.join('; ')}`, true);
-        } else {
-          await this.refreshAndMessage('Reset complete: cleared and reloaded all data');
+          messages.push(`Errors: ${errorEntities.join('; ')}`);
         }
+        if (mediaErrors.length > 0) {
+          messages.push(`Media download failed: ${mediaErrors.join('; ')}`);
+        }
+
+        const hasErrors = errorEntities.length > 0 || mediaErrors.length > 0;
+        await this.refreshAndMessage(messages.join(' — '), hasErrors);
       } else {
         this.showMessage(data.error || 'Failed to reset', true);
       }

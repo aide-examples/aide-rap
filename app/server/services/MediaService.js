@@ -226,8 +226,14 @@ class MediaService {
    * @returns {Promise<Object>} Created media record with URLs
    */
   async uploadFromUrl(url, uploadedBy = null, constraints = null) {
-    // Fetch the URL
-    const response = await fetch(url);
+    // Fetch the URL with proper headers and redirect handling
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'AIDE-RAP/1.0 (Media Seeder; +https://github.com/anthropics/aide)',
+        'Accept': 'image/*,*/*'
+      }
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
@@ -571,6 +577,8 @@ class MediaService {
               if (mediaId && typeof mediaId === 'string' && mediaId.length === 36) {
                 try {
                   MediaRepository.addReference(mediaId, entityName, row.id, field.name);
+                  // Also update manifest with reference
+                  this.addRefToManifest(mediaId, entityName, row.id, field.name);
                   count++;
                 } catch (err) {
                   // Reference might already exist - that's ok
@@ -650,6 +658,52 @@ class MediaService {
         }
       }
     });
+
+    // Update media references after seed load (bulk operation)
+    // SeedManager uses direct SQL, so entity:create/update events don't fire
+    eventBus.on('seed:load:after', (entityName, result) => {
+      this.updateEntityMediaRefs(entityName);
+    });
+  }
+
+  /**
+   * Update media references for all records of an entity
+   * Used after bulk operations like seeding where individual entity events don't fire
+   * @param {string} entityName - Entity class name
+   */
+  updateEntityMediaRefs(entityName) {
+    const { getSchema, getDatabase } = require('../config/database');
+
+    try {
+      const schema = getSchema();
+      const db = getDatabase();
+      const entity = schema.entities[entityName];
+      if (!entity) return;
+
+      // Find media columns
+      const mediaColumns = entity.columns.filter(c => c.customType === 'media');
+      if (mediaColumns.length === 0) return;
+
+      // Query all records with media fields
+      const fieldNames = mediaColumns.map(c => c.name);
+      const rows = db.prepare(`SELECT id, ${fieldNames.join(', ')} FROM ${entity.tableName}`).all();
+
+      for (const row of rows) {
+        for (const col of mediaColumns) {
+          const mediaId = row[col.name];
+          if (mediaId && typeof mediaId === 'string' && mediaId.length === 36) {
+            try {
+              MediaRepository.addReference(mediaId, entityName, row.id, col.name);
+            } catch (e) {
+              // Ignore duplicate errors
+            }
+            this.addRefToManifest(mediaId, entityName, row.id, col.name);
+          }
+        }
+      }
+    } catch (err) {
+      logger.debug('Could not update entity media refs', { entityName, error: err.message });
+    }
   }
 
   /**

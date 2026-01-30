@@ -63,14 +63,16 @@ function isValidUrl(str) {
  * and replace with the resulting media UUID.
  * @param {string} entityName - Entity name
  * @param {Object} record - Record to process
- * @returns {Promise<Object>} - Record with resolved media UUIDs
+ * @returns {Promise<{record: Object, mediaErrors: Array}>} - Record with resolved media UUIDs and any errors
  */
 async function resolveMediaUrls(entityName, record) {
-  if (!mediaService) return record;
+  const mediaErrors = [];
+
+  if (!mediaService) return { record, mediaErrors };
 
   const { schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-  if (!entity) return record;
+  if (!entity) return { record, mediaErrors };
 
   const resolved = { ...record };
 
@@ -89,13 +91,19 @@ async function resolveMediaUrls(entityName, record) {
         console.log(`  -> Stored as ${result.id}`);
       } catch (err) {
         console.warn(`  Warning: Could not fetch media URL for ${col.name}: ${err.message}`);
-        // Keep the URL value (validation will fail later, or it might be optional)
+        // Track the error for client feedback
+        mediaErrors.push({
+          field: col.name,
+          url: value.length > 80 ? value.substring(0, 80) + '...' : value,
+          error: err.message
+        });
+        // Set field to null (validation will fail later, or it might be optional)
         resolved[col.name] = null;
       }
     }
   }
 
-  return resolved;
+  return { record: resolved, mediaErrors };
 }
 
 /**
@@ -807,6 +815,7 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   let updated = 0;
   let skipped = 0;
   const errors = [];
+  const mediaErrors = [];
 
   // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
   const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
@@ -821,7 +830,16 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     let record = records[i];
 
     // Resolve media URLs (fetch URLs and replace with UUIDs)
-    record = await resolveMediaUrls(entityName, record);
+    const mediaResult = await resolveMediaUrls(entityName, record);
+    record = mediaResult.record;
+
+    // Collect media errors with row context
+    for (const mediaErr of mediaResult.mediaErrors) {
+      mediaErrors.push({
+        row: i + 1,
+        ...mediaErr
+      });
+    }
 
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
     const resolved = resolveConceptualFKs(entityName, record, lookups);
@@ -881,7 +899,12 @@ async function loadEntity(entityName, lookups = null, options = {}) {
 
   const result = { loaded, updated, skipped, replaced, errors };
 
-  // Emit after event
+  // Add media errors if any occurred
+  if (mediaErrors.length > 0) {
+    result.mediaErrors = mediaErrors;
+  }
+
+  // Emit after event (MediaService listens to update media refs)
   eventBus.emit('seed:load:after', entityName, result);
 
   return result;
