@@ -359,6 +359,7 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entit
   // Open database
   db = new Database(dbPath);
   db.pragma('foreign_keys = OFF'); // Disable during setup
+  db.pragma('journal_mode = WAL'); // Enable WAL for better concurrency
 
   logger.info('Database opened', { path: dbPath });
 
