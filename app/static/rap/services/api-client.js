@@ -123,10 +123,19 @@ const ApiClient = {
 
   /**
    * Update an existing record
+   * @param {string} entityName - Entity name
+   * @param {number} id - Record ID
+   * @param {Object} data - Data to update
+   * @param {number} version - Expected version for OCC (optional)
    */
-  async update(entityName, id, data) {
+  async update(entityName, id, data, version = null) {
+    const headers = {};
+    if (version !== null) {
+      headers['If-Match'] = `"${entityName}:${id}:${version}"`;
+    }
     return this.request(`${this.baseUrl}/${entityName}/${id}`, {
       method: 'PUT',
+      headers,
       body: JSON.stringify(data),
     });
   },

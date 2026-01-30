@@ -109,6 +109,7 @@
     await EntityExplorer.init();
     DetailPanel.init();
     ConfirmDialog.init();
+    ConflictDialog.init();
     ContextMenu.init();
     SeedManager.init('modal-container');
     SeedImportDialog.init('modal-container');

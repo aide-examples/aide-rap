@@ -67,5 +67,13 @@
     "export_failed": "Export fehlgeschlagen: %{message}",
 
     "no_references": "Keine Referenzen",
-    "no_relations": "Keine Beziehungen"
+    "no_relations": "Keine Beziehungen",
+
+    "conflict_title": "Versionskonflikt - %{entity} #%{id}",
+    "conflict_message": "Dieser Datensatz wurde von einem anderen Benutzer geändert. Bitte überprüfen Sie die Änderungen:",
+    "field": "Feld",
+    "your_value": "Ihr Wert",
+    "server_value": "Server-Wert",
+    "reload_changes": "Server-Version laden",
+    "overwrite": "Überschreiben"
 }

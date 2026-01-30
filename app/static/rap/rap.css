@@ -3365,3 +3365,96 @@
 .prefilter-actions .btn-primary:hover {
     background: var(--color-primary-hover);
 }
+
+/* -----------------------------------------------------------------------------
+   Conflict Dialog (OCC)
+   ----------------------------------------------------------------------------- */
+.conflict-dialog {
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    max-width: 600px;
+    width: 90%;
+}
+
+.conflict-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.conflict-dialog .dialog-content {
+    padding: 24px;
+}
+
+.conflict-dialog h3 {
+    margin: 0 0 8px 0;
+    color: var(--color-warning, #d97706);
+    font-size: 1.1rem;
+}
+
+.conflict-dialog .conflict-message {
+    margin: 0 0 16px 0;
+    color: var(--color-gray-650);
+    font-size: 0.9rem;
+}
+
+.conflict-diff {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 4px;
+}
+
+.conflict-diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.conflict-diff-table th {
+    background: var(--table-header-bg);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 500;
+    border-bottom: 1px solid var(--color-slate-200);
+}
+
+.conflict-diff-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--color-slate-100);
+    vertical-align: top;
+}
+
+.conflict-row-diff {
+    background: #fef3c7;
+}
+
+.conflict-row-same {
+    color: var(--color-gray-400);
+}
+
+.conflict-field-name {
+    font-weight: 500;
+    color: var(--color-gray-700);
+}
+
+.conflict-your-value {
+    color: var(--color-danger, #dc2626);
+}
+
+.conflict-server-value {
+    color: var(--color-success, #059669);
+}
+
+.null-value {
+    color: var(--color-gray-400);
+    font-style: italic;
+}
+
+.conflict-dialog .dialog-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}

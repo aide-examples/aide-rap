@@ -129,6 +129,22 @@
         </main>
     </div>
 
+    <!-- Conflict Dialog Template (OCC) -->
+    <dialog id="conflict-dialog" class="conflict-dialog">
+        <div class="dialog-content">
+            <h3 id="conflict-title" data-i18n="conflict_title">Version Conflict</h3>
+            <p class="conflict-message" data-i18n="conflict_message">
+                This record was modified by another user. Please review the changes:
+            </p>
+            <div id="conflict-diff" class="conflict-diff"></div>
+            <div class="dialog-buttons">
+                <button id="conflict-cancel" class="btn-secondary" data-i18n="cancel">Cancel</button>
+                <button id="conflict-reload" class="btn-primary" data-i18n="reload_changes">Load Server Version</button>
+                <button id="conflict-overwrite" class="btn-danger" data-i18n="overwrite">Overwrite</button>
+            </div>
+        </div>
+    </dialog>
+
     <!-- Confirm Dialog Template -->
     <dialog id="confirm-dialog" class="confirm-dialog">
         <div class="dialog-content">
@@ -166,6 +182,7 @@
     <script src="/static/rap/components/entity-explorer.js"></script>
     <script src="/static/rap/components/detail-panel.js"></script>
     <script src="/static/rap/components/entity-form.js"></script>
+    <script src="/static/rap/components/conflict-dialog.js"></script>
     <script src="/static/rap/utils/CsvParser.js"></script>
     <script src="/static/rap/components/seed-import-dialog.js"></script>
     <script src="/static/rap/components/seed-preview-dialog.js"></script>

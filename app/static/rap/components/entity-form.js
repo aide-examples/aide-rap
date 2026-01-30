@@ -398,7 +398,9 @@ const EntityForm = {
     try {
       let result;
       if (isEdit) {
-        result = await ApiClient.update(this.currentEntity, this.currentRecord.id, data);
+        // OCC: Pass version from current record
+        const version = this.currentRecord.version;
+        result = await ApiClient.update(this.currentEntity, this.currentRecord.id, data, version);
       } else {
         result = await ApiClient.create(this.currentEntity, data);
       }
@@ -412,11 +414,47 @@ const EntityForm = {
       DetailPanel.showRecord(this.currentEntity, result);
 
     } catch (err) {
-      this.handleError(err);
+      await this.handleError(err, data);
     }
   },
 
-  handleError(err) {
+  async handleError(err, submittedData = null) {
+    // OCC: Version conflict
+    if (err.code === 'VERSION_CONFLICT' && err.details?.currentRecord) {
+      const result = await ConflictDialog.show(
+        this.currentEntity,
+        submittedData,
+        err.details.currentRecord,
+        this.currentSchema
+      );
+
+      if (result.action === 'reload') {
+        // Reload form with server version
+        this.currentRecord = err.details.currentRecord;
+        this.originalData = { ...err.details.currentRecord };
+        const container = document.getElementById('panel-content');
+        await this.render(container, this.currentEntity, err.details.currentRecord);
+      } else if (result.action === 'overwrite') {
+        // Retry with new version (force update)
+        try {
+          const newVersion = err.details.currentRecord.version;
+          const updated = await ApiClient.update(
+            this.currentEntity,
+            this.currentRecord.id,
+            submittedData,
+            newVersion
+          );
+          this.isDirty = false;
+          await EntityExplorer.refresh();
+          DetailPanel.showRecord(this.currentEntity, updated);
+        } catch (retryErr) {
+          alert(i18n.t('error_generic', { message: retryErr.message }));
+        }
+      }
+      // 'cancel' action: do nothing, user stays in form
+      return;
+    }
+
     if (err.details && Array.isArray(err.details)) {
       // Validation errors
       err.details.forEach(detail => {

@@ -67,5 +67,13 @@
     "export_failed": "Export failed: %{message}",
 
     "no_references": "No references",
-    "no_relations": "No relations"
+    "no_relations": "No relations",
+
+    "conflict_title": "Version Conflict - %{entity} #%{id}",
+    "conflict_message": "This record was modified by another user. Please review the changes:",
+    "field": "Field",
+    "your_value": "Your Value",
+    "server_value": "Server Value",
+    "reload_changes": "Load Server Version",
+    "overwrite": "Overwrite"
 }
