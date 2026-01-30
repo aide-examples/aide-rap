@@ -8,7 +8,6 @@
 const fs = require('fs');
 const path = require('path');
 const eventBus = require('./EventBus');
-const { migrateSystemColumns } = require('../config/database');
 
 // Module-level seed directory (configured via init())
 let SEED_DIR = null;
@@ -713,7 +712,8 @@ function loadEntity(entityName, lookups = null, options = {}) {
     return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
   };
 
-  const columns = entity.columns.filter(c => !isComputedColumn(c)).map(c => c.name);
+  // Exclude system columns (created_at, updated_at, version) - they use SQLite DEFAULTs
+  const columns = entity.columns.filter(c => !isComputedColumn(c) && !c.system).map(c => c.name);
   const columnsWithoutId = columns.filter(c => c !== 'id');
   const placeholders = columns.map(() => '?').join(', ');
 
@@ -800,9 +800,6 @@ function loadEntity(entityName, lookups = null, options = {}) {
   }
 
   const result = { loaded, updated, skipped, replaced, errors };
-
-  // Ensure system columns (created_at, updated_at, version) have values
-  migrateSystemColumns([entity]);
 
   // Emit after event
   eventBus.emit('seed:load:after', entityName, result);

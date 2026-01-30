@@ -291,6 +291,7 @@ function findById(entityName, id, enrich = true) {
 
 /**
  * Create a new record
+ * System columns (created_at, updated_at, version) use SQLite DEFAULTs
  */
 function create(entityName, data) {
   const entity = ensureValidationRules(entityName);
@@ -300,15 +301,9 @@ function create(entityName, data) {
   const validated = validator.validate(entityName, data);
   convertBooleansForSql(entity, validated);
 
-  // Set system columns (timestamps + version)
-  const now = new Date().toISOString();
-  validated.created_at = now;
-  validated.updated_at = now;
-  validated.version = 1;
-
-  // Build INSERT statement
+  // Build INSERT statement (system columns use SQLite DEFAULTs)
   const columns = entity.columns
-    .filter(c => c.name !== 'id' && validated[c.name] !== undefined)
+    .filter(c => c.name !== 'id' && !c.system && validated[c.name] !== undefined)
     .map(c => c.name);
 
   const placeholders = columns.map(() => '?');

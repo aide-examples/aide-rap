@@ -101,7 +101,7 @@ const SYSTEM_COLUMNS = [
   {
     name: 'created_at',
     type: 'string',
-    sqlType: 'TEXT',
+    sqlType: "TEXT DEFAULT (datetime('now'))",
     jsType: 'string',
     required: false,
     system: true,
@@ -110,7 +110,7 @@ const SYSTEM_COLUMNS = [
   {
     name: 'updated_at',
     type: 'string',
-    sqlType: 'TEXT',
+    sqlType: "TEXT DEFAULT (datetime('now'))",
     jsType: 'string',
     required: false,
     system: true,
