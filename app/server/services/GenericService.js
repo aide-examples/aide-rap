@@ -57,21 +57,28 @@ function getEntity(entityName, id, correlationId = null) {
 /**
  * Create a new entity
  * Emits: entity:create:before, entity:create:after
+ * @param {string} entityName - Entity name
+ * @param {Object} data - Record data
+ * @param {Object} context - Request context { correlationId, clientIp }
  */
-function createEntity(entityName, data, correlationId = null) {
-  const log = correlationId ? logger.withCorrelation(correlationId) : logger;
+function createEntity(entityName, data, context = {}) {
+  // Support legacy correlationId parameter
+  if (typeof context === 'string') {
+    context = { correlationId: context };
+  }
+  const log = context.correlationId ? logger.withCorrelation(context.correlationId) : logger;
 
   log.debug(`Creating ${entityName}`, { data });
 
   // Before hook (can throw to abort)
-  eventBus.emit('entity:create:before', entityName, data);
+  eventBus.emit('entity:create:before', entityName, data, context);
 
   const result = runInTransaction(() => {
     return repository.create(entityName, data);
   });
 
-  // After hook (informational)
-  eventBus.emit('entity:create:after', entityName, result);
+  // After hook (informational, includes context for audit)
+  eventBus.emit('entity:create:after', entityName, result, context);
 
   return result;
 }
@@ -83,22 +90,26 @@ function createEntity(entityName, data, correlationId = null) {
  * @param {number} id - Record ID
  * @param {Object} data - Update data
  * @param {number|null} expectedVersion - Expected version for OCC (null = skip check)
- * @param {string|null} correlationId - Request correlation ID
+ * @param {Object} context - Request context { correlationId, clientIp }
  */
-function updateEntity(entityName, id, data, expectedVersion = null, correlationId = null) {
-  const log = correlationId ? logger.withCorrelation(correlationId) : logger;
+function updateEntity(entityName, id, data, expectedVersion = null, context = {}) {
+  // Support legacy correlationId parameter
+  if (typeof context === 'string') {
+    context = { correlationId: context };
+  }
+  const log = context.correlationId ? logger.withCorrelation(context.correlationId) : logger;
 
   log.debug(`Updating ${entityName}`, { id, data, expectedVersion });
 
-  // Before hook (can throw to abort)
-  eventBus.emit('entity:update:before', entityName, id, data);
+  // Before hook (can throw to abort, includes context for audit)
+  eventBus.emit('entity:update:before', entityName, id, data, context);
 
   const result = runInTransaction(() => {
     return repository.update(entityName, id, data, expectedVersion);
   });
 
-  // After hook (informational)
-  eventBus.emit('entity:update:after', entityName, result);
+  // After hook (informational, includes context for audit)
+  eventBus.emit('entity:update:after', entityName, result, context);
 
   return result;
 }
@@ -106,21 +117,28 @@ function updateEntity(entityName, id, data, expectedVersion = null, correlationI
 /**
  * Delete an entity
  * Emits: entity:delete:before, entity:delete:after
+ * @param {string} entityName - Entity name
+ * @param {number} id - Record ID
+ * @param {Object} context - Request context { correlationId, clientIp }
  */
-function deleteEntity(entityName, id, correlationId = null) {
-  const log = correlationId ? logger.withCorrelation(correlationId) : logger;
+function deleteEntity(entityName, id, context = {}) {
+  // Support legacy correlationId parameter
+  if (typeof context === 'string') {
+    context = { correlationId: context };
+  }
+  const log = context.correlationId ? logger.withCorrelation(context.correlationId) : logger;
 
   log.debug(`Deleting ${entityName}`, { id });
 
-  // Before hook (can throw to abort)
-  eventBus.emit('entity:delete:before', entityName, id);
+  // Before hook (can throw to abort, includes context for audit)
+  eventBus.emit('entity:delete:before', entityName, id, context);
 
   const result = runInTransaction(() => {
     return repository.remove(entityName, id);
   });
 
-  // After hook (informational)
-  eventBus.emit('entity:delete:after', entityName, id);
+  // After hook (informational, includes context for audit)
+  eventBus.emit('entity:delete:after', entityName, id, context);
 
   return result;
 }

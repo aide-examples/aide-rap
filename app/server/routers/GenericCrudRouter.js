@@ -185,6 +185,16 @@ router.get('/:entity/:id', validateEntity, (req, res, next) => {
 });
 
 /**
+ * Build request context for audit trail
+ */
+function buildContext(req) {
+  return {
+    correlationId: req.correlationId,
+    clientIp: req.ip || req.connection?.remoteAddress
+  };
+}
+
+/**
  * POST /api/entities/:entity - Create record
  */
 router.post('/:entity', validateEntity, (req, res, next) => {
@@ -192,7 +202,7 @@ router.post('/:entity', validateEntity, (req, res, next) => {
     const { entity } = req.params;
     const data = req.body;
 
-    const created = service.createEntity(entity, data, req.correlationId);
+    const created = service.createEntity(entity, data, buildContext(req));
 
     // Set ETag for OCC
     if (created.version !== undefined) {
@@ -222,7 +232,7 @@ router.put('/:entity/:id', validateEntity, (req, res, next) => {
     // Remove version from data (it's a system column, not user-settable)
     delete data.version;
 
-    const updated = service.updateEntity(entity, parseInt(id, 10), data, expectedVersion, req.correlationId);
+    const updated = service.updateEntity(entity, parseInt(id, 10), data, expectedVersion, buildContext(req));
 
     // Set ETag for OCC
     if (updated.version !== undefined) {
@@ -242,7 +252,7 @@ router.delete('/:entity/:id', validateEntity, (req, res, next) => {
   try {
     const { entity, id } = req.params;
 
-    const deleted = service.deleteEntity(entity, parseInt(id, 10), req.correlationId);
+    const deleted = service.deleteEntity(entity, parseInt(id, 10), buildContext(req));
 
     res.json({
       message: `${entity} with ID ${id} deleted`,

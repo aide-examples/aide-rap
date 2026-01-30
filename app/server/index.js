@@ -11,6 +11,7 @@ const { initDatabase, closeDatabase } = require('./config/database');
 const { correlationId, requestLogger, errorHandler } = require('./middleware');
 const GenericCrudRouter = require('./routers/GenericCrudRouter');
 const ComputedFieldService = require('./services/ComputedFieldService');
+const AuditService = require('./services/AuditService');
 const logger = require('./utils/logger');
 
 /**
@@ -35,6 +36,9 @@ function init(app, config) {
 
   // Initialize database
   initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters);
+
+  // Initialize audit trail (after database)
+  AuditService.init();
 
   // Middleware (before routes)
   app.use(correlationId);
