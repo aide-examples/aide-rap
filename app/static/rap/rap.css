@@ -3608,9 +3608,9 @@
 }
 
 .media-thumbnail {
-    width: 48px;
     height: 48px;
-    object-fit: cover;
+    width: auto;
+    max-width: 120px;
     border-radius: 4px;
     background: var(--color-gray-100);
 }
@@ -3678,20 +3678,20 @@
     display: none;
 }
 
-/* Table/Detail Thumbnails */
+/* Table/Detail Thumbnails - height-constrained, preserves aspect ratio */
 .media-thumb-tiny {
-    width: 24px;
     height: 24px;
-    object-fit: cover;
+    width: auto;
+    max-width: 60px;
     border-radius: 3px;
     vertical-align: middle;
     background: var(--color-gray-100);
 }
 
 .media-thumb-small {
-    width: 32px;
     height: 32px;
-    object-fit: cover;
+    width: auto;
+    max-width: 80px;
     border-radius: 4px;
     vertical-align: middle;
     background: var(--color-gray-100);

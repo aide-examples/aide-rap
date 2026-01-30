@@ -162,10 +162,10 @@ class MediaService {
           fs.mkdirSync(thumbSubdir, { recursive: true });
         }
 
-        // Generate thumbnail
-        const thumbSize = this.cfg.thumbnails?.maxWidth || 200;
+        // Generate thumbnail (height-constrained, preserves aspect ratio)
+        const thumbHeight = this.cfg.thumbnails?.maxHeight || 200;
         await sharpInstance(fileBuffer)
-          .resize(thumbSize, thumbSize, { fit: 'inside' })
+          .resize({ height: thumbHeight })
           .jpeg({ quality: this.cfg.thumbnails?.quality || 80 })
           .toFile(path.join(thumbSubdir, `${id}_thumb.jpg`));
 
@@ -703,7 +703,7 @@ class MediaService {
   }
 
   /**
-   * Backup media originals to backup directory
+   * Backup media files (originals + thumbnails) to backup directory
    * @param {string} backupDir - Backup directory path
    */
   backupTo(backupDir) {
@@ -714,15 +714,23 @@ class MediaService {
       fs.rmSync(mediaBackupDir, { recursive: true, force: true });
     }
 
+    fs.mkdirSync(mediaBackupDir, { recursive: true });
+
     // Copy originals directory (includes manifests)
     if (fs.existsSync(this.originalsPath)) {
-      fs.cpSync(this.originalsPath, mediaBackupDir, { recursive: true });
-      logger.info('Media files backed up', { dir: mediaBackupDir });
+      fs.cpSync(this.originalsPath, path.join(mediaBackupDir, 'originals'), { recursive: true });
     }
+
+    // Copy thumbnails directory
+    if (fs.existsSync(this.thumbnailsPath)) {
+      fs.cpSync(this.thumbnailsPath, path.join(mediaBackupDir, 'thumbnails'), { recursive: true });
+    }
+
+    logger.info('Media files backed up', { dir: mediaBackupDir });
   }
 
   /**
-   * Restore media originals from backup directory
+   * Restore media files (originals + thumbnails) from backup directory
    * @param {string} backupDir - Backup directory path
    */
   restoreFrom(backupDir) {
@@ -736,8 +744,21 @@ class MediaService {
     // Clear current media
     this.clearAll();
 
-    // Copy backup to originals
-    fs.cpSync(mediaBackupDir, this.originalsPath, { recursive: true });
+    // Restore originals (check both new and legacy backup structure)
+    const originalsBackup = path.join(mediaBackupDir, 'originals');
+    if (fs.existsSync(originalsBackup)) {
+      // New structure: backup/media/originals/
+      fs.cpSync(originalsBackup, this.originalsPath, { recursive: true });
+    } else {
+      // Legacy structure: backup/media/ contains files directly
+      fs.cpSync(mediaBackupDir, this.originalsPath, { recursive: true });
+    }
+
+    // Restore thumbnails (if present in backup)
+    const thumbnailsBackup = path.join(mediaBackupDir, 'thumbnails');
+    if (fs.existsSync(thumbnailsBackup)) {
+      fs.cpSync(thumbnailsBackup, this.thumbnailsPath, { recursive: true });
+    }
 
     // Rebuild index from manifests
     this.rebuildIndex();

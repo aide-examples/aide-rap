@@ -152,6 +152,10 @@ const SeedManager = {
       this.container.innerHTML = '';
       this.container.classList.remove('active');
     }
+    // Refresh entity counts after admin operations (seed, backup, restore, etc.)
+    if (typeof EntityExplorer !== 'undefined' && EntityExplorer.refreshCounts) {
+      EntityExplorer.refreshCounts();
+    }
   },
 
   /**
