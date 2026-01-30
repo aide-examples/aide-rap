@@ -276,6 +276,51 @@ function dropAllTables(orderedEntities) {
 }
 
 /**
+ * Migrate system columns (created_at, updated_at, version) for existing tables.
+ * - Adds columns if missing
+ * - Sets default values for existing records with NULL
+ * Called: after initDatabase, after restore, after seed load
+ */
+function migrateSystemColumns(orderedEntities) {
+  const now = new Date().toISOString();
+
+  for (const entity of orderedEntities) {
+    if (!tableExists(entity.tableName)) continue;
+
+    // Check which columns exist
+    const columns = db.prepare(`PRAGMA table_info(${entity.tableName})`).all();
+    const colNames = columns.map(c => c.name);
+
+    // Add missing columns
+    if (!colNames.includes('created_at')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN created_at TEXT`);
+      logger.debug(`Added created_at to ${entity.tableName}`);
+    }
+    if (!colNames.includes('updated_at')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN updated_at TEXT`);
+      logger.debug(`Added updated_at to ${entity.tableName}`);
+    }
+    if (!colNames.includes('version')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN version INTEGER DEFAULT 1`);
+      logger.debug(`Added version to ${entity.tableName}`);
+    }
+
+    // Set default values for existing records with NULL
+    const result = db.prepare(`
+      UPDATE ${entity.tableName}
+      SET created_at = COALESCE(created_at, ?),
+          updated_at = COALESCE(updated_at, ?),
+          version = COALESCE(version, 1)
+      WHERE created_at IS NULL OR updated_at IS NULL OR version IS NULL
+    `).run(now, now);
+
+    if (result.changes > 0) {
+      logger.info(`Migrated ${result.changes} records in ${entity.tableName} with system columns`);
+    }
+  }
+}
+
+/**
  * Create all tables
  */
 function createAllTables(orderedEntities) {
@@ -406,6 +451,9 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entit
     createAllViews(schema.orderedEntities);
     createUserViews(viewsConfig);
   }
+
+  // Migrate: ensure system columns exist and have values
+  migrateSystemColumns(schema.orderedEntities);
 
   // Enable foreign keys for runtime
   db.pragma('foreign_keys = ON');
@@ -606,5 +654,6 @@ module.exports = {
   forceRebuild,
   reinitialize,
   tableExists,
-  viewExists
+  viewExists,
+  migrateSystemColumns
 };

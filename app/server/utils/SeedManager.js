@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const eventBus = require('./EventBus');
+const { migrateSystemColumns } = require('../config/database');
 
 // Module-level seed directory (configured via init())
 let SEED_DIR = null;
@@ -799,6 +800,9 @@ function loadEntity(entityName, lookups = null, options = {}) {
   }
 
   const result = { loaded, updated, skipped, replaced, errors };
+
+  // Ensure system columns (created_at, updated_at, version) have values
+  migrateSystemColumns([entity]);
 
   // Emit after event
   eventBus.emit('seed:load:after', entityName, result);
