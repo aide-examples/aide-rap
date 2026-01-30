@@ -71,17 +71,21 @@ function computeSchemaHash(schema) {
   };
 
   // Hash entity structures (columns + constraints)
+  // Exclude system columns (created_at, updated_at, version) from hash
+  // to prevent unnecessary schema rebuilds when adding system columns
   for (const entity of schema.orderedEntities) {
     data.entities[entity.className] = {
-      columns: entity.columns.map(c => ({
-        name: c.name,
-        type: c.type,
-        sqlType: c.sqlType,
-        required: c.required,
-        unique: c.unique || false,
-        foreignKey: c.foreignKey?.references || null,
-        defaultValue: c.defaultValue
-      })),
+      columns: entity.columns
+        .filter(c => !c.system)  // Exclude system columns
+        .map(c => ({
+          name: c.name,
+          type: c.type,
+          sqlType: c.sqlType,
+          required: c.required,
+          unique: c.unique || false,
+          foreignKey: c.foreignKey?.references || null,
+          defaultValue: c.defaultValue
+        })),
       uniqueKeys: entity.uniqueKeys || {},
       indexes: entity.indexes || {}
     };

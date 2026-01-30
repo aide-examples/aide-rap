@@ -91,6 +91,43 @@ const TYPE_MAP = {
 };
 
 /**
+ * System columns added to ALL entities automatically.
+ * These are NOT defined in DataModel.md — they're infrastructure columns.
+ * - created_at: Timestamp when record was created
+ * - updated_at: Timestamp of last modification
+ * - version: OCC version counter (starts at 1, incremented on update)
+ */
+const SYSTEM_COLUMNS = [
+  {
+    name: 'created_at',
+    type: 'string',
+    sqlType: 'TEXT',
+    jsType: 'string',
+    required: false,
+    system: true,
+    ui: { readonly: true }
+  },
+  {
+    name: 'updated_at',
+    type: 'string',
+    sqlType: 'TEXT',
+    jsType: 'string',
+    required: false,
+    system: true,
+    ui: { readonly: true }
+  },
+  {
+    name: 'version',
+    type: 'int',
+    sqlType: 'INTEGER DEFAULT 1',
+    jsType: 'number',
+    required: false,
+    system: true,
+    ui: { readonly: true }
+  }
+];
+
+/**
  * Convert PascalCase to snake_case
  */
 function toSnakeCase(str) {
@@ -841,6 +878,11 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
       secondary: label2Col?.name || null
     }
   };
+
+  // Add system columns (timestamps + version) after user-defined columns
+  for (const sysCol of SYSTEM_COLUMNS) {
+    columns.push({ ...sysCol });
+  }
 
   return {
     className,

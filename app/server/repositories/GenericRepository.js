@@ -300,6 +300,12 @@ function create(entityName, data) {
   const validated = validator.validate(entityName, data);
   convertBooleansForSql(entity, validated);
 
+  // Set system columns (timestamps + version)
+  const now = new Date().toISOString();
+  validated.created_at = now;
+  validated.updated_at = now;
+  validated.version = 1;
+
   // Build INSERT statement
   const columns = entity.columns
     .filter(c => c.name !== 'id' && validated[c.name] !== undefined)
@@ -336,9 +342,13 @@ function update(entityName, id, data) {
   const validated = validator.validate(entityName, data);
   convertBooleansForSql(entity, validated);
 
-  // Build UPDATE statement
+  // Set system columns (update timestamp)
+  validated.updated_at = new Date().toISOString();
+  // Note: version increment is handled in Phase 3 (OCC)
+
+  // Build UPDATE statement (exclude system columns that shouldn't be user-settable)
   const columns = entity.columns
-    .filter(c => c.name !== 'id' && validated[c.name] !== undefined)
+    .filter(c => c.name !== 'id' && c.name !== 'created_at' && validated[c.name] !== undefined)
     .map(c => c.name);
 
   const setClause = columns.map(col => `${col} = ?`).join(', ');
