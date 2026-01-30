@@ -48,7 +48,7 @@
         // Import constants from shared module
         const { BOX_WIDTH, BOX_HEIGHT_COMPACT, ATTR_LINE_HEIGHT, HEADER_HEIGHT, BOX_PADDING,
                 STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_LABEL,
-                OPTIONAL_DASH, READONLY_DASH } = DiagramConstants;
+                OPTIONAL_DASH, READONLY_DASH, READONLY_COLOR, LABEL_UNDERLINE, LABEL2_UNDERLINE } = DiagramConstants;
 
         /**
          * Escape text for use in XML/SVG.
@@ -658,14 +658,31 @@
                         const attr = visibleAttrs[i];
                         const attrY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
                         const cleanType = ConnectionCalculator.extractBaseType(attr.type);
+                        const desc = attr.description || '';
+
+                        // Determine styling based on markers
+                        const isReadonly = /\[READONLY\]/i.test(desc);
+                        const isLabel = /\[LABEL\]/i.test(desc) && !/\[LABEL2\]/i.test(desc);
+                        const isLabel2 = /\[LABEL2\]/i.test(desc);
+                        const fillColor = isReadonly ? READONLY_COLOR : '#000';
+
+                        let displayText;
                         if (entityNames.includes(cleanType)) {
                             // FK attribute: bold name only
-                            const displayText = fitToContent ? attr.name : truncateText(attr.name, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold">${escapeXml(displayText)}</text>`);
+                            displayText = fitToContent ? attr.name : truncateText(attr.name, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold" fill="${fillColor}">${escapeXml(displayText)}</text>`);
                         } else {
                             const fullText = `${attr.name}: ${cleanType}`;
-                            const displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}">${escapeXml(displayText)}</text>`);
+                            displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="${fillColor}">${escapeXml(displayText)}</text>`);
+                        }
+
+                        // Add underline for LABEL/LABEL2
+                        if (isLabel || isLabel2) {
+                            const textWidth = measureText(displayText, FONT_SIZE_ATTR, FONT_FAMILY);
+                            const underlineY = attrY + 2;
+                            const dashAttr = isLabel2 ? ' stroke-dasharray="3,2"' : '';
+                            parts.push(`  <line x1="${pos.x + 5}" y1="${underlineY}" x2="${pos.x + 5 + textWidth}" y2="${underlineY}" stroke="${fillColor}" stroke-width="1"${dashAttr}/>`);
                         }
                     }
                 } else {
@@ -802,12 +819,24 @@
                         const line = document.createElement('div');
                         line.className = 'attr-line';
                         const baseType = ConnectionCalculator.extractBaseType(attr.type);
+                        const desc = attr.description || '';
                         if (entityNames.includes(baseType)) {
                             // FK attribute: bold name only
                             line.textContent = attr.name;
                             line.style.fontWeight = 'bold';
                         } else {
                             line.textContent = `${attr.name}: ${baseType}`;
+                        }
+                        // Apply marker styles
+                        if (/\[READONLY\]/i.test(desc)) {
+                            line.style.color = READONLY_COLOR;
+                        }
+                        if (/\[LABEL\]/i.test(desc) && !/\[LABEL2\]/i.test(desc)) {
+                            line.style.textDecoration = 'underline';
+                            line.style.textDecorationStyle = LABEL_UNDERLINE;
+                        } else if (/\[LABEL2\]/i.test(desc)) {
+                            line.style.textDecoration = 'underline';
+                            line.style.textDecorationStyle = LABEL2_UNDERLINE;
                         }
                         attrsDiv.appendChild(line);
                     });

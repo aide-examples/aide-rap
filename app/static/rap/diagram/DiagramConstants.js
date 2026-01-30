@@ -28,7 +28,12 @@
         OPTIONAL_DASH: '6,3',
 
         // Readonly/computed relationship styling (dotted)
-        READONLY_DASH: '2,2'
+        READONLY_DASH: '2,2',
+
+        // Attribute markers styling
+        READONLY_COLOR: '#C00000',
+        LABEL_UNDERLINE: 'solid',
+        LABEL2_UNDERLINE: 'dashed'
     };
 
     // Export as browser global
