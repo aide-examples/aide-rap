@@ -229,6 +229,11 @@ const EntityForm = {
   },
 
   getInputType(col) {
+    // Built-in types first
+    if (col.customType === 'mail') return 'email';
+    if (col.customType === 'url') return 'url';
+    if (col.customType === 'json') return 'textarea';
+    // Legacy checks
     if (col.type === 'number') return 'number';
     if (col.name.includes('date')) return 'date';
     if (col.name.includes('email')) return 'email';
@@ -285,6 +290,28 @@ const EntityForm = {
                value="1"
                ${checked ? 'checked' : ''}
                ${disabled}>
+      `;
+    }
+
+    // JSON fields: render as textarea
+    if (col.customType === 'json' || inputType === 'textarea') {
+      // Pretty-print JSON for editing
+      let jsonValue = displayValue;
+      if (displayValue && typeof displayValue === 'object') {
+        jsonValue = JSON.stringify(displayValue, null, 2);
+      } else if (displayValue && typeof displayValue === 'string') {
+        try {
+          jsonValue = JSON.stringify(JSON.parse(displayValue), null, 2);
+        } catch {
+          jsonValue = displayValue;
+        }
+      }
+      return `
+        <textarea class="form-input form-textarea json-input"
+                  id="field-${col.name}"
+                  name="${col.name}"
+                  rows="6"
+                  ${disabled}>${DomUtils.escapeHtml(jsonValue)}</textarea>
       `;
     }
 

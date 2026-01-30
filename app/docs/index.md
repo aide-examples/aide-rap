@@ -59,6 +59,27 @@ No `type_id INTEGER REFERENCES aircraft_type(id)` – just write `type: Aircraft
 
 Validation happens identically on frontend (for UX) and backend (for integrity).
 
+**Built-in Types** – Ready to use without defining:
+
+| Type | Storage | Validation | UI Display |
+|------|---------|------------|------------|
+| `int` | INTEGER | Must be a number | Number input |
+| `string` | TEXT | Must be a string | Text input |
+| `date` | TEXT | YYYY-MM-DD format | Date picker |
+| `bool` | INTEGER | true/false | Checkbox |
+| `json` | TEXT | Valid JSON | Pretty-printed code block |
+| `url` | TEXT | http(s):// URL | Clickable link |
+| `mail` | TEXT | Valid email | Mailto link |
+
+Example usage:
+```markdown
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| website | url | Company website |
+| contact | mail | Support email |
+| metadata | json | Additional data |
+```
+
 ### Color-Coded Areas of Competence
 
 Group related entities into colored areas. The colors flow through from your data model diagram into the UI – entity selector, tree nodes, and table headers all respect the grouping:

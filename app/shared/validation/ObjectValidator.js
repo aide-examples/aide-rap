@@ -27,6 +27,7 @@ class ObjectValidator {
       max: this._validateMax.bind(this),
       enum: this._validateEnum.bind(this),
       email: this._validateEmail.bind(this),
+      json: this._validateJson.bind(this),
       minItems: this._validateMinItems.bind(this),
       maxItems: this._validateMaxItems.bind(this),
       itemType: this._validateItemType.bind(this),
@@ -299,6 +300,30 @@ class ObjectValidator {
       };
     }
 
+    // JSON type: accept objects or valid JSON strings
+    if (expectedType === 'json') {
+      if (typeof value === 'object') return null; // Already an object
+      if (typeof value === 'string') {
+        try {
+          JSON.parse(value);
+          return null;
+        } catch {
+          return {
+            field: fieldName,
+            code: 'INVALID_JSON',
+            message: `Field "${fieldName}" must be valid JSON`,
+            value
+          };
+        }
+      }
+      return {
+        field: fieldName,
+        code: 'INVALID_JSON',
+        message: `Field "${fieldName}" must be valid JSON`,
+        value
+      };
+    }
+
     return null;
   }
 
@@ -454,6 +479,36 @@ class ObjectValidator {
     }
 
     return null;
+  }
+
+  _validateJson(fieldName, value, isJson) {
+    if (!isJson) return null;
+    if (value === null || value === undefined) return null;
+
+    // Objects are valid JSON
+    if (typeof value === 'object') return null;
+
+    // Strings must be parseable as JSON
+    if (typeof value === 'string') {
+      try {
+        JSON.parse(value);
+        return null;
+      } catch {
+        return {
+          field: fieldName,
+          code: 'INVALID_JSON',
+          message: `Field "${fieldName}" must be valid JSON`,
+          value
+        };
+      }
+    }
+
+    return {
+      field: fieldName,
+      code: 'INVALID_JSON',
+      message: `Field "${fieldName}" must be valid JSON`,
+      value
+    };
   }
 
   // ==================== Array validator implementations ====================

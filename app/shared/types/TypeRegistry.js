@@ -27,7 +27,7 @@ class TypeRegistry {
     /**
      * Built-in type names
      */
-    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean'];
+    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail'];
 
     /**
      * Built-in type definitions
@@ -62,6 +62,34 @@ class TypeRegistry {
         sqlType: 'INTEGER',
         jsType: 'boolean',
         validation: { type: 'boolean' }
+      },
+      json: {
+        kind: 'builtin',
+        sqlType: 'TEXT',
+        jsType: 'object',
+        validation: { type: 'json' }
+      },
+      url: {
+        kind: 'builtin',
+        sqlType: 'TEXT',
+        jsType: 'string',
+        validation: {
+          type: 'string',
+          pattern: '^https?:\\/\\/[^\\s]+$',
+          patternDescription: 'Valid URL (http:// or https://)',
+          patternExample: 'https://example.com'
+        }
+      },
+      mail: {
+        kind: 'builtin',
+        sqlType: 'TEXT',
+        jsType: 'string',
+        validation: {
+          type: 'string',
+          pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+          patternDescription: 'Valid email address',
+          patternExample: 'user@example.com'
+        }
       }
     };
   }

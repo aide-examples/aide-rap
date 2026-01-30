@@ -504,6 +504,17 @@ const EntityTable = {
               <span class="fk-loading">#${value}</span>
             </td>`;
           }
+        } else if (col.customType === 'url' && value) {
+          // URL: Clickable link
+          html += `<td><a href="${DomUtils.escapeHtml(value)}" target="_blank" rel="noopener" class="url-link">${DomUtils.escapeHtml(value)}</a></td>`;
+        } else if (col.customType === 'mail' && value) {
+          // Mail: Mailto link
+          html += `<td><a href="mailto:${DomUtils.escapeHtml(value)}" class="mail-link">${DomUtils.escapeHtml(value)}</a></td>`;
+        } else if (col.customType === 'json' && value) {
+          // JSON: Truncated preview with tooltip
+          const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+          const truncated = jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
+          html += `<td class="json-cell" title="${DomUtils.escapeHtml(jsonStr)}">${DomUtils.escapeHtml(truncated)}</td>`;
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const displayValue = value != null

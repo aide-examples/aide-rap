@@ -134,6 +134,21 @@ const DetailPanel = {
       let displayValue;
       if (value === null || value === undefined) {
         displayValue = '';
+      } else if (col.customType === 'url') {
+        // URL: Clickable link
+        displayValue = `<a href="${DomUtils.escapeHtml(value)}" target="_blank" rel="noopener">${DomUtils.escapeHtml(value)}</a>`;
+      } else if (col.customType === 'mail') {
+        // Mail: Mailto link
+        displayValue = `<a href="mailto:${DomUtils.escapeHtml(value)}">${DomUtils.escapeHtml(value)}</a>`;
+      } else if (col.customType === 'json') {
+        // JSON: Pretty-printed code block
+        try {
+          const jsonObj = typeof value === 'object' ? value : JSON.parse(value);
+          const pretty = JSON.stringify(jsonObj, null, 2);
+          displayValue = `<pre class="json-value">${DomUtils.escapeHtml(pretty)}</pre>`;
+        } catch {
+          displayValue = `<pre class="json-value">${DomUtils.escapeHtml(String(value))}</pre>`;
+        }
       } else {
         // Use ValueFormatter to convert enum internal->external
         displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, schema));

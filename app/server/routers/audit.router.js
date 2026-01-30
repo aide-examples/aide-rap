@@ -106,8 +106,8 @@ router.get('/schema/extended', (req, res) => {
         { value: 'UPDATE', label: 'Update' },
         { value: 'DELETE', label: 'Delete' }
       ], ui: { readonly: true } },
-      { name: 'before_data', type: 'string', required: false, ui: { readonly: true, display: 'json' } },
-      { name: 'after_data', type: 'string', required: false, ui: { readonly: true, display: 'json' } },
+      { name: 'before_data', type: 'string', customType: 'json', required: false, ui: { readonly: true } },
+      { name: 'after_data', type: 'string', customType: 'json', required: false, ui: { readonly: true } },
       { name: 'changed_by', type: 'string', required: false, ui: { readonly: true } },
       { name: 'changed_at', type: 'string', required: true, ui: { readonly: true } },
       { name: 'correlation_id', type: 'string', required: false, ui: { readonly: true } }

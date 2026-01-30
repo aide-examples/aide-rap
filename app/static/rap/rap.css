@@ -3458,3 +3458,56 @@
     justify-content: flex-end;
     flex-wrap: wrap;
 }
+
+/* ==================== Built-in Types: json, url, mail ==================== */
+
+/* JSON display in detail panel */
+.json-value {
+    font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+    font-size: 0.8rem;
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    max-height: 300px;
+    white-space: pre;
+    margin: 0;
+    border: 1px solid #e9ecef;
+}
+
+/* JSON cell in table */
+.json-cell {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #666;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* JSON textarea in forms */
+.json-input {
+    font-family: 'Fira Code', 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    resize: vertical;
+}
+
+/* URL and Mail links */
+.url-link,
+.mail-link {
+    color: var(--primary-color, #3b82f6);
+    text-decoration: none;
+}
+
+.url-link:hover,
+.mail-link:hover {
+    text-decoration: underline;
+}
+
+/* Form textarea styling */
+.form-textarea {
+    min-height: 100px;
+    resize: vertical;
+}
