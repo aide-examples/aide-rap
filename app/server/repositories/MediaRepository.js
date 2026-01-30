@@ -21,14 +21,15 @@ const { getDatabase } = require('../config/database');
  * @param {number} [metadata.height] - Image height
  * @param {boolean} [metadata.hasThumbnail] - Whether thumbnail exists
  * @param {string} [metadata.uploadedBy] - Username of uploader
+ * @param {string} [metadata.sourceUrl] - Original URL if fetched from web
  * @returns {Object} Created record
  */
 function create(metadata) {
   const db = getDatabase();
 
   const sql = `
-    INSERT INTO _media (id, original_name, mime_type, size, extension, width, height, has_thumbnail, uploaded_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO _media (id, original_name, mime_type, size, extension, width, height, has_thumbnail, uploaded_by, source_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.prepare(sql).run(
@@ -40,7 +41,8 @@ function create(metadata) {
     metadata.width || null,
     metadata.height || null,
     metadata.hasThumbnail ? 1 : 0,
-    metadata.uploadedBy || null
+    metadata.uploadedBy || null,
+    metadata.sourceUrl || null
   );
 
   return getById(metadata.id);
@@ -67,6 +69,7 @@ function getById(id) {
     height: row.height,
     hasThumbnail: row.has_thumbnail === 1,
     uploadedBy: row.uploaded_by,
+    sourceUrl: row.source_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -127,6 +130,7 @@ function list({ limit = 50, offset = 0, mimeType } = {}) {
     height: row.height,
     hasThumbnail: row.has_thumbnail === 1,
     uploadedBy: row.uploaded_by,
+    sourceUrl: row.source_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }));
@@ -143,8 +147,8 @@ function upsert(metadata) {
   const db = getDatabase();
 
   const sql = `
-    INSERT INTO _media (id, original_name, mime_type, size, extension, width, height, has_thumbnail, uploaded_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO _media (id, original_name, mime_type, size, extension, width, height, has_thumbnail, uploaded_by, source_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       original_name = excluded.original_name,
       mime_type = excluded.mime_type,
@@ -154,6 +158,7 @@ function upsert(metadata) {
       height = excluded.height,
       has_thumbnail = excluded.has_thumbnail,
       uploaded_by = excluded.uploaded_by,
+      source_url = excluded.source_url,
       updated_at = datetime('now')
   `;
 
@@ -166,7 +171,8 @@ function upsert(metadata) {
     metadata.width || null,
     metadata.height || null,
     metadata.hasThumbnail ? 1 : 0,
-    metadata.uploadedBy || null
+    metadata.uploadedBy || null,
+    metadata.sourceUrl || null
   );
 
   return getById(metadata.id);
@@ -226,6 +232,27 @@ function removeEntityReferences(entityName, entityId) {
   `;
 
   db.prepare(sql).run(entityName, entityId);
+}
+
+/**
+ * Get all media references for a specific entity record
+ * Used for immediate orphan cleanup when entity is updated/deleted
+ * @param {string} entityName - Entity class name
+ * @param {number} entityId - Entity record ID
+ * @returns {Array} Array of { mediaId, fieldName }
+ */
+function getEntityReferences(entityName, entityId) {
+  const db = getDatabase();
+
+  const sql = `
+    SELECT media_id, field_name FROM _media_refs
+    WHERE entity_name = ? AND entity_id = ?
+  `;
+
+  return db.prepare(sql).all(entityName, entityId).map(r => ({
+    mediaId: r.media_id,
+    fieldName: r.field_name
+  }));
 }
 
 /**
@@ -294,6 +321,58 @@ function getOrphanedMedia(olderThanHours = 24) {
 }
 
 /**
+ * List media files referenced by a specific entity/field combination
+ * Used for the per-column media browser
+ * @param {string} entityName - Entity class name (e.g., 'Currency')
+ * @param {string} fieldName - Field name (e.g., 'bills')
+ * @param {Object} options - Query options
+ * @param {number} [options.limit=50] - Max records to return
+ * @param {number} [options.offset=0] - Records to skip
+ * @returns {Object} { data: Array, total: number }
+ */
+function listByEntityField(entityName, fieldName, { limit = 50, offset = 0 } = {}) {
+  const db = getDatabase();
+
+  // Count total
+  const countSql = `
+    SELECT COUNT(DISTINCT m.id) as total
+    FROM _media m
+    JOIN _media_refs r ON m.id = r.media_id
+    WHERE r.entity_name = ? AND r.field_name = ?
+  `;
+  const { total } = db.prepare(countSql).get(entityName, fieldName);
+
+  // Get records with entity_id for context
+  const dataSql = `
+    SELECT m.*, r.entity_id
+    FROM _media m
+    JOIN _media_refs r ON m.id = r.media_id
+    WHERE r.entity_name = ? AND r.field_name = ?
+    ORDER BY m.created_at DESC
+    LIMIT ? OFFSET ?
+  `;
+  const rows = db.prepare(dataSql).all(entityName, fieldName, limit, offset);
+
+  const data = rows.map(row => ({
+    id: row.id,
+    originalName: row.original_name,
+    mimeType: row.mime_type,
+    size: row.size,
+    extension: row.extension,
+    width: row.width,
+    height: row.height,
+    hasThumbnail: row.has_thumbnail === 1,
+    uploadedBy: row.uploaded_by,
+    sourceUrl: row.source_url,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    entityId: row.entity_id
+  }));
+
+  return { data, total };
+}
+
+/**
  * Get total media count and size
  * @returns {Object} { count, totalSize }
  */
@@ -325,9 +404,13 @@ module.exports = {
   addReference,
   removeReference,
   removeEntityReferences,
+  getEntityReferences,
   getReferences,
   isReferenced,
   getOrphanedMedia,
+
+  // Field-specific queries
+  listByEntityField,
 
   // Utilities
   getStats,

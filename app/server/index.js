@@ -15,6 +15,7 @@ const mediaRouter = require('./routers/media.router');
 const ComputedFieldService = require('./services/ComputedFieldService');
 const AuditService = require('./services/AuditService');
 const MediaService = require('./services/MediaService');
+const SeedManager = require('./utils/SeedManager');
 const logger = require('./utils/logger');
 
 /**
@@ -46,6 +47,23 @@ function init(app, config) {
   // Initialize media service (after database)
   const mediaPath = paths?.media || path.join(paths?.data || path.join(appDir, 'data'), 'media');
   const mediaService = new MediaService(mediaPath, config);
+
+  // Sync existing media files from disk to database
+  // (handles case where files exist but DB was reset or table was missing)
+  const syncResult = mediaService.rebuildIndex();
+  if (syncResult.count > 0) {
+    logger.info(`Synced ${syncResult.count} media files from disk to database`);
+  }
+
+  // Rebuild media references from entity data
+  // (handles case where entities have media IDs but _media_refs is empty)
+  const refsResult = mediaService.rebuildReferences();
+  if (refsResult.count > 0) {
+    logger.info(`Rebuilt ${refsResult.count} media references from entity data`);
+  }
+
+  // Register MediaService with SeedManager for URL-based media seeding
+  SeedManager.setMediaService(mediaService);
 
   // Middleware (before routes)
   app.use(correlationId);

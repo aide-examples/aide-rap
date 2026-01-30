@@ -113,7 +113,11 @@ const EntityTable = {
 
       const headerLabel = DomUtils.splitCamelCase(col.label).replace(/[_ ]/g, '<br>');
       const bgStyle = col.areaColor ? ` style="background-color: ${col.areaColor}"` : '';
-      html += `<th class="sortable" data-column="${col.key}"${bgStyle}>
+      // Get description for tooltip (from view column or schema)
+      const rawDesc = col.description || '';
+      const cleanDesc = rawDesc.replace(/\[[^\]]*\]/g, '').trim();
+      const titleAttr = cleanDesc ? ` title="${DomUtils.escapeHtml(cleanDesc)}"` : '';
+      html += `<th class="sortable" data-column="${col.key}"${bgStyle}${titleAttr}>
         ${headerLabel}${sortIcon}
       </th>`;
     }
@@ -432,9 +436,22 @@ const EntityTable = {
         ? ` style="background-color: ${col.foreignKey.areaColor}"`
         : '';
 
-      html += `<th class="sortable${isFK}" data-column="${col.name}"${bgStyle}>
-        ${displayName}${sortIcon}
-      </th>`;
+      // Get description for tooltip (strip annotations like [LABEL], [UNIQUE], etc.)
+      const rawDesc = col.description || '';
+      const cleanDesc = rawDesc.replace(/\[[^\]]*\]/g, '').trim();
+      const titleAttr = cleanDesc ? ` title="${DomUtils.escapeHtml(cleanDesc)}"` : '';
+
+      // Special header for media columns - entire header is clickable
+      if (col.customType === 'media') {
+        const mediaTitle = cleanDesc ? `${cleanDesc} (click to browse)` : 'Click to browse media';
+        html += `<th class="media-column-header" data-column="${col.name}" data-field="${col.name}" title="${DomUtils.escapeHtml(mediaTitle)}">
+          📎 ${displayName} ▾
+        </th>`;
+      } else {
+        html += `<th class="sortable${isFK}" data-column="${col.name}"${bgStyle}${titleAttr}>
+          ${displayName}${sortIcon}
+        </th>`;
+      }
     }
     // Back-reference columns
     for (const ref of backRefs) {
@@ -697,6 +714,20 @@ const EntityTable = {
       });
       // Prevent click from triggering row selection
       input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // Media column header click - open media browser directly
+    this.container.querySelectorAll('.media-column-header').forEach(th => {
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const field = th.dataset.field;
+        const entity = this.currentEntity;
+
+        if (typeof MediaBrowser !== 'undefined') {
+          MediaBrowser.show(entity, field);
+        }
+      });
     });
 
     // Row click for selection

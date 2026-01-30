@@ -195,6 +195,60 @@ function parseUIAnnotations(description) {
 }
 
 /**
+ * Parse media constraints from description
+ * Supported:
+ *   [SIZE=50MB] or [MAXSIZE=50MB] - file size limit (B, KB, MB, GB)
+ *   [DIMENSION=800x600] - max image dimensions (width x height)
+ *   [MAXWIDTH=800] - max image width
+ *   [MAXHEIGHT=600] - max image height
+ *   [DURATION=5min] - max duration for audio/video (sec, min, h)
+ *
+ * Images exceeding dimensions are scaled down preserving aspect ratio.
+ */
+function parseMediaAnnotations(description) {
+  const media = {};
+
+  // Parse [SIZE=50MB] or [MAXSIZE=50MB]
+  const sizeMatch = description.match(/\[(?:MAX)?SIZE=(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)?\]/i);
+  if (sizeMatch) {
+    const num = parseFloat(sizeMatch[1]);
+    const unit = (sizeMatch[2] || 'B').toUpperCase();
+    const multipliers = { B: 1, KB: 1024, MB: 1024 * 1024, GB: 1024 * 1024 * 1024 };
+    media.maxSize = Math.floor(num * (multipliers[unit] || 1));
+  }
+
+  // Parse [DIMENSION=800x600]
+  const dimMatch = description.match(/\[DIMENSION=(\d+)x(\d+)\]/i);
+  if (dimMatch) {
+    media.maxWidth = parseInt(dimMatch[1], 10);
+    media.maxHeight = parseInt(dimMatch[2], 10);
+  }
+
+  // Parse [MAXWIDTH=800]
+  const widthMatch = description.match(/\[MAXWIDTH=(\d+)\]/i);
+  if (widthMatch) {
+    media.maxWidth = parseInt(widthMatch[1], 10);
+  }
+
+  // Parse [MAXHEIGHT=600]
+  const heightMatch = description.match(/\[MAXHEIGHT=(\d+)\]/i);
+  if (heightMatch) {
+    media.maxHeight = parseInt(heightMatch[1], 10);
+  }
+
+  // Parse [DURATION=5min]
+  const durMatch = description.match(/\[(?:MAX)?DURATION=(\d+(?:\.\d+)?)\s*(sec|min|h)?\]/i);
+  if (durMatch) {
+    const num = parseFloat(durMatch[1]);
+    const unit = (durMatch[2] || 'sec').toLowerCase();
+    const multipliers = { sec: 1, min: 60, h: 3600 };
+    media.maxDuration = Math.floor(num * (multipliers[unit] || 1));
+  }
+
+  return Object.keys(media).length > 0 ? media : null;
+}
+
+/**
  * Parse computed field annotation from description
  * Supported: [DAILY=Entity[condition].field], [IMMEDIATE=...], [HOURLY=...], [ON_DEMAND=...]
  *
@@ -782,6 +836,9 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     // Parse UI annotations
     const uiAnnotations = parseUIAnnotations(desc);
 
+    // Parse media constraints (for media type fields)
+    const mediaConstraints = parseMediaAnnotations(desc);
+
     // Parse computed field annotation (DAILY, IMMEDIATE, etc.)
     const computedRule = parseComputedAnnotation(desc);
 
@@ -834,6 +891,11 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
 
     if (calculatedDef) {
       column.calculated = calculatedDef;
+    }
+
+    // Add media constraints for media type fields
+    if (mediaConstraints) {
+      column.media = mediaConstraints;
     }
 
     columns.push(column);
@@ -1189,6 +1251,7 @@ module.exports = {
   parseEntityFile,
   parseAreasFromTable,
   parseUIAnnotations,
+  parseMediaAnnotations,
   buildDependencyOrder,
   enrichFKsWithLabelFields,
   initializeTypeRegistry,

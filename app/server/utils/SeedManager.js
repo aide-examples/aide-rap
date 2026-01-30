@@ -12,16 +12,90 @@ const eventBus = require('./EventBus');
 // Module-level seed directory (configured via init())
 let SEED_DIR = null;
 
+// Module-level MediaService instance (for resolving media URLs during seeding)
+let mediaService = null;
+
 /**
  * Initialize SeedManager with a specific seed directory
  * @param {string} seedDir - Path to the seed directory
+ * @param {Object} [options] - Optional configuration
+ * @param {Object} [options.mediaService] - MediaService instance for URL-based media seeding
  */
-function init(seedDir) {
+function init(seedDir, options = {}) {
   SEED_DIR = seedDir;
   // Ensure seed directory exists
   if (!fs.existsSync(SEED_DIR)) {
     fs.mkdirSync(SEED_DIR, { recursive: true });
   }
+
+  // Store MediaService for media URL resolution during seeding
+  if (options.mediaService) {
+    mediaService = options.mediaService;
+  }
+}
+
+/**
+ * Set MediaService instance (can be called after init if MediaService is created later)
+ * @param {Object} service - MediaService instance
+ */
+function setMediaService(service) {
+  mediaService = service;
+}
+
+/**
+ * Check if a string is a valid URL
+ * @param {string} str - String to check
+ * @returns {boolean}
+ */
+function isValidUrl(str) {
+  if (!str || typeof str !== 'string') return false;
+  try {
+    const url = new URL(str);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve media URLs in a record.
+ * For each media-type field, if the value is a URL, fetch it via MediaService
+ * and replace with the resulting media UUID.
+ * @param {string} entityName - Entity name
+ * @param {Object} record - Record to process
+ * @returns {Promise<Object>} - Record with resolved media UUIDs
+ */
+async function resolveMediaUrls(entityName, record) {
+  if (!mediaService) return record;
+
+  const { schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+  if (!entity) return record;
+
+  const resolved = { ...record };
+
+  // Find media-type columns
+  const mediaColumns = entity.columns.filter(c => c.customType === 'media');
+
+  for (const col of mediaColumns) {
+    const value = record[col.name];
+
+    // Check if value is a URL (not already a UUID)
+    if (isValidUrl(value)) {
+      try {
+        console.log(`  Fetching media URL for ${col.name}: ${value.substring(0, 50)}...`);
+        const result = await mediaService.uploadFromUrl(value, 'seed');
+        resolved[col.name] = result.id;
+        console.log(`  -> Stored as ${result.id}`);
+      } catch (err) {
+        console.warn(`  Warning: Could not fetch media URL for ${col.name}: ${err.message}`);
+        // Keep the URL value (validation will fail later, or it might be optional)
+        resolved[col.name] = null;
+      }
+    }
+  }
+
+  return resolved;
 }
 
 /**
@@ -656,9 +730,9 @@ function countSeedConflicts(entityName) {
  *   - replace: INSERT OR REPLACE (default, may break FK refs)
  *   - merge: UPDATE existing records (preserve id), INSERT new ones
  *   - skip_conflicts: Skip records that would conflict with existing ones
- * @returns {object} - { loaded, updated, skipped }
+ * @returns {Promise<object>} - { loaded, updated, skipped }
  */
-function loadEntity(entityName, lookups = null, options = {}) {
+async function loadEntity(entityName, lookups = null, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
   const { skipInvalid = false, mode = 'replace', preserveSystemColumns = false } = options;
@@ -744,7 +818,11 @@ function loadEntity(entityName, lookups = null, options = {}) {
       continue;
     }
 
-    const record = records[i];
+    let record = records[i];
+
+    // Resolve media URLs (fetch URLs and replace with UUIDs)
+    record = await resolveMediaUrls(entityName, record);
+
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
     const resolved = resolveConceptualFKs(entityName, record, lookups);
 
@@ -840,7 +918,7 @@ function clearEntity(entityName) {
  * Load all available seed files
  * Builds label lookups incrementally for FK resolution
  */
-function loadAll() {
+async function loadAll() {
   const { schema } = getDbAndSchema();
   const results = {};
 
@@ -860,7 +938,7 @@ function loadAll() {
     const seedFile = path.join(getSeedDir(), `${entity.className}.json`);
     if (fs.existsSync(seedFile)) {
       try {
-        const result = loadEntity(entity.className, lookups, { mode: 'merge' });
+        const result = await loadEntity(entity.className, lookups, { mode: 'merge' });
         results[entity.className] = result;
 
         // Update lookup for this entity (so subsequent entities can reference it)
@@ -905,9 +983,9 @@ function clearAll() {
 /**
  * Reset all: clear then load
  */
-function resetAll() {
+async function resetAll() {
   const clearResults = clearAll();
-  const loadResults = loadAll();
+  const loadResults = await loadAll();
 
   return {
     cleared: clearResults,
@@ -1026,9 +1104,9 @@ function backupAll() {
 /**
  * Restore all entity data from backup JSON files.
  * Similar to loadAll but reads from backup/ instead of seed/.
- * @returns {object} - Results per entity
+ * @returns {Promise<object>} - Results per entity
  */
-function restoreBackup() {
+async function restoreBackup() {
   const { schema } = getDbAndSchema();
   const backupDir = getBackupDir();
 
@@ -1051,7 +1129,7 @@ function restoreBackup() {
       const backupFile = path.join(backupDir, `${entity.className}.json`);
       if (fs.existsSync(backupFile)) {
         try {
-          const result = loadEntity(entity.className, lookups, { mode: 'replace', preserveSystemColumns: true });
+          const result = await loadEntity(entity.className, lookups, { mode: 'replace', preserveSystemColumns: true });
           results[entity.className] = result;
           lookups[entity.className] = buildLabelLookup(entity.className);
         } catch (err) {
@@ -1069,6 +1147,7 @@ function restoreBackup() {
 
 module.exports = {
   init,
+  setMediaService,
   getSeedDir,
   getBackupDir,
   getStatus,

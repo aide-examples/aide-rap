@@ -66,6 +66,18 @@ class MediaService {
   }
 
   /**
+   * Format bytes to human-readable string
+   * @param {number} bytes - Size in bytes
+   * @returns {string} Formatted size (e.g., "2.5 MB")
+   */
+  formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+  }
+
+  /**
    * Upload a single file
    * @param {Object} file - Multer file object
    * @param {Buffer} file.buffer - File content
@@ -73,12 +85,27 @@ class MediaService {
    * @param {string} file.mimetype - MIME type
    * @param {number} file.size - File size
    * @param {string} [uploadedBy] - Username of uploader
+   * @param {string} [sourceUrl] - Original URL if fetched from web
+   * @param {Object} [constraints] - Optional media constraints from schema
+   * @param {number} [constraints.maxSize] - Max file size in bytes
+   * @param {number} [constraints.maxWidth] - Max image width (will be scaled)
+   * @param {number} [constraints.maxHeight] - Max image height (will be scaled)
+   * @param {number} [constraints.maxDuration] - Max duration in seconds (for validation)
    * @returns {Promise<Object>} Created media record with URLs
    */
-  async upload(file, uploadedBy = null) {
+  async upload(file, uploadedBy = null, sourceUrl = null, constraints = null) {
+    // Apply constraints if provided
+    let fileBuffer = file.buffer;
+    let fileSize = file.size;
+
+    // Validate file size
+    if (constraints?.maxSize && fileSize > constraints.maxSize) {
+      throw new Error(`File too large: ${this.formatSize(fileSize)} exceeds ${this.formatSize(constraints.maxSize)}`);
+    }
+
     const id = uuidv4();
     const subdir = this.getSubdir(id);
-    const ext = path.extname(file.originalname).toLowerCase();
+    let ext = path.extname(file.originalname).toLowerCase();
     const filename = `${id}${ext}`;
 
     // Ensure subdirectory exists
@@ -87,61 +114,93 @@ class MediaService {
       fs.mkdirSync(originalsSubdir, { recursive: true });
     }
 
-    // Save original file
-    const filePath = path.join(originalsSubdir, filename);
-    fs.writeFileSync(filePath, file.buffer);
-
-    // Process image: get dimensions and generate thumbnail
+    // Process image: get dimensions, apply constraints, generate thumbnail
     const isImage = file.mimetype.startsWith('image/');
     let width = null;
     let height = null;
     let hasThumbnail = false;
+    let wasResized = false;
 
     if (isImage && getSharp()) {
       try {
+        const sharpInstance = getSharp();
+        const metadata = await sharpInstance(fileBuffer).metadata();
+        width = metadata.width;
+        height = metadata.height;
+
+        // Check if image needs to be resized based on constraints
+        const maxW = constraints?.maxWidth;
+        const maxH = constraints?.maxHeight;
+
+        if ((maxW && width > maxW) || (maxH && height > maxH)) {
+          // Resize image preserving aspect ratio
+          logger.info('Resizing image to fit constraints', {
+            id,
+            original: `${width}x${height}`,
+            maxWidth: maxW,
+            maxHeight: maxH
+          });
+
+          const resizedBuffer = await sharpInstance(fileBuffer)
+            .resize(maxW || null, maxH || null, { fit: 'inside', withoutEnlargement: true })
+            .toBuffer();
+
+          // Update buffer and get new dimensions
+          fileBuffer = resizedBuffer;
+          fileSize = resizedBuffer.length;
+          const newMeta = await sharpInstance(resizedBuffer).metadata();
+          width = newMeta.width;
+          height = newMeta.height;
+          wasResized = true;
+
+          logger.info('Image resized', { id, newSize: `${width}x${height}` });
+        }
+
+        // Ensure thumbnail subdirectory exists
         const thumbSubdir = path.join(this.thumbnailsPath, subdir);
         if (!fs.existsSync(thumbSubdir)) {
           fs.mkdirSync(thumbSubdir, { recursive: true });
         }
 
-        const sharpInstance = getSharp();
-        const metadata = await sharpInstance(file.buffer).metadata();
-        width = metadata.width;
-        height = metadata.height;
-
         // Generate thumbnail
         const thumbSize = this.cfg.thumbnails?.maxWidth || 200;
-        await sharpInstance(file.buffer)
+        await sharpInstance(fileBuffer)
           .resize(thumbSize, thumbSize, { fit: 'inside' })
           .jpeg({ quality: this.cfg.thumbnails?.quality || 80 })
           .toFile(path.join(thumbSubdir, `${id}_thumb.jpg`));
 
         hasThumbnail = true;
       } catch (err) {
-        logger.warn('Thumbnail generation failed', { id, error: err.message });
+        logger.warn('Image processing failed', { id, error: err.message });
       }
     }
 
-    // Update manifest (safety net)
+    // Save file (potentially resized)
+    const filePath = path.join(originalsSubdir, filename);
+    fs.writeFileSync(filePath, fileBuffer);
+
+    // Update manifest (safety net) - use potentially resized size
     this.updateManifest(subdir, id, {
       originalName: file.originalname,
       mimeType: file.mimetype,
-      size: file.size,
+      size: fileSize,
       uploadedBy,
+      sourceUrl,
       uploadedAt: new Date().toISOString()
     });
 
-    // Save to database
+    // Save to database (use potentially resized size)
     const record = MediaRepository.create({
       id,
       originalName: file.originalname,
       mimeType: file.mimetype,
-      size: file.size,
+      size: fileSize,
       extension: ext,
       width,
       height,
       hasThumbnail,
-      uploadedBy
+      uploadedBy,
+      sourceUrl
     });
 
     logger.info('Media uploaded', {
@@ -156,6 +215,64 @@ class MediaService {
       fileUrl: `/api/media/${id}/file`,
       thumbnailUrl: hasThumbnail ? `/api/media/${id}/thumbnail` : null
     };
+  }
+
+  /**
+   * Upload a file from a URL
+   * Fetches the URL, extracts filename and content-type, stores as media
+   * @param {string} url - URL to fetch
+   * @param {string} [uploadedBy] - Username of uploader
+   * @param {Object} [constraints] - Optional media constraints from schema
+   * @returns {Promise<Object>} Created media record with URLs
+   */
+  async uploadFromUrl(url, uploadedBy = null, constraints = null) {
+    // Fetch the URL
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    }
+
+    // Get content type and filename
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const mimeType = contentType.split(';')[0].trim();
+
+    // Try to extract filename from Content-Disposition header or URL
+    let filename = 'downloaded';
+    const contentDisposition = response.headers.get('content-disposition');
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        filename = match[1].replace(/['"]/g, '');
+      }
+    } else {
+      // Extract from URL path
+      try {
+        const urlPath = new URL(url).pathname;
+        const parts = urlPath.split('/');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && lastPart.includes('.')) {
+          filename = decodeURIComponent(lastPart);
+        }
+      } catch {
+        // Keep default filename
+      }
+    }
+
+    // Get file buffer
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Create a file-like object for upload()
+    const file = {
+      buffer,
+      originalname: filename,
+      mimetype: mimeType,
+      size: buffer.length
+    };
+
+    // Use existing upload method with sourceUrl and constraints
+    return this.upload(file, uploadedBy, url, constraints);
   }
 
   /**
@@ -388,8 +505,23 @@ class MediaService {
               width: entry.width || null,
               height: entry.height || null,
               hasThumbnail,
-              uploadedBy: entry.uploadedBy || null
+              uploadedBy: entry.uploadedBy || null,
+              sourceUrl: entry.sourceUrl || null
             });
+
+            // Also restore references from manifest if available
+            if (entry.refs && Array.isArray(entry.refs)) {
+              for (const ref of entry.refs) {
+                try {
+                  MediaRepository.addReference(id, ref.entity, ref.id, ref.field);
+                } catch (refErr) {
+                  // Ignore duplicate reference errors
+                  if (!refErr.message.includes('UNIQUE constraint')) {
+                    logger.debug('Failed to restore reference', { id, ref, error: refErr.message });
+                  }
+                }
+              }
+            }
 
             count++;
           } catch (err) {
@@ -407,6 +539,63 @@ class MediaService {
     return { count, errors };
   }
 
+  /**
+   * Rebuild media references from entity data
+   * Scans all entities with media fields and reconstructs _media_refs table
+   * @returns {Object} { count: number, errors: number }
+   */
+  rebuildReferences() {
+    const { getSchema, getDatabase } = require('../config/database');
+
+    try {
+      const schema = getSchema();
+      const db = getDatabase();
+      let count = 0;
+      let errors = 0;
+
+      // Find all entities with media fields
+      for (const [entityName, entity] of Object.entries(schema.entities)) {
+        const mediaFields = entity.columns.filter(c => c.customType === 'media');
+        if (mediaFields.length === 0) continue;
+
+        // Query all records from this entity
+        const tableName = entity.tableName;
+        const fieldNames = mediaFields.map(c => c.name);
+
+        try {
+          const rows = db.prepare(`SELECT id, ${fieldNames.join(', ')} FROM ${tableName}`).all();
+
+          for (const row of rows) {
+            for (const field of mediaFields) {
+              const mediaId = row[field.name];
+              if (mediaId && typeof mediaId === 'string' && mediaId.length === 36) {
+                try {
+                  MediaRepository.addReference(mediaId, entityName, row.id, field.name);
+                  count++;
+                } catch (err) {
+                  // Reference might already exist - that's ok
+                  if (!err.message.includes('UNIQUE constraint')) {
+                    errors++;
+                    logger.debug('Failed to add reference', { mediaId, entityName, error: err.message });
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          logger.warn('Failed to scan entity for media', { entityName, error: err.message });
+          errors++;
+        }
+      }
+
+      logger.info('References rebuild completed', { count, errors });
+      return { count, errors };
+    } catch (err) {
+      logger.error('Failed to rebuild references', { error: err.message });
+      return { count: 0, errors: 1 };
+    }
+  }
+
   // ============================================================================
   // Event Listeners for Reference Tracking
   // ============================================================================
@@ -415,21 +604,51 @@ class MediaService {
    * Setup EventBus listeners for entity changes
    */
   setupEventListeners() {
-    // Track media references when entities are created/updated
+    // Track media references when entities are created
     eventBus.on('entity:create:after', (entityName, record, context) => {
       this.trackMediaReferences(entityName, record.id, record);
     });
 
+    // Track media references when entities are updated (with immediate orphan cleanup)
     eventBus.on('entity:update:after', (entityName, record, context) => {
-      // Remove old references first (update might clear a media field)
+      // 1. Get old references BEFORE removing (for orphan detection)
+      const oldRefs = MediaRepository.getEntityReferences(entityName, record.id);
+      const oldMediaIds = oldRefs.map(r => r.mediaId);
+
+      // 2. Remove old references
       MediaRepository.removeEntityReferences(entityName, record.id);
-      // Add current references
+
+      // 3. Add current references
       this.trackMediaReferences(entityName, record.id, record);
+
+      // 4. Immediate cleanup: delete media that is now orphaned
+      for (const mediaId of oldMediaIds) {
+        if (!MediaRepository.isReferenced(mediaId)) {
+          this.delete(mediaId);
+          logger.info('Orphaned media deleted on update', { mediaId, entityName, entityId: record.id });
+        }
+      }
     });
 
-    // Remove all references when entity is deleted
+    // Remove all references when entity is deleted (with immediate orphan cleanup)
     eventBus.on('entity:delete:after', (entityName, id, context) => {
+      // 1. Get references before removing
+      const refs = MediaRepository.getEntityReferences(entityName, id);
+      const mediaIds = refs.map(r => r.mediaId);
+
+      // 2. Remove references from DB and manifest
       MediaRepository.removeEntityReferences(entityName, id);
+      for (const mediaId of mediaIds) {
+        this.removeRefFromManifest(mediaId, entityName, id);
+      }
+
+      // 3. Delete orphaned media immediately
+      for (const mediaId of mediaIds) {
+        if (!MediaRepository.isReferenced(mediaId)) {
+          this.delete(mediaId);
+          logger.info('Orphaned media deleted on entity delete', { mediaId, entityName, entityId: id });
+        }
+      }
     });
   }
 
@@ -455,11 +674,79 @@ class MediaService {
         const mediaId = record[col.name];
         if (mediaId && typeof mediaId === 'string' && mediaId.length === 36) {
           MediaRepository.addReference(mediaId, entityName, entityId, col.name);
+          // Also update manifest with reference info
+          this.addRefToManifest(mediaId, entityName, entityId, col.name);
         }
       }
     } catch (err) {
       // Schema might not be loaded yet during initialization
       logger.debug('Could not track media references', { entityName, error: err.message });
+    }
+  }
+
+  /**
+   * Add reference info to manifest file
+   * @param {string} mediaId - Media UUID
+   * @param {string} entityName - Entity class name
+   * @param {number} entityId - Entity record ID
+   * @param {string} fieldName - Field name
+   */
+  addRefToManifest(mediaId, entityName, entityId, fieldName) {
+    const subdir = this.getSubdir(mediaId);
+    const manifestPath = path.join(this.originalsPath, subdir, 'manifest.json');
+
+    if (!fs.existsSync(manifestPath)) return;
+
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (!manifest[mediaId]) return;
+
+      // Initialize or update refs array
+      if (!manifest[mediaId].refs) {
+        manifest[mediaId].refs = [];
+      }
+
+      // Check if this ref already exists
+      const existingRef = manifest[mediaId].refs.find(
+        r => r.entity === entityName && r.id === entityId && r.field === fieldName
+      );
+
+      if (!existingRef) {
+        manifest[mediaId].refs.push({
+          entity: entityName,
+          id: entityId,
+          field: fieldName
+        });
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      }
+    } catch (err) {
+      logger.debug('Could not update manifest with ref', { mediaId, error: err.message });
+    }
+  }
+
+  /**
+   * Remove reference from manifest file
+   * @param {string} mediaId - Media UUID
+   * @param {string} entityName - Entity class name
+   * @param {number} entityId - Entity record ID
+   */
+  removeRefFromManifest(mediaId, entityName, entityId) {
+    const subdir = this.getSubdir(mediaId);
+    const manifestPath = path.join(this.originalsPath, subdir, 'manifest.json');
+
+    if (!fs.existsSync(manifestPath)) return;
+
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (!manifest[mediaId] || !manifest[mediaId].refs) return;
+
+      manifest[mediaId].refs = manifest[mediaId].refs.filter(
+        r => !(r.entity === entityName && r.id === entityId)
+      );
+
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    } catch (err) {
+      logger.debug('Could not remove ref from manifest', { mediaId, error: err.message });
     }
   }
 

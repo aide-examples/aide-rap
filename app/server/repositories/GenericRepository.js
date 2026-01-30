@@ -523,8 +523,14 @@ function getExtendedSchemaInfo(entityName) {
         type: col.jsType,
         required: col.required,
         foreignKey: fkInfo,
-        ui: col.ui || null
+        ui: col.ui || null,
+        description: col.description || null
       };
+
+      // Add displayName for FK columns (conceptual name for UI)
+      if (col.displayName) {
+        colInfo.displayName = col.displayName;
+      }
 
       // Include default value if present (for form pre-population)
       if (col.defaultValue !== null && col.defaultValue !== undefined) {

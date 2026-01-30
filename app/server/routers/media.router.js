@@ -66,16 +66,32 @@ module.exports = function(mediaService, cfg) {
 
   /**
    * GET /api/media - List media with pagination
+   * Query params:
+   *   - limit, offset: pagination
+   *   - type: filter by MIME type prefix (e.g., 'image/')
+   *   - entity, field: filter by entity/field reference (for media browser)
    */
   router.get('/', (req, res, next) => {
     try {
-      const { limit = 50, offset = 0, type } = req.query;
+      const { limit = 50, offset = 0, type, entity, field } = req.query;
+      const parsedLimit = parseInt(limit, 10);
+      const parsedOffset = parseInt(offset, 10);
 
-      const result = MediaRepository.list({
-        limit: parseInt(limit, 10),
-        offset: parseInt(offset, 10),
-        mimeType: type
-      });
+      let result;
+
+      // If entity and field specified, use field-specific query
+      if (entity && field) {
+        result = MediaRepository.listByEntityField(entity, field, {
+          limit: parsedLimit,
+          offset: parsedOffset
+        });
+      } else {
+        result = MediaRepository.list({
+          limit: parsedLimit,
+          offset: parsedOffset,
+          mimeType: type
+        });
+      }
 
       // Add URLs to each record
       result.data = result.data.map(m => ({
@@ -88,8 +104,8 @@ module.exports = function(mediaService, cfg) {
         data: result.data,
         pagination: {
           total: result.total,
-          limit: parseInt(limit, 10),
-          offset: parseInt(offset, 10)
+          limit: parsedLimit,
+          offset: parsedOffset
         }
       });
     } catch (err) {
@@ -210,6 +226,7 @@ module.exports = function(mediaService, cfg) {
 
   /**
    * POST /api/media - Upload single file
+   * Body can include constraints: { maxSize, maxWidth, maxHeight, maxDuration }
    */
   router.post('/', upload.single('file'), async (req, res, next) => {
     try {
@@ -220,10 +237,71 @@ module.exports = function(mediaService, cfg) {
       }
 
       const uploadedBy = req.user?.username || null;
-      const result = await mediaService.upload(req.file, uploadedBy);
+
+      // Parse optional constraints from request body (passed as JSON in a field)
+      let constraints = null;
+      if (req.body.constraints) {
+        try {
+          constraints = typeof req.body.constraints === 'string'
+            ? JSON.parse(req.body.constraints)
+            : req.body.constraints;
+        } catch {
+          // Ignore invalid constraints
+        }
+      }
+
+      const result = await mediaService.upload(req.file, uploadedBy, null, constraints);
 
       res.status(201).json(result);
     } catch (err) {
+      // Handle size/dimension errors with appropriate status code
+      if (err.message.includes('too large') || err.message.includes('exceeds')) {
+        return res.status(413).json({
+          error: { code: 'FILE_TOO_LARGE', message: err.message }
+        });
+      }
+      next(err);
+    }
+  });
+
+  /**
+   * POST /api/media/from-url - Upload file from URL
+   * Body: { url, constraints?: { maxSize, maxWidth, maxHeight } }
+   */
+  router.post('/from-url', async (req, res, next) => {
+    try {
+      const { url, constraints } = req.body;
+
+      if (!url) {
+        return res.status(400).json({
+          error: { code: 'NO_URL', message: 'No URL provided' }
+        });
+      }
+
+      // Validate URL format
+      try {
+        new URL(url);
+      } catch {
+        return res.status(400).json({
+          error: { code: 'INVALID_URL', message: 'Invalid URL format' }
+        });
+      }
+
+      const uploadedBy = req.user?.username || null;
+      const result = await mediaService.uploadFromUrl(url, uploadedBy, constraints || null);
+
+      res.status(201).json(result);
+    } catch (err) {
+      if (err.message.includes('Failed to fetch')) {
+        return res.status(400).json({
+          error: { code: 'FETCH_FAILED', message: err.message }
+        });
+      }
+      if (err.message.includes('too large') || err.message.includes('exceeds')) {
+        return res.status(413).json({
+          error: { code: 'FILE_TOO_LARGE', message: err.message }
+        });
+      }
       next(err);
     }
   });

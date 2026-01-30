@@ -397,6 +397,7 @@ function initMediaTables() {
       height INTEGER,
       has_thumbnail INTEGER DEFAULT 0,
       uploaded_by TEXT,
+      source_url TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     )
@@ -416,6 +417,14 @@ function initMediaTables() {
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_media_created ON _media(created_at)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_media_refs_entity ON _media_refs(entity_name, entity_id)`);
+
+  // Migration: add source_url column if missing (for existing databases)
+  const columns = db.prepare('PRAGMA table_info(_media)').all();
+  const hasSourceUrl = columns.some(c => c.name === 'source_url');
+  if (!hasSourceUrl) {
+    db.exec('ALTER TABLE _media ADD COLUMN source_url TEXT');
+    logger.info('Migration: added source_url column to _media table');
+  }
 
   logger.debug('Media tables initialized');
 }

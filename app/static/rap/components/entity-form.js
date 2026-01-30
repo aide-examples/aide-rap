@@ -119,10 +119,31 @@ const EntityForm = {
         dropzone.addEventListener('drop', (e) => {
           e.preventDefault();
           dropzone.classList.remove('dragover');
+
+          // Check for files first
           if (e.dataTransfer.files.length > 0) {
             this.uploadMediaFile(e.dataTransfer.files[0], field);
+            return;
+          }
+
+          // Check for URL (text/uri-list or text/plain)
+          const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+          if (url && this.isValidUrl(url)) {
+            this.uploadMediaFromUrl(url, field);
           }
         });
+
+        // Paste handler for URLs
+        dropzone.addEventListener('paste', (e) => {
+          const text = e.clipboardData?.getData('text/plain');
+          if (text && this.isValidUrl(text)) {
+            e.preventDefault();
+            this.uploadMediaFromUrl(text, field);
+          }
+        });
+
+        // Make dropzone focusable for paste events
+        dropzone.setAttribute('tabindex', '0');
 
         dropzone.addEventListener('click', () => fileInput.click());
 
@@ -161,6 +182,86 @@ const EntityForm = {
     } catch (err) {
       console.warn('Could not load media metadata:', err);
     }
+  },
+
+  /**
+   * Check if a string is a valid URL
+   */
+  isValidUrl(str) {
+    try {
+      const url = new URL(str);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Upload media from a URL (server fetches the file)
+   */
+  async uploadMediaFromUrl(url, fieldElement) {
+    const hiddenInput = fieldElement.querySelector('.media-value');
+    const preview = fieldElement.querySelector('.media-preview');
+    const dropzone = fieldElement.querySelector('.media-dropzone');
+    const thumbnail = fieldElement.querySelector('.media-thumbnail');
+    const filenameSpan = fieldElement.querySelector('.media-filename');
+
+    // Show uploading state
+    dropzone.innerHTML = '<span class="uploading">Fetching URL...</span>';
+
+    try {
+      const response = await fetch('/api/media/from-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error?.message || 'Upload failed');
+      }
+
+      // Success - update field
+      hiddenInput.value = result.id;
+      filenameSpan.textContent = result.originalName;
+
+      if (result.thumbnailUrl) {
+        thumbnail.src = result.thumbnailUrl;
+        thumbnail.classList.remove('media-thumb-fallback');
+      } else {
+        thumbnail.src = '/icons/file.svg';
+        thumbnail.classList.add('media-thumb-fallback');
+      }
+
+      preview.classList.remove('hidden');
+      dropzone.classList.add('hidden');
+      this.checkDirty();
+
+    } catch (err) {
+      console.error('Media URL upload error:', err);
+      this.resetDropzone(dropzone, fieldElement, `Error: ${err.message}`);
+    }
+  },
+
+  /**
+   * Reset dropzone to initial state after error
+   */
+  resetDropzone(dropzone, fieldElement, errorMessage = null) {
+    if (errorMessage) {
+      dropzone.innerHTML = `<span class="error">${errorMessage}</span>`;
+    }
+    setTimeout(() => {
+      dropzone.innerHTML = '<span>Datei oder URL hierher ziehen</span><input type="file" class="media-file-input">';
+      // Reattach file input handler
+      const newFileInput = dropzone.querySelector('.media-file-input');
+      newFileInput.addEventListener('change', () => {
+        if (newFileInput.files.length > 0) {
+          this.uploadMediaFile(newFileInput.files[0], fieldElement);
+          newFileInput.value = '';
+        }
+      });
+    }, errorMessage ? 3000 : 0);
   },
 
   /**
@@ -209,18 +310,7 @@ const EntityForm = {
 
     } catch (err) {
       console.error('Media upload error:', err);
-      dropzone.innerHTML = `<span class="error">Error: ${err.message}</span>`;
-      setTimeout(() => {
-        dropzone.innerHTML = '<span>Datei hierher ziehen oder klicken</span><input type="file" class="media-file-input">';
-        // Reattach file input handler
-        const newFileInput = dropzone.querySelector('.media-file-input');
-        newFileInput.addEventListener('change', () => {
-          if (newFileInput.files.length > 0) {
-            this.uploadMediaFile(newFileInput.files[0], fieldElement);
-            newFileInput.value = '';
-          }
-        });
-      }, 3000);
+      this.resetDropzone(dropzone, fieldElement, `Error: ${err.message}`);
     }
   },
 
@@ -477,8 +567,8 @@ const EntityForm = {
             <span class="media-filename"></span>
             <button type="button" class="media-remove btn-icon" ${disabled} title="Entfernen">&times;</button>
           </div>
-          <div class="media-dropzone ${hasValue ? 'hidden' : ''}" ${isReadonly ? 'style="display:none"' : ''}>
-            <span>Datei hierher ziehen oder klicken</span>
+          <div class="media-dropzone ${hasValue ? 'hidden' : ''}" ${isReadonly ? 'style="display:none"' : ''} tabindex="0">
+            <span>Datei oder URL hierher ziehen</span>
             <input type="file" class="media-file-input">
           </div>
         </div>

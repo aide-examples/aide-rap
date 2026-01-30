@@ -56,13 +56,13 @@ module.exports = function(cfg) {
     // - replace: INSERT OR REPLACE (default, may break FK refs if id changes)
     // - merge: UPDATE existing records (preserve id), INSERT new ones
     // - skip_conflicts: Skip records that conflict with existing ones
-    router.post('/api/seed/load/:entity', (req, res) => {
+    router.post('/api/seed/load/:entity', async (req, res) => {
         try {
             const options = {
                 skipInvalid: req.body?.skipInvalid === true,
                 mode: req.body?.mode || 'replace'
             };
-            const result = SeedManager.loadEntity(req.params.entity, null, options);
+            const result = await SeedManager.loadEntity(req.params.entity, null, options);
             res.json({ success: true, ...result });
         } catch (e) {
             console.error(`Failed to load seed for ${req.params.entity}:`, e);
@@ -82,9 +82,9 @@ module.exports = function(cfg) {
     });
 
     // Load all seed files
-    router.post('/api/seed/load-all', (req, res) => {
+    router.post('/api/seed/load-all', async (req, res) => {
         try {
-            const results = SeedManager.loadAll();
+            const results = await SeedManager.loadAll();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to load all seeds:', e);
@@ -104,9 +104,9 @@ module.exports = function(cfg) {
     });
 
     // Reset all: clear then load
-    router.post('/api/seed/reset-all', (req, res) => {
+    router.post('/api/seed/reset-all', async (req, res) => {
         try {
-            const results = SeedManager.resetAll();
+            const results = await SeedManager.resetAll();
             res.json({ success: true, ...results });
         } catch (e) {
             console.error('Failed to reset all:', e);
@@ -225,9 +225,9 @@ module.exports = function(cfg) {
     });
 
     // Restore all entity data from backup files
-    router.post('/api/seed/restore-backup', (req, res) => {
+    router.post('/api/seed/restore-backup', async (req, res) => {
         try {
-            const results = SeedManager.restoreBackup();
+            const results = await SeedManager.restoreBackup();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to restore backup:', e);
