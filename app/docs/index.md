@@ -360,20 +360,25 @@ GET    /api/entities                      # List entity types
 GET    /api/entities/:entity/schema       # Schema metadata
 GET    /api/entities/:entity/schema/extended  # + UI hints, enums, FK info
 GET    /api/entities/:entity              # List records (filter, sort, page)
-GET    /api/entities/:entity/:id          # Single record
+GET    /api/entities/:entity/:id          # Single record (ETag header for OCC)
 GET    /api/entities/:entity/:id/references   # Back-references
 POST   /api/entities/:entity              # Create (with validation)
-PUT    /api/entities/:entity/:id          # Update (with validation)
+PUT    /api/entities/:entity/:id          # Update (If-Match header for OCC)
 DELETE /api/entities/:entity/:id          # Delete (with FK check)
 
 GET    /api/views                         # List views with groups/colors
 GET    /api/views/:name                   # Query view data (filter, sort, page)
 GET    /api/views/:name/schema            # View column metadata
+
+GET    /api/audit                         # Audit trail (readonly)
+GET    /api/audit/:id                     # Single audit entry
+GET    /api/audit/schema/extended         # Audit schema for UI
 ```
 
 **Filtering**: `?filter=column:value` or `?filter=searchterm` (LIKE search)
 **Sorting**: `?sort=column&order=asc|desc`
 **Pagination**: `?limit=50&offset=100`
+**OCC**: PUT with `If-Match: "Entity:id:version"` → 409 on conflict
 
 ---
 
@@ -460,6 +465,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 
 ## Procedures
 
+- [Database Features](procedures/database-features.md) – WAL mode, system columns, optimistic concurrency, audit trail
 - [Views Configuration](procedures/views-config.md) – Cross-entity join views with dot-notation FK paths
 - [Filter Dialogs](procedures/filter-dialogs.md) – Pre-load filters for large datasets (required/prefilter, text/dropdown/year/month, AND logic)
 - [Schema Migration](procedures/schema-migration.md) – Reinitialize database schema without server restart
