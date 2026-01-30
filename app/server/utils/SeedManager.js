@@ -661,7 +661,7 @@ function countSeedConflicts(entityName) {
 function loadEntity(entityName, lookups = null, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-  const { skipInvalid = false, mode = 'replace' } = options;
+  const { skipInvalid = false, mode = 'replace', preserveSystemColumns = false } = options;
 
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
@@ -712,8 +712,10 @@ function loadEntity(entityName, lookups = null, options = {}) {
     return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
   };
 
-  // Exclude system columns (created_at, updated_at, version) - they use SQLite DEFAULTs
-  const columns = entity.columns.filter(c => !isComputedColumn(c) && !c.system).map(c => c.name);
+  // Exclude system columns unless preserveSystemColumns is true (for restore)
+  const columns = entity.columns
+    .filter(c => !isComputedColumn(c) && (preserveSystemColumns || !c.system))
+    .map(c => c.name);
   const columnsWithoutId = columns.filter(c => c !== 'id');
   const placeholders = columns.map(() => '?').join(', ');
 
@@ -1049,7 +1051,7 @@ function restoreBackup() {
       const backupFile = path.join(backupDir, `${entity.className}.json`);
       if (fs.existsSync(backupFile)) {
         try {
-          const result = loadEntity(entity.className, lookups, { mode: 'replace' });
+          const result = loadEntity(entity.className, lookups, { mode: 'replace', preserveSystemColumns: true });
           results[entity.className] = result;
           lookups[entity.className] = buildLabelLookup(entity.className);
         } catch (err) {
