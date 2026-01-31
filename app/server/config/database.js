@@ -25,6 +25,7 @@ let storedDataModelPath = null;
 let storedEnabledEntities = null;
 let storedEntityPrefilters = null;
 let storedRequiredFilters = null;
+let storedTableOptions = null;
 
 /**
  * Check if table exists
@@ -437,8 +438,9 @@ function initMediaTables() {
  * @param {Array} [viewsConfig] - Optional user view definitions
  * @param {Object} [entityPrefilters] - Prefilter fields per entity { entityName: ['field1', 'field2'] }
  * @param {Object} [requiredFilters] - Required filter fields per entity { entityName: ['field1'] }
+ * @param {Object} [tableOptions] - Table display options per entity { entityName: { mediaRowHeight: 100 } }
  */
-function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters) {
+function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, tableOptions) {
   // Store params for reinitialize()
   storedDbPath = dbPath;
   storedDataModelPath = dataModelPath;
@@ -446,6 +448,7 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entit
   storedViewsConfig = viewsConfig || [];
   storedEntityPrefilters = entityPrefilters || {};
   storedRequiredFilters = requiredFilters || {};
+  storedTableOptions = tableOptions || {};
 
   // Ensure data directory exists
   const dataDir = path.dirname(dbPath);
@@ -546,6 +549,14 @@ function getEntityPrefilters() {
  */
 function getRequiredFilters() {
   return storedRequiredFilters || {};
+}
+
+/**
+ * Get table display options (from Crud.md)
+ * @returns {Object} Map of entity name to table options { entityName: { mediaRowHeight: 100 } }
+ */
+function getTableOptions() {
+  return storedTableOptions || {};
 }
 
 /**
@@ -701,6 +712,7 @@ module.exports = {
   reloadSchema,
   getEntityPrefilters,
   getRequiredFilters,
+  getTableOptions,
   closeDatabase,
   forceRebuild,
   reinitialize,

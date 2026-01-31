@@ -2,6 +2,10 @@
  * Entity Table Component
  * Sortable, scrollable table view for entity records
  */
+
+// System columns that are hidden by default (version, timestamps)
+const SYSTEM_COLUMNS = ['version', 'created_at', 'updated_at'];
+
 const EntityTable = {
   container: null,
   currentEntity: null,
@@ -12,6 +16,7 @@ const EntityTable = {
   sortColumn: null,
   sortDirection: 'asc', // 'asc' or 'desc'
   columnFilters: {}, // { columnName: filterValue }
+  showSystem: false, // Show system columns (version, created_at, updated_at)
 
   // Sort settings (shared with EntityTree)
   attributeOrder: 'schema', // 'schema' or 'alpha'
@@ -50,6 +55,20 @@ const EntityTable = {
       // Listen for changes (shared with EntityTree)
       refSelect.addEventListener('change', (e) => {
         this.referencePosition = e.target.value;
+        this.render();
+      });
+    }
+
+    // System columns toggle (version, created_at, updated_at)
+    const systemToggle = document.getElementById('show-system-toggle');
+    if (systemToggle) {
+      // Restore from sessionStorage
+      this.showSystem = sessionStorage.getItem('showSystem') === 'true';
+      systemToggle.checked = this.showSystem;
+
+      systemToggle.addEventListener('change', () => {
+        this.showSystem = systemToggle.checked;
+        sessionStorage.setItem('showSystem', this.showSystem);
         this.render();
       });
     }
@@ -296,7 +315,8 @@ const EntityTable = {
     if (!this.schema) return [];
 
     let columns = this.schema.columns.filter(col =>
-      !this.schema.ui?.hiddenFields?.includes(col.name)
+      !this.schema.ui?.hiddenFields?.includes(col.name) &&
+      (this.showSystem || !SYSTEM_COLUMNS.includes(col.name))
     );
 
     // Sort columns alphabetically if requested
@@ -490,12 +510,22 @@ const EntityTable = {
       const colSpan = columns.length + backRefs.length;
       html += `<tr><td colspan="${colSpan}" class="empty-table-message">${i18n.t('no_records_found')}</td></tr>`;
     }
+
+    // Get mediaRowHeight from tableOptions (if configured for this entity)
+    const mediaRowHeight = this.schema?.ui?.tableOptions?.mediaRowHeight;
+    // Find media columns for row height logic
+    const mediaColumns = columns.filter(col => col.customType === 'media');
+
     for (let i = 0; i < sortedRecords.length; i++) {
       const record = sortedRecords[i];
       const isSelected = record.id === this.selectedId;
       const rowClass = isSelected ? 'selected' : (i % 2 === 1 ? 'zebra' : '');
 
-      html += `<tr class="${rowClass}" data-id="${record.id}">`;
+      // Apply larger row height only if row has media content
+      const hasMedia = mediaRowHeight && mediaColumns.some(col => record[col.name]);
+      const rowStyle = hasMedia ? ` style="height: ${mediaRowHeight}px;"` : '';
+
+      html += `<tr class="${rowClass}"${rowStyle} data-id="${record.id}">`;
 
       for (const col of columns) {
         const value = record[col.name];
@@ -533,10 +563,11 @@ const EntityTable = {
           const truncated = jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
           html += `<td class="json-cell" title="${DomUtils.escapeHtml(jsonStr)}">${DomUtils.escapeHtml(truncated)}</td>`;
         } else if (col.customType === 'media' && value) {
-          // Media: Thumbnail link
+          // Media: Thumbnail link (with max-height if mediaRowHeight is configured)
+          const imgStyle = mediaRowHeight ? ` style="max-height: ${mediaRowHeight - 8}px;"` : '';
           html += `<td class="media-cell">
             <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="Datei oeffnen">
-              <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"
+              <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"${imgStyle}
                    onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
             </a>
           </td>`;

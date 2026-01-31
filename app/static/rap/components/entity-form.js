@@ -2,6 +2,10 @@
  * Entity Form Component
  * Dynamic form for creating/editing entity records
  */
+
+// System columns that are always hidden in forms (managed by the system)
+const SYSTEM_COLUMNS_FORM = ['version', 'created_at', 'updated_at'];
+
 const EntityForm = {
   currentEntity: null,
   currentRecord: null,
@@ -24,6 +28,8 @@ const EntityForm = {
     let html = '<form class="entity-form" id="entity-form">';
 
     for (const col of schema.columns) {
+      // Always skip system columns in forms (managed by the system)
+      if (SYSTEM_COLUMNS_FORM.includes(col.name)) continue;
       // Skip id field for create, show as readonly for edit
       if (col.name === 'id' && !isEdit) continue;
 

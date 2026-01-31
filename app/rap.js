@@ -208,11 +208,12 @@ const UISpecLoader = require('./server/utils/UISpecLoader');
 const mdCrud = UISpecLoader.loadCrudConfig(cfg.paths.docs);
 const mdViews = UISpecLoader.loadViewsConfig(cfg.paths.docs);
 
-// Extract entities, prefilters, and requiredFilters from CRUD config
-const crudConfig = mdCrud || { entities: [], prefilters: {}, requiredFilters: {} };
+// Extract entities, prefilters, requiredFilters, and tableOptions from CRUD config
+const crudConfig = mdCrud || { entities: [], prefilters: {}, requiredFilters: {}, tableOptions: {} };
 const enabledEntitiesRaw = crudConfig.entities || [];
 const entityPrefilters = crudConfig.prefilters || {};
 const requiredFilters = crudConfig.requiredFilters || {};
+const entityTableOptions = crudConfig.tableOptions || {};
 
 if (enabledEntitiesRaw.length > 0) {
     // Filter out area separator comments (entries starting with 20 dashes)
@@ -245,6 +246,7 @@ if (enabledEntitiesRaw.length > 0) {
         enabledEntities,
         entityPrefilters,
         requiredFilters,
+        entityTableOptions,
         paths: cfg.paths,
         viewsConfig: mdViews || []
     });

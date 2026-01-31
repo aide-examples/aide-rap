@@ -2692,6 +2692,18 @@
     font-style: italic;
 }
 
+/* Clickable URLs in seed preview */
+.seed-url-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.seed-url-link:hover {
+    text-decoration: underline;
+    color: var(--color-primary-dark, #1d4ed8);
+}
+
 /* Generator Validation Info */
 .generator-validation {
     margin-top: 12px;
@@ -3703,6 +3715,25 @@
 
 .media-cell a {
     display: inline-block;
+}
+
+/* Media cells in rows with fixed height */
+.entity-table tbody tr[style*="height"] .media-cell {
+    width: 1%;
+    white-space: nowrap;
+    max-width: none;
+    overflow: visible;
+    height: inherit;
+    padding: 4px;
+}
+
+/* Thumbnails in rows with fixed height - fit to cell */
+.entity-table tbody tr[style*="height"] .media-thumb-tiny {
+    height: 100%;
+    width: auto;
+    max-height: none;
+    max-width: none;
+    object-fit: contain;
 }
 
 .media-display {

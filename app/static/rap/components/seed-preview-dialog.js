@@ -204,6 +204,57 @@ const SeedPreviewDialog = {
   },
 
   /**
+   * Check if a string is a plain URL
+   */
+  isUrl(str) {
+    if (!str || typeof str !== 'string') return false;
+    return str.startsWith('http://') || str.startsWith('https://');
+  },
+
+  /**
+   * Parse markdown link [text](url) and return {text, url} or null
+   */
+  parseMarkdownLink(str) {
+    if (!str || typeof str !== 'string') return null;
+    const match = str.match(/^\[([^\]]*)\]\(([^)]+)\)$/);
+    if (match) {
+      return { text: match[1], url: match[2] };
+    }
+    return null;
+  },
+
+  /**
+   * Create clickable link HTML (opens in popup window)
+   */
+  createLinkHtml(url, displayText) {
+    const safeUrl = DomUtils.escapeHtml(url);
+    const safeText = DomUtils.escapeHtml(displayText);
+    return `<a href="${safeUrl}" onclick="window.open(this.href, 'seedPreview', 'width=800,height=600'); return false;" class="seed-url-link" title="${safeUrl}">${safeText}</a>`;
+  },
+
+  /**
+   * Format a cell value (make URLs clickable, parse markdown links)
+   */
+  formatCellValue(value) {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+
+    // Check for markdown link [text](url)
+    const mdLink = this.parseMarkdownLink(str);
+    if (mdLink) {
+      return this.createLinkHtml(mdLink.url, mdLink.text || mdLink.url);
+    }
+
+    // Check for plain URL
+    if (this.isUrl(str)) {
+      const displayUrl = str.length > 50 ? str.substring(0, 47) + '...' : str;
+      return this.createLinkHtml(str, displayUrl);
+    }
+
+    return DomUtils.escapeHtml(str);
+  },
+
+  /**
    * Render preview table
    */
   renderTable(emptyMessage) {
@@ -221,8 +272,7 @@ const SeedPreviewDialog = {
     const rows = previewRows.map(record => {
       const cells = columns.map(col => {
         const value = record[col];
-        const displayValue = value === null ? '' : DomUtils.escapeHtml(String(value));
-        return `<td>${displayValue}</td>`;
+        return `<td>${this.formatCellValue(value)}</td>`;
       }).join('');
       return `<tr>${cells}</tr>`;
     }).join('');

@@ -7,7 +7,7 @@
  * - FK constraint error handling
  */
 
-const { getDatabase, getSchema, getEntityPrefilters, getRequiredFilters } = require('../config/database');
+const { getDatabase, getSchema, getEntityPrefilters, getRequiredFilters, getTableOptions } = require('../config/database');
 const { ObjectValidator } = require('../../shared/validation');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const ColumnUtils = require('../../static/rap/utils/ColumnUtils');
@@ -557,7 +557,8 @@ function getExtendedSchemaInfo(entityName) {
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
       readonlyFields,
-      hiddenFields: hiddenFields.length > 0 ? hiddenFields : null
+      hiddenFields: hiddenFields.length > 0 ? hiddenFields : null,
+      tableOptions: getTableOptions()[entityName] || null
     },
     backReferences: inverseRels.map(rel => {
       // Get area color of the referencing entity

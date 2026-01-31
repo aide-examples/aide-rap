@@ -58,6 +58,25 @@ function isValidUrl(str) {
 }
 
 /**
+ * Extract URL from a markdown link [text](url) or return the string if it's a plain URL
+ * @param {string} str - String to check (may be markdown link or plain URL)
+ * @returns {string|null} - The URL or null if not a valid URL
+ */
+function extractUrl(str) {
+  if (!str || typeof str !== 'string') return null;
+
+  // Check for markdown link [text](url)
+  const mdMatch = str.match(/^\[([^\]]*)\]\(([^)]+)\)$/);
+  if (mdMatch) {
+    const url = mdMatch[2];
+    return isValidUrl(url) ? url : null;
+  }
+
+  // Plain URL
+  return isValidUrl(str) ? str : null;
+}
+
+/**
  * Resolve media URLs in a record.
  * For each media-type field, if the value is a URL, fetch it via MediaService
  * and replace with the resulting media UUID.
@@ -68,7 +87,10 @@ function isValidUrl(str) {
 async function resolveMediaUrls(entityName, record) {
   const mediaErrors = [];
 
-  if (!mediaService) return { record, mediaErrors };
+  if (!mediaService) {
+    console.warn(`[SeedManager] MediaService not set - cannot resolve media URLs`);
+    return { record, mediaErrors };
+  }
 
   const { schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
@@ -79,16 +101,29 @@ async function resolveMediaUrls(entityName, record) {
   // Find media-type columns
   const mediaColumns = entity.columns.filter(c => c.customType === 'media');
 
+  // Debug: log what we found
+  if (mediaColumns.length > 0) {
+    console.log(`[SeedManager] ${entityName} has ${mediaColumns.length} media column(s): ${mediaColumns.map(c => c.name).join(', ')}`);
+  }
+
   for (const col of mediaColumns) {
     const value = record[col.name];
 
+    // Extract URL (handles both plain URLs and markdown links [text](url))
+    const url = extractUrl(value);
+
+    // Debug: log the value we're checking
+    if (value) {
+      console.log(`[SeedManager] Checking ${col.name}: "${value}" - extractedUrl: ${url || 'none'}`);
+    }
+
     // Check if value is a URL (not already a UUID)
-    if (isValidUrl(value)) {
+    if (url) {
       try {
-        console.log(`  Fetching media URL for ${col.name}: ${value.substring(0, 50)}...`);
+        console.log(`  Fetching media URL for ${col.name}: ${url.substring(0, 50)}...`);
         // Pass media constraints from schema (e.g., maxWidth, maxHeight from [DIMENSION=800x600])
         const constraints = col.media || null;
-        const result = await mediaService.uploadFromUrl(value, 'seed', constraints);
+        const result = await mediaService.uploadFromUrl(url, 'seed', constraints);
         resolved[col.name] = result.id;
         console.log(`  -> Stored as ${result.id}`);
       } catch (err) {
@@ -96,7 +131,7 @@ async function resolveMediaUrls(entityName, record) {
         // Track the error for client feedback
         mediaErrors.push({
           field: col.name,
-          url: value.length > 80 ? value.substring(0, 80) + '...' : value,
+          url: url.length > 80 ? url.substring(0, 80) + '...' : url,
           error: err.message
         });
         // Set field to null (validation will fail later, or it might be optional)
@@ -932,9 +967,19 @@ function clearEntity(entityName) {
 
     const refEntity = schema.entities[ref.entity];
     if (refEntity) {
-      const refCount = db.prepare(`SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${ref.column} IS NOT NULL`).get().count;
-      if (refCount > 0) {
-        throw new Error(`Cannot clear ${entityName}: ${refCount} records in ${ref.entity} reference it`);
+      try {
+        const refCount = db.prepare(`SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${ref.column} IS NOT NULL`).get().count;
+        if (refCount > 0) {
+          throw new Error(`Cannot clear ${entityName}: ${refCount} records in ${ref.entity} reference it`);
+        }
+      } catch (e) {
+        // Column might not exist if schema changed (e.g., enum→entity conversion)
+        // Skip the check - the FK constraint doesn't exist in the actual DB yet
+        if (e.message?.includes('no such column')) {
+          console.warn(`[SeedManager] Skipping FK check for ${ref.entity}.${ref.column} - column not in DB (schema may need rebuild)`);
+          continue;
+        }
+        throw e;
       }
     }
   }

@@ -1,6 +1,7 @@
 /**
  * Detail Panel Component
  * Right side panel for viewing/editing records
+ * Uses SYSTEM_COLUMNS from entity-table.js (loaded earlier)
  */
 const DetailPanel = {
   panel: null,
@@ -11,6 +12,7 @@ const DetailPanel = {
   showIdsToggle: null,
   isCollapsed: false,
   showIds: false,
+  showSystem: false, // Show system columns (version, created_at, updated_at)
   mode: null, // 'view', 'edit', 'create', or null
 
   // Current record state (for re-rendering when toggle changes)
@@ -35,6 +37,19 @@ const DetailPanel = {
       this.showIdsToggle.addEventListener('change', () => {
         this.showIds = this.showIdsToggle.checked;
         sessionStorage.setItem('showIds', this.showIds);
+        // Re-render current record if any
+        if (this.currentEntity && this.currentRecord) {
+          this.showRecord(this.currentEntity, this.currentRecord);
+        }
+      });
+    }
+
+    // Restore show system columns state from session
+    const showSystemToggle = document.getElementById('show-system-toggle');
+    this.showSystem = sessionStorage.getItem('showSystem') === 'true';
+    if (showSystemToggle) {
+      showSystemToggle.addEventListener('change', () => {
+        this.showSystem = showSystemToggle.checked;
         // Re-render current record if any
         if (this.currentEntity && this.currentRecord) {
           this.showRecord(this.currentEntity, this.currentRecord);
@@ -130,6 +145,9 @@ const DetailPanel = {
     }
 
     for (const col of schema.columns) {
+      // Skip system columns unless toggle is enabled
+      if (!this.showSystem && SYSTEM_COLUMNS.includes(col.name)) continue;
+
       const value = record[col.name];
       let displayValue;
       if (value === null || value === undefined) {

@@ -34,9 +34,10 @@ const SEPARATOR_PREFIX = '-------------------- ';
  *   - `- EntityName (required: field1)` — always show filter dialog
  *   - `- EntityName (required: field1:select)` — always show filter dialog with dropdown
  *   - `- EntityName (required: field1, prefilter: field2)` — both
+ *   - `- EntityName (mediaRowHeight: 100)` — row height for rows with media
  * Field suffix `:select` = dropdown, no suffix = text input (LIKE)
  * @param {string} requirementsDir - Path to requirements/ directory
- * @returns {{entities: string[], prefilters: Object, requiredFilters: Object}|null}
+ * @returns {{entities: string[], prefilters: Object, requiredFilters: Object, tableOptions: Object}|null}
  */
 function loadCrudConfig(requirementsDir) {
   const mdPath = path.join(requirementsDir, 'ui', 'Crud.md');
@@ -46,6 +47,7 @@ function loadCrudConfig(requirementsDir) {
   const entities = [];
   const prefilters = {}; // { entityName: ['field1', 'field2:select'] }
   const requiredFilters = {}; // { entityName: ['field1', 'field2:select'] }
+  const tableOptions = {}; // { entityName: { mediaRowHeight: 100 } }
 
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
@@ -66,10 +68,11 @@ function loadCrudConfig(requirementsDir) {
         const entityName = parenMatch[1].trim();
         const optionsStr = parenMatch[2];
 
-        // Parse options: "required: field1:select, prefilter: field2"
+        // Parse options: "required: field1:select, prefilter: field2, mediaRowHeight: 100"
         // Split by known keywords (required: and prefilter:)
-        const requiredMatch = optionsStr.match(/required:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:prefilter:|$)|$)/i);
-        const prefilterMatch = optionsStr.match(/prefilter:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:required:|$)|$)/i);
+        const requiredMatch = optionsStr.match(/required:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:prefilter:|mediaRowHeight:|$)|$)/i);
+        const prefilterMatch = optionsStr.match(/prefilter:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:required:|mediaRowHeight:|$)|$)/i);
+        const mediaRowHeightMatch = optionsStr.match(/mediaRowHeight:\s*(\d+)/i);
 
         if (entityName) {
           entities.push(entityName);
@@ -89,6 +92,11 @@ function loadCrudConfig(requirementsDir) {
               prefilters[entityName] = fields;
             }
           }
+
+          if (mediaRowHeightMatch) {
+            if (!tableOptions[entityName]) tableOptions[entityName] = {};
+            tableOptions[entityName].mediaRowHeight = parseInt(mediaRowHeightMatch[1], 10);
+          }
         }
       } else if (entityPart) {
         entities.push(entityPart);
@@ -96,7 +104,7 @@ function loadCrudConfig(requirementsDir) {
     }
   }
 
-  return { entities, prefilters, requiredFilters };
+  return { entities, prefilters, requiredFilters, tableOptions };
 }
 
 /**
