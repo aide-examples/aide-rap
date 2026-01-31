@@ -431,19 +431,19 @@
                         path.setAttribute('marker-end', 'url(#arrowhead)');
 
                         // Dashed/dotted line for optional or readonly relationships
-                        if (/\[READONLY\]/i.test(attr.description || '')) {
+                        if (attr.ui?.readonly) {
                             path.setAttribute('stroke-dasharray', READONLY_DASH);
-                        } else if (/\[OPTIONAL\]/i.test(attr.type)) {
+                        } else if (attr.optional) {
                             path.setAttribute('stroke-dasharray', OPTIONAL_DASH);
                         }
 
                         let pathD;
 
                         if (className === baseType) {
-                            // Self-reference semicircle
+                            // Self-reference semicircle - originates at the attribute row
                             const boxWidth = getBoxWidth(className);
                             const bHeight = getBoxHeight(className);
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, boxWidth, bHeight);
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, boxWidth, bHeight, i);
                             pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
                         } else {
                             // Normal connection
@@ -591,15 +591,15 @@
                     const baseType = ConnectionCalculator.extractBaseType(attr.type);
 
                     if (entityNames.includes(baseType)) {
-                        const isOptional = /\[OPTIONAL\]/i.test(attr.type);
-                        const isReadonly = /\[READONLY\]/i.test(attr.description || '');
+                        const isOptional = attr.optional;
+                        const isReadonly = attr.ui?.readonly;
                         const dashAttr = isReadonly
                             ? ` stroke-dasharray="${READONLY_DASH}"`
                             : (isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '');
 
                         if (className === baseType) {
-                            // Self-reference semicircle
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[className], boxHeight(className));
+                            // Self-reference semicircle - originates at the attribute row
+                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[className], boxHeight(className), i);
                             const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
 
                             parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
@@ -658,12 +658,11 @@
                         const attr = visibleAttrs[i];
                         const attrY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
                         const cleanType = ConnectionCalculator.extractBaseType(attr.type);
-                        const desc = attr.description || '';
 
-                        // Determine styling based on markers
-                        const isReadonly = /\[READONLY\]/i.test(desc);
-                        const isLabel = /\[LABEL\]/i.test(desc) && !/\[LABEL2\]/i.test(desc);
-                        const isLabel2 = /\[LABEL2\]/i.test(desc);
+                        // Determine styling based on schema ui flags
+                        const isReadonly = attr.ui?.readonly;
+                        const isLabel = attr.ui?.label && !attr.ui?.label2;
+                        const isLabel2 = attr.ui?.label2;
                         const fillColor = isReadonly ? READONLY_COLOR : '#000';
 
                         let displayText;
@@ -819,7 +818,6 @@
                         const line = document.createElement('div');
                         line.className = 'attr-line';
                         const baseType = ConnectionCalculator.extractBaseType(attr.type);
-                        const desc = attr.description || '';
                         if (entityNames.includes(baseType)) {
                             // FK attribute: bold name only
                             line.textContent = attr.name;
@@ -827,14 +825,14 @@
                         } else {
                             line.textContent = `${attr.name}: ${baseType}`;
                         }
-                        // Apply marker styles
-                        if (/\[READONLY\]/i.test(desc)) {
+                        // Apply marker styles from schema ui flags
+                        if (attr.ui?.readonly) {
                             line.style.color = READONLY_COLOR;
                         }
-                        if (/\[LABEL\]/i.test(desc) && !/\[LABEL2\]/i.test(desc)) {
+                        if (attr.ui?.label && !attr.ui?.label2) {
                             line.style.textDecoration = 'underline';
                             line.style.textDecorationStyle = LABEL_UNDERLINE;
-                        } else if (/\[LABEL2\]/i.test(desc)) {
+                        } else if (attr.ui?.label2) {
                             line.style.textDecoration = 'underline';
                             line.style.textDecorationStyle = LABEL2_UNDERLINE;
                         }

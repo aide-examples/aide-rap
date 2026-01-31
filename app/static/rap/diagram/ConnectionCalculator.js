@@ -46,12 +46,13 @@
 
         /**
          * Get connection points for a relationship between two entities.
+         * Connection always originates at the attribute row (same in compact and detailed mode).
          * @param {Object} fromPos - Source position {x, y}
          * @param {Object} toPos - Target position {x, y}
          * @param {number} fromHeight - Source box height
          * @param {number} toHeight - Target box height
          * @param {number} attrIndex - Attribute index for connection point
-         * @param {boolean} showDetailed - Whether detailed view is shown
+         * @param {boolean} showDetailed - Unused, kept for API compatibility
          * @param {number} fromWidth - Source box width (optional, defaults to BOX_WIDTH)
          * @param {number} toWidth - Target box width (optional, defaults to BOX_WIDTH)
          */
@@ -65,13 +66,8 @@
             const toCx = toPos.x + actualToWidth / 2;
             const toCy = toPos.y + toHeight / 2;
 
-            // Source Y: attribute row in detailed mode, or box center
-            let fromY;
-            if (showDetailed && attrIndex >= 0) {
-                fromY = fromPos.y + HEADER_HEIGHT + (attrIndex + 0.5) * ATTR_LINE_HEIGHT + 2;
-            } else {
-                fromY = fromPos.y + fromHeight / 2;
-            }
+            // Source Y: always use attribute row position (same in compact and detailed mode)
+            const fromY = fromPos.y + HEADER_HEIGHT + (attrIndex + 0.5) * ATTR_LINE_HEIGHT + 2;
 
             // Source X: left or right edge depending on target position
             let fromX = toCx > fromPos.x + actualFromWidth / 2
@@ -92,12 +88,13 @@
 
         /**
          * Calculate self-reference semicircle geometry.
-         * Arc spans from half the box height (or first attr row) to the top of the box.
+         * Arc originates at the attribute row that creates the self-reference.
          * @param {Object} pos - Entity position {x, y}
          * @param {number} boxWidth - Box width (optional, defaults to BOX_WIDTH)
-         * @param {number} boxHeight - Box height (optional, for proportional sizing)
+         * @param {number} boxHeight - Box height (unused, kept for compatibility)
+         * @param {number} attrIndex - Index of the self-referencing attribute (0-based)
          */
-        getSelfReferenceArc(pos, boxWidth, boxHeight) {
+        getSelfReferenceArc(pos, boxWidth, boxHeight, attrIndex = 0) {
             const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT } = DiagramConstants;
 
             const actualWidth = boxWidth || BOX_WIDTH;
@@ -105,9 +102,8 @@
             const endX = startX;
             const endY = pos.y;
 
-            // Start at half box height or first attribute row, whichever is lower
-            const attrRowY = pos.y + HEADER_HEIGHT + 0.5 * ATTR_LINE_HEIGHT + 2;
-            const startY = boxHeight ? Math.max(attrRowY, pos.y + boxHeight / 2) : attrRowY;
+            // Start at the specific attribute row (center of the row)
+            const startY = pos.y + HEADER_HEIGHT + (attrIndex + 0.5) * ATTR_LINE_HEIGHT + 2;
 
             const vertDist = startY - endY;
             const radius = vertDist / 2;

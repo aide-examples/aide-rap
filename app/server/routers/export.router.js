@@ -58,10 +58,9 @@ async function generateEntityCardsPDF(model, outputPath) {
         return Object.keys(model.classes).includes(baseType);
     }
 
-    // Check if attribute is tagged as LABEL (in description as [LABEL] or [LABEL2])
+    // Check if attribute is tagged as LABEL (from schema ui flags)
     function isLabel(attr) {
-        const desc = attr.description || '';
-        return desc.includes('[LABEL]') || desc.includes('[LABEL2]');
+        return attr.ui?.label || attr.ui?.label2;
     }
 
     // Calculate card width based on content

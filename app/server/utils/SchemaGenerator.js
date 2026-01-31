@@ -885,6 +885,11 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
       column.ui = uiAnnotations;
     }
 
+    // Preserve optional flag from [OPTIONAL] annotation in Type column
+    if (attr.optional) {
+      column.optional = true;
+    }
+
     if (computedRule) {
       column.computed = computedRule;
     }

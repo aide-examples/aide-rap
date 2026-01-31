@@ -20,6 +20,15 @@ async function tryUrlLogin() {
     return false;
   }
 
+  // IMMEDIATELY clean URL to remove credentials from browser history
+  // This must happen before any async operations (hash, fetch) that could fail
+  const otherParams = new URLSearchParams(location.search);
+  otherParams.delete('user');
+  otherParams.delete('password');
+  otherParams.delete('pwh');
+  const cleanUrl = location.pathname + (otherParams.size ? '?' + otherParams.toString() : '');
+  history.replaceState({}, '', cleanUrl);
+
   try {
     // Use pre-hashed password or hash the plaintext password
     const hash = pwh || (password ? await sha256(password) : '');
@@ -29,15 +38,6 @@ async function tryUrlLogin() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: user, hash })
     });
-
-    // Clean URL to remove credentials from browser history
-    const cleanUrl = location.pathname + (params.size > 2 ? '?' + (() => {
-      params.delete('user');
-      params.delete('password');
-      params.delete('pwh');
-      return params.toString();
-    })() : '');
-    history.replaceState({}, '', cleanUrl || location.pathname);
 
     return res.ok;
   } catch (e) {
@@ -134,11 +134,12 @@ async function tryUrlLogin() {
         const userEl = document.createElement('span');
         userEl.className = 'status-user-indicator';
         const isMaster = window.currentUser.role === 'master';
+        const ipDisplay = window.currentUser.ip ? ` @ ${window.currentUser.ip}` : '';
         userEl.innerHTML = `
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 3px;">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
           </svg>
-          <span class="status-user-role">${window.currentUser.role}</span>
+          <span class="status-user-role">${window.currentUser.role}${ipDisplay}</span>
         `;
         if (isMaster) {
           userEl.title = 'Development mode (--noauth)';

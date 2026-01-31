@@ -23,7 +23,9 @@ function schemaToModel(schema) {
             attributes: entity.columns.map(col => ({
                 name: col.displayName || col.name,
                 type: col.foreignKey ? col.foreignKey.entity : col.type,
-                description: col.description || ''
+                description: col.description || '',
+                optional: col.optional || false,
+                ui: col.ui || {}
             })),
             types: entity.localTypes || {}
         };

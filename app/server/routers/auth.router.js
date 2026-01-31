@@ -157,7 +157,10 @@ module.exports = function(cfg) {
                 return res.status(401).json({ error: 'Session expired' });
             }
 
-            res.json({ role: sessionData.role });
+            // Get client IP (prefer X-Forwarded-For for reverse proxy setups)
+            const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown';
+
+            res.json({ role: sessionData.role, ip });
         } catch (e) {
             res.clearCookie('rap-session');
             return res.status(401).json({ error: 'Invalid session' });
