@@ -3690,6 +3690,64 @@
     display: none;
 }
 
+/* Media input area with URL and file button */
+.media-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.media-input-area.hidden {
+    display: none;
+}
+
+.media-buttons-row {
+    display: flex;
+    gap: 8px;
+}
+
+.media-url-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.media-url-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.media-url-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.media-file-btn,
+.media-url-load {
+    padding: 6px 12px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 4px;
+    background: var(--color-gray-100);
+    cursor: pointer;
+    font-size: 0.85em;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.media-file-btn:hover,
+.media-url-load:hover {
+    background: var(--color-gray-200);
+    border-color: var(--color-gray-400);
+}
+
+.media-url-load:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* Table/Detail Thumbnails - height-constrained, preserves aspect ratio */
 .media-thumb-tiny {
     height: 24px;

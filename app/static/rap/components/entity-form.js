@@ -100,11 +100,15 @@ const EntityForm = {
       const fieldName = field.dataset.field;
       const hiddenInput = field.querySelector('.media-value');
       const preview = field.querySelector('.media-preview');
+      const inputArea = field.querySelector('.media-input-area');
       const dropzone = field.querySelector('.media-dropzone');
       const fileInput = field.querySelector('.media-file-input');
       const removeBtn = field.querySelector('.media-remove');
       const thumbnail = field.querySelector('.media-thumbnail');
       const filenameSpan = field.querySelector('.media-filename');
+      const urlInput = field.querySelector('.media-url-input');
+      const urlLoadBtn = field.querySelector('.media-url-load');
+      const fileBtn = field.querySelector('.media-file-btn');
 
       // Load filename if value exists
       if (hiddenInput.value) {
@@ -139,18 +143,6 @@ const EntityForm = {
           }
         });
 
-        // Paste handler for URLs
-        dropzone.addEventListener('paste', (e) => {
-          const text = e.clipboardData?.getData('text/plain');
-          if (text && this.isValidUrl(text)) {
-            e.preventDefault();
-            this.uploadMediaFromUrl(text, field);
-          }
-        });
-
-        // Make dropzone focusable for paste events
-        dropzone.setAttribute('tabindex', '0');
-
         dropzone.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', () => {
@@ -161,12 +153,50 @@ const EntityForm = {
         });
       }
 
+      // File button handler
+      if (fileBtn && fileInput) {
+        fileBtn.addEventListener('click', () => fileInput.click());
+      }
+
+      // URL input handlers
+      if (urlInput && urlLoadBtn) {
+        const loadUrlFromInput = () => {
+          const url = urlInput.value.trim();
+          if (url && this.isValidUrl(url)) {
+            this.uploadMediaFromUrl(url, field);
+            urlInput.value = '';
+          } else if (url) {
+            urlInput.classList.add('error');
+            setTimeout(() => urlInput.classList.remove('error'), 2000);
+          }
+        };
+
+        urlLoadBtn.addEventListener('click', loadUrlFromInput);
+
+        urlInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            loadUrlFromInput();
+          }
+        });
+
+        // Auto-load on paste if valid URL
+        urlInput.addEventListener('paste', (e) => {
+          setTimeout(() => {
+            const url = urlInput.value.trim();
+            if (url && this.isValidUrl(url)) {
+              loadUrlFromInput();
+            }
+          }, 0);
+        });
+      }
+
       // Remove button
       if (removeBtn) {
         removeBtn.addEventListener('click', () => {
           hiddenInput.value = '';
           preview.classList.add('hidden');
-          dropzone.classList.remove('hidden');
+          if (inputArea) inputArea.classList.remove('hidden');
           thumbnail.src = '';
           filenameSpan.textContent = '';
           this.checkDirty();
@@ -208,12 +238,15 @@ const EntityForm = {
   async uploadMediaFromUrl(url, fieldElement) {
     const hiddenInput = fieldElement.querySelector('.media-value');
     const preview = fieldElement.querySelector('.media-preview');
+    const inputArea = fieldElement.querySelector('.media-input-area');
     const dropzone = fieldElement.querySelector('.media-dropzone');
     const thumbnail = fieldElement.querySelector('.media-thumbnail');
     const filenameSpan = fieldElement.querySelector('.media-filename');
+    const urlInput = fieldElement.querySelector('.media-url-input');
 
     // Show uploading state
-    dropzone.innerHTML = '<span class="uploading">Fetching URL...</span>';
+    const originalDropzoneHtml = dropzone.innerHTML;
+    dropzone.innerHTML = '<span class="uploading">Lade URL...</span>';
 
     try {
       const response = await fetch('/api/media/from-url', {
@@ -241,7 +274,8 @@ const EntityForm = {
       }
 
       preview.classList.remove('hidden');
-      dropzone.classList.add('hidden');
+      inputArea.classList.add('hidden');
+      if (urlInput) urlInput.value = '';
       this.checkDirty();
 
     } catch (err) {
@@ -258,7 +292,7 @@ const EntityForm = {
       dropzone.innerHTML = `<span class="error">${errorMessage}</span>`;
     }
     setTimeout(() => {
-      dropzone.innerHTML = '<span>Datei oder URL hierher ziehen</span><input type="file" class="media-file-input">';
+      dropzone.innerHTML = '<span>Datei hierher ziehen</span><input type="file" class="media-file-input">';
       // Reattach file input handler
       const newFileInput = dropzone.querySelector('.media-file-input');
       newFileInput.addEventListener('change', () => {
@@ -276,12 +310,13 @@ const EntityForm = {
   async uploadMediaFile(file, fieldElement) {
     const hiddenInput = fieldElement.querySelector('.media-value');
     const preview = fieldElement.querySelector('.media-preview');
+    const inputArea = fieldElement.querySelector('.media-input-area');
     const dropzone = fieldElement.querySelector('.media-dropzone');
     const thumbnail = fieldElement.querySelector('.media-thumbnail');
     const filenameSpan = fieldElement.querySelector('.media-filename');
 
     // Show uploading state
-    dropzone.innerHTML = '<span class="uploading">Uploading...</span>';
+    dropzone.innerHTML = '<span class="uploading">Hochladen...</span>';
 
     try {
       const formData = new FormData();
@@ -311,7 +346,7 @@ const EntityForm = {
       }
 
       preview.classList.remove('hidden');
-      dropzone.classList.add('hidden');
+      inputArea.classList.add('hidden');
       this.checkDirty();
 
     } catch (err) {
@@ -573,9 +608,18 @@ const EntityForm = {
             <span class="media-filename"></span>
             <button type="button" class="media-remove btn-icon" ${disabled} title="Entfernen">&times;</button>
           </div>
-          <div class="media-dropzone ${hasValue ? 'hidden' : ''}" ${isReadonly ? 'style="display:none"' : ''} tabindex="0">
-            <span>Datei oder URL hierher ziehen</span>
-            <input type="file" class="media-file-input">
+          <div class="media-input-area ${hasValue ? 'hidden' : ''}" ${isReadonly ? 'style="display:none"' : ''}>
+            <div class="media-dropzone" tabindex="0">
+              <span>Datei hierher ziehen</span>
+              <input type="file" class="media-file-input">
+            </div>
+            <div class="media-buttons-row">
+              <button type="button" class="media-file-btn btn-small">📁 Datei wählen</button>
+            </div>
+            <div class="media-url-row">
+              <input type="text" class="media-url-input form-input" placeholder="URL einfügen...">
+              <button type="button" class="media-url-load btn-small">Laden</button>
+            </div>
           </div>
         </div>
       `;
