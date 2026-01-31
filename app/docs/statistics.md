@@ -2,7 +2,7 @@
 
 Lines of code statistics for the AIDE RAP project.
 
-*Generated: 2026-01-30 23:29*
+*Generated: 2026-01-31 10:59*
 
 ## External Dependencies
 
@@ -32,8 +32,8 @@ Lines of code statistics for the AIDE RAP project.
 | Shared (app/shared) | 1735 |
 | Frontend (app/static) | 15722 |
 | Tools | 1086 |
-| Config (package.json etc.) | 54 |
-| **Subtotal** | **32559** |
+| Config (package.json etc.) | 70 |
+| **Subtotal** | **32575** |
 
 ## Systems
 
@@ -42,16 +42,16 @@ Lines of code statistics for the AIDE RAP project.
 | book_1 | 118 | 22 | 44 | 184 |
 | book_2 | 319 | 114 | 95 | 528 |
 | flow | 274 | 34 | 67 | 375 |
-| irma | 1328 | 118 | 201 | 1647 |
-| **Subtotal** | **2039** | **288** | **407** | **2734** |
+| irma | 934 | 118 | 201 | 1253 |
+| **Subtotal** | **1645** | **288** | **407** | **2340** |
 
 ## Summary
 
 | Component | Own Code |
 |-----------|----------|
 | AIDE-FRAME | 12916 |
-| AIDE-RAP Platform | 32559 |
-| Systems (all) | 2734 |
-| **Total Own Code** | **48209** |
+| AIDE-RAP Platform | 32575 |
+| Systems (all) | 2340 |
+| **Total Own Code** | **47831** |
 
 *Note: node_modules contains third-party dependencies and is excluded from own code counts.*

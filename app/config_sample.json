@@ -1,7 +1,22 @@
 {
-    "_comment": "Copy this file to config.json and customize for your setup",
+    "_comment": "Copy this file to app/systems/<name>/config.json and customize",
     "port": 18354,
     "log_level": "INFO",
+    "titleHtml": "<img src='/icons/logo.png' style='height:28px; vertical-align:middle; margin-right:8px'>My System",
+    "auth": {
+        "enabled": false,
+        "passwords": {
+            "admin": "",
+            "user": "",
+            "guest": ""
+        },
+        "sessionSecret": "change-this-in-production",
+        "sessionTimeout": 86400
+    },
+    "pagination": {
+        "threshold": 100,
+        "pageSize": 100
+    },
     "pwa": {
         "enabled": false,
         "name": "AIDE RAP",
@@ -9,9 +24,10 @@
         "description": "Rapid Application Prototyping",
         "theme_color": "#0f766e",
         "background_color": "#f5f5f5",
-        "icon_192": "/static/icons/icon-192.svg",
-        "icon_512": "/static/icons/icon-512.svg",
+        "icon192": "/icons/icon-192.svg",
+        "icon512": "/icons/icon-512.svg",
         "icon": {
+            "outputDir": "system",
             "background": "#0f766e",
             "line1_text": "aide",
             "line1_color": "#94a3b8",

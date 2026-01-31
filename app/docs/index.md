@@ -17,28 +17,79 @@ What if you could design your application's data model as naturally as writing d
 
 This is the dream of what CASE tools in the 1990s wanted to be – now actually working.
 
+| What you write | What you get |
+|----------------|--------------|
+| Markdown tables | SQLite with constraints |
+| `type: AircraftType` | Foreign key with label resolution |
+| `[DAILY=rule]` | Computed fields, auto-updated |
+| `## Data Generator` | AI-generated test data |
+
+There are two essential parts for each aide-rap system:
+- The DESIGN DOCUMENTS which describe your system
+- The RUNTIME ENVIRONMENT which populates the model with data and lets you work with it
 ---
+
+# DESIGN DOCUMENTS
 
 ## How It Works
 
-### Data Model as Documentation
+### Model Builder: AI-Assisted System Creation
 
-Define entities in simple Markdown tables. Foreign keys, types, and constraints are expressed naturally:
+The fastest way to start: describe your system in plain language, let AI generate the data model.
+
+1. **Open Model Builder** (Seed Data → + New System)
+2. **Write a Design Brief** in natural language:
+   ```
+   I need a library system: Authors write Books, Members borrow them.
+   Track loan dates and return status.
+   ```
+3. **Copy the generated prompt** to Claude, ChatGPT, or any LLM
+4. **Paste the AI response** (Mermaid ER diagram) back into the builder
+5. **Import** → Entity files, DataModel.md, and seed files are created
+
+See [Create New System](procedures/system-create.md) for the full workflow.
+
+### Manual Modeling
+
+You describe the data *Entities* of your system, grouping them into *Areas of Competence*.
+You can use built-in *DataTypes* (like string, number, email, media, json, ..) and you can define your *Own Types* using *Enumerations* or *Regular Expressions* or *Numeric Ranges*. You define *Derived Attributes* to be computed on the server or on the client. You describe certain aspects of the *User Interface*, especially *Joined Views* which span a path over several Entities following their (foreign key) *Relations*.
+
+Everything is described in *Markdown Documents* with a fairly simple syntax.
+
+When you want to change your model, an AI assistant can guide you
+because there is a set of pre-defined [procedures](/rap#procedures) for it which contains hints on how to handle typical steps like adding new Entities, renaming attributes and so on.
+
+## Areas of Competence
+
+First you define Areas which act as a semantic group of the Entities of your Data Model.
+You assign a color code to each Area which will flow through from your data model diagram into the UI of the running system – entity selector, tree nodes, and table headers all respect the grouping.
+
+Example from IRMA (engine management system):
+- **OEM** (blue) – AircraftOEM, AircraftType, EngineOEM, EngineType
+- **Operations** (green) – CAMO, Airline, Operator, Aircraft, Registration
+- **Engine Management** (orange) – Engine, EngineLease, EngineEvent, EngineAllocation
+- **Maintenance** (purple) – MRO, RepairShop, Workscope
+
+## Data Model
+
+Define entities in simple Markdown tables. Foreign keys, types, and constraints are expressed naturally.
 
 ```markdown
-# Aircraft
+### Aircraft (Example)
 
-| Attribute     | Type            | Description                    |
-|---------------|-----------------|--------------------------------|
-| registration  | TailSign [LABEL]| Aircraft registration (D-AINA) |
-| serial_number | MSN             | Manufacturer serial number     |
-| type          | AircraftType    | ← Foreign key, just by name    |
-| status        | OperationalStatus| Active, Grounded, or Retired  |
+| Attribute     | Type            | Description                    | Example  |
+|---------------|-----------------|--------------------------------|----------|
+| registration  | TailSign [LABEL]| Aircraft registration          | D-AINA   |
+| serial_number | MSN             | Manufacturer serial number     | 7-13     |
+| type          | AircraftType    | Refers to a different entity   | A-320    |
+| status        | AcStatus        | Active, Grounded, or Retired   | Grounded |
 ```
+The database will use internal ids to uniquely identify objects and to create
+foreign key relations, but there is no need to define this in the Entity document.
+No `type_id INTEGER REFERENCES aircraft_type(id)` – just write `type: AircraftType` 
+and the system handles the rest.
 
-No `type_id INTEGER REFERENCES aircraft_type(id)` – just write `type: AircraftType` and the system handles the rest.
-
-### Smart Type System
+## Smart Type System
 
 **Pattern Types** – Define validation patterns with regex:
 ```markdown
@@ -50,6 +101,9 @@ No `type_id INTEGER REFERENCES aircraft_type(id)` – just write `type: Aircraft
 
 **Enum Types** – Map internal values to display labels:
 ```markdown
+
+**AcStatus**
+
 | Internal | External  | Description           |
 |----------|-----------|----------------------|
 | 1        | Active    | Currently in service |
@@ -59,7 +113,7 @@ No `type_id INTEGER REFERENCES aircraft_type(id)` – just write `type: Aircraft
 
 Validation happens identically on frontend (for UX) and backend (for integrity).
 
-**Built-in Types** – Ready to use without defining:
+## Built-in Types – Ready to use without defining:
 
 | Type | Storage | Validation | UI Display |
 |------|---------|------------|------------|
@@ -81,6 +135,181 @@ Example usage:
 | metadata | json | Additional data |
 | attachment | media | Uploaded file |
 ```
+
+# RUNTIME ENVIRONMENT
+
+## Relational Database
+
+AIDE RAP generates DDL for a database system (SQLite at the moment).
+It provides a Web API for CRUD actions and for reading joined views.
+It also handles defined rules for derived read-only attributes which
+improve performance and readability. The database handles updates
+with optimistic concurrency control and keeps track of changes in
+an audit trail. It uses internal keys to identify objects and foreign
+key relationships. It offers backup, restore and loading from JSON
+data with "natural keys" resolving them to internal identifiers.
+
+## User Interface
+
+### Three-View Entity Explorer
+
+Switch seamlessly between viewing modes:
+
+| View | Best For |
+|------|----------|
+| **Table** | Quick scanning, sorting, filtering |
+| **Tree (Vertical)** | Deep relationship exploration |
+| **Tree (Horizontal)** | Compact attribute display |
+
+**Deep Relationship Traversal:** The tree view doesn't stop at one level. Click any foreign key to expand it, then expand *its* foreign keys, and so on – as deep as you want to go:
+
+```
+Aircraft D-AINA
+  └─ type: Airbus A320neo
+       └─ manufacturer: Airbus SE
+            └─ Aircraft [5] ← back-references!
+                 └─ D-AINB
+                      └─ operator: Lufthansa
+                           └─ ...
+```
+
+**Cycle Detection** prevents infinite loops – if you'd circle back to an already-visited record, you'll see a ↻ marker instead of an expand arrow.
+
+**Focused Navigation** keeps the tree manageable – opening a new branch automatically closes sibling branches.
+
+**FK Label Resolution:** Instead of showing raw IDs, the system creates database views that join display labels:
+
+```sql
+-- Auto-generated view
+CREATE VIEW aircraft_view AS
+SELECT a.*,
+       t.designation AS type_label,
+       o.name AS operator_label
+FROM aircraft a
+LEFT JOIN aircraft_type t ON a.type_id = t.id
+LEFT JOIN operator o ON a.operator_id = o.id
+```
+
+One query returns everything the UI needs – no N+1 problems.
+
+### User Views (Cross-Entity Join Tables)
+
+Define read-only views in `config.json` that join data across entities via FK chains:
+
+```json
+{
+    "name": "Engine Status",
+    "base": "EngineAllocation",
+    "columns": [
+        "engine.serial_number AS ESN",
+        "engine.type.thrust_lbs AS Thrust",
+        "mount_position AS pos OMIT 0"
+    ]
+}
+```
+
+- **Dot-notation paths** follow FK relationships: `engine.type.thrust_lbs` → EngineAllocation → Engine → EngineType
+- **AS alias** for custom column headers
+- **OMIT** suppresses specific values from display (FK columns default to `OMIT null`)
+- Materialized as SQL views (`uv_*`) at startup — no runtime overhead
+- Separate **Views dropdown** (blue) left of the entity selector
+- Full column filtering and sorting, same as entity tables
+- Row click jumps to the base entity's edit form
+
+**Back-Reference Columns** pull data from child entities that point *to* the base entity via FK — implemented as correlated SQL subqueries:
+
+```json
+{
+    "name": "Engine Overview",
+    "base": "Engine",
+    "columns": [
+        "serial_number AS ESN",
+        "type.designation AS Type",
+        "EngineAllocation<engine(COUNT) AS Allocations",
+        "EngineEvent<engine(COUNT) AS Events OMIT 0",
+        "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+    ]
+}
+```
+
+Syntax: `Entity<fk_field(params).column`
+
+| Part | Description | Example |
+|------|-------------|---------|
+| `Entity` | Child entity with FK to base | `EngineAllocation` |
+| `<fk_field` | FK column pointing to base (without `_id`) | `<engine` |
+| `(params)` | Comma-separated: `COUNT`, `LIST`, `WHERE col=val`, `ORDER BY col`, `LIMIT n` | `(WHERE end_date=null, LIMIT 1)` |
+| `.column` | Target column, supports FK-chain dot-paths | `.aircraft.registration` |
+
+See [Views Configuration](procedures/views-config.md) for the full syntax reference.
+
+### Context Menu
+
+Right-click any record (in table or tree) for quick actions:
+- **New** – Create a new record of this entity type
+- **Details** – Read-only view in side panel
+- **Edit** – Open form for modification
+- **Delete** – With confirmation and FK constraint checking
+- **Export CSV** – Download current table view as CSV (semicolon-separated, UTF-8)
+- **Export PDF** – Download current table view as PDF
+
+### Export (PDF, CSV)
+
+Export the current table view to a professionally formatted PDF:
+
+- **A4 Landscape** layout for maximum column space
+- **Entity color** in title bar and column headers
+- **FK column colors** match their target entity's area color
+- **Dynamic column widths** based on content
+- **Filtered data** – exports only what's currently visible
+- **FK labels** instead of raw IDs
+- **Enum conversion** – shows external values, not internal codes
+- **Automatic page breaks** with header repetition
+- **Page numbers** on each page
+
+**TreeView PDF Export:**
+
+When in Tree View mode, PDF export captures the currently expanded structure:
+- Exports only what's visible (expanded nodes)
+- Uses indentation to show hierarchy depth
+- Includes symbols for relationships: `▸` root, `→` FK, `←` back-reference, `↻` cycle
+- Respects current sort settings (attribute order, reference position)
+
+---
+
+## Admin Tools
+
+### Seed Manager
+
+The Admin menu opens a dedicated interface for managing seed data across all entities:
+
+**Entity Overview Table:**
+- Shows all entities in dependency order (load top-to-bottom, clear bottom-to-top)
+- **Seed** – Record count in seed file (or `--` if none); shows `valid / total` when some records have unresolved FKs
+- **Backup** – Record count in backup file (or `--` if none)
+- **DB Rows** – Current record count in database
+
+**Context Menu Actions** (click or right-click on entity row):
+- **Import...** – Open import dialog (paste or drag & drop JSON/CSV)
+- **Export...** – Download seed file as JSON or CSV
+- **Generate...** – Open AI generator dialog
+- **Load...** – Preview seed data, then load into database
+- **Clear** – Delete all records from database
+
+**Import Dialog Features:**
+- **Auto-detect format** – JSON or CSV (semicolon, comma, or tab separated)
+- **Drag & drop** – Drop `.json` or `.csv` files directly
+- **Paste support** – Paste text from clipboard
+- **Preview table** – Shows parsed records before saving
+- **FK validation** – Warns about unresolved foreign key references
+
+**Bulk Operations:**
+- **Backup** – Export all DB data to `data/backup/` as JSON (with FK label resolution)
+- **Restore** – Clear DB and reload from backup files
+- **Load All** – Load all available seed files (merge mode)
+- **Clear All** – Clear all database tables
+- **Reset All** – Clear then reload all seed data
+- **Reinitialize** – Re-read DataModel.md and rebuild database schema without server restart. Two-step confirmation: warns about data loss, then offers backup before proceeding. See [Schema Migration](procedures/schema-migration.md) for details.
 
 ### Media Store
 
@@ -169,179 +398,6 @@ Seed files can reference media by URL. The system automatically fetches and stor
 ]
 ```
 
-### Color-Coded Areas of Competence
-
-Group related entities into colored areas. The colors flow through from your data model diagram into the UI – entity selector, tree nodes, and table headers all respect the grouping:
-
-- **Fleet Management** (blue) – Aircraft, Registration, Operator
-- **Technical Data** (green) – AircraftType, AircraftManufacturer
-- **Maintenance** (orange) – MaintenanceEvent, MaintenanceType
-
----
-
-## UI Features
-
-### Three-View Entity Explorer
-
-Switch seamlessly between viewing modes:
-
-| View | Best For |
-|------|----------|
-| **Table** | Quick scanning, sorting, filtering |
-| **Tree (Vertical)** | Deep relationship exploration |
-| **Tree (Horizontal)** | Compact attribute display |
-
-### Deep Relationship Traversal
-
-The tree view doesn't stop at one level. Click any foreign key to expand it, then expand *its* foreign keys, and so on – as deep as you want to go:
-
-```
-Aircraft D-AINA
-  └─ type: Airbus A320neo
-       └─ manufacturer: Airbus SE
-            └─ Aircraft [5] ← back-references!
-                 └─ D-AINB
-                      └─ operator: Lufthansa
-                           └─ ...
-```
-
-**Cycle Detection** prevents infinite loops – if you'd circle back to an already-visited record, you'll see a ↻ marker instead of an expand arrow.
-
-**Focused Navigation** keeps the tree manageable – opening a new branch automatically closes sibling branches.
-
-### FK Label Resolution via SQL Views
-
-Instead of showing raw IDs, the system creates database views that join display labels:
-
-```sql
--- Auto-generated view
-CREATE VIEW aircraft_view AS
-SELECT a.*,
-       t.designation AS type_label,
-       o.name AS operator_label
-FROM aircraft a
-LEFT JOIN aircraft_type t ON a.type_id = t.id
-LEFT JOIN operator o ON a.operator_id = o.id
-```
-
-One query returns everything the UI needs – no N+1 problems.
-
-### User Views — Cross-Entity Join Tables
-
-Define read-only views in `config.json` that join data across entities via FK chains:
-
-```json
-{
-    "name": "Engine Status",
-    "base": "EngineAllocation",
-    "columns": [
-        "engine.serial_number AS ESN",
-        "engine.type.thrust_lbs AS Thrust",
-        "mount_position AS pos OMIT 0"
-    ]
-}
-```
-
-- **Dot-notation paths** follow FK relationships: `engine.type.thrust_lbs` → EngineAllocation → Engine → EngineType
-- **AS alias** for custom column headers
-- **OMIT** suppresses specific values from display (FK columns default to `OMIT null`)
-- Materialized as SQL views (`uv_*`) at startup — no runtime overhead
-- Separate **Views dropdown** (blue) left of the entity selector
-- Full column filtering and sorting, same as entity tables
-- Row click jumps to the base entity's edit form
-
-**Back-Reference Columns** pull data from child entities that point *to* the base entity via FK — implemented as correlated SQL subqueries:
-
-```json
-{
-    "name": "Engine Overview",
-    "base": "Engine",
-    "columns": [
-        "serial_number AS ESN",
-        "type.designation AS Type",
-        "EngineAllocation<engine(COUNT) AS Allocations",
-        "EngineEvent<engine(COUNT) AS Events OMIT 0",
-        "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
-    ]
-}
-```
-
-Syntax: `Entity<fk_field(params).column`
-
-| Part | Description | Example |
-|------|-------------|---------|
-| `Entity` | Child entity with FK to base | `EngineAllocation` |
-| `<fk_field` | FK column pointing to base (without `_id`) | `<engine` |
-| `(params)` | Comma-separated: `COUNT`, `LIST`, `WHERE col=val`, `ORDER BY col`, `LIMIT n` | `(WHERE end_date=null, LIMIT 1)` |
-| `.column` | Target column, supports FK-chain dot-paths | `.aircraft.registration` |
-
-See [Views Configuration](procedures/views-config.md) for the full syntax reference.
-
-### Context Menu Actions
-
-Right-click any record (in table or tree) for quick actions:
-- **New** – Create a new record of this entity type
-- **Details** – Read-only view in side panel
-- **Edit** – Open form for modification
-- **Delete** – With confirmation and FK constraint checking
-- **Export CSV** – Download current table view as CSV (semicolon-separated, UTF-8)
-- **Export PDF** – Download current table view as PDF
-
-### PDF Export
-
-Export the current table view to a professionally formatted PDF:
-
-- **A4 Landscape** layout for maximum column space
-- **Entity color** in title bar and column headers
-- **FK column colors** match their target entity's area color
-- **Dynamic column widths** based on content
-- **Filtered data** – exports only what's currently visible
-- **FK labels** instead of raw IDs
-- **Enum conversion** – shows external values, not internal codes
-- **Automatic page breaks** with header repetition
-- **Page numbers** on each page
-
-**TreeView PDF Export:**
-
-When in Tree View mode, PDF export captures the currently expanded structure:
-- Exports only what's visible (expanded nodes)
-- Uses indentation to show hierarchy depth
-- Includes symbols for relationships: `▸` root, `→` FK, `←` back-reference, `↻` cycle
-- Respects current sort settings (attribute order, reference position)
-
-### Admin Seed Manager
-
-The Admin menu opens a dedicated interface for managing seed data across all entities:
-
-**Entity Overview Table:**
-- Shows all entities in dependency order (load top-to-bottom, clear bottom-to-top)
-- **Seed** – Record count in seed file (or `--` if none); shows `valid / total` when some records have unresolved FKs
-- **Backup** – Record count in backup file (or `--` if none)
-- **DB Rows** – Current record count in database
-
-**Context Menu Actions** (click or right-click on entity row):
-- **Import...** – Open import dialog (paste or drag & drop JSON/CSV)
-- **Export...** – Download seed file as JSON or CSV
-- **Generate...** – Open AI generator dialog
-- **Load...** – Preview seed data, then load into database
-- **Clear** – Delete all records from database
-
-**Import Dialog Features:**
-- **Auto-detect format** – JSON or CSV (semicolon, comma, or tab separated)
-- **Drag & drop** – Drop `.json` or `.csv` files directly
-- **Paste support** – Paste text from clipboard
-- **Preview table** – Shows parsed records before saving
-- **FK validation** – Warns about unresolved foreign key references
-
-**Bulk Operations:**
-- **Backup** – Export all DB data to `data/backup/` as JSON (with FK label resolution)
-- **Restore** – Clear DB and reload from backup files
-- **Load All** – Load all available seed files (merge mode)
-- **Clear All** – Clear all database tables
-- **Reset All** – Clear then reload all seed data
-- **Reinitialize** – Re-read DataModel.md and rebuild database schema without server restart. Two-step confirmation: warns about data loss, then offers backup before proceeding. See [Schema Migration](procedures/schema-migration.md) for details.
-
----
 
 ## Advanced Features
 
@@ -399,10 +455,12 @@ This approach keeps documentation and diagrams in sync – change the Markdown, 
 
 ---
 
+# TECHNICAL REFERENCE
+
 ## Architecture
 
 ```
-aide-irma/
+your-system/
 ├── app/
 │   ├── docs/requirements/
 │   │   ├── DataModel.md          # Visual data model with areas
@@ -419,18 +477,18 @@ aide-irma/
 │   ├── shared/
 │   │   ├── types/                # TypeRegistry, TypeParser
 │   │   └── validation/           # ObjectValidator (isomorphic)
-│   ├── static/irma/
+│   ├── static/<system>/
 │   │   ├── components/           # UI components (ES6 modules)
-│   │   ├── irma.html             # Main page
-│   │   └── irma.css              # Styling
+│   │   ├── <system>.html         # Main page
+│   │   └── <system>.css          # Styling
 │   └── data/
-│       ├── irma.sqlite           # Database
+│       ├── <system>.sqlite       # Database
 │       └── seed/                 # Seed data (imported or AI-generated)
 ├── tools/                        # CLI utilities
 └── aide-frame/                   # Framework (symlink)
 ```
 
-### Data Flow
+## Data Flow
 
 ```
 Markdown Definition
@@ -446,22 +504,6 @@ Views    Extended Schema
        ↓
    Browser UI
 ```
-
----
-
-## Key Innovations
-
-| Feature | Traditional Approach | AIDE Framework |
-|---------|---------------------|----------------|
-| Schema Definition | XML, YAML, or code | Markdown tables |
-| FK Display | Raw IDs or extra queries | SQL Views with labels |
-| Type Validation | Code annotations | Markdown patterns |
-| Seed Data | Manual JSON files | AI-generated from descriptions |
-| Relationship Navigation | Flat lists | Infinite-depth tree with cycle detection |
-| Cross-Entity Views | Custom SQL or reporting tools | Config-driven dot-notation FK joins + back-reference subqueries |
-| Entity Grouping | Folder structure | Color-coded areas in UI |
-
----
 
 ## API Reference
 
@@ -494,31 +536,69 @@ GET    /api/audit/schema/extended         # Audit schema for UI
 
 ## Configuration
 
-Edit `app/config.json`:
+### System Configuration
+
+Each system has its own `config.json` in `app/systems/<name>/`.
+Use `app/config_sample.json` as template for new systems.
 
 ```json
 {
   "port": 18354,
-  "crud": {
-    "enabledEntities": ["Aircraft", "Operator", "Registration", ...]
+  "log_level": "INFO",
+  "titleHtml": "<img src='/icons/logo.png'>My System",
+  "auth": {
+    "enabled": true,
+    "passwords": { "admin": "$2b$10$...", "user": "$2b$10$..." },
+    "sessionSecret": "change-in-production",
+    "sessionTimeout": 86400
   },
-  "views": [
-    "-------------------- Fleet Analysis",
-    { "name": "Engine Status", "base": "EngineAllocation", "columns": ["..."] }
-  ],
-  "llm": {
-    "active": "gemini",
-    "providers": {
-      "gemini": { "apiKey": "...", "model": "gemini-2.0-flash-lite" },
-      "anthropic": { "apiKey": "...", "model": "claude-sonnet-4-20250514" }
-    }
-  }
+  "pagination": { "threshold": 100, "pageSize": 100 },
+  "pwa": {
+    "enabled": true,
+    "name": "My System",
+    "short_name": "SYS",
+    "theme_color": "#2563eb"
+  },
+  "layout": { "default": "page-fill", "allow_toggle": false },
+  "docsEditable": true,
+  "helpEditable": false
 }
 ```
 
+### UI Configuration (Markdown)
+
+Entity visibility and views are defined in `docs/requirements/ui/`:
+
+**Crud.md** — Which entities appear in the UI:
+```markdown
+# CRUD
+
+## Engine Management
+- Engine
+- EngineEvent
+
+## Operations
+- Aircraft
+- Operator
+```
+
+**Views.md** — Cross-entity join views:
+```markdown
+# Views
+
+## Engine Management
+
+### Engine Status
+```
+```json
+{ "base": "EngineAllocation", "columns": ["engine.serial_number AS ESN", "aircraft.registration"] }
+```
+
+See [Views Configuration](procedures/views-config.md) for the full syntax.
+
 ---
 
-## Feature Backlog
+# FEATURE BACKLOG
 
 Ideas for future development:
 
@@ -561,6 +641,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 - [ ] Drag & Drop column reordering
 - [ ] Saved filter presets
 - [ ] Dark mode
+- [ ] Accessibility (ARIA labels, high-contrast mode, screen reader support)
 
 ### Visualization
 - [ ] Simple charts (count by status, by type)
@@ -568,15 +649,25 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 
 ---
 
-## See Also
+# Reference & Procedures
 
-- [IRMA User Guide](/help) – How to use the demonstration application
+### Technical Framework
+
 - [aide-frame Repository](https://github.com/aide-examples/aide-frame) – The underlying framework
 
-## Procedures
+### Reference
 
+- [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
+- [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships
+- [Seed Data](seed-data.md) – Import, export, and AI-generate test data
+
+### Procedures
+
+- [Create New System](procedures/system-create.md) – AI-assisted system creation via Model Builder
+- [Add Entity](procedures/entity-add.md) – Step-by-step guide for adding new entities
+- [Add Attribute](procedures/attribute-add.md) – Adding attributes to existing entities
+- [Diagram Workflow](procedures/diagram-workflow.md) – Creating and editing data model diagrams
 - [Database Features](procedures/database-features.md) – WAL mode, system columns, optimistic concurrency, audit trail
 - [Views Configuration](procedures/views-config.md) – Cross-entity join views with dot-notation FK paths
 - [Filter Dialogs](procedures/filter-dialogs.md) – Pre-load filters for large datasets (required/prefilter, text/dropdown/year/month, AND logic)
 - [Schema Migration](procedures/schema-migration.md) – Reinitialize database schema without server restart
-- [Seed Data](seed-data.md) – Import, export, and AI-generate test data
