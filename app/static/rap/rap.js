@@ -2,6 +2,50 @@
  * AIDE RAP - Client-side initialization
  */
 
+/**
+ * Try login via URL parameters
+ * Supports: ?user=admin&password=xxx or ?user=admin&pwh=<sha256-hash>
+ * Password is hashed client-side before transmission
+ * URL is cleaned after login attempt to remove credentials from history
+ * @returns {Promise<boolean>} true if login succeeded
+ */
+async function tryUrlLogin() {
+  const params = new URLSearchParams(location.search);
+  const user = params.get('user');
+  const password = params.get('password');
+  const pwh = params.get('pwh');
+
+  // Need user role and either password or pre-hashed password
+  if (!user || (!password && !pwh)) {
+    return false;
+  }
+
+  try {
+    // Use pre-hashed password or hash the plaintext password
+    const hash = pwh || (password ? await sha256(password) : '');
+
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: user, hash })
+    });
+
+    // Clean URL to remove credentials from browser history
+    const cleanUrl = location.pathname + (params.size > 2 ? '?' + (() => {
+      params.delete('user');
+      params.delete('password');
+      params.delete('pwh');
+      return params.toString();
+    })() : '');
+    history.replaceState({}, '', cleanUrl || location.pathname);
+
+    return res.ok;
+  } catch (e) {
+    console.error('URL login failed:', e);
+    return false;
+  }
+}
+
 (async () => {
   try {
     // Initialize Framework i18n
@@ -64,12 +108,20 @@
         // Auth enabled - check session
         const authRes = await fetch('/api/auth/me');
         if (authRes.status === 401) {
-          // Not authenticated - show login dialog
-          await LoginDialog.show();
-          return; // Stop initialization until login completes
+          // Not authenticated - try URL-parameter login first
+          const urlLoginSuccess = await tryUrlLogin();
+          if (!urlLoginSuccess) {
+            // No URL params or login failed - show login dialog
+            await LoginDialog.show();
+            return; // Stop initialization until login completes
+          }
+          // URL login succeeded - continue initialization
+          const meRes = await fetch('/api/auth/me');
+          window.currentUser = await meRes.json();
+        } else {
+          // Already authenticated
+          window.currentUser = await authRes.json();
         }
-        // Store current user for permission checks
-        window.currentUser = await authRes.json();
       }
 
       // Add user indicator to status footer

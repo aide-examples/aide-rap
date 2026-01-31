@@ -2,9 +2,13 @@
  * Authentication Router
  * Handles login, logout, and session management
  * Emits: auth:login:after, auth:login:failed, auth:logout:after
+ *
+ * Password verification uses SHA-256:
+ * - Client hashes password with SHA-256 before sending
+ * - Server compares received hash against stored hash
+ * - No plaintext passwords travel over the network
  */
 const express = require('express');
-const bcrypt = require('bcrypt');
 const eventBus = require('../utils/EventBus');
 
 module.exports = function(cfg) {
@@ -55,36 +59,35 @@ module.exports = function(cfg) {
 
     /**
      * POST /api/auth/login
-     * Body: { role: 'admin'|'user'|'guest', password: string }
+     * Body: { role: 'admin'|'user'|'guest', hash: string }
+     * Client sends SHA-256 hash of password (not plaintext)
      * Sets session cookie on success
      */
     router.post('/api/auth/login', express.json(), async (req, res) => {
-        const { role, password } = req.body;
+        const { role, hash: receivedHash } = req.body;
 
         // Validate role
         if (!['admin', 'user', 'guest'].includes(role)) {
             return res.status(400).json({ error: 'Invalid role' });
         }
 
-        // Get password hash for role
-        const hash = passwords[role];
+        // Get stored password hash for role
+        const storedHash = passwords[role];
 
         // Admin always requires password
         if (role === 'admin') {
-            if (!hash) {
+            if (!storedHash) {
                 return res.status(403).json({ error: 'Admin account not configured' });
             }
 
-            const valid = await bcrypt.compare(password || '', hash);
-            if (!valid) {
+            if (receivedHash !== storedHash) {
                 eventBus.emit('auth:login:failed', { role, reason: 'invalid_password', ip: req.ip });
                 return res.status(401).json({ error: 'Invalid password' });
             }
         } else {
             // user/guest: if hash is empty, allow access without password
-            if (hash) {
-                const valid = await bcrypt.compare(password || '', hash);
-                if (!valid) {
+            if (storedHash) {
+                if (receivedHash !== storedHash) {
                     eventBus.emit('auth:login:failed', { role, reason: 'invalid_password', ip: req.ip });
                     return res.status(401).json({ error: 'Invalid password' });
                 }

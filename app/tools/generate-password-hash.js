@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Generate bcrypt password hash for AIDE RAP authentication
+ * Generate SHA-256 password hash for AIDE RAP authentication
  *
  * Usage:
  *   node app/tools/generate-password-hash.js <password>
  *
  * Example:
  *   node app/tools/generate-password-hash.js mysecretpassword
- *   # Output: $2b$10$xYz...
+ *   # Output: 5e884898da28047d1650f25e4ca478eb...
  *
  * Copy the output hash to your system's config.json:
  *   {
@@ -19,9 +19,12 @@
  *       }
  *     }
  *   }
+ *
+ * The password is hashed client-side (browser) before transmission,
+ * so only the SHA-256 hash travels over the network.
  */
 
-const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 const password = process.argv[2];
 
@@ -33,5 +36,5 @@ if (!password) {
     process.exit(1);
 }
 
-const hash = bcrypt.hashSync(password, 10);
+const hash = crypto.createHash('sha256').update(password).digest('hex');
 console.log(hash);

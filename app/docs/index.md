@@ -548,7 +548,7 @@ Use `app/config_sample.json` as template for new systems.
   "titleHtml": "<img src='/icons/logo.png'>My System",
   "auth": {
     "enabled": true,
-    "passwords": { "admin": "$2b$10$...", "user": "$2b$10$..." },
+    "passwords": { "admin": "<sha256-hash>", "user": "" },
     "sessionSecret": "change-in-production",
     "sessionTimeout": 86400
   },
@@ -595,6 +595,46 @@ Entity visibility and views are defined in `docs/requirements/ui/`:
 ```
 
 See [Views Configuration](procedures/views-config.md) for the full syntax.
+
+### Authentication
+
+Enable authentication in `config.json`:
+
+```json
+{
+  "auth": {
+    "enabled": true,
+    "passwords": {
+      "admin": "<sha256-hash>",
+      "user": "",
+      "guest": ""
+    },
+    "sessionSecret": "change-in-production",
+    "sessionTimeout": 86400
+  }
+}
+```
+
+**Generate password hash:**
+```bash
+node app/tools/generate-password-hash.js mypassword
+# Output: 5e884898da28047d1650f25e4ca478eb...
+```
+
+**Roles:**
+- `admin` – Full access, always requires password
+- `user` – Standard access, password optional (empty = no password required)
+- `guest` – Read-only access, password optional
+
+**URL-Login for Bookmarks:**
+```
+http://server/?user=admin&password=mypassword
+http://server/?user=admin&pwh=5e884898da28047d...
+```
+
+Passwords are hashed client-side (SHA-256) before transmission. URL is cleaned after login to prevent credentials in browser history.
+
+**Disable auth:** Start server with `--noauth` flag or set `"enabled": false`.
 
 ---
 
