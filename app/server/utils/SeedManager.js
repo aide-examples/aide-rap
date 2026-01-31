@@ -924,8 +924,12 @@ function clearEntity(entityName) {
   }
 
   // Check for FK constraints - are there entities that reference this one?
+  // Skip self-references (they will be deleted along with the entity's data)
   const backRefs = schema.inverseRelationships[entityName] || [];
   for (const ref of backRefs) {
+    // Self-references don't block clearing - deleting all records handles them
+    if (ref.entity === entityName) continue;
+
     const refEntity = schema.entities[ref.entity];
     if (refEntity) {
       const refCount = db.prepare(`SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${ref.column} IS NOT NULL`).get().count;
