@@ -11,7 +11,7 @@ Aggregate types allow you to define a single logical field in your data model th
 | Aggregate Type | Expands to | Canonical Format |
 |----------------|------------|------------------|
 | `geo` | `{name}_latitude`, `{name}_longitude` | `"48.1371, 11.5754"` |
-| `address` | `{name}_street`, `{name}_city`, `{name}_zip`, `{name}_country` | *(planned)* |
+| `address` | `{name}_street`, `{name}_city`, `{name}_zip`, `{name}_country` | `"{zip} {city}"` |
 
 ---
 
@@ -189,21 +189,57 @@ A tracking device fixed at the cradle of an EngineStand.
 
 ---
 
-## Future Aggregate Types
+## Built-in: `address`
 
-### `address` (planned)
+Postal address stored as four TEXT columns.
+
+### Usage in Entity Markdown
 
 ```markdown
-| headquarters | address | Main office location | 22335 Hamburg |
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| headquarters | address | Main office location | 22335 Hamburg, Weg beim Jäger 193 |
+| office | address | Branch office address | 80995 Munich |
 ```
 
-Expands to:
-- `{name}_street` (TEXT)
-- `{name}_city` (TEXT)
-- `{name}_zip` (TEXT)
-- `{name}_country` (TEXT)
+### Generated Database Columns
 
-Canonical: `"{zip} {city}, {street}"`
+```sql
+headquarters_street TEXT,
+headquarters_city TEXT,
+headquarters_zip TEXT,
+headquarters_country TEXT
+```
+
+### Field Specification
+
+| Subfield | SQL Type | Description |
+|----------|----------|-------------|
+| `street` | TEXT | Street address |
+| `city` | TEXT | City name |
+| `zip` | TEXT | Postal/ZIP code |
+| `country` | TEXT | Country name |
+
+### Seed Data Format
+
+```json
+{
+  "headquarters": {
+    "street": "Weg beim Jäger 193",
+    "city": "Hamburg",
+    "zip": "22335",
+    "country": "Germany"
+  }
+}
+```
+
+### Canonical Format
+
+The canonical display format is: `"{zip} {city}"` (e.g., "22335 Hamburg")
+
+---
+
+## Future Aggregate Types
 
 ### Custom Aggregates (planned)
 

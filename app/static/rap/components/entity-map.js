@@ -32,13 +32,17 @@ const EntityMap = {
   },
 
   /**
-   * Check if schema has geo columns
+   * Check if schema has geo columns (latitude/longitude pairs)
+   * Works with 'geo' type and 'address' type (which includes lat/lng)
    * @param {Object} schema - View schema (columns) or entity schema (columns)
    * @returns {boolean}
    */
   hasGeoColumns(schema) {
     if (!schema || !schema.columns) return false;
-    return schema.columns.some(c => c.aggregateType === 'geo');
+    // Look for latitude/longitude fields regardless of aggregate type (geo or address)
+    const hasLat = schema.columns.some(c => c.aggregateField === 'latitude');
+    const hasLng = schema.columns.some(c => c.aggregateField === 'longitude');
+    return hasLat && hasLng;
   },
 
   /**
@@ -54,25 +58,17 @@ const EntityMap = {
     // Normalize columns to unified format (entity uses 'name', view uses 'key')
     const columns = this.normalizeColumns(schema.columns);
 
-    // Find geo columns (aggregateType === 'geo')
-    const geoColumns = columns.filter(c => c.aggregateType === 'geo');
-
-    if (geoColumns.length === 0) {
-      this.container.innerHTML = '<p class="empty-message">No geo column found</p>';
-      return;
-    }
-
-    // Find latitude and longitude columns
-    const latCol = geoColumns.find(c => c.aggregateField === 'latitude');
-    const lngCol = geoColumns.find(c => c.aggregateField === 'longitude');
+    // Find latitude and longitude columns (works for both 'geo' and 'address' types)
+    const latCol = columns.find(c => c.aggregateField === 'latitude');
+    const lngCol = columns.find(c => c.aggregateField === 'longitude');
 
     if (!latCol || !lngCol) {
-      this.container.innerHTML = '<p class="empty-message">Geo columns incomplete (need latitude + longitude)</p>';
+      this.container.innerHTML = '<p class="empty-message">No geo columns found (need latitude + longitude)</p>';
       return;
     }
 
-    // Get label column: first non-geo column, or use schema.labelField if available
-    const labelColumn = columns.find(c => c.aggregateType !== 'geo') || columns[0];
+    // Get label column: first column that's not lat/lng
+    const labelColumn = columns.find(c => c.aggregateField !== 'latitude' && c.aggregateField !== 'longitude') || columns[0];
 
     // Clear container and create map div
     this.container.innerHTML = `<div id="entity-map" class="entity-map-canvas"></div>`;

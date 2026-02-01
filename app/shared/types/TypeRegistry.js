@@ -117,10 +117,12 @@ class TypeRegistry {
           { name: 'street', type: 'string', sqlType: 'TEXT', required: false },
           { name: 'city', type: 'string', sqlType: 'TEXT', required: false },
           { name: 'zip', type: 'string', sqlType: 'TEXT', required: false },
-          { name: 'country', type: 'string', sqlType: 'TEXT', required: false }
+          { name: 'country', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'latitude', type: 'number', sqlType: 'REAL', required: false },
+          { name: 'longitude', type: 'number', sqlType: 'REAL', required: false }
         ],
         canonical: '{zip} {city}, {street}',
-        description: 'Postal address (street, city, zip, country)'
+        description: 'Postal address with geocoded coordinates'
       }
     };
   }

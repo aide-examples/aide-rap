@@ -673,6 +673,58 @@
     text-transform: capitalize;
 }
 
+/* Geocoded lat/lng fields in address type */
+.form-fieldset.aggregate-group .aggregate-subfield.geocoded-field {
+    opacity: 0.7;
+}
+
+.form-fieldset.aggregate-group .aggregate-subfield.geocoded-field .form-input {
+    background: var(--color-gray-100);
+    cursor: not-allowed;
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.form-fieldset.aggregate-group .aggregate-subfield.geocoded-field .form-input:not(:placeholder-shown) {
+    background: #e8f5e9;
+    border-color: #81c784;
+}
+
+.geocoded-hint {
+    font-size: 0.7rem;
+    color: var(--color-gray-400);
+    font-weight: normal;
+    margin-left: 4px;
+}
+
+/* Address map container */
+.address-map-container {
+    margin-bottom: 12px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color-dark);
+}
+
+.address-map-container.hidden {
+    display: none;
+}
+
+/* Address map button */
+.form-fieldset.aggregate-group legend .address-map-btn {
+    margin-left: 4px;
+    padding: 2px 6px;
+    font-size: 0.9rem;
+    background: transparent;
+    border: 1px solid var(--border-color-dark);
+    border-radius: 4px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.form-fieldset.aggregate-group legend .address-map-btn:hover {
+    background: var(--color-gray-100);
+}
+
 /* Geo map toggle button in legend */
 .form-fieldset.aggregate-group legend .geo-map-toggle {
     margin-left: 8px;
@@ -764,43 +816,89 @@
     color: var(--color-gray-700);
 }
 
+/* Geo search modal overlay */
+.geo-search-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
 /* Geo search dialog */
 .geo-search-dialog {
     max-width: 500px;
     width: 90vw;
+    background: white;
     border: none;
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     padding: 0;
 }
 
-.geo-search-dialog::backdrop {
-    background: rgba(0, 0, 0, 0.5);
-}
-
 .geo-search-dialog .dialog-content {
     padding: 20px;
 }
 
-.geo-search-dialog h3 {
-    margin: 0 0 16px;
+.geo-search-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color-dark);
+}
+
+.geo-search-header h3 {
+    margin: 0;
     font-size: 1.1rem;
 }
 
-.geo-search-form {
+.geo-search-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--color-gray-500);
+    padding: 0;
+    line-height: 1;
+}
+
+.geo-search-close:hover {
+    color: var(--color-gray-700);
+}
+
+.geo-search-input-row {
     display: flex;
     gap: 8px;
-    margin-bottom: 16px;
+    padding: 16px 20px;
 }
 
 .geo-search-input {
     flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color-dark);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.geo-search-submit {
+    padding: 8px 12px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
 .geo-search-results {
     max-height: 300px;
     overflow-y: auto;
-    margin-bottom: 16px;
+    padding: 0 20px 16px;
 }
 
 .geo-search-result {
@@ -2885,7 +2983,7 @@
 .seed-preview-table {
     border-collapse: collapse;
     font-size: 0.8rem;
-    white-space: nowrap;
+    width: 100%;
 }
 
 .seed-preview-table th {
@@ -2902,10 +3000,6 @@
 .seed-preview-table td {
     padding: 6px 10px;
     border-bottom: 1px solid var(--border-color);
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .seed-preview-table tr:hover td {
@@ -2927,6 +3021,16 @@
 .seed-url-link:hover {
     text-decoration: underline;
     color: var(--color-primary-dark, #1d4ed8);
+}
+
+/* JSON values in seed preview (aggregate types like address, geo) */
+.seed-json-value {
+    font-family: monospace;
+    font-size: 0.75rem;
+    background: var(--color-gray-100);
+    padding: 2px 4px;
+    border-radius: 3px;
+    color: var(--color-gray-600);
 }
 
 /* Generator Validation Info */

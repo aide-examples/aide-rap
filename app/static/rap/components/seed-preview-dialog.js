@@ -233,10 +233,17 @@ const SeedPreviewDialog = {
   },
 
   /**
-   * Format a cell value (make URLs clickable, parse markdown links)
+   * Format a cell value (make URLs clickable, parse markdown links, show objects as JSON)
    */
   formatCellValue(value) {
     if (value === null || value === undefined) return '';
+
+    // Handle objects (like aggregate types: address, geo) as inline JSON
+    if (typeof value === 'object') {
+      const json = JSON.stringify(value);
+      return `<code class="seed-json-value">${DomUtils.escapeHtml(json)}</code>`;
+    }
+
     const str = String(value);
 
     // Check for markdown link [text](url)

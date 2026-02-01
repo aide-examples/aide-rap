@@ -57,6 +57,7 @@ const EntityForm = {
         const groupCols = aggregateGroups[groupName];
         const typeName = col.aggregateType || 'geo';
         const isGeo = typeName === 'geo';
+        const isAddress = typeName === 'address';
 
         html += `
           <fieldset class="form-fieldset aggregate-group" data-aggregate="${groupName}" data-aggregate-type="${typeName}">
@@ -67,10 +68,17 @@ const EntityForm = {
                 <button type="button" class="geo-reverse-btn btn-icon" title="Show address">📍</button>
                 <button type="button" class="geo-map-toggle btn-icon" title="Toggle map">🗺️</button>
               ` : ''}
+              ${isAddress ? `
+                <button type="button" class="address-search-btn btn-icon" title="Search address">🔍</button>
+                <button type="button" class="address-map-btn btn-icon" title="Show on map">🗺️</button>
+              ` : ''}
             </legend>
             ${isGeo ? `
               <div class="geo-address-display hidden" data-aggregate="${groupName}"></div>
               <div class="geo-map-container hidden" data-aggregate="${groupName}"><div class="geo-map" id="geo-map-${groupName}"></div></div>
+            ` : ''}
+            ${isAddress ? `
+              <div class="address-map-container hidden" data-aggregate="${groupName}"><div class="geo-map" id="address-map-${groupName}"></div></div>
             ` : ''}
             <div class="aggregate-fields">`;
 
@@ -86,10 +94,17 @@ const EntityForm = {
           // Determine input type based on column type (number vs string)
           const inputType = subCol.type === 'number' ? 'number' : 'text';
           const stepAttr = subCol.type === 'number' ? 'step="any"' : '';
+
+          // For address type: make lat/lng readonly with special styling
+          const isGeoField = isAddress && (subCol.aggregateField === 'latitude' || subCol.aggregateField === 'longitude');
+          const readonlyAttr = isGeoField ? 'readonly' : '';
+          const geoClass = isGeoField ? 'geocoded-field' : '';
+          const geoHint = isGeoField ? '<span class="geocoded-hint">📍 via Adresssuche</span>' : '';
+
           html += `
-              <div class="form-field aggregate-subfield">
-                <label class="form-label" for="field-${subCol.name}">${subLabel}</label>
-                <input type="${inputType}" ${stepAttr} class="form-input"
+              <div class="form-field aggregate-subfield ${geoClass}">
+                <label class="form-label" for="field-${subCol.name}">${subLabel} ${geoHint}</label>
+                <input type="${inputType}" ${stepAttr} ${readonlyAttr} class="form-input"
                        id="field-${subCol.name}" name="${subCol.name}"
                        value="${value !== null && value !== undefined ? value : ''}">
               </div>`;
@@ -159,6 +174,9 @@ const EntityForm = {
 
     // Initialize geo map handlers
     this.initGeoMaps();
+
+    // Initialize address search handlers
+    this.initAddressSearch();
   },
 
   /**
@@ -257,6 +275,192 @@ const EntityForm = {
         lngInput.addEventListener('change', updateHandler);
       }
     });
+  },
+
+  /**
+   * Initialize address search handlers for address aggregate fields
+   */
+  initAddressSearch() {
+    const addressGroups = document.querySelectorAll('.aggregate-group[data-aggregate-type="address"]');
+
+    addressGroups.forEach(group => {
+      const aggregateName = group.dataset.aggregate;
+      const searchBtn = group.querySelector('.address-search-btn');
+      const mapBtn = group.querySelector('.address-map-btn');
+      const mapContainer = group.querySelector('.address-map-container');
+      const mapDiv = group.querySelector('.geo-map');
+
+      if (searchBtn) {
+        searchBtn.addEventListener('click', () => this.openAddressSearchDialog(aggregateName, group));
+      }
+
+      // Map toggle button for address
+      if (mapBtn && mapContainer && mapDiv) {
+        mapBtn.addEventListener('click', () => {
+          const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+          const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+          const lat = parseFloat(latInput?.value);
+          const lng = parseFloat(lngInput?.value);
+
+          if (isNaN(lat) || isNaN(lng)) {
+            alert('Keine Koordinaten vorhanden. Bitte erst eine Adresse suchen.');
+            return;
+          }
+
+          const isHidden = mapContainer.classList.contains('hidden');
+          if (isHidden) {
+            mapContainer.classList.remove('hidden');
+
+            // Initialize map for address (reuse geo map infrastructure)
+            if (!this.geoMaps[aggregateName]) {
+              this.initLeafletMap(aggregateName, group, mapDiv);
+            } else {
+              setTimeout(() => this.geoMaps[aggregateName].map.invalidateSize(), 10);
+            }
+            this.updateGeoMarker(aggregateName, group);
+          } else {
+            mapContainer.classList.add('hidden');
+          }
+        });
+      }
+    });
+  },
+
+  /**
+   * Open address search dialog for address aggregate fields
+   */
+  openAddressSearchDialog(aggregateName, group) {
+    // Collect existing address values for pre-fill
+    const streetInput = group.querySelector(`[name="${aggregateName}_street"]`);
+    const cityInput = group.querySelector(`[name="${aggregateName}_city"]`);
+    const zipInput = group.querySelector(`[name="${aggregateName}_zip"]`);
+    const countryInput = group.querySelector(`[name="${aggregateName}_country"]`);
+
+    const parts = [
+      streetInput?.value?.trim(),
+      zipInput?.value?.trim(),
+      cityInput?.value?.trim(),
+      countryInput?.value?.trim()
+    ].filter(Boolean);
+    const defaultQuery = parts.join(', ');
+
+    // Create modal dialog
+    const modal = document.createElement('div');
+    modal.className = 'geo-search-modal';
+    modal.innerHTML = `
+      <div class="geo-search-dialog">
+        <div class="geo-search-header">
+          <h3>Adresse suchen</h3>
+          <button type="button" class="geo-search-close btn-icon">×</button>
+        </div>
+        <div class="geo-search-input-row">
+          <input type="text" class="geo-search-input" placeholder="Adresse eingeben..." autofocus>
+          <button type="button" class="geo-search-submit btn-icon">🔍</button>
+        </div>
+        <div class="geo-search-results"></div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const input = modal.querySelector('.geo-search-input');
+    const submitBtn = modal.querySelector('.geo-search-submit');
+    const closeBtn = modal.querySelector('.geo-search-close');
+    const resultsDiv = modal.querySelector('.geo-search-results');
+
+    // Pre-fill with existing address
+    if (defaultQuery) {
+      input.value = defaultQuery;
+    }
+
+    const doSearch = async () => {
+      const query = input.value.trim();
+      if (!query) return;
+
+      resultsDiv.innerHTML = '<div class="loading">Suche...</div>';
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`;
+        const results = await this.throttledGeoRequest(url);
+
+        if (results.length === 0) {
+          resultsDiv.innerHTML = '<div class="no-results">Keine Ergebnisse gefunden</div>';
+          return;
+        }
+
+        resultsDiv.innerHTML = results.map((r, i) => `
+          <div class="geo-search-result" data-index="${i}">
+            <strong>${r.display_name.split(',')[0]}</strong>
+            <small>${r.display_name}</small>
+          </div>
+        `).join('');
+
+        // Click handler for results
+        resultsDiv.querySelectorAll('.geo-search-result').forEach((el, i) => {
+          el.addEventListener('click', () => {
+            const result = results[i];
+            this.fillAddressFields(aggregateName, group, result);
+            modal.remove();
+          });
+        });
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="error">Fehler: ${err.message}</div>`;
+      }
+    };
+
+    submitBtn.addEventListener('click', doSearch);
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') doSearch();
+    });
+
+    closeBtn.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+
+    input.focus();
+  },
+
+  /**
+   * Fill address fields from Nominatim result (including geocoded lat/lng)
+   */
+  fillAddressFields(aggregateName, group, result) {
+    const addr = result.address || {};
+
+    // Map Nominatim fields to our address fields
+    const streetInput = group.querySelector(`[name="${aggregateName}_street"]`);
+    const cityInput = group.querySelector(`[name="${aggregateName}_city"]`);
+    const zipInput = group.querySelector(`[name="${aggregateName}_zip"]`);
+    const countryInput = group.querySelector(`[name="${aggregateName}_country"]`);
+    const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+    const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+
+    // Build street from road + house_number
+    let street = '';
+    if (addr.road) {
+      street = addr.road;
+      if (addr.house_number) {
+        street += ' ' + addr.house_number;
+      }
+    }
+
+    // City: try multiple fields (city, town, village, municipality)
+    const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || '';
+
+    // ZIP code
+    const zip = addr.postcode || '';
+
+    // Country
+    const country = addr.country || '';
+
+    if (streetInput) streetInput.value = street;
+    if (cityInput) cityInput.value = city;
+    if (zipInput) zipInput.value = zip;
+    if (countryInput) countryInput.value = country;
+
+    // Fill geocoded coordinates from Nominatim result
+    if (latInput && result.lat) latInput.value = result.lat;
+    if (lngInput && result.lon) lngInput.value = result.lon;
   },
 
   /**

@@ -155,7 +155,7 @@ The system automatically:
 | Aggregate | Expands to | Status |
 |-----------|------------|--------|
 | `geo` | `{name}_latitude`, `{name}_longitude` | Available |
-| `address` | `{name}_street`, `{name}_city`, `{name}_zip`, `{name}_country` | Planned |
+| `address` | `{name}_street`, `{name}_city`, `{name}_zip`, `{name}_country` | Available |
 
 See [Aggregate Types](aggregate-types.md) for full reference.
 
