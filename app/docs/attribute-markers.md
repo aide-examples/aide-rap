@@ -24,7 +24,9 @@ Type annotations are placed in the **Type column** after the type name.
 | Tag | Description | Effect |
 |-----|-------------|--------|
 | `[OPTIONAL]` | Nullable field | Column allows NULL values |
-| `[DEFAULT=x]` | Explicit default value | Used for migration (ALTER TABLE) and NEW forms |
+| `[DEFAULT=x]` | Explicit default value | SQL DEFAULT clause, **implies OPTIONAL** |
+
+> **Note:** `[DEFAULT=x]` automatically makes the field optional. If there's a default value, the field doesn't need to be provided during INSERT.
 
 ### Hierarchical Default System
 
