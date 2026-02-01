@@ -63,24 +63,30 @@ class TypeParser {
     const types = {};
     const lines = content.split('\n');
 
-    let currentSection = null;  // 'pattern' or 'enum' or 'inline-enum'
+    let currentSection = null;  // 'pattern' or 'enum' or 'inline-enum' or 'aggregate'
     let currentTypeName = null; // For both pattern and enum types with ### headers
     let currentEnumValues = [];
+    let currentAggregateFields = []; // For aggregate types
+    let currentCanonical = null; // Canonical format for aggregates
     let currentDescription = ''; // Description text between ### header and table
     let inlineEnums = {};  // Type name -> values (for inline enum format)
     let inTable = false;
     let tableHeaders = [];
+    let isAggregate = false; // Flag for current type being an aggregate
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
 
       // Detect section headers
       if (line.startsWith('## Pattern Types') || line.startsWith('## Pattern')) {
-        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentDescription, scope, types);
+        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentAggregateFields, currentCanonical, currentDescription, scope, types, isAggregate);
         currentSection = 'pattern';
         currentTypeName = null;
         currentEnumValues = [];
+        currentAggregateFields = [];
+        currentCanonical = null;
         currentDescription = '';
+        isAggregate = false;
         this._flushInlineEnums(inlineEnums, scope, types);
         inlineEnums = {};
         inTable = false;
@@ -88,28 +94,56 @@ class TypeParser {
       }
 
       if (line.startsWith('## Enum Types') || line.startsWith('## Enum')) {
-        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentDescription, scope, types);
+        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentAggregateFields, currentCanonical, currentDescription, scope, types, isAggregate);
         currentSection = 'enum';
         currentTypeName = null;
         currentEnumValues = [];
+        currentAggregateFields = [];
+        currentCanonical = null;
         currentDescription = '';
+        isAggregate = false;
         this._flushInlineEnums(inlineEnums, scope, types);
         inlineEnums = {};
         inTable = false;
         continue;
       }
 
-      // Detect type name (### TypeName) - works for both pattern and enum sections
+      // Detect type name (### TypeName or ### TypeName [AGGREGATE])
       if (line.startsWith('### ')) {
-        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentDescription, scope, types);
-        currentTypeName = line.substring(4).trim();
+        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentAggregateFields, currentCanonical, currentDescription, scope, types, isAggregate);
+        let typeLine = line.substring(4).trim();
+
+        // Check for [AGGREGATE] marker
+        isAggregate = typeLine.includes('[AGGREGATE]');
+        if (isAggregate) {
+          typeLine = typeLine.replace(/\s*\[AGGREGATE\]\s*/i, '').trim();
+        }
+
+        currentTypeName = typeLine;
         currentEnumValues = [];
+        currentAggregateFields = [];
+        currentCanonical = null;
         currentDescription = '';
         inTable = false;
-        // If no section set, default to enum (for entity-local types)
-        if (!currentSection) {
+
+        // If aggregate marker found, set section to aggregate
+        if (isAggregate) {
+          currentSection = 'aggregate';
+        } else if (!currentSection) {
+          // If no section set, default to enum (for entity-local types)
           currentSection = 'enum';
         }
+        continue;
+      }
+
+      // Capture Canonical: line for aggregate types
+      if (isAggregate && line.toLowerCase().startsWith('canonical:')) {
+        let canonical = line.substring(10).trim();
+        // Strip backticks if present
+        if (canonical.startsWith('`') && canonical.endsWith('`')) {
+          canonical = canonical.slice(1, -1);
+        }
+        currentCanonical = canonical;
         continue;
       }
 
@@ -198,6 +232,13 @@ class TypeParser {
               inlineEnums[inlineEnum.typeName].push(inlineEnum.value);
             }
           }
+          // Aggregate types with [AGGREGATE] marker: | Field | Type | Description |
+          else if (isAggregate && currentTypeName && tableHeaders.includes('field') && tableHeaders.includes('type')) {
+            const aggregateField = this._parseAggregateFieldRow(cells, tableHeaders);
+            if (aggregateField) {
+              currentAggregateFields.push(aggregateField);
+            }
+          }
         }
       } else {
         // Non-table line - reset table state
@@ -209,7 +250,7 @@ class TypeParser {
     }
 
     // Flush any remaining type
-    this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentDescription, scope, types);
+    this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentAggregateFields, currentCanonical, currentDescription, scope, types, isAggregate);
 
     // Flush inline enums
     this._flushInlineEnums(inlineEnums, scope, types);
@@ -218,11 +259,23 @@ class TypeParser {
   }
 
   /**
-   * Flushes the current type (pattern or enum) to registry
+   * Flushes the current type (pattern, enum, or aggregate) to registry
    * @private
    */
-  _flushCurrentType(section, name, enumValues, description, scope, types) {
+  _flushCurrentType(section, name, enumValues, aggregateFields, canonical, description, scope, types, isAggregate) {
     if (!name) return;
+
+    // Register aggregate type
+    if (isAggregate && aggregateFields.length > 0) {
+      this.registry.registerAggregate(name, aggregateFields, { canonical, description }, scope);
+      types[name] = {
+        kind: 'aggregate',
+        fields: [...aggregateFields],
+        canonical: canonical || aggregateFields.map(f => `{${f.name}}`).join(', '),
+        description
+      };
+      return;
+    }
 
     // Register enum if we have values - table format determines type, not section
     // (enums with Internal/External columns can appear under ## Pattern Types)
@@ -309,7 +362,8 @@ class TypeParser {
     return lowerCells.includes('type') ||
            lowerCells.includes('pattern') ||
            lowerCells.includes('internal') ||
-           lowerCells.includes('external');
+           lowerCells.includes('external') ||
+           lowerCells.includes('field');  // For aggregate types
   }
 
   /**
@@ -395,6 +449,48 @@ class TypeParser {
         external: cells[externalIdx],
         description: descIdx >= 0 ? cells[descIdx] || '' : ''
       }
+    };
+  }
+
+  /**
+   * Parses an aggregate field row
+   * Format: | Field | Type | Description |
+   * @param {string[]} cells - Cell values
+   * @param {string[]} headers - Column headers
+   * @returns {Object|null} - { name, type, required }
+   * @private
+   */
+  _parseAggregateFieldRow(cells, headers) {
+    const fieldIdx = headers.indexOf('field');
+    const typeIdx = headers.indexOf('type');
+    const descIdx = headers.indexOf('description');
+
+    if (fieldIdx === -1 || typeIdx === -1) return null;
+    if (!cells[fieldIdx] || !cells[typeIdx]) return null;
+
+    const fieldName = cells[fieldIdx].trim();
+    let fieldType = cells[typeIdx].trim().toLowerCase();
+    const description = descIdx >= 0 ? cells[descIdx] || '' : '';
+
+    // Check for [OPTIONAL] marker in description
+    const required = !description.toLowerCase().includes('[optional]');
+
+    // Normalize type names
+    if (fieldType === 'integer') fieldType = 'int';
+    if (fieldType === 'text') fieldType = 'string';
+    if (fieldType === 'real' || fieldType === 'float' || fieldType === 'double') fieldType = 'number';
+
+    // Only allow primitive types (no nested aggregates, no FKs)
+    const allowedTypes = ['string', 'int', 'number', 'date', 'bool', 'boolean', 'mail', 'url'];
+    if (!allowedTypes.includes(fieldType)) {
+      console.warn(`TypeParser: Aggregate field '${fieldName}' has unsupported type '${fieldType}', using 'string'`);
+      fieldType = 'string';
+    }
+
+    return {
+      name: fieldName,
+      type: fieldType,
+      required
     };
   }
 

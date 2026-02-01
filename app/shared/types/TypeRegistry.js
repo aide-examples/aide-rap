@@ -177,6 +177,41 @@ class TypeRegistry {
   }
 
   /**
+   * Registers an aggregate type (composite type that expands to multiple columns)
+   * @param {string} name - Type name
+   * @param {Array<Object>} fields - Array of { name, type, required }
+   * @param {Object} [options] - Additional options
+   * @param {string} [options.canonical] - Canonical format string e.g. '{field1}, {field2}'
+   * @param {string} [options.description] - Type description
+   * @param {string} [scope='global'] - Scope
+   */
+  registerAggregate(name, fields, options = {}, scope = 'global') {
+    // Map field types to SQL types
+    const typeToSql = {
+      string: 'TEXT',
+      int: 'INTEGER',
+      number: 'REAL',
+      date: 'TEXT',
+      bool: 'INTEGER',
+      boolean: 'INTEGER',
+      mail: 'TEXT',
+      url: 'TEXT'
+    };
+
+    this.register(name, {
+      kind: 'aggregate',
+      fields: fields.map(f => ({
+        name: f.name,
+        type: f.type === 'int' ? 'number' : (f.type === 'bool' ? 'boolean' : f.type),
+        sqlType: typeToSql[f.type] || 'TEXT',
+        required: f.required !== false
+      })),
+      canonical: options.canonical || fields.map(f => `{${f.name}}`).join(', '),
+      description: options.description || ''
+    }, scope);
+  }
+
+  /**
    * Checks if a type exists
    * @param {string} name - Type name
    * @param {string} [entityName] - Entity context for local types
