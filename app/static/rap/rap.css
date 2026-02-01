@@ -1423,6 +1423,7 @@
 .entity-table {
     border-collapse: collapse;
     font-size: 0.85rem;
+    width: 100%;
 }
 
 .entity-table thead {
@@ -1502,6 +1503,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Aggregate canonical columns (address, contact, etc.) - allow word wrap */
+.entity-table td.aggregate-cell {
+    max-width: 280px;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.3;
 }
 
 .entity-table tbody tr {
