@@ -9,7 +9,12 @@
  * - detail-panel.js
  */
 
+// System columns that are hidden by default (version, timestamps)
+const SYSTEM_COLUMNS = ['version', 'created_at', 'updated_at'];
+
 const ColumnUtils = {
+  // Expose SYSTEM_COLUMNS for components that need it
+  SYSTEM_COLUMNS,
   /**
    * Get the label field name for a column
    * For FK columns (ending in _id), returns the corresponding _label field
@@ -43,13 +48,17 @@ const ColumnUtils = {
   },
 
   /**
-   * Get visible columns (excluding hidden fields)
+   * Get visible columns (excluding hidden fields and optionally system columns)
    * @param {Object} schema - Schema with columns and ui.hiddenFields
+   * @param {boolean} showSystem - Whether to include system columns (default: false)
    * @returns {Array} - Filtered columns array
    */
-  getVisibleColumns(schema) {
+  getVisibleColumns(schema, showSystem = false) {
     const hiddenFields = schema.ui?.hiddenFields || [];
-    return schema.columns.filter(col => !hiddenFields.includes(col.name));
+    return schema.columns.filter(col =>
+      !hiddenFields.includes(col.name) &&
+      (showSystem || !SYSTEM_COLUMNS.includes(col.name))
+    );
   },
 
   /**

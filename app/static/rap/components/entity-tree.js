@@ -200,6 +200,7 @@ const EntityTree = {
             referencePosition: this.referencePosition,
             attributeLayout: this.attributeLayout,
             showCycles: this.showCycles,
+            showSystem: EntityTable.showSystem, // Shared with EntityTable
             backRefPreviewLimit: this.treeConfig?.backRefPreviewLimit || 10
         };
     },

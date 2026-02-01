@@ -1,7 +1,7 @@
 /**
  * Detail Panel Component
  * Right side panel for viewing/editing records
- * Uses SYSTEM_COLUMNS from entity-table.js (loaded earlier)
+ * Uses SYSTEM_COLUMNS from ColumnUtils (via entity-table.js)
  */
 const DetailPanel = {
   panel: null,

@@ -47,7 +47,8 @@ const TreeRenderer = {
         let html = `<div class="tree-node-content ${isRowLayout ? 'layout-row' : 'layout-list'}">`;
 
         // Separate columns into regular attributes, outbound FKs, and prepare back-references
-        let columns = schema.columns.filter(col => !schema.ui?.hiddenFields?.includes(col.name));
+        // Use ColumnUtils to filter hidden and system columns
+        let columns = ColumnUtils.getVisibleColumns(schema, context.showSystem);
 
         // Sort columns if needed
         if (context.attributeOrder === 'alpha') {
@@ -247,7 +248,7 @@ const TreeRenderer = {
             let html = '<div class="tree-fk-content">';
 
             // Separate regular columns and FK columns
-            const allCols = schema.columns.filter(col => !schema.ui?.hiddenFields?.includes(col.name));
+            const allCols = ColumnUtils.getVisibleColumns(schema, context.showSystem);
             const regularCols = allCols.filter(col => !col.foreignKey);
             const fkCols = allCols.filter(col => col.foreignKey && record[col.name]);
 
@@ -461,10 +462,9 @@ const TreeRenderer = {
     async renderBackRefRowContent(entityName, record, schema, visitedPath, context) {
         let html = '<div class="backref-row-expanded">';
 
-        // Get FK columns that have values
-        const fkCols = schema.columns.filter(col =>
-            col.foreignKey && record[col.name] && !schema.ui?.hiddenFields?.includes(col.name)
-        );
+        // Get FK columns that have values (respecting hidden and system column settings)
+        const visibleCols = ColumnUtils.getVisibleColumns(schema, context.showSystem);
+        const fkCols = visibleCols.filter(col => col.foreignKey && record[col.name]);
 
         // Render FKs recursively
         for (const col of fkCols) {

@@ -3,8 +3,8 @@
  * Sortable, scrollable table view for entity records
  */
 
-// System columns that are hidden by default (version, timestamps)
-const SYSTEM_COLUMNS = ['version', 'created_at', 'updated_at'];
+// Use SYSTEM_COLUMNS from ColumnUtils (loaded before this file)
+const SYSTEM_COLUMNS = ColumnUtils.SYSTEM_COLUMNS;
 
 const EntityTable = {
   container: null,
@@ -372,10 +372,8 @@ const EntityTable = {
   getVisibleColumns() {
     if (!this.schema) return [];
 
-    let columns = this.schema.columns.filter(col =>
-      !this.schema.ui?.hiddenFields?.includes(col.name) &&
-      (this.showSystem || !SYSTEM_COLUMNS.includes(col.name))
-    );
+    // Use ColumnUtils for consistent hidden/system column filtering
+    let columns = ColumnUtils.getVisibleColumns(this.schema, this.showSystem);
 
     // Collapse aggregate sub-fields into canonical columns
     const aggregateSources = new Map();  // sourceName -> { type, subCols }
