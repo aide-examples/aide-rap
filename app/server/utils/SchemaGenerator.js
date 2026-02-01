@@ -391,7 +391,9 @@ function decodeHtmlEntities(text) {
 /**
  * Extract type annotations from type string
  * Supported: [DEFAULT=x], [OPTIONAL]
- * e.g., "MaintenanceCategory [DEFAULT=A]" -> { type: "MaintenanceCategory", default: "A", optional: false }
+ * Note: [DEFAULT=x] implies [OPTIONAL] - if there's a default, the field is not required
+ *
+ * e.g., "MaintenanceCategory [DEFAULT=A]" -> { type: "MaintenanceCategory", default: "A", optional: true }
  * e.g., "EngineType [OPTIONAL]" -> { type: "EngineType", default: null, optional: true }
  * e.g., "int" -> { type: "int", default: null, optional: false }
  */
@@ -404,6 +406,7 @@ function extractTypeAnnotations(typeStr) {
   if (defaultMatch) {
     defaultValue = defaultMatch[1].trim();
     type = type.replace(/\s*\[DEFAULT=[^\]]+\]/i, '').trim();
+    optional = true;  // DEFAULT implies OPTIONAL
   }
 
   if (/\[OPTIONAL\]/i.test(type)) {
@@ -875,6 +878,21 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
       sqlType = 'INTEGER PRIMARY KEY';
     } else if (isRequired && !foreignKey) {
       sqlType += ' NOT NULL';
+    }
+
+    // Add DEFAULT clause if explicit default is specified
+    if (attr.explicitDefault !== null && attr.explicitDefault !== '' && name !== 'id') {
+      // Format default value based on type
+      if (typeInfo.jsType === 'boolean') {
+        // Convert true/false to 1/0 for SQLite
+        const boolVal = attr.explicitDefault.toLowerCase() === 'true' ? 1 : 0;
+        sqlType += ` DEFAULT ${boolVal}`;
+      } else if (typeInfo.jsType === 'number') {
+        sqlType += ` DEFAULT ${attr.explicitDefault}`;
+      } else {
+        // String/text values need quotes
+        sqlType += ` DEFAULT '${attr.explicitDefault.replace(/'/g, "''")}'`;
+      }
     }
 
     // Parse UI annotations
