@@ -13,6 +13,9 @@ const EntityForm = {
   isDirty: false,
 
   async render(container, entityName, record = null) {
+    // Cleanup existing map instances
+    this.cleanupGeoMaps();
+
     this.currentEntity = entityName;
     this.currentRecord = record;
     this.isDirty = false;
@@ -53,10 +56,15 @@ const EntityForm = {
 
         const groupCols = aggregateGroups[groupName];
         const typeName = col.aggregateType || 'geo';
+        const isGeo = typeName === 'geo';
 
         html += `
-          <fieldset class="form-fieldset aggregate-group" data-aggregate="${groupName}">
-            <legend>${groupName} <span class="aggregate-type">(${typeName})</span></legend>
+          <fieldset class="form-fieldset aggregate-group" data-aggregate="${groupName}" data-aggregate-type="${typeName}">
+            <legend>
+              ${groupName} <span class="aggregate-type">(${typeName})</span>
+              ${isGeo ? `<button type="button" class="geo-map-toggle btn-icon" title="Toggle map">🗺️</button>` : ''}
+            </legend>
+            ${isGeo ? `<div class="geo-map-container hidden" data-aggregate="${groupName}"><div class="geo-map" id="geo-map-${groupName}"></div></div>` : ''}
             <div class="aggregate-fields">`;
 
         for (const subCol of groupCols) {
@@ -138,6 +146,151 @@ const EntityForm = {
 
     // Initialize media field handlers
     this.initMediaFields();
+
+    // Initialize geo map handlers
+    this.initGeoMaps();
+  },
+
+  /**
+   * Cleanup existing Leaflet map instances to prevent memory leaks
+   */
+  cleanupGeoMaps() {
+    for (const name in this.geoMaps) {
+      if (this.geoMaps[name]?.map) {
+        this.geoMaps[name].map.remove();
+      }
+    }
+    this.geoMaps = {};
+  },
+
+  /**
+   * Initialize geo field map toggles and Leaflet maps
+   */
+  geoMaps: {},  // Store map instances by aggregate name
+
+  initGeoMaps() {
+    const geoGroups = document.querySelectorAll('.aggregate-group[data-aggregate-type="geo"]');
+
+    geoGroups.forEach(group => {
+      const aggregateName = group.dataset.aggregate;
+      const toggleBtn = group.querySelector('.geo-map-toggle');
+      const mapContainer = group.querySelector('.geo-map-container');
+      const mapDiv = group.querySelector('.geo-map');
+
+      if (!toggleBtn || !mapContainer || !mapDiv) return;
+
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = mapContainer.classList.contains('hidden');
+
+        if (isHidden) {
+          mapContainer.classList.remove('hidden');
+
+          // Initialize map if not already done
+          if (!this.geoMaps[aggregateName]) {
+            this.initLeafletMap(aggregateName, group, mapDiv);
+          } else {
+            // Invalidate size when showing (Leaflet needs this)
+            setTimeout(() => this.geoMaps[aggregateName].map.invalidateSize(), 10);
+          }
+
+          // Update marker position from current field values
+          this.updateGeoMarker(aggregateName, group);
+          toggleBtn.textContent = '🗺️';
+          toggleBtn.title = 'Hide map';
+        } else {
+          mapContainer.classList.add('hidden');
+          toggleBtn.title = 'Show map';
+        }
+      });
+
+      // Update marker when coordinate fields change
+      const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+      const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+
+      if (latInput && lngInput) {
+        const updateHandler = () => {
+          if (this.geoMaps[aggregateName]) {
+            this.updateGeoMarker(aggregateName, group);
+          }
+        };
+        latInput.addEventListener('change', updateHandler);
+        lngInput.addEventListener('change', updateHandler);
+      }
+    });
+  },
+
+  /**
+   * Initialize a Leaflet map for a geo aggregate field
+   */
+  initLeafletMap(aggregateName, group, mapDiv) {
+    // Get current coordinates or use default (central Europe)
+    const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+    const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+
+    let lat = parseFloat(latInput?.value) || 48.1351;  // Munich as default
+    let lng = parseFloat(lngInput?.value) || 11.5820;
+    const hasCoords = latInput?.value && lngInput?.value;
+
+    // Create map
+    const map = L.map(mapDiv).setView([lat, lng], hasCoords ? 13 : 4);
+
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Create marker (draggable)
+    const marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+
+    // Update fields when marker is dragged
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      if (latInput) {
+        latInput.value = pos.lat.toFixed(6);
+        latInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (lngInput) {
+        lngInput.value = pos.lng.toFixed(6);
+        lngInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      this.checkDirty();
+    });
+
+    // Click on map to set marker position
+    map.on('click', (e) => {
+      marker.setLatLng(e.latlng);
+      if (latInput) {
+        latInput.value = e.latlng.lat.toFixed(6);
+        latInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (lngInput) {
+        lngInput.value = e.latlng.lng.toFixed(6);
+        lngInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      this.checkDirty();
+    });
+
+    this.geoMaps[aggregateName] = { map, marker };
+  },
+
+  /**
+   * Update marker position from field values
+   */
+  updateGeoMarker(aggregateName, group) {
+    const mapData = this.geoMaps[aggregateName];
+    if (!mapData) return;
+
+    const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+    const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+
+    const lat = parseFloat(latInput?.value);
+    const lng = parseFloat(lngInput?.value);
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      mapData.marker.setLatLng([lat, lng]);
+      mapData.map.setView([lat, lng], mapData.map.getZoom() < 10 ? 13 : mapData.map.getZoom());
+    }
   },
 
   /**

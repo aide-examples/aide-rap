@@ -673,6 +673,45 @@
     text-transform: capitalize;
 }
 
+/* Geo map toggle button in legend */
+.form-fieldset.aggregate-group legend .geo-map-toggle {
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 0.9rem;
+    background: transparent;
+    border: 1px solid var(--border-color-dark);
+    border-radius: 4px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.form-fieldset.aggregate-group legend .geo-map-toggle:hover {
+    background: var(--color-gray-100);
+}
+
+/* Geo map container */
+.geo-map-container {
+    margin-bottom: 12px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color-dark);
+}
+
+.geo-map-container.hidden {
+    display: none;
+}
+
+.geo-map {
+    height: 200px;
+    width: 100%;
+    z-index: 1;
+}
+
+/* Leaflet popup style override */
+.leaflet-popup-content-wrapper {
+    border-radius: 6px;
+}
+
 .form-label {
     font-size: 0.85rem;
     font-weight: 500;
