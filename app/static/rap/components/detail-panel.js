@@ -1,7 +1,7 @@
 /**
  * Detail Panel Component
  * Right side panel for viewing/editing records
- * Uses SYSTEM_COLUMNS from ColumnUtils (via entity-table.js)
+ * Uses ColumnUtils.SYSTEM_COLUMNS for system column filtering
  */
 const DetailPanel = {
   panel: null,
@@ -146,7 +146,7 @@ const DetailPanel = {
 
     for (const col of schema.columns) {
       // Skip system columns unless toggle is enabled
-      if (!this.showSystem && SYSTEM_COLUMNS.includes(col.name)) continue;
+      if (!this.showSystem && ColumnUtils.SYSTEM_COLUMNS.includes(col.name)) continue;
 
       const value = record[col.name];
       let displayValue;

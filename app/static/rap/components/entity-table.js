@@ -1,10 +1,8 @@
 /**
  * Entity Table Component
  * Sortable, scrollable table view for entity records
+ * Uses ColumnUtils.SYSTEM_COLUMNS for system column filtering
  */
-
-// Use SYSTEM_COLUMNS from ColumnUtils (loaded before this file)
-const SYSTEM_COLUMNS = ColumnUtils.SYSTEM_COLUMNS;
 
 const EntityTable = {
   container: null,
