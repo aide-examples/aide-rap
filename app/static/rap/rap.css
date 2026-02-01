@@ -712,6 +712,136 @@
     border-radius: 6px;
 }
 
+/* Geo search and reverse buttons */
+.form-fieldset.aggregate-group legend .geo-search-btn,
+.form-fieldset.aggregate-group legend .geo-reverse-btn {
+    margin-left: 4px;
+    padding: 2px 6px;
+    font-size: 0.9rem;
+    background: transparent;
+    border: 1px solid var(--border-color-dark);
+    border-radius: 4px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.form-fieldset.aggregate-group legend .geo-search-btn:hover,
+.form-fieldset.aggregate-group legend .geo-reverse-btn:hover {
+    background: var(--color-gray-100);
+}
+
+/* Geo address display */
+.geo-address-display {
+    padding: 8px 12px;
+    background: var(--color-blue-50);
+    border: 1px solid var(--color-blue-200);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.geo-address-display.hidden {
+    display: none;
+}
+
+.geo-address-text {
+    flex: 1;
+}
+
+.geo-address-close {
+    padding: 0 4px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--color-gray-500);
+}
+
+.geo-address-close:hover {
+    color: var(--color-gray-700);
+}
+
+/* Geo search dialog */
+.geo-search-dialog {
+    max-width: 500px;
+    width: 90vw;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    padding: 0;
+}
+
+.geo-search-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.geo-search-dialog .dialog-content {
+    padding: 20px;
+}
+
+.geo-search-dialog h3 {
+    margin: 0 0 16px;
+    font-size: 1.1rem;
+}
+
+.geo-search-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.geo-search-input {
+    flex: 1;
+}
+
+.geo-search-results {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+}
+
+.geo-search-result {
+    padding: 10px 12px;
+    border: 1px solid var(--border-color-dark);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.geo-search-result:hover {
+    background: var(--color-gray-100);
+}
+
+.geo-search-result strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.geo-search-result small {
+    color: var(--color-gray-500);
+    font-size: 0.8rem;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.geo-search-results .loading,
+.geo-search-results .no-results,
+.geo-search-results .error {
+    padding: 12px;
+    text-align: center;
+    color: var(--color-gray-500);
+}
+
+.geo-search-results .error {
+    color: var(--color-danger);
+}
+
 .form-label {
     font-size: 0.85rem;
     font-weight: 500;

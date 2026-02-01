@@ -62,9 +62,16 @@ const EntityForm = {
           <fieldset class="form-fieldset aggregate-group" data-aggregate="${groupName}" data-aggregate-type="${typeName}">
             <legend>
               ${groupName} <span class="aggregate-type">(${typeName})</span>
-              ${isGeo ? `<button type="button" class="geo-map-toggle btn-icon" title="Toggle map">🗺️</button>` : ''}
+              ${isGeo ? `
+                <button type="button" class="geo-search-btn btn-icon" title="Search address">🔍</button>
+                <button type="button" class="geo-reverse-btn btn-icon" title="Show address">📍</button>
+                <button type="button" class="geo-map-toggle btn-icon" title="Toggle map">🗺️</button>
+              ` : ''}
             </legend>
-            ${isGeo ? `<div class="geo-map-container hidden" data-aggregate="${groupName}"><div class="geo-map" id="geo-map-${groupName}"></div></div>` : ''}
+            ${isGeo ? `
+              <div class="geo-address-display hidden" data-aggregate="${groupName}"></div>
+              <div class="geo-map-container hidden" data-aggregate="${groupName}"><div class="geo-map" id="geo-map-${groupName}"></div></div>
+            ` : ''}
             <div class="aggregate-fields">`;
 
         for (const subCol of groupCols) {
@@ -168,14 +175,44 @@ const EntityForm = {
    */
   geoMaps: {},  // Store map instances by aggregate name
 
+  // Rate limiting for Nominatim API (1 request per second)
+  lastGeoRequest: 0,
+
+  async throttledGeoRequest(url) {
+    const now = Date.now();
+    const elapsed = now - this.lastGeoRequest;
+    if (elapsed < 1000) {
+      await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+    }
+    this.lastGeoRequest = Date.now();
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    return response.json();
+  },
+
   initGeoMaps() {
     const geoGroups = document.querySelectorAll('.aggregate-group[data-aggregate-type="geo"]');
 
     geoGroups.forEach(group => {
       const aggregateName = group.dataset.aggregate;
       const toggleBtn = group.querySelector('.geo-map-toggle');
+      const searchBtn = group.querySelector('.geo-search-btn');
+      const reverseBtn = group.querySelector('.geo-reverse-btn');
       const mapContainer = group.querySelector('.geo-map-container');
       const mapDiv = group.querySelector('.geo-map');
+      const addressDisplay = group.querySelector('.geo-address-display');
+
+      // Search button: open address search dialog
+      if (searchBtn) {
+        searchBtn.addEventListener('click', () => this.openGeoSearchDialog(aggregateName, group));
+      }
+
+      // Reverse button: show address from current coordinates
+      if (reverseBtn) {
+        reverseBtn.addEventListener('click', () => this.showReverseGeocode(aggregateName, group, addressDisplay));
+      }
 
       if (!toggleBtn || !mapContainer || !mapDiv) return;
 
@@ -290,6 +327,163 @@ const EntityForm = {
     if (!isNaN(lat) && !isNaN(lng)) {
       mapData.marker.setLatLng([lat, lng]);
       mapData.map.setView([lat, lng], mapData.map.getZoom() < 10 ? 13 : mapData.map.getZoom());
+    }
+  },
+
+  /**
+   * Open address search dialog for geocoding
+   */
+  async openGeoSearchDialog(aggregateName, group) {
+    // Create modal dialog for address search
+    const existingDialog = document.getElementById('geo-search-dialog');
+    if (existingDialog) existingDialog.remove();
+
+    const dialog = document.createElement('dialog');
+    dialog.id = 'geo-search-dialog';
+    dialog.className = 'geo-search-dialog';
+    dialog.innerHTML = `
+      <div class="dialog-content">
+        <h3>🔍 Adresse suchen</h3>
+        <div class="geo-search-form">
+          <input type="text" class="form-input geo-search-input" placeholder="Adresse eingeben..." autofocus>
+          <button type="button" class="btn-primary geo-search-submit">Suchen</button>
+        </div>
+        <div class="geo-search-results"></div>
+        <div class="dialog-buttons">
+          <button type="button" class="btn-secondary geo-search-cancel">Abbrechen</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+
+    const input = dialog.querySelector('.geo-search-input');
+    const submitBtn = dialog.querySelector('.geo-search-submit');
+    const cancelBtn = dialog.querySelector('.geo-search-cancel');
+    const resultsDiv = dialog.querySelector('.geo-search-results');
+
+    const doSearch = async () => {
+      const query = input.value.trim();
+      if (!query) return;
+
+      resultsDiv.innerHTML = '<div class="loading">Suche...</div>';
+
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
+        const results = await this.throttledGeoRequest(url);
+
+        if (results.length === 0) {
+          resultsDiv.innerHTML = '<div class="no-results">Keine Ergebnisse gefunden</div>';
+          return;
+        }
+
+        resultsDiv.innerHTML = results.map((r, i) => `
+          <div class="geo-search-result" data-index="${i}">
+            <strong>${r.display_name.split(',')[0]}</strong>
+            <small>${r.display_name}</small>
+          </div>
+        `).join('');
+
+        // Click handler for results
+        resultsDiv.querySelectorAll('.geo-search-result').forEach((el, i) => {
+          el.addEventListener('click', () => {
+            const result = results[i];
+            this.applyGeoSearchResult(aggregateName, group, result);
+            dialog.close();
+            dialog.remove();
+          });
+        });
+
+      } catch (err) {
+        resultsDiv.innerHTML = `<div class="error">Fehler: ${err.message}</div>`;
+      }
+    };
+
+    submitBtn.addEventListener('click', doSearch);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doSearch();
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      dialog.close();
+      dialog.remove();
+    });
+
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.close();
+        dialog.remove();
+      }
+    });
+
+    dialog.showModal();
+    input.focus();
+  },
+
+  /**
+   * Apply selected geocoding result to fields
+   */
+  applyGeoSearchResult(aggregateName, group, result) {
+    const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+    const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+
+    if (latInput) {
+      latInput.value = parseFloat(result.lat).toFixed(6);
+      latInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (lngInput) {
+      lngInput.value = parseFloat(result.lon).toFixed(6);
+      lngInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Update map if visible
+    if (this.geoMaps[aggregateName]) {
+      this.updateGeoMarker(aggregateName, group);
+    }
+
+    this.checkDirty();
+  },
+
+  /**
+   * Show reverse geocoding result (coordinates → address)
+   */
+  async showReverseGeocode(aggregateName, group, addressDisplay) {
+    const latInput = group.querySelector(`[name="${aggregateName}_latitude"]`);
+    const lngInput = group.querySelector(`[name="${aggregateName}_longitude"]`);
+
+    const lat = parseFloat(latInput?.value);
+    const lng = parseFloat(lngInput?.value);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      addressDisplay.textContent = 'Keine Koordinaten vorhanden';
+      addressDisplay.classList.remove('hidden');
+      setTimeout(() => addressDisplay.classList.add('hidden'), 3000);
+      return;
+    }
+
+    addressDisplay.textContent = 'Lade Adresse...';
+    addressDisplay.classList.remove('hidden');
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
+      const result = await this.throttledGeoRequest(url);
+
+      if (result.error) {
+        addressDisplay.textContent = result.error;
+      } else {
+        addressDisplay.innerHTML = `
+          <span class="geo-address-text">${result.display_name}</span>
+          <button type="button" class="geo-address-close btn-icon" title="Schließen">×</button>
+        `;
+        addressDisplay.querySelector('.geo-address-close').addEventListener('click', () => {
+          addressDisplay.classList.add('hidden');
+        });
+      }
+    } catch (err) {
+      addressDisplay.textContent = `Fehler: ${err.message}`;
+      setTimeout(() => addressDisplay.classList.add('hidden'), 3000);
     }
   },
 
