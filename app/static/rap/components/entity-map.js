@@ -1,6 +1,7 @@
 /**
  * Entity Map Component
- * Displays view data on a Leaflet map with marker clustering
+ * Displays data on a Leaflet map with marker clustering
+ * Works with both Views and Entities
  */
 const EntityMap = {
   map: null,
@@ -14,21 +15,49 @@ const EntityMap = {
   },
 
   /**
-   * Load view data onto the map
-   * @param {Object} viewSchema - View schema with columns (including hasGeo)
-   * @param {Array} records - View data records
+   * Convert entity schema fields to unified column format
+   * @param {Object} schema - Entity schema with fields array
+   * @returns {Array} Columns in unified format
    */
-  loadView(viewSchema, records) {
+  entityFieldsToColumns(schema) {
+    if (!schema || !schema.fields) return [];
+    return schema.fields.map(f => ({
+      key: f.name,
+      label: f.label || f.name,
+      jsType: f.jsType,
+      aggregateType: f.aggregateType,
+      aggregateField: f.aggregateField
+    }));
+  },
+
+  /**
+   * Check if schema has geo columns
+   * @param {Object} schema - View schema (columns) or entity schema (fields)
+   * @returns {boolean}
+   */
+  hasGeoColumns(schema) {
+    const columns = schema.columns || this.entityFieldsToColumns(schema);
+    return columns.some(c => c.aggregateType === 'geo');
+  },
+
+  /**
+   * Load data onto the map (works with both views and entities)
+   * @param {Object} schema - View schema (with columns) or entity schema (with fields)
+   * @param {Array} records - Data records
+   */
+  load(schema, records) {
     if (!this.container) {
       this.container = document.getElementById('entity-map-container');
     }
 
+    // Normalize to columns format
+    const columns = schema.columns || this.entityFieldsToColumns(schema);
+
     // Find geo columns (aggregateType === 'geo')
-    // Geo columns are expanded into latitude/longitude with aggregateField
-    const geoColumns = viewSchema.columns.filter(c => c.aggregateType === 'geo');
+    const geoColumns = columns.filter(c => c.aggregateType === 'geo');
 
     if (geoColumns.length === 0) {
-      this.container.innerHTML = '<p class="empty-message">No geo column found in view</p>';
+      this.container.innerHTML = '<p class="empty-message">No geo column found</p>';
       return;
     }
 
@@ -41,8 +70,8 @@ const EntityMap = {
       return;
     }
 
-    // Get label column (first column in view)
-    const labelColumn = viewSchema.columns[0];
+    // Get label column: first non-geo column, or use schema.labelField if available
+    const labelColumn = columns.find(c => c.aggregateType !== 'geo') || columns[0];
 
     // Clear container and create map div
     this.container.innerHTML = `<div id="entity-map" class="entity-map-canvas"></div>`;
@@ -90,8 +119,8 @@ const EntityMap = {
       // Store label for later tooltip updates
       marker._labelText = String(label);
 
-      // Create popup content with all view columns
-      const popupContent = this.createPopup(record, viewSchema.columns, labelColumn.key, latCol.key, lngCol.key);
+      // Create popup content with all columns
+      const popupContent = this.createPopup(record, columns, labelColumn.key, latCol.key, lngCol.key);
       marker.bindPopup(popupContent, { maxWidth: 300 });
 
       // Add tooltip (permanent based on current setting)

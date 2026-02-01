@@ -20,6 +20,7 @@ const EntityExplorer = {
   btnViewTreeV: null,
   btnViewMap: null,
   currentEntity: null,
+  currentEntitySchema: null, // Cached entity schema for map rendering
   currentView: null, // null = entity mode, object = view mode { name, base, color }
   entityMetadata: {}, // Map of entity name -> { readonly, system, ... }
   records: [],
@@ -694,7 +695,7 @@ const EntityExplorer = {
   async onEntityChange() {
     const entityName = this.selectorValue;
 
-    // Restore tree buttons (may have been hidden in view mode), hide map controls
+    // Restore tree buttons (may have been hidden in view mode), hide map controls initially
     this.btnViewTreeH.style.display = '';
     this.btnViewTreeV.style.display = '';
     this.btnViewMap.style.display = 'none';
@@ -707,6 +708,7 @@ const EntityExplorer = {
 
     if (!entityName) {
       this.currentEntity = null;
+      this.currentEntitySchema = null;
       this.records = [];
       this.prefilterFields = null;
       this.requiredFilterFields = null;
@@ -723,10 +725,18 @@ const EntityExplorer = {
     let defaultSort = null;
     try {
       const schema = await SchemaCache.getExtended(entityName);
+      this.currentEntitySchema = schema;
       this.prefilterFields = schema.prefilter || null;
       this.requiredFilterFields = schema.requiredFilter || null;
       defaultSort = schema.ui?.tableOptions?.defaultSort || null;
+
+      // Show map button if entity has geo field
+      if (EntityMap.hasGeoColumns(schema)) {
+        this.btnViewMap.style.display = '';
+        this.mapLabelsToggle.style.display = '';
+      }
     } catch (e) {
+      this.currentEntitySchema = null;
       this.prefilterFields = null;
       this.requiredFilterFields = null;
     }
@@ -742,6 +752,7 @@ const EntityExplorer = {
   async onViewChange(viewName, baseName, color) {
     this.currentView = { name: viewName, base: baseName, color };
     this.currentEntity = null;
+    this.currentEntitySchema = null;
     this.selectedId = null;
     this.records = [];
     this.prefilterFields = null;
@@ -1028,18 +1039,27 @@ const EntityExplorer = {
   },
 
   renderMap() {
-    if (!this.currentView || !this.currentViewSchema) {
-      this.mapContainer.innerHTML = `<p class="empty-message">Select a view with geo data</p>`;
+    // View mode
+    if (this.currentView && this.currentViewSchema) {
+      if (this.records.length === 0) {
+        this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+        return;
+      }
+      EntityMap.load(this.currentViewSchema, this.records);
       return;
     }
 
-    if (this.records.length === 0) {
-      this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+    // Entity mode
+    if (this.currentEntity && this.currentEntitySchema) {
+      if (this.records.length === 0) {
+        this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+        return;
+      }
+      EntityMap.load(this.currentEntitySchema, this.records);
       return;
     }
 
-    // Delegate to EntityMap component
-    EntityMap.loadView(this.currentViewSchema, this.records);
+    this.mapContainer.innerHTML = `<p class="empty-message">Select a view or entity with geo data</p>`;
   },
 
   async renderTable() {
