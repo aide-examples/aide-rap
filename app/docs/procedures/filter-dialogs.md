@@ -90,6 +90,22 @@ The threshold and page size are configured globally:
 | `threshold` | 500 | Show prefilter dialog when `total > threshold` |
 | `pageSize` | 200 | Records per page when paginating |
 
+### Tree View Config (config.json)
+
+The Tree View back-reference preview can be limited to show only the first N items:
+
+```json
+{
+  "tree": {
+    "backRefPreviewLimit": 10
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `backRefPreviewLimit` | 10 | Maximum number of back-references to show initially (header shows "10 of 136" if limited) |
+
 ---
 
 ## Field Path Syntax

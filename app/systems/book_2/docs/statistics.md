@@ -2,7 +2,7 @@
 
 Lines of code for the **book_2** system.
 
-*Generated: 2026-02-01 10:00*
+*Generated: 2026-02-01 11:11*
 
 ## Documentation
 
@@ -17,13 +17,13 @@ Lines of code for the **book_2** system.
 
 | Category | LOC |
 |----------|----:|
-| config.json | 44 |
+| config.json | 47 |
 | DataModel.yaml | 0 |
 | DataModel-layout.json | 51 |
-| **Subtotal** | **95** |
+| **Subtotal** | **98** |
 
 ## Total
 
 | Category | LOC |
 |----------|----:|
-| **System Total** | **448** |
+| **System Total** | **451** |

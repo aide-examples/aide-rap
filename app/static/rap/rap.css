@@ -1211,18 +1211,6 @@
     padding: 4px 0 4px 20px;
 }
 
-/* Nested FK link */
-.fk-link .fk-ref {
-    color: var(--color-primary);
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-}
-
-.fk-link .fk-ref:hover {
-    text-decoration-style: solid;
-}
-
 /* Back-references */
 .tree-backref-node {
     margin: 8px 0 4px 0;
@@ -1254,6 +1242,16 @@
 
 .tree-backref-content {
     padding: 4px 0 4px 20px;
+}
+
+/* "X more..." indicator when back-references are limited */
+.backref-more-indicator {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    color: var(--color-warning-dark);
+    font-style: italic;
+    border-top: 1px dashed #fcd34d;
+    margin-top: 4px;
 }
 
 /* Back-reference table */
@@ -1552,6 +1550,19 @@
 }
 
 .entity-table .fk-value:hover {
+    text-decoration-style: solid;
+    color: var(--color-primary-hover);
+}
+
+/* FK links in view tables (navigate to tree view) */
+.entity-table .fk-link {
+    color: var(--color-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+.entity-table .fk-link:hover {
     text-decoration-style: solid;
     color: var(--color-primary-hover);
 }

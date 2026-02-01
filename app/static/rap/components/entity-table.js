@@ -213,7 +213,15 @@ const EntityTable = {
           } else if (col.omit !== undefined && String(value) === col.omit) {
             // value matches omit rule: suppress
           } else {
-            displayValue = DomUtils.escapeHtml(String(value));
+            // Check for FK link (hidden _fk_ column contains the target id)
+            const fkId = col.fkEntity && col.fkIdColumn ? record[col.fkIdColumn] : null;
+            if (fkId != null) {
+              // Render as clickable link to tree view
+              const escaped = DomUtils.escapeHtml(String(value));
+              displayValue = `<a href="#" class="fk-link" data-entity="${col.fkEntity}" data-id="${fkId}">${escaped}</a>`;
+            } else {
+              displayValue = DomUtils.escapeHtml(String(value));
+            }
           }
         }
 
@@ -326,6 +334,19 @@ const EntityTable = {
         }
       });
       input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // FK link click → navigate to tree view with expand
+    this.container.querySelectorAll('.fk-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const entity = link.dataset.entity;
+        const id = parseInt(link.dataset.id);
+        if (entity && id) {
+          this.onNavigate(entity, id);
+        }
+      });
     });
 
     // Row click → jump to base entity edit
@@ -1039,20 +1060,13 @@ const EntityTable = {
   },
 
   /**
-   * Handle FK navigation
+   * Handle FK navigation - navigate to tree view with first level expanded
    */
   onNavigate(entityName, recordId) {
-    // Switch to the target entity and select the record
-    EntityExplorer.selectEntity(entityName);
-    setTimeout(() => {
-      EntityExplorer.selectedId = recordId;
-      const record = EntityExplorer.records.find(r => r.id === recordId);
-      if (record) {
-        DetailPanel.showRecord(entityName, record);
-        this.selectedId = recordId;
-        this.render();
-      }
-    }, 300);
+    // Navigate to tree view and expand first level
+    EntityTree.onNavigateAndExpand(entityName, recordId, { expandLevels: 1 });
+    // Switch to tree view mode
+    EntityExplorer.setViewMode('tree-h');
   },
 
   /**

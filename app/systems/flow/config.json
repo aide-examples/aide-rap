@@ -41,5 +41,8 @@
       "line2_color": "#ffffff",
       "line2_size": 0.38
     }
+  },
+  "tree": {
+    "backRefPreviewLimit": 10
   }
 }

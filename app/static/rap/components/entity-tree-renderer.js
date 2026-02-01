@@ -317,16 +317,22 @@ const TreeRenderer = {
 
             if (count === 0) continue;
 
+            // Determine if we're showing a limited preview
+            const limit = context.backRefPreviewLimit || 10;
+            const isLimited = count > limit;
+            const displayCount = isLimited ? `${limit} of ${count}` : `${count}`;
+
             html += `
             <div class="tree-backref-node ${isExpanded ? 'expanded' : ''}"
                  data-node-id="${nodeId}"
                  data-ref-entity="${ref.entity}"
                  data-ref-column="${ref.column}"
                  data-parent-entity="${entityName}"
-                 data-parent-id="${recordId}">
+                 data-parent-id="${recordId}"
+                 data-total-count="${count}">
               <div class="tree-backref-header" data-action="toggle-backref" style="background-color: ${areaColor};">
                 <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
-                <span class="backref-label">${ref.entity} [${count}]</span>
+                <span class="backref-label">${ref.entity} [${displayCount}]</span>
               </div>
           `;
 
@@ -357,6 +363,12 @@ const TreeRenderer = {
             const schema = await SchemaCache.getExtended(refEntity);
             const areaColor = schema.areaColor || '#f5f5f5';
 
+            // Apply preview limit
+            const limit = context.backRefPreviewLimit || 10;
+            const totalCount = refData.records.length;
+            const isLimited = totalCount > limit;
+            const displayRecords = isLimited ? refData.records.slice(0, limit) : refData.records;
+
             // Get visible columns and build display columns with FK labels using shared ColumnUtils
             const visibleCols = ColumnUtils.getVisibleColumns(schema);
             const displayCols = ColumnUtils.buildDisplayColumnsWithLabels(visibleCols);
@@ -370,7 +382,7 @@ const TreeRenderer = {
 
             // Build table rows with expand triangles and cycle detection
             let rowsHtml = '';
-            for (const record of refData.records) {
+            for (const record of displayRecords) {
                 const rowNodeId = `backref-row-${refEntity}-${record.id}-in-${entityName}-${recordId}`;
                 const rowPairKey = `${refEntity}-${record.id}`;
                 const isCycle = visitedPath.has(rowPairKey);
@@ -433,12 +445,18 @@ const TreeRenderer = {
                 }
             }
 
+            // Add "more..." indicator if limited
+            const moreIndicator = isLimited
+                ? `<div class="backref-more-indicator">${totalCount - limit} more...</div>`
+                : '';
+
             return `
             <div class="tree-backref-content">
               <table class="tree-backref-table">
                 <thead><tr>${headers}</tr></thead>
                 <tbody>${rowsHtml}</tbody>
               </table>
+              ${moreIndicator}
             </div>
           `;
         } catch (e) {

@@ -577,7 +577,7 @@ const EntityExplorer = {
     this.openDropdown();
   },
 
-  selectEntityFromDropdown(name, areaColor) {
+  async selectEntityFromDropdown(name, areaColor) {
     this.selectorValue = name;
     // Update trigger text
     const textSpan = this.selectorTrigger.querySelector('.entity-selector-text');
@@ -601,13 +601,13 @@ const EntityExplorer = {
       item.classList.remove('selected');
     });
 
-    this.onEntityChange();
+    await this.onEntityChange();
   },
 
-  selectEntity(entityName) {
+  async selectEntity(entityName) {
     const item = this.selectorMenu.querySelector(`[data-value="${entityName}"]`);
     if (item) {
-      this.selectEntityFromDropdown(entityName, item.dataset.color);
+      await this.selectEntityFromDropdown(entityName, item.dataset.color);
     }
   },
 

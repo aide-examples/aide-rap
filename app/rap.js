@@ -200,6 +200,10 @@ app.get('/api/config/pagination', (req, res) => {
     res.json(cfg.pagination || { threshold: 500, pageSize: 200 });
 });
 
+app.get('/api/config/tree', (req, res) => {
+    res.json(cfg.tree || { backRefPreviewLimit: 10 });
+});
+
 // =============================================================================
 // 7c. BACKEND INITIALIZATION (CRUD API)
 // =============================================================================

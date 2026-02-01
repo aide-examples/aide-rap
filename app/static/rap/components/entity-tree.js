@@ -19,10 +19,32 @@ const EntityTree = {
     attributeLayout: 'list', // 'row' (horizontal) or 'list' (vertical) - controlled by view mode buttons
     showCycles: false, // false = hide cycle nodes completely, true = show with cycle indicator (not expandable)
 
+    // Config from server
+    treeConfig: null, // { backRefPreviewLimit: 10 }
+
     init(containerId) {
         this.container = document.getElementById(containerId);
         this.state = new TreeState();
         this.initSortControls();
+        this.loadTreeConfig();
+    },
+
+    /**
+     * Load tree config from server
+     */
+    async loadTreeConfig() {
+        if (this.treeConfig) return this.treeConfig;
+        try {
+            const resp = await fetch('/api/config/tree');
+            if (resp.ok) {
+                this.treeConfig = await resp.json();
+            } else {
+                this.treeConfig = { backRefPreviewLimit: 10 };
+            }
+        } catch (e) {
+            this.treeConfig = { backRefPreviewLimit: 10 };
+        }
+        return this.treeConfig;
     },
 
     /**
@@ -130,13 +152,14 @@ const EntityTree = {
     },
 
     /**
-     * Recursively expand FK nodes to a given depth
+     * Recursively expand FK nodes and back-references to a given depth
      */
     async expandFKLevels(entityName, record, levelsRemaining, parentRecordId = null) {
         if (levelsRemaining <= 0) return;
 
         const schema = await SchemaCache.getExtended(entityName);
 
+        // Expand outbound FK nodes
         for (const col of schema.columns) {
             if (col.foreignKey && record[col.name]) {
                 const fkId = record[col.name];
@@ -157,6 +180,14 @@ const EntityTree = {
                 }
             }
         }
+
+        // Expand back-reference nodes (entities that reference this record)
+        if (schema.backReferences && schema.backReferences.length > 0) {
+            for (const ref of schema.backReferences) {
+                const backrefNodeId = `backref-${ref.entity}-to-${entityName}-${record.id}`;
+                this.state.expand(backrefNodeId);
+            }
+        }
     },
 
     /**
@@ -168,7 +199,8 @@ const EntityTree = {
             attributeOrder: this.attributeOrder,
             referencePosition: this.referencePosition,
             attributeLayout: this.attributeLayout,
-            showCycles: this.showCycles
+            showCycles: this.showCycles,
+            backRefPreviewLimit: this.treeConfig?.backRefPreviewLimit || 10
         };
     },
 
@@ -293,16 +325,6 @@ const EntityTree = {
             });
         });
 
-        // Click on FK reference link
-        this.container.querySelectorAll('.fk-ref').forEach(el => {
-            el.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const entityName = el.dataset.entity;
-                const recordId = parseInt(el.dataset.id);
-                this.onNavigate(entityName, recordId);
-            });
-        });
-
         // Click on FK entity type link (e.g., "(AircraftType)")
         this.container.querySelectorAll('[data-action="navigate-entity"]').forEach(el => {
             el.addEventListener('click', (e) => {
@@ -390,46 +412,39 @@ const EntityTree = {
     },
 
     /**
-     * Handle navigation to another entity
-     */
-    onNavigate(entityName, recordId) {
-        // Switch to the target entity and select the record
-        EntityExplorer.selectEntity(entityName);
-        // After loading, we need to select the specific record
-        setTimeout(() => {
-            EntityExplorer.selectedId = recordId;
-            EntityExplorer.updateSelection();
-            const record = EntityExplorer.records.find(r => r.id === recordId);
-            if (record) {
-                DetailPanel.showRecord(entityName, record);
-            }
-        }, 300);
-    },
-
-    /**
      * Handle navigation to another entity AND expand the target record
+     * @param {string} entityName - Target entity name
+     * @param {number} recordId - Target record ID
+     * @param {Object} [options] - Options
+     * @param {number} [options.expandLevels=0] - Number of FK levels to expand
      */
-    onNavigateAndExpand(entityName, recordId) {
-        // Switch to the target entity
-        EntityExplorer.selectEntity(entityName);
-        // After loading, select AND expand the specific record
-        setTimeout(() => {
-            const nodeId = `${entityName}-${recordId}`;
-            // Add to expanded nodes so it will be expanded when rendered
-            this.state.clear();
-            this.state.expand(nodeId);
-            this.state.setSelection(nodeId);
+    async onNavigateAndExpand(entityName, recordId, options = {}) {
+        const expandLevels = options.expandLevels || 0;
 
-            EntityExplorer.selectedId = recordId;
-            const record = EntityExplorer.records.find(r => r.id === recordId);
-            if (record) {
-                DetailPanel.showRecord(entityName, record);
-                // Re-render tree to show expanded state
-                this.currentEntity = entityName;
-                this.records = EntityExplorer.records;
-                this.render();
+        // Switch to the target entity and wait for records to load
+        await EntityExplorer.selectEntity(entityName);
+
+        const nodeId = `${entityName}-${recordId}`;
+        // Add to expanded nodes so it will be expanded when rendered
+        this.state.clear();
+        this.state.expand(nodeId);
+        this.state.setSelection(nodeId);
+
+        EntityExplorer.selectedId = recordId;
+        const record = EntityExplorer.records.find(r => r.id === recordId);
+        if (record) {
+            DetailPanel.showRecord(entityName, record);
+
+            // Expand FK levels if requested
+            if (expandLevels > 0) {
+                await this.expandFKLevels(entityName, record, expandLevels);
             }
-        }, 300);
+
+            // Re-render tree to show expanded state
+            this.currentEntity = entityName;
+            this.records = EntityExplorer.records;
+            this.render();
+        }
     },
 
     /**

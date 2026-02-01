@@ -69,6 +69,9 @@ module.exports = function() {
           if (c.aggregateSource) col.aggregateSource = c.aggregateSource;
           if (c.aggregateType) col.aggregateType = c.aggregateType;
           if (c.aggregateField) col.aggregateField = c.aggregateField;
+          // FK link metadata for navigation
+          if (c.fkEntity) col.fkEntity = c.fkEntity;
+          if (c.fkIdColumn) col.fkIdColumn = c.fkIdColumn;
           return col;
         }),
         ...(view.calculator ? { calculator: view.calculator } : {}),

@@ -210,12 +210,21 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
 
   const lastAlias = 'j_' + pathParts.join('_');
 
+  // Build FK link info for navigation
+  // fkEntity: target entity name for the link
+  // fkIdExpr: SQL expression to get the FK target's id
+  const fkInfo = {
+    fkEntity: currentEntity.className,
+    fkIdExpr: `${lastAlias}.id`
+  };
+
   return {
     joins,
     selectExpr: `${lastAlias}.${col.name}`,
     label: titleCase(col.displayName || col.name),
     jsType: col.jsType || 'string',
-    entityName: currentEntity.className
+    entityName: currentEntity.className,
+    fkInfo
   };
 }
 
@@ -985,7 +994,7 @@ function parseAllUserViews(viewsConfig, schema) {
           ? (schema.areas[colEntity.area]?.color || '#f5f5f5')
           : '#f5f5f5';
 
-        parsedView.columns.push({
+        const colDef = {
           path: parsed.path,
           label,
           jsType: resolved.jsType,
@@ -993,7 +1002,16 @@ function parseAllUserViews(viewsConfig, schema) {
           sqlAlias: label,
           omit,
           areaColor: colAreaColor
-        });
+        };
+
+        // Add FK link info for navigation (FK paths only)
+        if (resolved.fkInfo) {
+          colDef.fkEntity = resolved.fkInfo.fkEntity;
+          colDef.fkIdExpr = resolved.fkInfo.fkIdExpr;
+          colDef.fkIdColumn = `_fk_${label}`;  // Hidden column name for the FK id
+        }
+
+        parsedView.columns.push(colDef);
 
         // Collect joins
         for (const join of resolved.joins) {
@@ -1080,6 +1098,10 @@ function generateUserViewSQL(parsedView) {
 
   for (const col of parsedView.columns) {
     selectCols.push(`${col.selectExpr} AS "${col.sqlAlias}"`);
+    // Add hidden FK id column for navigation links
+    if (col.fkIdExpr && col.fkIdColumn) {
+      selectCols.push(`${col.fkIdExpr} AS "${col.fkIdColumn}"`);
+    }
   }
 
   const joinClauses = parsedView.joins.map(

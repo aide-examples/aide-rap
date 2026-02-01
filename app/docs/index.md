@@ -576,6 +576,7 @@ Use `app/config_sample.json` as template for new systems.
     "sessionTimeout": 86400
   },
   "pagination": { "threshold": 100, "pageSize": 100 },
+  "tree": { "backRefPreviewLimit": 10 },
   "pwa": {
     "enabled": true,
     "name": "My System",

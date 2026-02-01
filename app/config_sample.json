@@ -42,5 +42,8 @@
         "allow_toggle": false
     },
     "docsEditable": false,
-    "helpEditable": false
+    "helpEditable": false,
+    "tree": {
+        "backRefPreviewLimit": 10
+    }
 }
