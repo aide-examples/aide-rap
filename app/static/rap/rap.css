@@ -634,6 +634,45 @@
     gap: 4px;
 }
 
+/* Aggregate field groups (geo, address, etc.) */
+.form-fieldset.aggregate-group {
+    border: 1px solid var(--border-color-dark);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 0;
+    background: var(--color-gray-50);
+}
+
+.form-fieldset.aggregate-group legend {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--color-gray-600);
+    padding: 0 8px;
+}
+
+.form-fieldset.aggregate-group .aggregate-type {
+    font-weight: 400;
+    color: var(--color-gray-400);
+    font-size: 0.8rem;
+}
+
+.form-fieldset.aggregate-group .aggregate-fields {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.form-fieldset.aggregate-group .aggregate-subfield {
+    flex: 1;
+    min-width: 120px;
+}
+
+.form-fieldset.aggregate-group .aggregate-subfield .form-label {
+    font-size: 0.8rem;
+    color: var(--color-gray-500);
+    text-transform: capitalize;
+}
+
 .form-label {
     font-size: 0.85rem;
     font-weight: 500;

@@ -27,7 +27,7 @@ class TypeRegistry {
     /**
      * Built-in type names
      */
-    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media'];
+    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media', 'geo'];
 
     /**
      * Built-in type definitions
@@ -101,6 +101,15 @@ class TypeRegistry {
           patternDescription: 'Media reference (UUID)',
           patternExample: '550e8400-e29b-41d4-a716-446655440000'
         }
+      },
+      geo: {
+        kind: 'aggregate',
+        fields: [
+          { name: 'latitude', type: 'number', sqlType: 'REAL', required: false },
+          { name: 'longitude', type: 'number', sqlType: 'REAL', required: false }
+        ],
+        canonical: '{latitude}, {longitude}',
+        description: 'GPS coordinates (latitude, longitude)'
       }
     };
   }
@@ -230,10 +239,45 @@ class TypeRegistry {
   }
 
   /**
+   * Checks if a type is an aggregate type (expands to multiple columns)
+   * @param {string} name - Type name
+   * @param {string} [entityName] - Entity context
+   * @returns {boolean}
+   */
+  isAggregate(name, entityName = null) {
+    const type = this.resolve(name, entityName);
+    return type && type.kind === 'aggregate';
+  }
+
+  /**
+   * Gets the fields for an aggregate type
+   * @param {string} name - Type name
+   * @param {string} [entityName] - Entity context
+   * @returns {Array|null} - Array of { name, type, sqlType, required } or null
+   */
+  getAggregateFields(name, entityName = null) {
+    const type = this.resolve(name, entityName);
+    if (!type || type.kind !== 'aggregate') return null;
+    return [...type.fields];
+  }
+
+  /**
+   * Gets the canonical format string for an aggregate type
+   * @param {string} name - Type name
+   * @param {string} [entityName] - Entity context
+   * @returns {string|null} - Format string like '{latitude}, {longitude}' or null
+   */
+  getAggregateCanonical(name, entityName = null) {
+    const type = this.resolve(name, entityName);
+    if (!type || type.kind !== 'aggregate') return null;
+    return type.canonical || null;
+  }
+
+  /**
    * Gets the SQL type for a custom type
    * @param {string} name - Type name
    * @param {string} [entityName] - Entity context
-   * @returns {string} - SQL type (INTEGER, TEXT, etc.)
+   * @returns {string|null} - SQL type (INTEGER, TEXT, etc.) or null for aggregate types
    */
   getSqlType(name, entityName = null) {
     const type = this.resolve(name, entityName);
@@ -241,6 +285,11 @@ class TypeRegistry {
 
     if (type.kind === 'builtin') {
       return type.sqlType;
+    }
+
+    if (type.kind === 'aggregate') {
+      // Aggregate types expand to multiple columns, no single SQL type
+      return null;
     }
 
     if (type.kind === 'enum') {
@@ -260,7 +309,7 @@ class TypeRegistry {
    * Generates validation rules for ObjectValidator
    * @param {string} name - Type name
    * @param {string} [entityName] - Entity context
-   * @returns {Object|null} - Validation rules or null
+   * @returns {Object|null} - Validation rules or null (aggregate types return null, validated per-field)
    */
   toValidationRules(name, entityName = null) {
     const type = this.resolve(name, entityName);
@@ -268,6 +317,11 @@ class TypeRegistry {
 
     if (type.kind === 'builtin') {
       return { ...type.validation };
+    }
+
+    if (type.kind === 'aggregate') {
+      // Aggregate types are validated per expanded field, not as a whole
+      return null;
     }
 
     if (type.kind === 'pattern') {

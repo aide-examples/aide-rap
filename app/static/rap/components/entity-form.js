@@ -27,11 +27,61 @@ const EntityForm = {
 
     let html = '<form class="entity-form" id="entity-form">';
 
+    // Identify aggregate groups: { sourceName: [columns] }
+    const aggregateGroups = {};
+    const renderedAggregates = new Set();
+    for (const col of schema.columns) {
+      if (col.aggregateSource) {
+        if (!aggregateGroups[col.aggregateSource]) {
+          aggregateGroups[col.aggregateSource] = [];
+        }
+        aggregateGroups[col.aggregateSource].push(col);
+      }
+    }
+
     for (const col of schema.columns) {
       // Always skip system columns in forms (managed by the system)
       if (SYSTEM_COLUMNS_FORM.includes(col.name)) continue;
       // Skip id field for create, show as readonly for edit
       if (col.name === 'id' && !isEdit) continue;
+
+      // Handle aggregate fields: render as a group
+      if (col.aggregateSource) {
+        const groupName = col.aggregateSource;
+        if (renderedAggregates.has(groupName)) continue; // Already rendered
+        renderedAggregates.add(groupName);
+
+        const groupCols = aggregateGroups[groupName];
+        const typeName = col.aggregateType || 'geo';
+
+        html += `
+          <fieldset class="form-fieldset aggregate-group" data-aggregate="${groupName}">
+            <legend>${groupName} <span class="aggregate-type">(${typeName})</span></legend>
+            <div class="aggregate-fields">`;
+
+        for (const subCol of groupCols) {
+          let value;
+          if (record) {
+            value = record[subCol.name];
+          } else {
+            value = subCol.defaultValue !== undefined ? subCol.defaultValue : '';
+          }
+
+          const subLabel = subCol.aggregateField || subCol.name.replace(`${groupName}_`, '');
+          html += `
+              <div class="form-field aggregate-subfield">
+                <label class="form-label" for="field-${subCol.name}">${subLabel}</label>
+                <input type="number" step="any" class="form-input"
+                       id="field-${subCol.name}" name="${subCol.name}"
+                       value="${value !== null && value !== undefined ? value : ''}">
+              </div>`;
+        }
+
+        html += `
+            </div>
+          </fieldset>`;
+        continue;
+      }
 
       // For NEW: use defaultValue from schema (if available), otherwise empty
       // For EDIT: use record value

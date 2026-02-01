@@ -795,6 +795,50 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     let displayName = null;  // Conceptual name for UI/diagrams
 
     const cleanType = extractTypeName(attrType);
+    const typeRegistry = getTypeRegistry();
+
+    // Check if type is an aggregate (expands to multiple columns)
+    if (typeRegistry.isAggregate(cleanType)) {
+      const aggregateFields = typeRegistry.getAggregateFields(cleanType);
+      const uiAnnotations = parseUIAnnotations(desc);
+
+      // Create a column for each field in the aggregate with prefix
+      for (const field of aggregateFields) {
+        const colName = `${name}_${field.name}`;
+        let sqlType = field.sqlType;
+
+        // Aggregate fields are optional unless explicitly marked required
+        // (we don't add NOT NULL by default)
+
+        const column = {
+          name: colName,
+          type: field.type,
+          sqlType,
+          jsType: field.type,
+          required: false,  // Aggregate sub-fields are optional by default
+          customType: null,
+          defaultValue: null,
+          description: `${name}: ${field.name}`,
+          aggregateType: cleanType,       // Mark as part of an aggregate
+          aggregateField: field.name,     // Which field within the aggregate
+          aggregateSource: name           // Original attribute name from markdown
+        };
+
+        // Copy UI annotations from parent to sub-fields (e.g., [HIDDEN])
+        if (uiAnnotations) {
+          column.ui = { ...uiAnnotations };
+        }
+
+        columns.push(column);
+
+        // Add validation rules for each sub-field
+        validationRules[colName] = { type: field.type === 'number' ? 'number' : 'string' };
+      }
+
+      // Skip normal column creation for aggregate types
+      continue;
+    }
+
     if (allEntityNames.includes(cleanType)) {
       // Conceptual FK notation: type is entity name
       // e.g., "type: AircraftType" -> column: type_id, displayName: type

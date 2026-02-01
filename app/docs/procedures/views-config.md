@@ -166,6 +166,13 @@ Entity<fk_field(params).column AS Label
 | `(params)` | Filter, sort, limit, or aggregation directives | `(WHERE end_date=null, LIMIT 1)` |
 | `.column` | Target column on the child entity (or FK chain from it) | `.mount_position` |
 
+> ⚠️ **Parentheses required**: The `(params)` part is mandatory, even when empty or only specifying `LIMIT 1`. Omitting parentheses causes the column to be silently ignored.
+>
+> - ✅ `Entity<fk(LIMIT 1).column`
+> - ✅ `Entity<fk(COUNT)`
+> - ✅ `Entity<fk().column` (empty parens = defaults)
+> - ❌ `Entity<fk.column` (missing parens — silently ignored)
+
 ### Parameters (comma-separated inside parentheses)
 
 | Parameter | Effect | Example |

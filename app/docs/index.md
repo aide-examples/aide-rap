@@ -136,6 +136,29 @@ Example usage:
 | attachment | media | Uploaded file |
 ```
 
+## Aggregate Types – Composite Fields
+
+Some data naturally groups together – like GPS coordinates (latitude + longitude) or addresses (street, city, zip, country). Aggregate types let you define these as a single logical field that expands to multiple database columns.
+
+```markdown
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| position | geo | GPS coordinates | 48.1371, 11.5754 |
+```
+
+The system automatically:
+- Creates `position_latitude` and `position_longitude` columns in the database
+- Accepts nested objects in seed data: `"position": { "latitude": 48.1, "longitude": 11.5 }`
+- Displays as one canonical column in tables: "48.1371, 11.5754"
+- Groups subfields in edit forms
+
+| Aggregate | Expands to | Status |
+|-----------|------------|--------|
+| `geo` | `{name}_latitude`, `{name}_longitude` | Available |
+| `address` | `{name}_street`, `{name}_city`, `{name}_zip`, `{name}_country` | Planned |
+
+See [Aggregate Types](aggregate-types.md) for full reference.
+
 # RUNTIME ENVIRONMENT
 
 ## Relational Database
@@ -698,6 +721,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 ### Reference
 
 - [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
+- [Aggregate Types](aggregate-types.md) – `geo`, `address`, and custom composite types
 - [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships
 - [Seed Data](seed-data.md) – Import, export, and AI-generate test data
 

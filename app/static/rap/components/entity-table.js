@@ -310,6 +310,7 @@ const EntityTable = {
    * Get visible columns based on schema and sort settings
    * Respects both attributeOrder (alpha/schema) and referencePosition (start/end/inline)
    * Back-references are always at the end (handled separately in render)
+   * Aggregate sub-fields are collapsed into a single canonical column
    */
   getVisibleColumns() {
     if (!this.schema) return [];
@@ -318,6 +319,49 @@ const EntityTable = {
       !this.schema.ui?.hiddenFields?.includes(col.name) &&
       (this.showSystem || !SYSTEM_COLUMNS.includes(col.name))
     );
+
+    // Collapse aggregate sub-fields into canonical columns
+    const aggregateSources = new Map();  // sourceName -> { type, subCols }
+    const aggregateColNames = new Set();
+
+    for (const col of columns) {
+      if (col.aggregateSource) {
+        const source = col.aggregateSource;
+        if (!aggregateSources.has(source)) {
+          aggregateSources.set(source, { type: col.aggregateType, subCols: [] });
+        }
+        aggregateSources.get(source).subCols.push(col);
+        aggregateColNames.add(col.name);
+      }
+    }
+
+    // Replace aggregate sub-columns with single canonical column
+    const result = [];
+    const insertedAggregates = new Set();
+
+    for (const col of columns) {
+      if (col.aggregateSource) {
+        const source = col.aggregateSource;
+        if (!insertedAggregates.has(source)) {
+          insertedAggregates.add(source);
+          const aggInfo = aggregateSources.get(source);
+          // Create virtual canonical column
+          result.push({
+            name: source,
+            type: aggInfo.type,
+            jsType: 'string',
+            isAggregateCanonical: true,
+            aggregateType: aggInfo.type,
+            subColumns: aggInfo.subCols.map(c => c.name)
+          });
+        }
+        // Skip individual sub-columns
+        continue;
+      }
+      result.push(col);
+    }
+
+    columns = result;
 
     // Sort columns alphabetically if requested
     if (this.attributeOrder === 'alpha') {
@@ -571,6 +615,23 @@ const EntityTable = {
                    onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
             </a>
           </td>`;
+        } else if (col.isAggregateCanonical) {
+          // Aggregate canonical column: combine sub-fields into formatted string
+          const subValues = col.subColumns.map(subCol => record[subCol]);
+          const hasValue = subValues.some(v => v != null);
+          let displayValue = '';
+          if (hasValue) {
+            if (col.aggregateType === 'geo') {
+              // Geo: "{latitude}, {longitude}"
+              const lat = subValues[0] ?? '';
+              const lng = subValues[1] ?? '';
+              displayValue = lat !== '' || lng !== '' ? `${lat}, ${lng}` : '';
+            } else {
+              // Generic: join with ", "
+              displayValue = subValues.filter(v => v != null).join(', ');
+            }
+          }
+          html += `<td class="aggregate-cell">${DomUtils.escapeHtml(displayValue)}</td>`;
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const displayValue = value != null

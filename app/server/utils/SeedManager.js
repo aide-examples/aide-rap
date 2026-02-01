@@ -144,6 +144,61 @@ async function resolveMediaUrls(entityName, record) {
 }
 
 /**
+ * Flatten nested aggregate type values in a record.
+ * Converts { position: { latitude: 48.1, longitude: 11.5 } }
+ * to { position_latitude: 48.1, position_longitude: 11.5 }
+ *
+ * @param {string} entityName - Entity name
+ * @param {Object} record - Record to process
+ * @returns {Object} - Record with flattened aggregate values
+ */
+function flattenAggregates(entityName, record) {
+  const { schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+  if (!entity) return record;
+
+  const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
+  const typeRegistry = getTypeRegistry();
+
+  const flattened = { ...record };
+
+  // Find aggregate columns by looking for aggregateSource metadata
+  const aggregateSources = new Set();
+  for (const col of entity.columns) {
+    if (col.aggregateSource) {
+      aggregateSources.add(col.aggregateSource);
+    }
+  }
+
+  // For each aggregate source, check if record has nested value
+  for (const sourceName of aggregateSources) {
+    const nestedValue = record[sourceName];
+
+    if (nestedValue && typeof nestedValue === 'object' && !Array.isArray(nestedValue)) {
+      // Find the aggregate type from schema columns
+      const aggregateCol = entity.columns.find(c => c.aggregateSource === sourceName);
+      if (aggregateCol && aggregateCol.aggregateType) {
+        const fields = typeRegistry.getAggregateFields(aggregateCol.aggregateType);
+
+        if (fields) {
+          // Flatten nested object to prefixed fields
+          for (const field of fields) {
+            const flatKey = `${sourceName}_${field.name}`;
+            if (nestedValue[field.name] !== undefined) {
+              flattened[flatKey] = nestedValue[field.name];
+            }
+          }
+          // Remove the nested key
+          delete flattened[sourceName];
+        }
+      }
+    }
+  }
+
+  return flattened;
+}
+
+/**
  * Get the current seed directory
  * @returns {string} - The seed directory path
  */
@@ -878,6 +933,9 @@ async function loadEntity(entityName, lookups = null, options = {}) {
       });
     }
 
+    // Flatten nested aggregate values (e.g., { position: { latitude, longitude } } -> { position_latitude, position_longitude })
+    record = flattenAggregates(entityName, record);
+
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
     const resolved = resolveConceptualFKs(entityName, record, lookups);
 
@@ -1165,6 +1223,26 @@ function backupAll() {
       for (const col of entity.columns) {
         if (col.computed && !col.foreignKey) {
           delete exported[col.name];
+        }
+      }
+
+      // Nest aggregate fields (e.g., position_latitude + position_longitude -> position: { latitude, longitude })
+      const aggregateSources = new Map();  // sourceName -> { fieldName: value }
+      for (const col of entity.columns) {
+        if (col.aggregateSource && col.aggregateField) {
+          const source = col.aggregateSource;
+          if (!aggregateSources.has(source)) {
+            aggregateSources.set(source, {});
+          }
+          if (exported[col.name] !== undefined) {
+            aggregateSources.get(source)[col.aggregateField] = exported[col.name];
+            delete exported[col.name];
+          }
+        }
+      }
+      for (const [source, nested] of aggregateSources) {
+        if (Object.keys(nested).length > 0) {
+          exported[source] = nested;
         }
       }
 

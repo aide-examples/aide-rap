@@ -552,6 +552,13 @@ function getExtendedSchemaInfo(entityName) {
         colInfo.calculated = col.calculated;
       }
 
+      // Add aggregate type info (for grouping related fields)
+      if (col.aggregateSource) {
+        colInfo.aggregateSource = col.aggregateSource;
+        colInfo.aggregateField = col.aggregateField;
+        colInfo.aggregateType = col.aggregateType;
+      }
+
       return colInfo;
     }),
     ui: {
