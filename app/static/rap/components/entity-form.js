@@ -83,10 +83,13 @@ const EntityForm = {
           }
 
           const subLabel = subCol.aggregateField || subCol.name.replace(`${groupName}_`, '');
+          // Determine input type based on column type (number vs string)
+          const inputType = subCol.type === 'number' ? 'number' : 'text';
+          const stepAttr = subCol.type === 'number' ? 'step="any"' : '';
           html += `
               <div class="form-field aggregate-subfield">
                 <label class="form-label" for="field-${subCol.name}">${subLabel}</label>
-                <input type="number" step="any" class="form-input"
+                <input type="${inputType}" ${stepAttr} class="form-input"
                        id="field-${subCol.name}" name="${subCol.name}"
                        value="${value !== null && value !== undefined ? value : ''}">
               </div>`;

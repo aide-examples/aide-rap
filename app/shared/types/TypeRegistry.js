@@ -27,7 +27,7 @@ class TypeRegistry {
     /**
      * Built-in type names
      */
-    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media', 'geo'];
+    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media', 'geo', 'address'];
 
     /**
      * Built-in type definitions
@@ -110,6 +110,17 @@ class TypeRegistry {
         ],
         canonical: '{latitude}, {longitude}',
         description: 'GPS coordinates (latitude, longitude)'
+      },
+      address: {
+        kind: 'aggregate',
+        fields: [
+          { name: 'street', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'city', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'zip', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'country', type: 'string', sqlType: 'TEXT', required: false }
+        ],
+        canonical: '{zip} {city}, {street}',
+        description: 'Postal address (street, city, zip, country)'
       }
     };
   }
