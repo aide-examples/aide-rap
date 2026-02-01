@@ -1016,6 +1016,90 @@ class MediaService {
   }
 
   /**
+   * Restore media links in entity tables from manifest refs
+   * Scans all manifests and updates entity records' media fields
+   * @returns {Object} { restored: number, notFound: number, errors: Array }
+   */
+  restoreMediaLinks() {
+    const { getSchema, getDatabase } = require('../config/database');
+
+    try {
+      const schema = getSchema();
+      const db = getDatabase();
+      const manifests = this.getAllManifests();
+
+      let restored = 0;
+      let notFound = 0;
+      const errors = [];
+
+      for (const [mediaId, entry] of Object.entries(manifests)) {
+        if (!entry.refs || !Array.isArray(entry.refs)) continue;
+
+        for (const ref of entry.refs) {
+          try {
+            const entity = schema.entities[ref.entity];
+            if (!entity) {
+              errors.push({ mediaId, ref, error: `Entity ${ref.entity} not found` });
+              continue;
+            }
+
+            // Find the media column
+            const mediaCol = entity.columns.find(c => c.name === ref.field);
+            if (!mediaCol || mediaCol.customType !== 'media') {
+              errors.push({ mediaId, ref, error: `Field ${ref.field} is not a media column` });
+              continue;
+            }
+
+            // Resolve entity ID by label
+            const entityId = this.getEntityIdByLabel(ref.entity, ref.label);
+            if (!entityId) {
+              notFound++;
+              logger.debug('Could not find entity by label', { entity: ref.entity, label: ref.label });
+              continue;
+            }
+
+            // Check if record already has this media linked
+            const existing = db.prepare(
+              `SELECT ${ref.field} FROM ${entity.tableName} WHERE id = ?`
+            ).get(entityId);
+
+            if (existing && existing[ref.field] === mediaId) {
+              // Already linked correctly
+              continue;
+            }
+
+            // Update the entity record
+            db.prepare(
+              `UPDATE ${entity.tableName} SET ${ref.field} = ? WHERE id = ?`
+            ).run(mediaId, entityId);
+
+            // Also ensure reference exists in _media_refs
+            try {
+              MediaRepository.addReference(mediaId, ref.entity, entityId, ref.field);
+            } catch (refErr) {
+              // Ignore duplicate reference errors
+              if (!refErr.message.includes('UNIQUE constraint')) {
+                logger.debug('Failed to add reference', { mediaId, ref, error: refErr.message });
+              }
+            }
+
+            restored++;
+            logger.debug('Restored media link', { mediaId, entity: ref.entity, field: ref.field, entityId });
+          } catch (err) {
+            errors.push({ mediaId, ref, error: err.message });
+          }
+        }
+      }
+
+      logger.info('Media links restored', { restored, notFound, errorCount: errors.length });
+      return { restored, notFound, errors };
+    } catch (err) {
+      logger.error('Failed to restore media links', { error: err.message });
+      throw err;
+    }
+  }
+
+  /**
    * Get service statistics
    * @returns {Object} { fileCount, totalSize, orphanCount }
    */

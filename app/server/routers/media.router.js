@@ -420,6 +420,30 @@ module.exports = function(mediaService, cfg) {
   });
 
   /**
+   * POST /api/media/restore-links - Restore media links from manifests
+   * Updates entity records' media fields based on manifest refs
+   */
+  router.post('/restore-links', (req, res, next) => {
+    try {
+      // Check admin role
+      if (req.user && req.user.role !== 'admin') {
+        return res.status(403).json({
+          error: { code: 'FORBIDDEN', message: 'Admin access required' }
+        });
+      }
+
+      const result = mediaService.restoreMediaLinks();
+
+      res.json({
+        success: true,
+        ...result
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  /**
    * GET /api/media/manifests - Export all manifests
    */
   router.get('/manifests', (req, res, next) => {

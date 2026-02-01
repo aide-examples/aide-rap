@@ -379,6 +379,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
   let targetLabel;
   let targetJsType;
   let resolvedEntityName = refEntityName;
+  let isLabelColumn = false;  // Track if terminal column is [LABEL]
   const internalJoins = [];
 
   if (tailPath) {
@@ -408,6 +409,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
         targetSelectExpr = `_br.${col.name}`;
         targetLabel = titleCase(col.displayName || col.name);
         targetJsType = col.jsType || 'string';
+        isLabelColumn = !!col.ui?.label;
       }
     } else {
       // Multi-segment: walk FK chain from child entity
@@ -539,12 +541,26 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
     jsType = targetJsType;
   }
 
+  // Build FK link info for scalar back-references (LIMIT 1)
+  // Only generate link if the column is the LABEL of the back-ref entity
+  // This makes the displayed value clickable to navigate to the referenced record
+  let fkInfo = null;
+  if (!isCount && !isList && isLabelColumn) {
+    const fromClause = `${refEntity.tableName} _br`;
+    const limitVal = params.limit || 1;
+    fkInfo = {
+      fkEntity: refEntityName,
+      fkIdExpr: `(SELECT _br.id FROM ${fromClause}${joinClausesSQL ? ' ' + joinClausesSQL : ''} WHERE ${whereClause}${orderClause} LIMIT ${limitVal})`
+    };
+  }
+
   return {
     joins: [],
     selectExpr,
     label,
     jsType,
-    entityName: resolvedEntityName
+    entityName: resolvedEntityName,
+    fkInfo
   };
 }
 

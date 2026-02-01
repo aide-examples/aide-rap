@@ -1261,6 +1261,50 @@ function backupAll() {
 }
 
 /**
+ * Restore a single entity from backup JSON file.
+ * @param {string} entityName - The entity to restore
+ * @returns {Promise<object>} - Load result
+ */
+async function restoreEntity(entityName) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+  const backupDir = getBackupDir();
+
+  if (!entity) {
+    throw new Error(`Entity ${entityName} not found in schema`);
+  }
+
+  const backupFile = path.join(backupDir, `${entityName}.json`);
+  if (!fs.existsSync(backupFile)) {
+    throw new Error(`No backup file found for ${entityName}`);
+  }
+
+  // Emit event for single-entity restore (media handling)
+  eventBus.emit('seed:restore:entity:before', { entityName, backupDir });
+
+  // Clear entity data first
+  try {
+    db.pragma('foreign_keys = OFF');
+    db.prepare(`DELETE FROM ${entity.tableName}`).run();
+    db.pragma('foreign_keys = ON');
+  } catch (err) {
+    // Ignore errors during clear
+  }
+
+  // Temporarily point seed dir to backup dir for loadEntity
+  const originalSeedDir = SEED_DIR;
+  SEED_DIR = backupDir;
+
+  try {
+    const result = await loadEntity(entityName, null, { mode: 'replace', preserveSystemColumns: true });
+    return result;
+  } finally {
+    // Restore original seed dir
+    SEED_DIR = originalSeedDir;
+  }
+}
+
+/**
  * Restore all entity data from backup JSON files.
  * Similar to loadAll but reads from backup/ instead of seed/.
  * @returns {Promise<object>} - Results per entity
@@ -1333,6 +1377,7 @@ module.exports = {
   buildLabelLookup,
   countSeedConflicts,
   backupAll,
+  restoreEntity,
   restoreBackup,
   // Export getter for path (for testing and external access)
   get SEED_DIR() { return getSeedDir(); }

@@ -30,6 +30,7 @@ const SeedManager = {
       <div class="context-menu-item" data-action="generate">🤖 Generate...</div>
       <div class="context-menu-separator"></div>
       <div class="context-menu-item" data-action="load">▶️ Load...</div>
+      <div class="context-menu-item" data-action="restore">🔄 Restore from Backup</div>
       <div class="context-menu-item" data-action="clear">🗑️ Clear</div>
     `;
     document.body.appendChild(this.contextMenu);
@@ -50,7 +51,7 @@ const SeedManager = {
   /**
    * Show context menu at position
    */
-  showContextMenu(x, y, entityName, hasSeeds) {
+  showContextMenu(x, y, entityName, hasSeeds, hasBackup) {
     this.selectedEntity = entityName;
     this.contextMenu.style.left = x + 'px';
     this.contextMenu.style.top = y + 'px';
@@ -59,11 +60,15 @@ const SeedManager = {
     // Enable/disable load and export based on seed availability
     const loadItem = this.contextMenu.querySelector('[data-action="load"]');
     const exportItem = this.contextMenu.querySelector('[data-action="export"]');
+    const restoreItem = this.contextMenu.querySelector('[data-action="restore"]');
     if (loadItem) {
       loadItem.classList.toggle('disabled', !hasSeeds);
     }
     if (exportItem) {
       exportItem.classList.toggle('disabled', !hasSeeds);
+    }
+    if (restoreItem) {
+      restoreItem.classList.toggle('disabled', !hasBackup);
     }
   },
 
@@ -90,6 +95,9 @@ const SeedManager = {
         break;
       case 'load':
         this.openLoadPreview(entityName);
+        break;
+      case 'restore':
+        await this.restoreEntity(entityName);
         break;
       case 'clear':
         await this.clearEntity(entityName);
@@ -217,7 +225,7 @@ const SeedManager = {
       }
 
       return `
-        <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}">
+        <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}" data-has-backup="${hasBackup}">
           <td class="dep-status">${depDot}</td>
           <td class="entity-name">${e.name}</td>
           <td class="seed-count">${seedDisplay}</td>
@@ -256,6 +264,7 @@ const SeedManager = {
             <span class="footer-spacer"></span>
             <button class="btn-seed btn-backup" title="Backup all DB data to JSON files">Backup</button>
             <button class="btn-seed btn-restore" title="Restore all data from backup files">Restore</button>
+            <button class="btn-seed btn-restore-media" title="Restore media links from manifest refs">Restore Media</button>
             <button class="btn-seed btn-load-all">Load All</button>
             <button class="btn-seed btn-clear-all">Clear All</button>
             <button class="btn-seed btn-reset-all">Reset All</button>
@@ -288,7 +297,8 @@ const SeedManager = {
         e.stopPropagation();
         const entityName = row.dataset.entity;
         const hasSeeds = row.dataset.hasSeeds === 'true';
-        this.showContextMenu(e.pageX, e.pageY, entityName, hasSeeds);
+        const hasBackup = row.dataset.hasBackup === 'true';
+        this.showContextMenu(e.pageX, e.pageY, entityName, hasSeeds, hasBackup);
       };
       row.addEventListener('click', showMenu);
       row.addEventListener('contextmenu', showMenu);
@@ -300,6 +310,7 @@ const SeedManager = {
     this.container.querySelector('.btn-reset-all')?.addEventListener('click', () => this.resetAll());
     this.container.querySelector('.btn-backup')?.addEventListener('click', () => this.backupAll());
     this.container.querySelector('.btn-restore')?.addEventListener('click', () => this.restoreBackup());
+    this.container.querySelector('.btn-restore-media')?.addEventListener('click', () => this.restoreMediaLinks());
     this.container.querySelector('.btn-reinit')?.addEventListener('click', () => this.reinitialize());
     this.container.querySelector('.btn-new-system')?.addEventListener('click', () => this.openModelBuilder());
   },
@@ -371,6 +382,31 @@ const SeedManager = {
         await this.refreshAndMessage(msg, hasErrors);
       } else {
         this.showMessage(data.error || 'Failed to load', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Restore data for a single entity from backup
+   */
+  async restoreEntity(entityName) {
+    if (!confirm(`Restore ${entityName} from backup? This will clear current data and load from backup.`)) return;
+
+    try {
+      const response = await fetch(`/api/seed/restore/${entityName}`, { method: 'POST' });
+      const data = await response.json();
+
+      if (data.success) {
+        const parts = [];
+        if (data.loaded > 0) parts.push(`${data.loaded} loaded`);
+        if (data.updated > 0) parts.push(`${data.updated} updated`);
+        if (data.skipped > 0) parts.push(`${data.skipped} skipped`);
+
+        await this.refreshAndMessage(`${entityName} restored: ${parts.join(', ') || 'no records'}`);
+      } else {
+        this.showMessage(data.error || 'Failed to restore', true);
       }
     } catch (err) {
       this.showMessage(err.message, true);
@@ -534,6 +570,29 @@ const SeedManager = {
         await this.refreshAndMessage(`Restored data for ${loaded} entities from backup`);
       } else {
         this.showMessage(data.error || 'Restore failed', true);
+      }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Restore media links from manifest refs
+   */
+  async restoreMediaLinks() {
+    try {
+      const response = await fetch('/api/media/restore-links', { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        const msg = `Media links restored: ${data.restored} updated`;
+        const hasErrors = data.notFound > 0 || (data.errors && data.errors.length > 0);
+        const details = [];
+        if (data.notFound > 0) details.push(`${data.notFound} records not found`);
+        if (data.errors && data.errors.length > 0) details.push(`${data.errors.length} errors`);
+        const fullMsg = details.length > 0 ? `${msg} (${details.join(', ')})` : msg;
+        await this.refreshAndMessage(fullMsg, hasErrors);
+      } else {
+        this.showMessage(data.error || 'Restore media links failed', true);
       }
     } catch (err) {
       this.showMessage(err.message, true);

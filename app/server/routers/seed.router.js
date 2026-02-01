@@ -235,5 +235,16 @@ module.exports = function(cfg) {
         }
     });
 
+    // Restore a single entity from backup
+    router.post('/api/seed/restore/:entity', async (req, res) => {
+        try {
+            const result = await SeedManager.restoreEntity(req.params.entity);
+            res.json({ success: true, ...result });
+        } catch (e) {
+            console.error(`Failed to restore ${req.params.entity}:`, e);
+            res.status(400).json({ success: false, error: e.message });
+        }
+    });
+
     return router;
 };
