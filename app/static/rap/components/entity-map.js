@@ -15,34 +15,35 @@ const EntityMap = {
   },
 
   /**
-   * Convert entity schema fields to unified column format
-   * @param {Object} schema - Entity schema with fields array
-   * @returns {Array} Columns in unified format
+   * Normalize columns to unified format with 'key' property
+   * Entity columns have 'name', view columns have 'key'
+   * @param {Array} columns - Raw columns array
+   * @returns {Array} Normalized columns with 'key' property
    */
-  entityFieldsToColumns(schema) {
-    if (!schema || !schema.fields) return [];
-    return schema.fields.map(f => ({
-      key: f.name,
-      label: f.label || f.name,
-      jsType: f.jsType,
-      aggregateType: f.aggregateType,
-      aggregateField: f.aggregateField
+  normalizeColumns(columns) {
+    if (!columns) return [];
+    return columns.map(c => ({
+      key: c.key || c.name,  // Views use 'key', entities use 'name'
+      label: c.label || c.key || c.name,
+      jsType: c.jsType,
+      aggregateType: c.aggregateType,
+      aggregateField: c.aggregateField
     }));
   },
 
   /**
    * Check if schema has geo columns
-   * @param {Object} schema - View schema (columns) or entity schema (fields)
+   * @param {Object} schema - View schema (columns) or entity schema (columns)
    * @returns {boolean}
    */
   hasGeoColumns(schema) {
-    const columns = schema.columns || this.entityFieldsToColumns(schema);
-    return columns.some(c => c.aggregateType === 'geo');
+    if (!schema || !schema.columns) return false;
+    return schema.columns.some(c => c.aggregateType === 'geo');
   },
 
   /**
    * Load data onto the map (works with both views and entities)
-   * @param {Object} schema - View schema (with columns) or entity schema (with fields)
+   * @param {Object} schema - View schema or entity schema (both have columns)
    * @param {Array} records - Data records
    */
   load(schema, records) {
@@ -50,8 +51,8 @@ const EntityMap = {
       this.container = document.getElementById('entity-map-container');
     }
 
-    // Normalize to columns format
-    const columns = schema.columns || this.entityFieldsToColumns(schema);
+    // Normalize columns to unified format (entity uses 'name', view uses 'key')
+    const columns = this.normalizeColumns(schema.columns);
 
     // Find geo columns (aggregateType === 'geo')
     const geoColumns = columns.filter(c => c.aggregateType === 'geo');
