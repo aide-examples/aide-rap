@@ -546,14 +546,15 @@
                 entitiesMaxY = Math.max(entitiesMaxY, pos.y + boxHeight(className));
             }
 
-            // Calculate legend height (areas + type categories + header + padding)
+            // Calculate legend height
+            // Left: areas, Right: type categories (aggregates, enums, patterns)
             const numAreas = Object.keys(model.areas || {}).length;
             const globalTypesObj = model.globalTypes || {};
             const hasEnums = Object.values(globalTypesObj).some(t => t.kind === 'enum');
             const hasAggregates = Object.values(globalTypesObj).some(t => t.kind === 'aggregate');
             const hasPatterns = Object.values(globalTypesObj).some(t => t.kind === 'pattern');
-            const typeRows = (hasEnums ? 1 : 0) + (hasAggregates ? 1 : 0) + (hasPatterns ? 1 : 0);
-            const legendRows = numAreas + typeRows;
+            const typeCategories = (hasEnums ? 1 : 0) + (hasAggregates ? 1 : 0) + (hasPatterns ? 1 : 0);
+            const legendRows = Math.max(numAreas, typeCategories);
             const legendHeight = 30 + legendRows * 20 + 20; // header + rows + bottom padding
 
             const width = maxX;
@@ -709,106 +710,96 @@
             parts.push('');
             parts.push('  <!-- Legend -->');
 
-            // Collect types by area
-            const typesByArea = {};
+            // Collect entity-local types with their area
+            const typeToArea = {};  // typeName -> areaId
             for (const [className, classDef] of Object.entries(model.classes || {})) {
                 if (classDef.types && Object.keys(classDef.types).length > 0) {
                     const area = classDef.area || 'unknown';
-                    if (!typesByArea[area]) typesByArea[area] = [];
                     for (const typeName of Object.keys(classDef.types)) {
-                        typesByArea[area].push(typeName);
+                        typeToArea[typeName] = area;
                     }
                 }
             }
 
-            // Global types - separate by kind (enum, aggregate, pattern)
+            // Get area color for a type (or gray for global)
+            const getTypeColor = (typeName) => {
+                const areaId = typeToArea[typeName];
+                if (areaId && model.areas?.[areaId]) {
+                    return model.areas[areaId].color || '#E0E0E0';
+                }
+                return '#E0E0E0';  // Gray for global types
+            };
+
+            // Group all types by kind (global + entity-local)
             const globalTypes = model.globalTypes || {};
-            const enumTypes = [];
             const aggregateTypes = [];
+            const enumTypes = [];
             const patternTypes = [];
+
+            // Add global types
             for (const [name, def] of Object.entries(globalTypes)) {
-                if (def.kind === 'enum') enumTypes.push(name);
-                else if (def.kind === 'aggregate') aggregateTypes.push(name);
+                if (def.kind === 'aggregate') aggregateTypes.push(name);
+                else if (def.kind === 'enum') enumTypes.push(name);
                 else if (def.kind === 'pattern') patternTypes.push(name);
             }
 
+            // Add entity-local types
+            for (const [className, classDef] of Object.entries(model.classes || {})) {
+                if (classDef.types) {
+                    for (const [typeName, typeDef] of Object.entries(classDef.types)) {
+                        if (typeDef.kind === 'aggregate') aggregateTypes.push(typeName);
+                        else if (typeDef.kind === 'enum') enumTypes.push(typeName);
+                        else if (typeDef.kind === 'pattern') patternTypes.push(typeName);
+                    }
+                }
+            }
+
             let legendX = 20;
-            let legendY = entitiesMaxY + 50; // Start below entity area with gap
-            const typesStartX = 160; // Start X for types column
-            const typeBoxWidth = 10;
+            let legendY = entitiesMaxY + 50;
+            const typesStartX = 160;
             const typeBoxHeight = 10;
             const typeSpacing = 5;
 
+            // Headers
             parts.push(`  <text x="${legendX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Areas:</text>`);
             parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Types:</text>`);
             legendY += 20;
 
-            for (const [areaId, areaDef] of Object.entries(model.areas || {})) {
-                const areaColor = areaDef.color || '#FFFFFF';
-                const areaName = areaDef.name || areaId;
+            // Build left (areas) and right (type categories) rows
+            const areas = Object.entries(model.areas || {});
+            const typeCategories = [];
+            if (aggregateTypes.length > 0) typeCategories.push({ label: 'Aggregates', types: aggregateTypes });
+            if (enumTypes.length > 0) typeCategories.push({ label: 'Enums', types: enumTypes });
+            if (patternTypes.length > 0) typeCategories.push({ label: 'Patterns', types: patternTypes });
 
-                // Area box and name
-                parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
-                parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
+            const maxRows = Math.max(areas.length, typeCategories.length);
 
-                // Types for this area (on the same row)
-                const areaTypes = typesByArea[areaId] || [];
-                let typeX = typesStartX;
-                for (const typeName of areaTypes) {
-                    const textWidth = measureText(typeName, 9, FONT_FAMILY);
-                    parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
-                    parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
-                    typeX += textWidth + 6 + typeSpacing;
+            for (let row = 0; row < maxRows; row++) {
+                // Left: Area (if exists for this row)
+                if (row < areas.length) {
+                    const [areaId, areaDef] = areas[row];
+                    const areaColor = areaDef.color || '#FFFFFF';
+                    const areaName = areaDef.name || areaId;
+                    parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+                    parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
+                }
+
+                // Right: Type category (if exists for this row)
+                if (row < typeCategories.length) {
+                    const cat = typeCategories[row];
+                    parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="10" font-weight="bold">${cat.label}:</text>`);
+
+                    let typeX = typesStartX + measureText(cat.label + ':', 10, FONT_FAMILY) + 8;
+                    for (const typeName of cat.types) {
+                        const textWidth = measureText(typeName, 9, FONT_FAMILY);
+                        const typeColor = getTypeColor(typeName);
+                        parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${typeColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
+                        parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
+                        typeX += textWidth + 6 + typeSpacing;
+                    }
                 }
 
                 legendY += 20;
-            }
-
-            // Enums row (light blue)
-            if (enumTypes.length > 0) {
-                const enumColor = '#D4E6F1';
-                parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${enumColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
-                parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">Enums</text>`);
-
-                let typeX = typesStartX;
-                for (const typeName of enumTypes) {
-                    const textWidth = measureText(typeName, 9, FONT_FAMILY);
-                    parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${enumColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
-                    parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
-                    typeX += textWidth + 6 + typeSpacing;
-                }
-                legendY += 20;
-            }
-
-            // Aggregates row (light green)
-            if (aggregateTypes.length > 0) {
-                const aggColor = '#D5F5E3';
-                parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${aggColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
-                parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">Aggregates</text>`);
-
-                let typeX = typesStartX;
-                for (const typeName of aggregateTypes) {
-                    const textWidth = measureText(typeName, 9, FONT_FAMILY);
-                    parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${aggColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
-                    parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
-                    typeX += textWidth + 6 + typeSpacing;
-                }
-                legendY += 20;
-            }
-
-            // Pattern types row (light gray) - if any
-            if (patternTypes.length > 0) {
-                const patternColor = '#E0E0E0';
-                parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${patternColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
-                parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">Patterns</text>`);
-
-                let typeX = typesStartX;
-                for (const typeName of patternTypes) {
-                    const textWidth = measureText(typeName, 9, FONT_FAMILY);
-                    parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${patternColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
-                    parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
-                    typeX += textWidth + 6 + typeSpacing;
-                }
             }
 
             // Watermark in bottom right corner (aligned with legend start)
