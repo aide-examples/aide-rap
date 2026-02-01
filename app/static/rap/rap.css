@@ -4228,3 +4228,153 @@
     color: #666;
     font-size: 13px;
 }
+
+/* -----------------------------------------------------------------------------
+   Entity Map - Leaflet map view for geo data
+   ----------------------------------------------------------------------------- */
+
+.entity-map {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.entity-map-canvas {
+    flex: 1;
+    min-height: 400px;
+    background: #f3f4f6;
+}
+
+/* Map popup styling */
+.map-popup {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.map-popup-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #1f2937;
+}
+
+.map-popup-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.map-popup-table tr:not(:last-child) td {
+    padding-bottom: 4px;
+}
+
+.map-popup-label {
+    color: #6b7280;
+    font-size: 11px;
+    text-transform: uppercase;
+    padding-right: 12px;
+    white-space: nowrap;
+    vertical-align: top;
+}
+
+.map-popup-value {
+    color: #374151;
+    word-break: break-word;
+}
+
+.map-popup-actions {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.map-popup-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-size: 12px;
+}
+
+.map-popup-link:hover {
+    text-decoration: underline;
+}
+
+/* Override Leaflet popup styles for consistency */
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-popup-content {
+    margin: 12px 14px;
+}
+
+/* Marker cluster styling tweaks */
+.marker-cluster-small {
+    background-color: rgba(37, 99, 235, 0.6);
+}
+.marker-cluster-small div {
+    background-color: rgba(37, 99, 235, 0.8);
+}
+
+.marker-cluster-medium {
+    background-color: rgba(37, 99, 235, 0.6);
+}
+.marker-cluster-medium div {
+    background-color: rgba(37, 99, 235, 0.8);
+}
+
+.marker-cluster-large {
+    background-color: rgba(37, 99, 235, 0.6);
+}
+.marker-cluster-large div {
+    background-color: rgba(37, 99, 235, 0.8);
+}
+
+/* Map labels toggle in header */
+.map-labels-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    margin-left: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+
+.map-labels-toggle:hover {
+    background: var(--bg-hover);
+}
+
+.map-labels-toggle input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+    margin: 0;
+}
+
+.map-labels-toggle span {
+    line-height: 1;
+}
+
+/* Map label tooltips */
+.map-label-tooltip {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #374151;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.map-label-tooltip::before {
+    border-top-color: #d1d5db;
+}

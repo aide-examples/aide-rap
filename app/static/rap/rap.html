@@ -14,6 +14,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
+    <!-- Leaflet MarkerCluster for map views -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 </head>
 <body>
     <div class="app-container page-fill">
@@ -90,6 +94,16 @@
                                     <rect x="6" y="12" width="8" height="2"/>
                                 </svg>
                             </button>
+                            <button id="btn-view-map" class="btn-view-mode" title="Map view" data-i18n-title="tooltip_map_view" style="display:none">
+                                <!-- Map marker icon -->
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <path d="M7 0C4.5 0 2.5 2 2.5 4.5C2.5 8 7 14 7 14S11.5 8 11.5 4.5C11.5 2 9.5 0 7 0ZM7 6.5C5.9 6.5 5 5.6 5 4.5S5.9 2.5 7 2.5S9 3.4 9 4.5S8.1 6.5 7 6.5Z"/>
+                                </svg>
+                            </button>
+                            <label id="map-labels-toggle" class="map-labels-toggle" style="display:none" title="Show marker labels">
+                                <input type="checkbox" id="map-show-labels" checked>
+                                <span>Labels</span>
+                            </label>
                         </div>
                         <div id="view-selector" class="view-selector-dropdown" style="display:none">
                             <button class="view-selector-trigger">
@@ -117,6 +131,10 @@
 
                     <!-- Entity Tree (tree view) -->
                     <div id="entity-tree-container" class="entity-list">
+                    </div>
+
+                    <!-- Entity Map (map view) -->
+                    <div id="entity-map-container" class="entity-map hidden">
                     </div>
                 </section>
 
@@ -190,6 +208,7 @@
     <script src="/static/rap/components/entity-tree-pdf.js"></script>
     <script src="/static/rap/components/entity-tree.js"></script>
     <script src="/static/rap/components/entity-table.js"></script>
+    <script src="/static/rap/components/entity-map.js"></script>
     <script src="/static/rap/components/entity-explorer.js"></script>
     <script src="/static/rap/components/detail-panel.js"></script>
     <script src="/static/rap/components/media-upload.js"></script>

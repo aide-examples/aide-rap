@@ -14,9 +14,11 @@ const EntityExplorer = {
   viewSelectorValue: '',
   tableContainer: null,
   treeContainer: null,
+  mapContainer: null,
   btnViewTable: null,
   btnViewTreeH: null,
   btnViewTreeV: null,
+  btnViewMap: null,
   currentEntity: null,
   currentView: null, // null = entity mode, object = view mode { name, base, color }
   entityMetadata: {}, // Map of entity name -> { readonly, system, ... }
@@ -441,15 +443,19 @@ const EntityExplorer = {
     this.viewSelectorMenu = this.viewSelector.querySelector('.view-selector-menu');
     this.tableContainer = document.getElementById('entity-table-container');
     this.treeContainer = document.getElementById('entity-tree-container');
+    this.mapContainer = document.getElementById('entity-map-container');
     this.btnViewTable = document.getElementById('btn-view-table');
     this.btnViewTreeH = document.getElementById('btn-view-tree-h');
     this.btnViewTreeV = document.getElementById('btn-view-tree-v');
+    this.btnViewMap = document.getElementById('btn-view-map');
+    this.mapLabelsToggle = document.getElementById('map-labels-toggle');
+    this.mapLabelsCheckbox = document.getElementById('map-show-labels');
 
     // Initialize components
     EntityTree.init('entity-tree-container');
     EntityTable.init('entity-table-container');
 
-    // Restore view mode from session
+    // Restore view mode from session (note: 'map' mode is not restored, requires active view)
     const savedViewMode = sessionStorage.getItem('viewMode');
     if (savedViewMode && ['table', 'tree-h', 'tree-v'].includes(savedViewMode)) {
       this.viewMode = savedViewMode;
@@ -480,6 +486,10 @@ const EntityExplorer = {
     this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
     this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
     this.btnViewTreeV.addEventListener('click', () => this.setViewMode('tree-v'));
+    this.btnViewMap.addEventListener('click', () => this.setViewMode('map'));
+    this.mapLabelsCheckbox.addEventListener('change', (e) => {
+      EntityMap.togglePermanentLabels(e.target.checked);
+    });
 
     // Refresh counts button
     const btnRefresh = document.getElementById('btn-refresh-counts');
@@ -684,9 +694,16 @@ const EntityExplorer = {
   async onEntityChange() {
     const entityName = this.selectorValue;
 
-    // Restore tree buttons (may have been hidden in view mode)
+    // Restore tree buttons (may have been hidden in view mode), hide map controls
     this.btnViewTreeH.style.display = '';
     this.btnViewTreeV.style.display = '';
+    this.btnViewMap.style.display = 'none';
+    this.mapLabelsToggle.style.display = 'none';
+    // If we were in map mode, switch back to default
+    if (this.viewMode === 'map') {
+      this.viewMode = 'tree-v';
+    }
+    this.updateViewToggle();
 
     if (!entityName) {
       this.currentEntity = null;
@@ -729,9 +746,11 @@ const EntityExplorer = {
     this.records = [];
     this.prefilterFields = null;
 
-    // Force table view, hide tree buttons
+    // Force table view, hide tree buttons, hide map controls (will show if hasGeo)
     this.btnViewTreeH.style.display = 'none';
     this.btnViewTreeV.style.display = 'none';
+    this.btnViewMap.style.display = 'none';
+    this.mapLabelsToggle.style.display = 'none';
     this.viewMode = 'table';
     this.updateViewToggle();
 
@@ -751,6 +770,12 @@ const EntityExplorer = {
       this.currentViewSchema = viewSchema;  // Cache for loadMoreRecords
       this.prefilterFields = viewSchema.prefilter || null;
       this.requiredFilterFields = viewSchema.requiredFilter || null;
+
+      // Show map button and labels toggle if view has geo column
+      if (viewSchema.hasGeo) {
+        this.btnViewMap.style.display = '';
+        this.mapLabelsToggle.style.display = '';
+      }
 
       const config = await this.getPaginationConfig();
 
@@ -971,15 +996,18 @@ const EntityExplorer = {
 
   updateViewToggle() {
     const isTree = this.viewMode === 'tree-h' || this.viewMode === 'tree-v';
+    const isMap = this.viewMode === 'map';
 
     // Update button states
     this.btnViewTable.classList.toggle('active', this.viewMode === 'table');
     this.btnViewTreeH.classList.toggle('active', this.viewMode === 'tree-h');
     this.btnViewTreeV.classList.toggle('active', this.viewMode === 'tree-v');
+    this.btnViewMap.classList.toggle('active', isMap);
 
     // Show/hide containers
     this.tableContainer.classList.toggle('hidden', this.viewMode !== 'table');
     this.treeContainer.classList.toggle('hidden', !isTree);
+    this.mapContainer.classList.toggle('hidden', !isMap);
 
     // Update EntityTree attribute layout based on view mode
     // This will re-render the tree if layout changed, preserving expanded nodes
@@ -991,13 +1019,37 @@ const EntityExplorer = {
   renderCurrentView() {
     if (this.viewMode === 'table') {
       this.renderTable();
+    } else if (this.viewMode === 'map') {
+      this.renderMap();
     } else {
       // Both tree-h and tree-v use the tree renderer
       this.renderTree();
     }
   },
 
+  renderMap() {
+    if (!this.currentView || !this.currentViewSchema) {
+      this.mapContainer.innerHTML = `<p class="empty-message">Select a view with geo data</p>`;
+      return;
+    }
+
+    if (this.records.length === 0) {
+      this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+      return;
+    }
+
+    // Delegate to EntityMap component
+    EntityMap.loadView(this.currentViewSchema, this.records);
+  },
+
   async renderTable() {
+    // View mode: render view table
+    if (this.currentView && this.currentViewSchema) {
+      await EntityTable.loadView(this.currentView.name, this.currentViewSchema, this.records);
+      return;
+    }
+
+    // Entity mode
     if (!this.currentEntity) {
       this.tableContainer.innerHTML = `<p class="empty-message">${i18n.t('select_entity_message')}</p>`;
       return;

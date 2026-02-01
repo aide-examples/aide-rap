@@ -54,10 +54,15 @@ module.exports = function() {
         return res.status(404).json({ error: `View "${req.params.name}" not found` });
       }
 
+      // Check if view has any geo columns (for map view toggle)
+      // Geo columns are expanded to latitude/longitude with aggregateType='geo'
+      const hasGeo = view.columns.some(c => c.aggregateType === 'geo');
+
       res.json({
         name: view.name,
         base: view.base,
         color: view.color,
+        hasGeo,
         columns: view.columns.map(c => {
           const col = { key: c.sqlAlias, label: c.label, type: c.jsType };
           if (c.path) col.path = c.path; // Original column path for prefilter matching

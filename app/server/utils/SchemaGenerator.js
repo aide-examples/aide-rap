@@ -87,7 +87,8 @@ const TYPE_MAP = {
   string: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string' } },
   date: { sqlType: 'TEXT', jsType: 'string', validation: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' } },
   bool: { sqlType: 'INTEGER', jsType: 'boolean', validation: { type: 'boolean' } },
-  boolean: { sqlType: 'INTEGER', jsType: 'boolean', validation: { type: 'boolean' } }
+  boolean: { sqlType: 'INTEGER', jsType: 'boolean', validation: { type: 'boolean' } },
+  geo: { sqlType: 'TEXT', jsType: 'geo', validation: { type: 'string' } }
 };
 
 /**
