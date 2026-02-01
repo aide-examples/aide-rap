@@ -133,6 +133,53 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
       }
       throw new Error(`Column "${colName}" not found in entity "${baseEntityName}"`);
     }
+
+    // If this is a FK column, auto-resolve to the target entity's label
+    if (col.foreignKey) {
+      const targetEntityName = col.foreignKey.entity;
+      const targetEntity = schema.entities[targetEntityName];
+
+      if (!targetEntity) {
+        throw new Error(`FK target entity "${targetEntityName}" not found in schema`);
+      }
+
+      // Find label column in target entity
+      const labelCol = targetEntity.columns.find(c => c.isLabel) ||
+                       targetEntity.columns.find(c => c.name === 'name' || c.name === 'designation' || c.name === 'title');
+
+      if (!labelCol) {
+        // Fallback: just return the FK id (no join)
+        return {
+          joins: [],
+          selectExpr: `b.${col.name}`,
+          label: titleCase(col.displayName || col.name),
+          jsType: col.jsType || 'string',
+          entityName: baseEntityName
+        };
+      }
+
+      // Build join to get the label
+      const alias = 'j_' + (col.displayName || colName);
+      const join = {
+        alias,
+        table: targetEntity.tableName,
+        onLeft: `b.${col.name}`,
+        onRight: `${alias}.id`
+      };
+
+      return {
+        joins: [join],
+        selectExpr: `${alias}.${labelCol.name}`,
+        label: titleCase(col.displayName || col.name),
+        jsType: labelCol.jsType || 'string',
+        entityName: targetEntityName,
+        fkInfo: {
+          fkEntity: targetEntityName,
+          fkIdExpr: `b.${col.name}`
+        }
+      };
+    }
+
     return {
       joins: [],
       selectExpr: `b.${col.name}`,
