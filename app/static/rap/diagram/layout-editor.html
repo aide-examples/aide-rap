@@ -553,8 +553,8 @@
             const hasEnums = Object.values(globalTypesObj).some(t => t.kind === 'enum');
             const hasAggregates = Object.values(globalTypesObj).some(t => t.kind === 'aggregate');
             const hasPatterns = Object.values(globalTypesObj).some(t => t.kind === 'pattern');
-            const typeCategories = (hasEnums ? 1 : 0) + (hasAggregates ? 1 : 0) + (hasPatterns ? 1 : 0);
-            const legendRows = Math.max(numAreas, typeCategories);
+            const numTypeCategories = (hasEnums ? 1 : 0) + (hasAggregates ? 1 : 0) + (hasPatterns ? 1 : 0);
+            const legendRows = Math.max(numAreas, numTypeCategories);
             const legendHeight = 30 + legendRows * 20 + 20; // header + rows + bottom padding
 
             const width = maxX;
