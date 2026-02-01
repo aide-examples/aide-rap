@@ -82,7 +82,8 @@ module.exports = function() {
         ...(view.calculator ? { calculator: view.calculator } : {}),
         ...(view.prefilter ? { prefilter: view.prefilter } : {}),
         ...(view.requiredFilter ? { requiredFilter: view.requiredFilter } : {}),
-        ...(view.defaultSort ? { defaultSort: view.defaultSort } : {})
+        ...(view.defaultSort ? { defaultSort: view.defaultSort } : {}),
+        ...(view.chart ? { chart: view.chart } : {})
       });
     } catch (err) {
       logger.error('Failed to get view schema', { error: err.message });

@@ -708,7 +708,8 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 - [ ] Accessibility (ARIA labels, high-contrast mode, screen reader support)
 
 ### Visualization
-- [ ] Simple charts (count by status, by type)
+- [x] **Chart View** – Vega-Lite based charts in Views (bar, line, point, arc). Define `chart` property with encoding spec.
+- [x] **Map View** – Leaflet maps for entities/views with geo columns, marker clustering, tooltips
 - [ ] Timeline view for date fields
 
 ---
@@ -721,6 +722,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 
 ### Reference
 
+- [Scalar Types](scalar-types.md) – `int`, `number`, `string`, `date`, `bool` – built-in attribute types
 - [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
 - [Aggregate Types](aggregate-types.md) – `geo`, `address`, and custom composite types
 - [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships

@@ -18,6 +18,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <!-- Vega-Lite for chart views -->
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 </head>
 <body>
     <div class="app-container page-fill">
@@ -100,6 +104,15 @@
                                     <path d="M7 0C4.5 0 2.5 2 2.5 4.5C2.5 8 7 14 7 14S11.5 8 11.5 4.5C11.5 2 9.5 0 7 0ZM7 6.5C5.9 6.5 5 5.6 5 4.5S5.9 2.5 7 2.5S9 3.4 9 4.5S8.1 6.5 7 6.5Z"/>
                                 </svg>
                             </button>
+                            <button id="btn-view-chart" class="btn-view-mode" title="Chart view" data-i18n-title="tooltip_chart_view" style="display:none">
+                                <!-- Bar chart icon -->
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                    <rect x="0" y="8" width="3" height="6"/>
+                                    <rect x="4" y="4" width="3" height="10"/>
+                                    <rect x="8" y="6" width="3" height="8"/>
+                                    <rect x="12" y="2" width="2" height="12"/>
+                                </svg>
+                            </button>
                             <label id="map-labels-toggle" class="map-labels-toggle" style="display:none" title="Show marker labels">
                                 <input type="checkbox" id="map-show-labels" checked>
                                 <span>Labels</span>
@@ -135,6 +148,10 @@
 
                     <!-- Entity Map (map view) -->
                     <div id="entity-map-container" class="entity-map hidden">
+                    </div>
+
+                    <!-- Entity Chart (chart view) -->
+                    <div id="entity-chart-container" class="entity-chart hidden">
                     </div>
                 </section>
 
@@ -209,6 +226,7 @@
     <script src="/static/rap/components/entity-tree.js"></script>
     <script src="/static/rap/components/entity-table.js"></script>
     <script src="/static/rap/components/entity-map.js"></script>
+    <script src="/static/rap/components/entity-chart.js"></script>
     <script src="/static/rap/components/entity-explorer.js"></script>
     <script src="/static/rap/components/detail-panel.js"></script>
     <script src="/static/rap/components/media-upload.js"></script>

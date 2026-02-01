@@ -15,10 +15,12 @@ const EntityExplorer = {
   tableContainer: null,
   treeContainer: null,
   mapContainer: null,
+  chartContainer: null,
   btnViewTable: null,
   btnViewTreeH: null,
   btnViewTreeV: null,
   btnViewMap: null,
+  btnViewChart: null,
   currentEntity: null,
   currentEntitySchema: null, // Cached entity schema for map rendering
   currentView: null, // null = entity mode, object = view mode { name, base, color }
@@ -445,16 +447,19 @@ const EntityExplorer = {
     this.tableContainer = document.getElementById('entity-table-container');
     this.treeContainer = document.getElementById('entity-tree-container');
     this.mapContainer = document.getElementById('entity-map-container');
+    this.chartContainer = document.getElementById('entity-chart-container');
     this.btnViewTable = document.getElementById('btn-view-table');
     this.btnViewTreeH = document.getElementById('btn-view-tree-h');
     this.btnViewTreeV = document.getElementById('btn-view-tree-v');
     this.btnViewMap = document.getElementById('btn-view-map');
+    this.btnViewChart = document.getElementById('btn-view-chart');
     this.mapLabelsToggle = document.getElementById('map-labels-toggle');
     this.mapLabelsCheckbox = document.getElementById('map-show-labels');
 
     // Initialize components
     EntityTree.init('entity-tree-container');
     EntityTable.init('entity-table-container');
+    EntityChart.init('entity-chart-container');
 
     // Restore view mode from session (note: 'map' mode is not restored, requires active view)
     const savedViewMode = sessionStorage.getItem('viewMode');
@@ -488,6 +493,7 @@ const EntityExplorer = {
     this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
     this.btnViewTreeV.addEventListener('click', () => this.setViewMode('tree-v'));
     this.btnViewMap.addEventListener('click', () => this.setViewMode('map'));
+    this.btnViewChart.addEventListener('click', () => this.setViewMode('chart'));
     this.mapLabelsCheckbox.addEventListener('change', (e) => {
       EntityMap.togglePermanentLabels(e.target.checked);
     });
@@ -735,6 +741,8 @@ const EntityExplorer = {
         this.btnViewMap.style.display = '';
         this.mapLabelsToggle.style.display = '';
       }
+      // Hide chart button for entities (charts are view-only)
+      this.btnViewChart.style.display = 'none';
     } catch (e) {
       this.currentEntitySchema = null;
       this.prefilterFields = null;
@@ -757,10 +765,11 @@ const EntityExplorer = {
     this.records = [];
     this.prefilterFields = null;
 
-    // Force table view, hide tree buttons, hide map controls (will show if hasGeo)
+    // Force table view, hide tree buttons, hide map/chart controls (will show if hasGeo/chart)
     this.btnViewTreeH.style.display = 'none';
     this.btnViewTreeV.style.display = 'none';
     this.btnViewMap.style.display = 'none';
+    this.btnViewChart.style.display = 'none';
     this.mapLabelsToggle.style.display = 'none';
     this.viewMode = 'table';
     this.updateViewToggle();
@@ -786,6 +795,10 @@ const EntityExplorer = {
       if (viewSchema.hasGeo) {
         this.btnViewMap.style.display = '';
         this.mapLabelsToggle.style.display = '';
+      }
+      // Show chart button if view has chart config
+      if (viewSchema.chart) {
+        this.btnViewChart.style.display = '';
       }
 
       const config = await this.getPaginationConfig();
@@ -1008,17 +1021,20 @@ const EntityExplorer = {
   updateViewToggle() {
     const isTree = this.viewMode === 'tree-h' || this.viewMode === 'tree-v';
     const isMap = this.viewMode === 'map';
+    const isChart = this.viewMode === 'chart';
 
     // Update button states
     this.btnViewTable.classList.toggle('active', this.viewMode === 'table');
     this.btnViewTreeH.classList.toggle('active', this.viewMode === 'tree-h');
     this.btnViewTreeV.classList.toggle('active', this.viewMode === 'tree-v');
     this.btnViewMap.classList.toggle('active', isMap);
+    this.btnViewChart.classList.toggle('active', isChart);
 
     // Show/hide containers
     this.tableContainer.classList.toggle('hidden', this.viewMode !== 'table');
     this.treeContainer.classList.toggle('hidden', !isTree);
     this.mapContainer.classList.toggle('hidden', !isMap);
+    this.chartContainer.classList.toggle('hidden', !isChart);
 
     // Update EntityTree attribute layout based on view mode
     // This will re-render the tree if layout changed, preserving expanded nodes
@@ -1032,6 +1048,8 @@ const EntityExplorer = {
       this.renderTable();
     } else if (this.viewMode === 'map') {
       this.renderMap();
+    } else if (this.viewMode === 'chart') {
+      this.renderChart();
     } else {
       // Both tree-h and tree-v use the tree renderer
       this.renderTree();
@@ -1060,6 +1078,20 @@ const EntityExplorer = {
     }
 
     this.mapContainer.innerHTML = `<p class="empty-message">Select a view or entity with geo data</p>`;
+  },
+
+  renderChart() {
+    // Charts are only available for views with chart config
+    if (this.currentView && this.currentViewSchema && this.currentViewSchema.chart) {
+      if (this.records.length === 0) {
+        this.chartContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+        return;
+      }
+      EntityChart.load(this.currentViewSchema, this.records);
+      return;
+    }
+
+    this.chartContainer.innerHTML = `<p class="empty-message">Select a view with chart configuration</p>`;
   },
 
   async renderTable() {

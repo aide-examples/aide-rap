@@ -7,11 +7,12 @@
 
 const path = require('path');
 const express = require('express');
-const { initDatabase, closeDatabase } = require('./config/database');
+const { initDatabase, closeDatabase, watchViewsFile } = require('./config/database');
 const { correlationId, requestLogger, errorHandler } = require('./middleware');
 const GenericCrudRouter = require('./routers/GenericCrudRouter');
 const AuditRouter = require('./routers/audit.router');
 const mediaRouter = require('./routers/media.router');
+const adminRouter = require('./routers/admin.router');
 const ComputedFieldService = require('./services/ComputedFieldService');
 const AuditService = require('./services/AuditService');
 const MediaService = require('./services/MediaService');
@@ -40,6 +41,9 @@ function init(app, config) {
 
   // Initialize database
   initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, entityTableOptions);
+
+  // Watch Views.md for hot-reload (development convenience)
+  watchViewsFile();
 
   // Initialize audit trail (after database)
   AuditService.init();
@@ -82,6 +86,9 @@ function init(app, config) {
 
   // Mount Media router (file upload/management)
   app.use('/api/media', mediaRouter(mediaService, config));
+
+  // Mount Admin router (development tools)
+  app.use(adminRouter());
 
   // Error handler (after routes)
   app.use('/api', errorHandler);

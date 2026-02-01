@@ -924,7 +924,8 @@ function parseAllUserViews(viewsConfig, schema) {
       calculator: entry.calculator || null,
       prefilter: entry.prefilter || null,
       requiredFilter: entry.requiredFilter || null,
-      defaultSort: defaultSort
+      defaultSort: defaultSort,
+      chart: entry.chart || null
     };
 
     // Deduplicate joins by alias

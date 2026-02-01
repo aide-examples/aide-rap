@@ -155,6 +155,8 @@ See [Computed References](computed-references.md) for full syntax.
 
 ## See Also
 
+- [Scalar Types](scalar-types.md) — `int`, `number`, `string`, `date`, `bool`
+- [Aggregate Types](aggregate-types.md) — Composite types like `geo`
 - [Procedures: Add Attribute](procedures/attribute-add.md) — Step-by-step guide
 - [Procedures: Add Entity](procedures/entity-add.md) — Complete entity checklist
 - [Database Features](procedures/database-features.md) — System columns, audit trail

@@ -433,6 +433,182 @@ Shows a filter dialog only when the dataset exceeds the pagination threshold:
 
 ---
 
+## Chart View
+
+Views can include a `chart` property that defines a Vega-Lite visualization. When present, a **Chart** button appears in the view toggle (alongside Table, Tree, Map).
+
+### Syntax
+
+Add a `chart` object containing a Vega-Lite specification (without `$schema`, `width`, `data`):
+
+```json
+{
+  "name": "Stands by Engine Type",
+  "base": "EngineType",
+  "columns": [
+    "designation AS Engine Type",
+    "EngineStand<engine_type(COUNT) AS Stands"
+  ],
+  "chart": {
+    "mark": "bar",
+    "encoding": {
+      "x": { "field": "Engine Type", "type": "nominal" },
+      "y": { "field": "Stands", "type": "quantitative" }
+    }
+  }
+}
+```
+
+### Chart Object
+
+The `chart` property accepts any valid [Vega-Lite](https://vega.github.io/vega-lite/) specification fragment. The system automatically adds:
+
+- `$schema`: Vega-Lite v5 schema URL
+- `width`: `"container"` (responsive width)
+- `height`: 400 (default height)
+- `data.values`: View records (filtered to visible columns)
+
+You define only the visualization-specific parts:
+
+| Property | Description | Example |
+|----------|-------------|---------|
+| `mark` | Chart type | `"bar"`, `"line"`, `"point"`, `"arc"` |
+| `encoding` | Data-to-visual mappings | See below |
+| `title` | Chart title (optional) | `"Engine Distribution"` |
+
+### Encoding
+
+The `encoding` object maps data fields to visual channels:
+
+```json
+"encoding": {
+  "x": {
+    "field": "Engine Type",
+    "type": "nominal",
+    "axis": { "labelAngle": -45 }
+  },
+  "y": {
+    "field": "Stands",
+    "type": "quantitative",
+    "axis": { "tickMinStep": 1, "format": "d" }
+  },
+  "color": {
+    "field": "Engine Type",
+    "type": "nominal",
+    "legend": null
+  }
+}
+```
+
+| Channel | Purpose | Common Types |
+|---------|---------|--------------|
+| `x` | Horizontal position | `nominal`, `ordinal`, `quantitative`, `temporal` |
+| `y` | Vertical position | `nominal`, `ordinal`, `quantitative`, `temporal` |
+| `color` | Fill color | `nominal`, `quantitative` |
+| `size` | Mark size | `quantitative` |
+| `shape` | Mark shape | `nominal` |
+| `tooltip` | Hover tooltip | `nominal`, `quantitative` |
+
+### Field Names
+
+Use the **column alias** (the part after `AS`) as the field name in encodings:
+
+```json
+"columns": [
+  "designation AS Engine Type",        // ← Use "Engine Type" in chart
+  "EngineStand<engine_type(COUNT) AS Stands"  // ← Use "Stands" in chart
+]
+```
+
+### Chart Types
+
+| Mark | Use Case | Example |
+|------|----------|---------|
+| `bar` | Categorical comparison | Counts by category |
+| `line` | Trends over time | Time series |
+| `point` | Scatter plot | Correlation analysis |
+| `arc` | Pie/donut chart | Proportions |
+| `area` | Cumulative trends | Stacked time series |
+
+### Example: Bar Chart with Styling
+
+```json
+{
+  "name": "Stands by Engine Type",
+  "base": "EngineType",
+  "columns": [
+    "designation AS Engine Type",
+    "EngineStand<engine_type(COUNT) AS Stands"
+  ],
+  "chart": {
+    "mark": "bar",
+    "encoding": {
+      "x": {
+        "field": "Engine Type",
+        "type": "nominal",
+        "axis": { "labelFontSize": 14, "labelColor": "black", "labelAngle": -45 }
+      },
+      "y": {
+        "field": "Stands",
+        "type": "quantitative",
+        "axis": { "tickMinStep": 1, "format": "d", "labelFontSize": 14, "labelColor": "black" }
+      },
+      "color": { "field": "Engine Type", "type": "nominal", "legend": null }
+    }
+  }
+}
+```
+
+### UI Behavior
+
+- The **Chart** button appears in the view toggle only when `chart` is defined
+- Charts use the Quartz theme and SVG rendering
+- Charts are responsive (width adjusts to container)
+- Chart data is prepared from the same records shown in the table view
+
+### Vega-Lite Resources
+
+- [Vega-Lite Documentation](https://vega.github.io/vega-lite/docs/)
+- [Example Gallery](https://vega.github.io/vega-lite/examples/)
+- [Online Editor](https://vega.github.io/editor/)
+
+---
+
+## Map View
+
+Views with **geo columns** (type `geo`) automatically get a **Map** button. Clicking it displays records as markers on an interactive Leaflet map.
+
+### Requirements
+
+For Map View to appear, the view must include columns of type `geo` (which expand to latitude/longitude pairs):
+
+```json
+{
+  "name": "Stand Tracking",
+  "base": "EngineStand",
+  "columns": [
+    "serial_number AS Stand",
+    "EngineTracker<stand(LIMIT 1).position AS Position"
+  ]
+}
+```
+
+The `position` column (type `geo`) provides the coordinates for map markers.
+
+### Map Features
+
+- **Marker clustering**: Groups nearby markers at low zoom levels
+- **Tooltips**: Show the label field (first non-geo column)
+- **Popups**: Click markers to see all column values
+- **Auto-zoom**: Fits bounds to show all markers
+- **Toggle labels**: Show/hide permanent marker labels
+
+### See Also
+
+- [Aggregate Types: geo](../aggregate-types.md#built-in-geo) — GPS coordinate storage
+
+---
+
 ## Limitations
 
 - **Single-level back-references**: Back-reference columns support one inbound FK step with optional outbound FK-following. Chaining multiple back-references (e.g., `...column<Entity(...)`) is not supported.

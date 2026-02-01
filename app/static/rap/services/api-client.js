@@ -15,6 +15,47 @@ const ApiClient = {
     return `${this.baseUrl}/${entityName}`;
   },
 
+  // --- Internal helpers for unified logic ---
+
+  /**
+   * Build query params for data requests (shared by getAll and getViewData)
+   * @private
+   */
+  _buildDataParams(options) {
+    const params = new URLSearchParams();
+    if (options.filter) params.set('filter', options.filter);
+    if (options.sort) params.set('sort', options.sort);
+    if (options.order) params.set('order', options.order);
+    if (options.limit) params.set('limit', options.limit);
+    if (options.offset) params.set('offset', options.offset);
+    return params;
+  },
+
+  /**
+   * Fetch data from a base URL with optional query params
+   * @private
+   */
+  _fetchData(baseUrl, options = {}) {
+    const params = this._buildDataParams(options);
+    const queryString = params.toString();
+    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+    return this.request(url);
+  },
+
+  /**
+   * Fetch distinct values from a base URL
+   * @private
+   */
+  _fetchDistinct(baseUrl, columnPath, type = 'select') {
+    const params = new URLSearchParams();
+    if (type && type !== 'select') params.set('type', type);
+    const queryString = params.toString();
+    const url = queryString
+      ? `${baseUrl}/distinct/${encodeURIComponent(columnPath)}?${queryString}`
+      : `${baseUrl}/distinct/${encodeURIComponent(columnPath)}`;
+    return this.request(url);
+  },
+
   /**
    * Make a fetch request with error handling
    */
@@ -89,14 +130,7 @@ const ApiClient = {
    * @param {string} type - Extraction type: 'select' (default), 'year', or 'month'
    */
   async getDistinctValues(entityName, columnPath, type = 'select') {
-    const params = new URLSearchParams();
-    if (type && type !== 'select') params.set('type', type);
-    const queryString = params.toString();
-    const baseUrl = this.getEntityUrl(entityName);
-    const url = queryString
-      ? `${baseUrl}/distinct/${encodeURIComponent(columnPath)}?${queryString}`
-      : `${baseUrl}/distinct/${encodeURIComponent(columnPath)}`;
-    return this.request(url);
+    return this._fetchDistinct(this.getEntityUrl(entityName), columnPath, type);
   },
 
   /**
@@ -105,18 +139,7 @@ const ApiClient = {
    * @param {Object} options - { filter, sort, order, limit, offset }
    */
   async getAll(entityName, options = {}) {
-    const params = new URLSearchParams();
-    if (options.filter) params.set('filter', options.filter);
-    if (options.sort) params.set('sort', options.sort);
-    if (options.order) params.set('order', options.order);
-    if (options.limit) params.set('limit', options.limit);
-    if (options.offset) params.set('offset', options.offset);
-
-    const queryString = params.toString();
-    const baseUrl = this.getEntityUrl(entityName);
-    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
-
-    return this.request(url);
+    return this._fetchData(this.getEntityUrl(entityName), options);
   },
 
   /**
@@ -179,19 +202,7 @@ const ApiClient = {
    * @param {Object} options - { filter, sort, order, limit, offset }
    */
   async getViewData(viewName, options = {}) {
-    const params = new URLSearchParams();
-    if (options.filter) params.set('filter', options.filter);
-    if (options.sort) params.set('sort', options.sort);
-    if (options.order) params.set('order', options.order);
-    if (options.limit) params.set('limit', options.limit);
-    if (options.offset) params.set('offset', options.offset);
-
-    const queryString = params.toString();
-    const url = queryString
-      ? `/api/views/${encodeURIComponent(viewName)}?${queryString}`
-      : `/api/views/${encodeURIComponent(viewName)}`;
-
-    return this.request(url);
+    return this._fetchData(`/api/views/${encodeURIComponent(viewName)}`, options);
   },
 
   /**
@@ -209,13 +220,7 @@ const ApiClient = {
    * @param {string} type - Extraction type: 'select' (default), 'year', or 'month'
    */
   async getViewDistinctValues(viewName, columnName, type = 'select') {
-    const params = new URLSearchParams();
-    if (type && type !== 'select') params.set('type', type);
-    const queryString = params.toString();
-    const url = queryString
-      ? `/api/views/${encodeURIComponent(viewName)}/distinct/${encodeURIComponent(columnName)}?${queryString}`
-      : `/api/views/${encodeURIComponent(viewName)}/distinct/${encodeURIComponent(columnName)}`;
-    return this.request(url);
+    return this._fetchDistinct(`/api/views/${encodeURIComponent(viewName)}`, columnName, type);
   },
 };
 

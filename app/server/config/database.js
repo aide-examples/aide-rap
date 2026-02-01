@@ -703,6 +703,82 @@ function reloadSchema() {
   return { success: true, hash: newHash, warning };
 }
 
+/**
+ * Reload only user views (without full schema reload)
+ * More efficient for Views.md changes
+ */
+function reloadUserViews() {
+  if (!db || !storedDataModelPath) {
+    throw new Error('Cannot reload views: database was never initialized');
+  }
+
+  const requirementsDir = path.dirname(storedDataModelPath);
+  const UISpecLoader = require('../utils/UISpecLoader');
+  const mdViews = UISpecLoader.loadViewsConfig(requirementsDir);
+
+  if (mdViews) {
+    storedViewsConfig = mdViews;
+    createUserViews(storedViewsConfig);
+    logger.info('User views reloaded from Views.md');
+    eventBus.emit('views:reload:after', schema.userViews);
+  }
+
+  return { success: true, viewCount: schema.userViews?.length || 0 };
+}
+
+/**
+ * Watch Views.md for changes and auto-reload
+ * Uses debounce to avoid multiple reloads on rapid saves
+ */
+let viewsWatcher = null;
+let viewsReloadTimeout = null;
+
+function watchViewsFile() {
+  if (!storedDataModelPath) return;
+
+  const requirementsDir = path.dirname(storedDataModelPath);
+  const viewsPath = path.join(requirementsDir, 'ui', 'Views.md');
+
+  if (!fs.existsSync(viewsPath)) {
+    logger.debug('Views.md not found, skipping file watch');
+    return;
+  }
+
+  // Close existing watcher if any
+  if (viewsWatcher) {
+    viewsWatcher.close();
+  }
+
+  viewsWatcher = fs.watch(viewsPath, (eventType) => {
+    if (eventType === 'change') {
+      // Debounce: wait 500ms before reloading (IDEs often save multiple times)
+      if (viewsReloadTimeout) {
+        clearTimeout(viewsReloadTimeout);
+      }
+      viewsReloadTimeout = setTimeout(() => {
+        try {
+          reloadUserViews();
+        } catch (err) {
+          logger.error('Failed to reload views on file change', { error: err.message });
+        }
+      }, 500);
+    }
+  });
+
+  logger.info('Watching Views.md for changes');
+}
+
+function unwatchViewsFile() {
+  if (viewsWatcher) {
+    viewsWatcher.close();
+    viewsWatcher = null;
+  }
+  if (viewsReloadTimeout) {
+    clearTimeout(viewsReloadTimeout);
+    viewsReloadTimeout = null;
+  }
+}
+
 module.exports = {
   initDatabase,
   getDatabase,
@@ -710,6 +786,9 @@ module.exports = {
   getSchemaHash,
   checkSchemaChanged,
   reloadSchema,
+  reloadUserViews,
+  watchViewsFile,
+  unwatchViewsFile,
   getEntityPrefilters,
   getRequiredFilters,
   getTableOptions,

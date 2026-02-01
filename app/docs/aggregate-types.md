@@ -185,7 +185,7 @@ A tracking device fixed at the cradle of an EngineStand.
 | `position_latitude` | REAL | geo.latitude |
 | `position_longitude` | REAL | geo.longitude |
 | `mounted_date` | TEXT | date |
-| `battery_soc` | INTEGER | number |
+| `battery_soc` | REAL | number |
 
 ---
 
@@ -227,6 +227,7 @@ Define custom aggregate types in `Types.md`:
 
 ## See Also
 
+- [Scalar Types](scalar-types.md) — `int`, `number`, `string`, `date`, `bool`
 - [Attribute Markers](attribute-markers.md) — `[LABEL]`, `[READONLY]`, etc.
 - [Seed Data](seed-data.md) — Import/export formats
 - [Database Features](procedures/database-features.md) — System columns, schema

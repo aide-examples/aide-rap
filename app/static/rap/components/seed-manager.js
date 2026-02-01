@@ -269,6 +269,7 @@ const SeedManager = {
             <button class="btn-seed btn-clear-all">Clear All</button>
             <button class="btn-seed btn-reset-all">Reset All</button>
             <button class="btn-seed btn-reinit" title="Re-read data model and rebuild schema">Reinitialize</button>
+            <button class="btn-seed btn-reload-views" title="Reload Views.md without restart">Reload Views</button>
           </div>
         </div>
       </div>
@@ -312,6 +313,7 @@ const SeedManager = {
     this.container.querySelector('.btn-restore')?.addEventListener('click', () => this.restoreBackup());
     this.container.querySelector('.btn-restore-media')?.addEventListener('click', () => this.restoreMediaLinks());
     this.container.querySelector('.btn-reinit')?.addEventListener('click', () => this.reinitialize());
+    this.container.querySelector('.btn-reload-views')?.addEventListener('click', () => this.reloadViews());
     this.container.querySelector('.btn-new-system')?.addEventListener('click', () => this.openModelBuilder());
   },
 
@@ -594,6 +596,20 @@ const SeedManager = {
       } else {
         this.showMessage(data.error || 'Restore media links failed', true);
       }
+    } catch (err) {
+      this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Reload Views: re-read Views.md without full reinitialize
+   */
+  async reloadViews() {
+    try {
+      const res = await fetch('/api/admin/reload-views', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Reload failed');
+      this.showMessage(`Views reloaded (${data.viewCount} views). Refresh browser to see changes.`);
     } catch (err) {
       this.showMessage(err.message, true);
     }
