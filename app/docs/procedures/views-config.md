@@ -40,6 +40,10 @@ Views are defined in `config.json` under the `"views"` key, sibling to `"crud"`:
 | `name` | Yes | Display name shown in the Views dropdown |
 | `base` | Yes | Base entity (PascalCase). Determines the SQL base table, area color, and row-click target |
 | `columns` | Yes | Array of column definitions (see below) |
+| `sort` | No | Default sort column and order (see [Default Sorting](#default-sorting)) |
+| `requiredFilter` | No | Fields requiring user filter before loading (always shows dialog) |
+| `prefilter` | No | Fields for optional prefilter (dialog shown when dataset is large) |
+| `calculator` | No | Client-side JavaScript for row styling |
 
 ### Separators
 
@@ -106,6 +110,38 @@ The `OMIT` keyword suppresses specific values from display, rendering the cell a
 | `"serial_number OMIT 0"` | Suppress `0` |
 | `"type.designation AS Type"` | Suppress `null` (FK default) |
 | `"type.designation AS Type OMIT -"` | Suppress `-` (overrides FK default) |
+
+### `.*` — Aggregate Type Expansion
+
+The `.*` suffix expands [aggregate types](../aggregate-types.md) (like `geo`) into separate columns for each subfield.
+
+**Default behavior** (without `.*`): Aggregate fields display as a single canonical column:
+```json
+"position"         // → "48.1, 11.5" (one column)
+```
+
+**Expanded behavior** (with `.*`): Aggregate fields display as separate columns:
+```json
+"position.*"       // → "Latitude", "Longitude" (two columns)
+"position.* AS Pos"  // → "Pos Latitude", "Pos Longitude"
+```
+
+**With back-references:**
+```json
+"EngineTracker<stand(LIMIT 1).position.*"              // → "Position Latitude", "Position Longitude"
+"EngineTracker<stand(LIMIT 1).position.* AS Tracker"   // → "Tracker Latitude", "Tracker Longitude"
+```
+
+**Object syntax:**
+```json
+{ "path": "position.*", "label": "GPS" }   // → "GPS Latitude", "GPS Longitude"
+```
+
+| Format | Result |
+|--------|--------|
+| `"position"` | One column: "48.1, 11.5" |
+| `"position.*"` | Two columns: "Position Latitude", "Position Longitude" |
+| `"position.* AS Pos"` | Two columns: "Pos Latitude", "Pos Longitude" |
 
 ---
 
@@ -299,6 +335,101 @@ After adding or changing views, restart the server and check:
 - [ ] Table displays correct joined data
 - [ ] Column filters and sorting work
 - [ ] Row click navigates to base entity edit form
+
+---
+
+## Default Sorting
+
+Views can specify a default sort order that is applied when the view is first loaded.
+
+### Syntax
+
+**String format:**
+```json
+{
+  "name": "Engine Status",
+  "base": "Engine",
+  "sort": "serial_number",
+  "columns": [...]
+}
+```
+
+**With direction (DESC):**
+```json
+{
+  "sort": "total_cycles DESC"
+}
+```
+
+**Object format:**
+```json
+{
+  "sort": { "column": "serial_number", "order": "desc" }
+}
+```
+
+| Format | Result |
+|--------|--------|
+| `"sort": "name"` | Sort by `name` ascending |
+| `"sort": "date DESC"` | Sort by `date` descending |
+| `"sort": { "column": "id", "order": "asc" }` | Sort by `id` ascending |
+
+---
+
+## Required Filter & Prefilter
+
+Views support the same filter dialog behavior as CRUD entities.
+
+### Required Filter
+
+Forces a filter dialog before loading data (always shown, regardless of dataset size):
+
+```json
+{
+  "name": "Engine Allocations",
+  "base": "EngineAllocation",
+  "requiredFilter": ["aircraft.registration"],
+  "columns": [...]
+}
+```
+
+### Prefilter
+
+Shows a filter dialog only when the dataset exceeds the pagination threshold:
+
+```json
+{
+  "name": "All Events",
+  "base": "EngineEvent",
+  "prefilter": ["engine.serial_number:select", "event_type"],
+  "columns": [...]
+}
+```
+
+### Field Syntax
+
+| Suffix | Behavior |
+|--------|----------|
+| `"field"` | Text input with LIKE matching |
+| `"field:select"` | Dropdown with distinct values |
+
+### Combined Example
+
+```json
+{
+  "name": "Shop Visits",
+  "base": "EngineEvent",
+  "requiredFilter": ["shop.name:select"],
+  "prefilter": ["engine.type.designation:select"],
+  "sort": "event_date DESC",
+  "columns": [
+    "engine.serial_number AS ESN",
+    "event_date",
+    "shop.name AS Shop",
+    "workscope.designation AS Workscope"
+  ]
+}
+```
 
 ---
 

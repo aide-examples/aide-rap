@@ -82,12 +82,20 @@ const EntityTable = {
     this.currentViewConfig = null; // Exit view mode
     this.records = records;
     this.selectedId = null;
-    this.sortColumn = null;
-    this.sortDirection = 'asc';
     this.columnFilters = {}; // Reset filters on entity change
 
     // Get schema
     this.schema = await SchemaCache.getExtended(entityName);
+
+    // Apply default sort from tableOptions (if configured)
+    const defaultSort = this.schema?.ui?.tableOptions?.defaultSort;
+    if (defaultSort) {
+      this.sortColumn = defaultSort.column;
+      this.sortDirection = defaultSort.order || 'asc';
+    } else {
+      this.sortColumn = null;
+      this.sortDirection = 'asc';
+    }
 
     await this.render();
   },
@@ -100,10 +108,17 @@ const EntityTable = {
     this.currentViewConfig = viewSchema;
     this.records = records;
     this.selectedId = null;
-    this.sortColumn = null;
-    this.sortDirection = 'asc';
     this.columnFilters = {};
     this.schema = null;
+
+    // Apply default sort from view config
+    if (viewSchema.defaultSort) {
+      this.sortColumn = viewSchema.defaultSort.column;
+      this.sortDirection = viewSchema.defaultSort.order || 'asc';
+    } else {
+      this.sortColumn = null;
+      this.sortDirection = 'asc';
+    }
 
     this.renderView();
   },
@@ -117,7 +132,8 @@ const EntityTable = {
       return;
     }
 
-    const columns = this.currentViewConfig.columns.filter(c => !c.hidden && !c.autoHidden);
+    // Get visible columns and group aggregate sub-fields into canonical columns
+    const columns = this.getViewVisibleColumns();
     const sortedRecords = this.getViewSortedRecords(columns);
 
     let html = '<div class="entity-table-wrapper"><table class="entity-table">';
@@ -172,15 +188,35 @@ const EntityTable = {
 
       html += `<tr class="${rowClass}"${rowStyleAttr} data-id="${record.id}">`;
       for (const col of columns) {
-        const value = record[col.key];
         let displayValue = '';
-        if (value == null) {
-          // null/undefined: suppress unless no omit rule would hide it anyway
-        } else if (col.omit !== undefined && String(value) === col.omit) {
-          // value matches omit rule: suppress
+
+        if (col.isAggregateCanonical) {
+          // Aggregate canonical column: combine sub-fields into formatted string
+          const subValues = col.subColumns.map(subCol => record[subCol]);
+          const hasValue = subValues.some(v => v != null);
+          if (hasValue) {
+            if (col.aggregateType === 'geo') {
+              // Geo: "{latitude}, {longitude}"
+              const lat = subValues[0] ?? '';
+              const lng = subValues[1] ?? '';
+              displayValue = lat !== '' || lng !== '' ? `${lat}, ${lng}` : '';
+            } else {
+              // Generic: join with ", "
+              displayValue = subValues.filter(v => v != null).join(', ');
+            }
+            displayValue = DomUtils.escapeHtml(displayValue);
+          }
         } else {
-          displayValue = DomUtils.escapeHtml(String(value));
+          const value = record[col.key];
+          if (value == null) {
+            // null/undefined: suppress unless no omit rule would hide it anyway
+          } else if (col.omit !== undefined && String(value) === col.omit) {
+            // value matches omit rule: suppress
+          } else {
+            displayValue = DomUtils.escapeHtml(String(value));
+          }
         }
+
         // Calculator cell styles (e.g., row._cellStyles = { colKey: { backgroundColor: '#fff' } })
         // Support both titlecased key (e.g., 'Usage') and snake_case key (e.g., 'usage')
         const snakeCaseKey = col.key.toLowerCase().replace(/ /g, '_');
@@ -383,6 +419,65 @@ const EntityTable = {
     // 'inline' keeps the original order (schema or alpha)
 
     return columns;
+  },
+
+  /**
+   * Get visible columns for views, grouping aggregate sub-fields into canonical columns.
+   * Similar to getVisibleColumns() for entity tables.
+   */
+  getViewVisibleColumns() {
+    if (!this.currentViewConfig?.columns) return [];
+
+    let columns = this.currentViewConfig.columns.filter(c => !c.hidden && !c.autoHidden);
+
+    // Collapse aggregate sub-fields into canonical columns
+    const aggregateSources = new Map();  // sourceName -> { type, subCols }
+    const aggregateColKeys = new Set();
+
+    for (const col of columns) {
+      if (col.aggregateSource) {
+        const source = col.aggregateSource;
+        if (!aggregateSources.has(source)) {
+          aggregateSources.set(source, { type: col.aggregateType, subCols: [] });
+        }
+        aggregateSources.get(source).subCols.push(col);
+        aggregateColKeys.add(col.key);
+      }
+    }
+
+    // Replace aggregate sub-columns with single canonical column
+    const result = [];
+    const insertedAggregates = new Set();
+
+    for (const col of columns) {
+      if (col.aggregateSource) {
+        const source = col.aggregateSource;
+        if (!insertedAggregates.has(source)) {
+          insertedAggregates.add(source);
+          const aggInfo = aggregateSources.get(source);
+          // Use label from first sub-column, removing the field suffix
+          // e.g., "Pos Latitude" → "Pos"
+          const firstLabel = aggInfo.subCols[0].label || source;
+          const baseLabel = firstLabel.replace(/\s+(Latitude|Longitude|Street|City|Zip|Country)$/i, '').trim() || source;
+          // Create virtual canonical column
+          result.push({
+            key: source,
+            label: baseLabel,
+            type: aggInfo.type,
+            jsType: 'string',
+            isAggregateCanonical: true,
+            aggregateType: aggInfo.type,
+            subColumns: aggInfo.subCols.map(c => c.key),
+            areaColor: aggInfo.subCols[0].areaColor
+          });
+        }
+        // Skip individual sub-columns
+        continue;
+      }
+      result.push(col);
+    }
+
+    return result;
   },
 
   /**

@@ -30,22 +30,31 @@ function titleCase(str) {
 }
 
 /**
- * Parse a single column config entry into { path, label, omit }
+ * Parse a single column config entry into { path, label, omit, expandAggregate }
  *
  * Supports:
  *   "serial_number"                        → { path: "serial_number", label: null, omit: undefined }
  *   "type.designation AS Engine Type"      → { path: "type.designation", label: "Engine Type", omit: undefined }
  *   "mount_position AS pos OMIT 0"        → { path: "mount_position", label: "pos", omit: "0" }
  *   "total_cycles OMIT 0"                 → { path: "total_cycles", label: null, omit: "0" }
+ *   "position.*"                          → { path: "position", expandAggregate: true }
  *   { path: "type.manufacturer.name", label: "OEM" }           → as-is
  *   { path: "total_cycles", label: "Cycles", omit: 0 }         → omit: "0"
  */
 function parseColumnEntry(entry) {
   if (typeof entry === 'object' && entry.path) {
+    // Check for expandAggregate flag or .* suffix
+    let path = entry.path;
+    let expandAggregate = entry.expandAggregate || false;
+    if (path.endsWith('.*')) {
+      path = path.slice(0, -2);
+      expandAggregate = true;
+    }
     return {
-      path: entry.path,
+      path,
       label: entry.label || null,
-      omit: entry.omit !== undefined ? String(entry.omit) : undefined
+      omit: entry.omit !== undefined ? String(entry.omit) : undefined,
+      expandAggregate
     };
   }
 
@@ -63,9 +72,23 @@ function parseColumnEntry(entry) {
     // Then extract AS alias
     const asMatch = str.match(/^(.+?)\s+AS\s+(.+)$/i);
     if (asMatch) {
-      return { path: asMatch[1].trim(), label: asMatch[2].trim(), omit };
+      let path = asMatch[1].trim();
+      let expandAggregate = false;
+      if (path.endsWith('.*')) {
+        path = path.slice(0, -2);
+        expandAggregate = true;
+      }
+      return { path, label: asMatch[2].trim(), omit, expandAggregate };
     }
-    return { path: str.trim(), label: null, omit };
+
+    // Check for .* suffix (expand aggregate)
+    let path = str.trim();
+    let expandAggregate = false;
+    if (path.endsWith('.*')) {
+      path = path.slice(0, -2);
+      expandAggregate = true;
+    }
+    return { path, label: null, omit, expandAggregate };
   }
 
   return null;
@@ -97,6 +120,17 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
     const colName = segments[0];
     const col = entity.columns.find(c => c.name === colName || c.displayName === colName);
     if (!col) {
+      // Check if it's an aggregate source
+      const aggregateCols = entity.columns.filter(c => c.aggregateSource === colName);
+      if (aggregateCols.length > 0) {
+        return {
+          isAggregate: true,
+          aggregateSource: colName,
+          aggregateType: aggregateCols[0].aggregateType,
+          targetEntity: entity,
+          pathStr: colName
+        };
+      }
       throw new Error(`Column "${colName}" not found in entity "${baseEntityName}"`);
     }
     return {
@@ -156,6 +190,18 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
   );
 
   if (!col) {
+    // Check if it's an aggregate source
+    const aggregateCols = currentEntity.columns.filter(c => c.aggregateSource === terminalCol);
+    if (aggregateCols.length > 0) {
+      return {
+        isAggregate: true,
+        aggregateSource: terminalCol,
+        aggregateType: aggregateCols[0].aggregateType,
+        targetEntity: currentEntity,
+        pathStr: dotPath,
+        joins  // Include joins for FK path
+      };
+    }
     throw new Error(
       `Terminal column "${terminalCol}" not found in entity "${currentEntity.className}" ` +
       `(path: "${dotPath}", base: "${baseEntityName}")`
@@ -286,13 +332,27 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
       // Direct column on child entity
       const col = refEntity.columns.find(c => c.name === segments[0] || c.displayName === segments[0]);
       if (!col) {
-        throw new Error(
-          `Column "${segments[0]}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
-        );
+        // Check if it's an aggregate source (e.g., "position" → position_latitude, position_longitude)
+        const aggregateCols = refEntity.columns.filter(c => c.aggregateSource === segments[0]);
+        if (aggregateCols.length > 0) {
+          // Return aggregate marker - caller will expand to multiple columns
+          return {
+            isAggregate: true,
+            aggregateSource: segments[0],
+            aggregateType: aggregateCols[0].aggregateType,
+            targetEntity: refEntity,
+            pathStr
+          };
+        } else {
+          throw new Error(
+            `Column "${segments[0]}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
+          );
+        }
+      } else {
+        targetSelectExpr = `_br.${col.name}`;
+        targetLabel = titleCase(col.displayName || col.name);
+        targetJsType = col.jsType || 'string';
       }
-      targetSelectExpr = `_br.${col.name}`;
-      targetLabel = titleCase(col.displayName || col.name);
-      targetJsType = col.jsType || 'string';
     } else {
       // Multi-segment: walk FK chain from child entity
       let currentEntity = refEntity;
@@ -339,15 +399,28 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
         c => c.name === terminalColName || c.displayName === terminalColName
       );
       if (!col) {
-        throw new Error(
-          `Terminal column "${terminalColName}" not found in entity "${currentEntity.className}" ` +
-          `(back-ref tail: "${tailPath}", path: "${pathStr}")`
-        );
+        // Check if it's an aggregate source
+        const aggregateCols = currentEntity.columns.filter(c => c.aggregateSource === terminalColName);
+        if (aggregateCols.length > 0) {
+          // Return aggregate marker - caller will expand to multiple columns
+          return {
+            isAggregate: true,
+            aggregateSource: terminalColName,
+            aggregateType: aggregateCols[0].aggregateType,
+            targetEntity: currentEntity,
+            pathStr
+          };
+        } else {
+          throw new Error(
+            `Terminal column "${terminalColName}" not found in entity "${currentEntity.className}" ` +
+            `(back-ref tail: "${tailPath}", path: "${pathStr}")`
+          );
+        }
+      } else {
+        targetSelectExpr = `${currentAlias}.${col.name}`;
+        targetLabel = titleCase(col.displayName || col.name);
+        targetJsType = col.jsType || 'string';
       }
-
-      targetSelectExpr = `${currentAlias}.${col.name}`;
-      targetLabel = titleCase(col.displayName || col.name);
-      targetJsType = col.jsType || 'string';
       resolvedEntityName = currentEntity.className;
     }
   }
@@ -420,6 +493,295 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
 }
 
 /**
+ * Expand a back-reference path with aggregate type into individual columns.
+ *
+ * Supports:
+ *   "EngineTracker<stand(LIMIT 1).position" → expands to position_latitude, position_longitude subqueries
+ *
+ * @param {string} pathStr - Back-reference path (without .* suffix)
+ * @param {string} baseEntityName - The view's base entity
+ * @param {Object} schema - Full schema object
+ * @param {string|null} labelPrefix - Optional custom label prefix
+ * @param {boolean} includeMetadata - Include aggregateSource/Type/Field for client-side grouping
+ * @returns {Array<{ path, label, jsType, selectExpr, entityName, [aggregateSource], [aggregateType], [aggregateField] }>}
+ */
+function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPrefix = null, includeMetadata = false) {
+  // Parse back-ref: Entity<fk(params).tailPath
+  const match = pathStr.match(/^(\w+)<(\w+)\(([^)]*)\)(?:\.(.+))?$/);
+  if (!match) {
+    throw new Error(`Invalid back-reference syntax for aggregate expansion: "${pathStr}"`);
+  }
+
+  const [, refEntityName, fkFieldName, paramsStr, tailPath] = match;
+
+  // Validate child entity
+  const refEntity = schema.entities[refEntityName];
+  if (!refEntity) {
+    throw new Error(`Back-ref entity "${refEntityName}" not found in schema`);
+  }
+
+  // Find FK column in child entity that points to base entity
+  const fkCol = refEntity.columns.find(
+    c => c.foreignKey && (c.displayName === fkFieldName || c.name === fkFieldName || c.name === fkFieldName + '_id')
+  );
+  if (!fkCol || !fkCol.foreignKey) {
+    throw new Error(
+      `FK "${fkFieldName}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
+    );
+  }
+
+  // Verify FK target matches the view's base entity
+  if (fkCol.foreignKey.entity !== baseEntityName) {
+    throw new Error(
+      `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
+      `not "${baseEntityName}" (back-ref: "${pathStr}")`
+    );
+  }
+
+  const params = parseBackRefParams(paramsStr);
+
+  // Find aggregate columns in the child entity (or follow FK chain for tailPath)
+  let targetEntity = refEntity;
+  let aggregateSource = tailPath || '';
+  const internalJoins = [];
+  let currentAlias = '_br';
+
+  if (tailPath && tailPath.includes('.')) {
+    // Multi-segment tail: follow FK chain
+    const segments = tailPath.split('.');
+    aggregateSource = segments[segments.length - 1];
+    const pathParts = [];
+
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i];
+      pathParts.push(seg);
+
+      const innerFkCol = targetEntity.columns.find(
+        c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
+      );
+
+      if (!innerFkCol || !innerFkCol.foreignKey) {
+        throw new Error(
+          `FK segment "${seg}" not found in entity "${targetEntity.className}" ` +
+          `(back-ref tail: "${tailPath}", path: "${pathStr}")`
+        );
+      }
+
+      const nextEntityName = innerFkCol.foreignKey.entity;
+      const nextEntity = schema.entities[nextEntityName];
+      if (!nextEntity) {
+        throw new Error(`FK target entity "${nextEntityName}" not found in schema`);
+      }
+
+      const joinAlias = '_br_' + pathParts.join('_');
+
+      internalJoins.push({
+        table: nextEntity.tableName,
+        alias: joinAlias,
+        onLeft: `${currentAlias}.${innerFkCol.name}`,
+        onRight: `${joinAlias}.id`
+      });
+
+      currentAlias = joinAlias;
+      targetEntity = nextEntity;
+    }
+  }
+
+  // Find aggregate columns in target entity
+  const aggregateCols = targetEntity.columns.filter(c => c.aggregateSource === aggregateSource);
+
+  if (aggregateCols.length === 0) {
+    throw new Error(
+      `No aggregate columns found for "${aggregateSource}" in entity "${targetEntity.className}" ` +
+      `(path: "${pathStr}.*", base: "${baseEntityName}")`
+    );
+  }
+
+  // Build WHERE clause
+  let whereClause = `_br.${fkCol.name} = b.id`;
+  for (const cond of params.where) {
+    const condCol = refEntity.columns.find(c => c.name === cond.column || c.displayName === cond.column);
+    const colName = condCol ? condCol.name : cond.column;
+    if (cond.value === 'null') {
+      whereClause += ` AND _br.${colName} IS NULL`;
+    } else {
+      whereClause += ` AND _br.${colName} = '${cond.value}'`;
+    }
+  }
+
+  // Build ORDER BY clause
+  let orderClause = '';
+  if (params.orderBy) {
+    const orderCol = refEntity.columns.find(
+      c => c.name === params.orderBy.column || c.displayName === params.orderBy.column
+    );
+    const orderColName = orderCol ? orderCol.name : params.orderBy.column;
+    orderClause = ` ORDER BY _br.${orderColName} ${params.orderBy.dir}`;
+  }
+
+  // Build JOIN clauses for internal FKs
+  const joinClausesSQL = internalJoins.map(
+    j => `LEFT JOIN ${j.table} ${j.alias} ON ${j.onLeft} = ${j.onRight}`
+  ).join(' ');
+
+  const limitClause = ` LIMIT ${params.limit || 1}`;
+  const fromClause = `${refEntity.tableName} _br`;
+
+  // Create a column for each aggregate field
+  const results = [];
+  const prefix = labelPrefix || titleCase(aggregateSource);
+
+  for (const col of aggregateCols) {
+    const fieldLabel = titleCase(col.aggregateField);
+    const selectExpr = `${currentAlias}.${col.name}`;
+
+    const subquery = `(SELECT ${selectExpr} FROM ${fromClause}${joinClausesSQL ? ' ' + joinClausesSQL : ''} WHERE ${whereClause}${orderClause}${limitClause})`;
+
+    const result = {
+      path: `${pathStr}.${col.aggregateField}`,
+      label: `${prefix} ${fieldLabel}`,
+      jsType: col.jsType || 'string',
+      selectExpr: subquery,
+      entityName: targetEntity.className
+    };
+
+    // Add metadata for client-side grouping (when not using .* syntax)
+    if (includeMetadata) {
+      result.aggregateSource = aggregateSource;
+      result.aggregateType = col.aggregateType;
+      result.aggregateField = col.aggregateField;
+    }
+
+    results.push(result);
+  }
+
+  return results;
+}
+
+/**
+ * Expand an aggregate type column into its individual subfield columns.
+ *
+ * Supports:
+ *   "position"                    → expands position_latitude, position_longitude from base entity
+ *   "tracker.position"            → walks FK chain, then expands aggregate from final entity
+ *
+ * @param {string} path - Column path (without .* suffix)
+ * @param {string} baseEntityName - The view's base entity
+ * @param {Object} schema - Full schema object
+ * @param {string|null} labelPrefix - Optional custom label prefix
+ * @param {boolean} includeMetadata - Include aggregateSource/Type/Field for client-side grouping
+ * @returns {Array<{ path, label, jsType, selectExpr, joins, entityName, [aggregateSource], [aggregateType], [aggregateField] }>}
+ */
+function expandAggregateColumns(path, baseEntityName, schema, labelPrefix = null, includeMetadata = false) {
+  const results = [];
+  const segments = path.split('.');
+
+  // Walk FK chain to find target entity and build joins
+  let currentEntity = schema.entities[baseEntityName];
+  if (!currentEntity) {
+    throw new Error(`Base entity "${baseEntityName}" not found in schema`);
+  }
+
+  const joins = [];
+  const pathParts = [];
+  let prevAlias = 'b';
+
+  // All segments are FK segments (we're looking for aggregate field at the end)
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    pathParts.push(seg);
+
+    // Check if this segment is a direct aggregate field on current entity
+    const aggregateCols = currentEntity.columns.filter(c => c.aggregateSource === seg);
+    if (aggregateCols.length > 0) {
+      // Found aggregate columns - expand them
+      const prefix = labelPrefix || titleCase(seg);
+      for (const col of aggregateCols) {
+        const fieldLabel = titleCase(col.aggregateField);
+        const result = {
+          path: segments.slice(0, i).concat([col.name]).join('.') || col.name,
+          label: `${prefix} ${fieldLabel}`,
+          jsType: col.jsType || 'string',
+          selectExpr: `${prevAlias}.${col.name}`,
+          joins: [...joins],
+          entityName: currentEntity.className
+        };
+        if (includeMetadata) {
+          result.aggregateSource = seg;
+          result.aggregateType = col.aggregateType;
+          result.aggregateField = col.aggregateField;
+        }
+        results.push(result);
+      }
+      return results;
+    }
+
+    // Not an aggregate, must be FK segment
+    const fkCol = currentEntity.columns.find(
+      c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
+    );
+
+    if (!fkCol || !fkCol.foreignKey) {
+      throw new Error(
+        `FK segment "${seg}" not found in entity "${currentEntity.className}" ` +
+        `(expand aggregate path: "${path}", base: "${baseEntityName}")`
+      );
+    }
+
+    const targetEntityName = fkCol.foreignKey.entity;
+    const targetEntity = schema.entities[targetEntityName];
+
+    if (!targetEntity) {
+      throw new Error(`FK target entity "${targetEntityName}" not found in schema`);
+    }
+
+    const alias = 'j_' + pathParts.join('_');
+
+    joins.push({
+      alias,
+      table: targetEntity.tableName,
+      onLeft: `${prevAlias}.${fkCol.name}`,
+      onRight: `${alias}.id`
+    });
+
+    prevAlias = alias;
+    currentEntity = targetEntity;
+  }
+
+  // If we get here, the last segment should be an aggregate source
+  const lastSeg = segments[segments.length - 1];
+  const aggregateCols = currentEntity.columns.filter(c => c.aggregateSource === lastSeg);
+
+  if (aggregateCols.length === 0) {
+    throw new Error(
+      `No aggregate columns found for "${lastSeg}" in entity "${currentEntity.className}" ` +
+      `(path: "${path}.*", base: "${baseEntityName}")`
+    );
+  }
+
+  const prefix = labelPrefix || titleCase(lastSeg);
+  for (const col of aggregateCols) {
+    const fieldLabel = titleCase(col.aggregateField);
+    const result = {
+      path: path + '.' + col.name.split('_').pop(), // e.g., position.latitude
+      label: `${prefix} ${fieldLabel}`,
+      jsType: col.jsType || 'string',
+      selectExpr: `${prevAlias}.${col.name}`,
+      joins: [...joins],
+      entityName: currentEntity.className
+    };
+    if (includeMetadata) {
+      result.aggregateSource = lastSeg;
+      result.aggregateType = col.aggregateType;
+      result.aggregateField = col.aggregateField;
+    }
+    results.push(result);
+  }
+
+  return results;
+}
+
+/**
  * Parse all user view definitions and resolve against schema.
  *
  * @param {Array} viewsConfig - Array from config.json "views" key
@@ -461,6 +823,23 @@ function parseAllUserViews(viewsConfig, schema) {
     const areaKey = baseEntity.area;
     const areaColor = schema.areas[areaKey]?.color || '#f5f5f5';
 
+    // Parse sort configuration: "column", "column DESC", or { column, order }
+    let defaultSort = null;
+    if (entry.sort) {
+      if (typeof entry.sort === 'string') {
+        const parts = entry.sort.trim().split(/\s+/);
+        defaultSort = {
+          column: parts[0],
+          order: (parts[1] || 'asc').toLowerCase()
+        };
+      } else if (typeof entry.sort === 'object') {
+        defaultSort = {
+          column: entry.sort.column,
+          order: (entry.sort.order || 'asc').toLowerCase()
+        };
+      }
+    }
+
     const parsedView = {
       name: entry.name,
       sqlName: toSqlName(entry.name),
@@ -471,7 +850,9 @@ function parseAllUserViews(viewsConfig, schema) {
       columns: [],
       joins: [],
       calculator: entry.calculator || null,
-      prefilter: entry.prefilter || null
+      prefilter: entry.prefilter || null,
+      requiredFilter: entry.requiredFilter || null,
+      defaultSort: defaultSort
     };
 
     // Deduplicate joins by alias
@@ -485,10 +866,112 @@ function parseAllUserViews(viewsConfig, schema) {
       }
 
       try {
+        // Handle .* expansion for aggregate types
+        if (parsed.expandAggregate) {
+          const isBackRef = parsed.path.includes('<');
+
+          if (isBackRef) {
+            // Back-reference with aggregate expansion
+            const expandedCols = expandBackRefAggregateColumns(parsed.path, entry.base, schema, parsed.label);
+            for (const expCol of expandedCols) {
+              const omit = parsed.omit !== undefined ? parsed.omit : 'null';
+
+              const colEntity = schema.entities[expCol.entityName];
+              const colAreaColor = colEntity
+                ? (schema.areas[colEntity.area]?.color || '#f5f5f5')
+                : '#f5f5f5';
+
+              parsedView.columns.push({
+                path: expCol.path,
+                label: expCol.label,
+                jsType: expCol.jsType,
+                selectExpr: expCol.selectExpr,
+                sqlAlias: expCol.label,
+                omit,
+                areaColor: colAreaColor
+              });
+            }
+          } else {
+            // Regular path with aggregate expansion
+            const expandedCols = expandAggregateColumns(parsed.path, entry.base, schema, parsed.label);
+            for (const expCol of expandedCols) {
+              // FK paths default to omit null
+              const omit = parsed.omit !== undefined
+                ? parsed.omit
+                : (expCol.path.includes('.') ? 'null' : undefined);
+
+              const colEntity = schema.entities[expCol.entityName];
+              const colAreaColor = colEntity
+                ? (schema.areas[colEntity.area]?.color || '#f5f5f5')
+                : '#f5f5f5';
+
+              parsedView.columns.push({
+                path: expCol.path,
+                label: expCol.label,
+                jsType: expCol.jsType,
+                selectExpr: expCol.selectExpr,
+                sqlAlias: expCol.label,
+                omit,
+                areaColor: colAreaColor
+              });
+
+              for (const join of expCol.joins) {
+                if (!joinMap.has(join.alias)) {
+                  joinMap.set(join.alias, join);
+                }
+              }
+            }
+          }
+          continue;
+        }
+
         const isBackRef = parsed.path.includes('<');
         const resolved = isBackRef
           ? resolveBackRefPath(parsed.path, entry.base, schema)
           : resolveColumnPath(parsed.path, entry.base, schema);
+
+        // Check if this is an aggregate type (without .* suffix)
+        // If so, expand to multiple columns with metadata for client-side grouping
+        if (resolved.isAggregate) {
+          // Expand aggregate with metadata for client-side canonical formatting
+          const expandedCols = isBackRef
+            ? expandBackRefAggregateColumns(parsed.path, entry.base, schema, parsed.label, true)
+            : expandAggregateColumns(parsed.path, entry.base, schema, parsed.label, true);
+
+          for (const expCol of expandedCols) {
+            const omit = parsed.omit !== undefined ? parsed.omit : 'null';
+
+            const colEntity = schema.entities[expCol.entityName];
+            const colAreaColor = colEntity
+              ? (schema.areas[colEntity.area]?.color || '#f5f5f5')
+              : '#f5f5f5';
+
+            parsedView.columns.push({
+              path: expCol.path,
+              label: expCol.label,
+              jsType: expCol.jsType,
+              selectExpr: expCol.selectExpr,
+              sqlAlias: expCol.label,
+              omit,
+              areaColor: colAreaColor,
+              // Aggregate metadata for client-side grouping
+              aggregateSource: expCol.aggregateSource,
+              aggregateType: expCol.aggregateType,
+              aggregateField: expCol.aggregateField
+            });
+
+            // Collect joins for regular paths
+            if (expCol.joins) {
+              for (const join of expCol.joins) {
+                if (!joinMap.has(join.alias)) {
+                  joinMap.set(join.alias, join);
+                }
+              }
+            }
+          }
+          continue;
+        }
+
         const label = parsed.label || resolved.label;
 
         // FK paths (dot notation) default to omit null

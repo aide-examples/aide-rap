@@ -65,10 +65,16 @@ module.exports = function() {
           if (c.areaColor) col.areaColor = c.areaColor;
           if (c.calculated) col.calculated = c.calculated;
           if (c.autoHidden) col.autoHidden = c.autoHidden;
+          // Aggregate metadata for client-side grouping
+          if (c.aggregateSource) col.aggregateSource = c.aggregateSource;
+          if (c.aggregateType) col.aggregateType = c.aggregateType;
+          if (c.aggregateField) col.aggregateField = c.aggregateField;
           return col;
         }),
         ...(view.calculator ? { calculator: view.calculator } : {}),
-        ...(view.prefilter ? { prefilter: view.prefilter } : {})
+        ...(view.prefilter ? { prefilter: view.prefilter } : {}),
+        ...(view.requiredFilter ? { requiredFilter: view.requiredFilter } : {}),
+        ...(view.defaultSort ? { defaultSort: view.defaultSort } : {})
       });
     } catch (err) {
       logger.error('Failed to get view schema', { error: err.message });

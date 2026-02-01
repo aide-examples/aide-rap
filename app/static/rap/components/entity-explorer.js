@@ -353,15 +353,49 @@ const EntityExplorer = {
       this.records = this.records.concat(newRecords);
       this.hasMore = this.records.length < this.totalRecords;
 
-      // Execute calculated fields on new records
-      if (!this.currentView) {
+      // Execute calculated fields
+      if (this.currentView) {
+        // For views: normalize keys and run calculations on all records
+        const viewSchema = this.currentViewSchema;
+        if (viewSchema) {
+          this.normalizeRecordKeys(viewSchema);
+
+          // Execute [CALCULATED] fields
+          const calcCols = viewSchema.columns.filter(c => c.calculated);
+          for (const col of calcCols) {
+            try {
+              const fn = new Function('data', col.calculated.code);
+              fn(this.records);
+              const lowercaseKey = col.key.toLowerCase().replace(/ /g, '_');
+              if (lowercaseKey !== col.key) {
+                for (const record of this.records) {
+                  if (record[lowercaseKey] !== undefined) {
+                    record[col.key] = record[lowercaseKey];
+                  }
+                }
+              }
+            } catch (e) {
+              console.error(`Calculation error for ${col.key}:`, e);
+            }
+          }
+
+          // Run calculator
+          if (viewSchema.calculator) {
+            try {
+              const fn = new Function('data', 'schema', viewSchema.calculator);
+              fn(this.records, viewSchema);
+            } catch (e) {
+              console.error(`Calculator error:`, e);
+            }
+          }
+        }
+      } else {
         await this.executeCalculatedFields();
       }
 
       // Re-render table with all records
       if (this.currentView) {
-        const viewSchema = await ApiClient.getViewSchema(this.currentView.name);
-        await EntityTable.loadView(this.currentView.name, viewSchema, this.records);
+        await EntityTable.loadView(this.currentView.name, this.currentViewSchema, this.records);
       } else {
         await EntityTable.loadEntity(this.currentEntity, this.records);
       }
@@ -668,17 +702,23 @@ const EntityExplorer = {
     this.currentEntity = entityName;
     this.selectedId = null;
 
-    // Get prefilter and requiredFilter fields from extended schema
+    // Get prefilter, requiredFilter, and defaultSort from extended schema
+    let defaultSort = null;
     try {
       const schema = await SchemaCache.getExtended(entityName);
       this.prefilterFields = schema.prefilter || null;
       this.requiredFilterFields = schema.requiredFilter || null;
+      defaultSort = schema.ui?.tableOptions?.defaultSort || null;
     } catch (e) {
       this.prefilterFields = null;
       this.requiredFilterFields = null;
     }
 
-    await this.loadRecords();
+    // Pass default sort to loadRecords
+    const loadOptions = defaultSort
+      ? { sort: defaultSort.column, order: defaultSort.order }
+      : {};
+    await this.loadRecords('', loadOptions);
     DetailPanel.clear();
   },
 
@@ -697,16 +737,38 @@ const EntityExplorer = {
 
     DetailPanel.clear();
 
-    // Load view data with optional prefilter
+    // Reset pagination state
+    this.records = [];
+    this.hasMore = false;
+    this.totalRecords = 0;
+    this.currentFilter = '';
+    this.currentSort = null;
+    this.currentOrder = null;
+
+    // Load view data with optional prefilter and pagination
     try {
       const viewSchema = await ApiClient.getViewSchema(viewName);
+      this.currentViewSchema = viewSchema;  // Cache for loadMoreRecords
       this.prefilterFields = viewSchema.prefilter || null;
+      this.requiredFilterFields = viewSchema.requiredFilter || null;
 
-      // Check if we need prefilter dialog (for views with prefilter configured)
-      // View prefilters always show dialog (like required filter for entities)
+      const config = await this.getPaginationConfig();
+
+      // First, get total count (for pagination threshold check)
+      const countResult = await ApiClient.getViewData(viewName, { limit: 0 });
+      this.totalRecords = countResult.total || 0;
+
+      // Check if we need filter dialog (same logic as entities):
+      // 1. requiredFilter: always show dialog (regardless of record count)
+      // 2. prefilter: only show dialog when dataset is large
+      const hasRequired = this.requiredFilterFields && this.requiredFilterFields.length > 0;
+      const hasPrefilter = this.prefilterFields && this.prefilterFields.length > 0;
+      const isLargeDataset = this.totalRecords > config.threshold;
+
       let filter = '';
-      if (this.prefilterFields && this.prefilterFields.length > 0) {
-        const prefilterResult = await this.showPrefilterDialog(viewName, this.prefilterFields, {
+      if (hasRequired || (hasPrefilter && isLargeDataset)) {
+        const dialogFields = hasRequired ? this.requiredFilterFields : this.prefilterFields;
+        const prefilterResult = await this.showPrefilterDialog(viewName, dialogFields, {
           isView: true,
           viewName: viewName,
           viewSchema: viewSchema
@@ -717,9 +779,35 @@ const EntityExplorer = {
         }
       }
 
-      const options = filter ? { filter } : {};
-      const result = await ApiClient.getViewData(viewName, options);
+      this.currentFilter = filter;
+
+      // Re-get total count with filter applied
+      if (filter) {
+        const filteredCount = await ApiClient.getViewData(viewName, { limit: 0, filter });
+        this.totalRecords = filteredCount.total || 0;
+      }
+
+      // Determine if we need pagination
+      const needsPagination = this.totalRecords > config.threshold;
+
+      // Apply default sort from view config
+      if (viewSchema.defaultSort) {
+        this.currentSort = viewSchema.defaultSort.column;
+        this.currentOrder = viewSchema.defaultSort.order;
+      }
+
+      const loadOptions = {};
+      if (filter) loadOptions.filter = filter;
+      if (this.currentSort) loadOptions.sort = this.currentSort;
+      if (this.currentOrder) loadOptions.order = this.currentOrder;
+      if (needsPagination) {
+        loadOptions.limit = config.pageSize;
+        loadOptions.offset = 0;
+      }
+
+      const result = await ApiClient.getViewData(viewName, loadOptions);
       this.records = result.data || [];
+      this.hasMore = needsPagination && this.records.length < this.totalRecords;
 
       // Normalize keys: add lowercase aliases for calculated field compatibility
       // View columns may be titlecased (Value, Usage), but calculation code uses lowercase (value, usage)
@@ -758,7 +846,12 @@ const EntityExplorer = {
       }
 
       await EntityTable.loadView(viewName, viewSchema, this.records);
-      this.updateRecordStatus(this.records.length);
+      this.updateRecordStatus();
+
+      // Setup infinite scroll if paginated
+      if (needsPagination) {
+        setTimeout(() => this.setupScrollObserver(), 100);
+      }
     } catch (err) {
       console.error('Failed to load view:', err);
       this.tableContainer.innerHTML = `<p class="empty-message">Error: ${err.message}</p>`;

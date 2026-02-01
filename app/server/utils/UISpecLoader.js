@@ -35,6 +35,8 @@ const SEPARATOR_PREFIX = '-------------------- ';
  *   - `- EntityName (required: field1:select)` — always show filter dialog with dropdown
  *   - `- EntityName (required: field1, prefilter: field2)` — both
  *   - `- EntityName (mediaRowHeight: 100)` — row height for rows with media
+ *   - `- EntityName (sort: column_name)` — default sort ascending
+ *   - `- EntityName (sort: column_name DESC)` — default sort descending
  * Field suffix `:select` = dropdown, no suffix = text input (LIKE)
  * @param {string} requirementsDir - Path to requirements/ directory
  * @returns {{entities: string[], prefilters: Object, requiredFilters: Object, tableOptions: Object}|null}
@@ -68,11 +70,12 @@ function loadCrudConfig(requirementsDir) {
         const entityName = parenMatch[1].trim();
         const optionsStr = parenMatch[2];
 
-        // Parse options: "required: field1:select, prefilter: field2, mediaRowHeight: 100"
-        // Split by known keywords (required: and prefilter:)
-        const requiredMatch = optionsStr.match(/required:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:prefilter:|mediaRowHeight:|$)|$)/i);
-        const prefilterMatch = optionsStr.match(/prefilter:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:required:|mediaRowHeight:|$)|$)/i);
+        // Parse options: "required: field1:select, prefilter: field2, mediaRowHeight: 100, sort: column DESC"
+        // Split by known keywords
+        const requiredMatch = optionsStr.match(/required:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:prefilter:|mediaRowHeight:|sort:|$)|$)/i);
+        const prefilterMatch = optionsStr.match(/prefilter:\s*([^,)]+(?:,\s*[^,)]+)*?)(?=,\s*(?:required:|mediaRowHeight:|sort:|$)|$)/i);
         const mediaRowHeightMatch = optionsStr.match(/mediaRowHeight:\s*(\d+)/i);
+        const sortMatch = optionsStr.match(/sort:\s*(\w+)(?:\s+(asc|desc))?/i);
 
         if (entityName) {
           entities.push(entityName);
@@ -96,6 +99,14 @@ function loadCrudConfig(requirementsDir) {
           if (mediaRowHeightMatch) {
             if (!tableOptions[entityName]) tableOptions[entityName] = {};
             tableOptions[entityName].mediaRowHeight = parseInt(mediaRowHeightMatch[1], 10);
+          }
+
+          if (sortMatch) {
+            if (!tableOptions[entityName]) tableOptions[entityName] = {};
+            tableOptions[entityName].defaultSort = {
+              column: sortMatch[1],
+              order: (sortMatch[2] || 'asc').toLowerCase()
+            };
           }
         }
       } else if (entityPart) {
