@@ -108,16 +108,33 @@ class TypeParser {
         continue;
       }
 
+      if (line.startsWith('## Aggregate Types') || line.startsWith('## Aggregate')) {
+        this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentAggregateFields, currentCanonical, currentDescription, scope, types, isAggregate);
+        currentSection = 'aggregate';
+        currentTypeName = null;
+        currentEnumValues = [];
+        currentAggregateFields = [];
+        currentCanonical = null;
+        currentDescription = '';
+        isAggregate = false;  // Will be set by individual ### headers
+        this._flushInlineEnums(inlineEnums, scope, types);
+        inlineEnums = {};
+        inTable = false;
+        continue;
+      }
+
       // Detect type name (### TypeName or ### TypeName [AGGREGATE])
       if (line.startsWith('### ')) {
         this._flushCurrentType(currentSection, currentTypeName, currentEnumValues, currentAggregateFields, currentCanonical, currentDescription, scope, types, isAggregate);
         let typeLine = line.substring(4).trim();
 
-        // Check for [AGGREGATE] marker
-        isAggregate = typeLine.includes('[AGGREGATE]');
-        if (isAggregate) {
+        // Check for [AGGREGATE] marker or if we're in ## Aggregate Types section
+        const hasAggregateMarker = typeLine.includes('[AGGREGATE]');
+        if (hasAggregateMarker) {
           typeLine = typeLine.replace(/\s*\[AGGREGATE\]\s*/i, '').trim();
         }
+        // Set isAggregate if explicit marker OR if we're in aggregate section
+        isAggregate = hasAggregateMarker || currentSection === 'aggregate';
 
         currentTypeName = typeLine;
         currentEnumValues = [];
@@ -126,8 +143,8 @@ class TypeParser {
         currentDescription = '';
         inTable = false;
 
-        // If aggregate marker found, set section to aggregate
-        if (isAggregate) {
+        // If aggregate marker found, set section to aggregate (for types outside ## Aggregate section)
+        if (hasAggregateMarker && currentSection !== 'aggregate') {
           currentSection = 'aggregate';
         } else if (!currentSection) {
           // If no section set, default to enum (for entity-local types)
