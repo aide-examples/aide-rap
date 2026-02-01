@@ -313,5 +313,52 @@ const ValueFormatter = {
    */
   getEnumValues(columnName, schema) {
     return schema.enumFields?.[columnName]?.values || null;
+  },
+
+  /**
+   * Format a value as HTML for display, handling special types
+   * Centralized formatting to reduce redundancy across components
+   *
+   * @param {*} value - The raw value
+   * @param {Object} col - Column definition with name, customType, etc.
+   * @param {Object} schema - Entity schema for enum lookup
+   * @param {Object} options - { size: 'tiny'|'small'|'medium' } for media
+   * @returns {string} - HTML string for display
+   */
+  formatDisplayHtml(value, col, schema = null, options = {}) {
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+
+    // Media: thumbnail with link
+    if (col.customType === 'media') {
+      const size = options.size || 'tiny';
+      const thumbClass = size === 'small' ? 'media-thumb-small' : 'media-thumb-tiny';
+      return `<a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" class="media-link">
+        <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="${thumbClass}"
+             onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+      </a>`;
+    }
+
+    // URL: clickable link
+    if (col.customType === 'url' && value) {
+      const escaped = DomUtils.escapeHtml(String(value));
+      return `<a href="${escaped}" target="_blank" rel="noopener" class="url-link">${escaped}</a>`;
+    }
+
+    // JSON: formatted preview
+    if (col.customType === 'json' && value) {
+      const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      const truncated = jsonStr.length > 50 ? jsonStr.substring(0, 47) + '...' : jsonStr;
+      return `<span class="json-value" title="${DomUtils.escapeHtml(jsonStr)}">${DomUtils.escapeHtml(truncated)}</span>`;
+    }
+
+    // Enum: internal -> external conversion
+    if (schema) {
+      const formatted = this.format(value, col.name, schema);
+      return DomUtils.escapeHtml(formatted);
+    }
+
+    return DomUtils.escapeHtml(String(value));
   }
 };

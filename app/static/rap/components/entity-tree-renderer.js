@@ -74,7 +74,7 @@ const TreeRenderer = {
             }
             if (!isRowLayout) {
                 for (const col of regularCols) {
-                    html += this.renderAttribute(col.name, record[col.name], schema);
+                    html += this.renderAttribute(col, record[col.name], schema);
                 }
             }
         } else if (context.referencePosition === 'inline') {
@@ -84,7 +84,7 @@ const TreeRenderer = {
                 if (col.foreignKey) {
                     html += await this.renderForeignKeyNode(col, value, record, visitedPath, context);
                 } else if (!isRowLayout) {
-                    html += this.renderAttribute(col.name, value, schema);
+                    html += this.renderAttribute(col, value, schema);
                 }
             }
             if (hasBackRefs) {
@@ -94,7 +94,7 @@ const TreeRenderer = {
             // 'end' (default): regular attributes first, then FKs, then back-refs
             if (!isRowLayout) {
                 for (const col of regularCols) {
-                    html += this.renderAttribute(col.name, record[col.name], schema);
+                    html += this.renderAttribute(col, record[col.name], schema);
                 }
             }
             for (const col of fkCols) {
@@ -115,12 +115,7 @@ const TreeRenderer = {
     renderAttributeRow(columns, record, schema) {
         const cells = columns.map(col => {
             const value = record[col.name];
-            let displayValue;
-            if (value === null || value === undefined) {
-                displayValue = '';
-            } else {
-                displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, schema));
-            }
+            const displayValue = ValueFormatter.formatDisplayHtml(value, col, schema);
             return `<td title="${col.name}">${displayValue}</td>`;
         }).join('');
 
@@ -136,22 +131,15 @@ const TreeRenderer = {
 
     /**
      * Render a regular attribute
-     * Uses ValueFormatter to convert enum internal->external values
+     * Uses ValueFormatter.formatDisplayHtml for special types (media, url, json, enum)
      */
-    renderAttribute(name, value, schema = null) {
-        let displayValue;
-        if (value === null || value === undefined) {
-            displayValue = '';
-        } else if (schema) {
-            // Use ValueFormatter for enum conversion
-            displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, name, schema));
-        } else {
-            displayValue = DomUtils.escapeHtml(String(value));
-        }
+    renderAttribute(col, value, schema = null) {
+        const displayValue = ValueFormatter.formatDisplayHtml(value, col, schema);
+        const name = col.name || col;
 
         return `
           <div class="tree-attribute">
-            <span class="attr-name">${name.replace(/_/g, ' ')}:</span>
+            <span class="attr-name">${String(name).replace(/_/g, ' ')}:</span>
             <span class="attr-value">${displayValue}</span>
           </div>
         `;
@@ -268,7 +256,7 @@ const TreeRenderer = {
                 html += this.renderAttributeRow(regularCols, record, schema);
             } else {
                 for (const col of regularCols) {
-                    html += this.renderAttribute(col.name, record[col.name], schema);
+                    html += this.renderAttribute(col, record[col.name], schema);
                 }
             }
 

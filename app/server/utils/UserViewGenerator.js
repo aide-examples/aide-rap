@@ -143,8 +143,8 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
         throw new Error(`FK target entity "${targetEntityName}" not found in schema`);
       }
 
-      // Find label column in target entity
-      const labelCol = targetEntity.columns.find(c => c.isLabel) ||
+      // Find label column in target entity (ui.label from [LABEL] annotation)
+      const labelCol = targetEntity.columns.find(c => c.ui?.label) ||
                        targetEntity.columns.find(c => c.name === 'name' || c.name === 'designation' || c.name === 'title');
 
       if (!labelCol) {
