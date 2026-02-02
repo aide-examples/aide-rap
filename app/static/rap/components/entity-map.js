@@ -113,12 +113,20 @@ const EntityMap = {
       const label = record[labelColumn.key] || `Record #${record.id || '?'}`;
       const marker = L.marker([lat, lng]);
 
-      // Store label for later tooltip updates
+      // Store record ID and label for later access
+      marker._recordId = record.id;
       marker._labelText = String(label);
 
       // Create popup content with all columns
       const popupContent = this.createPopup(record, columns, labelColumn.key, latCol.key, lngCol.key);
       marker.bindPopup(popupContent, { maxWidth: 300 });
+
+      // Track selection when popup opens (for deep-link serialization)
+      marker.on('popupopen', () => {
+        if (typeof EntityExplorer !== 'undefined') {
+          EntityExplorer.selectedId = record.id;
+        }
+      });
 
       // Add tooltip (permanent based on current setting)
       marker.bindTooltip(marker._labelText, {
@@ -164,6 +172,23 @@ const EntityMap = {
         className: 'map-label-tooltip'
       });
     }
+  },
+
+  /**
+   * Open popup for a specific record by ID
+   * Used when restoring map view from deep-link with selected marker
+   * @param {number} recordId - Record ID to open popup for
+   */
+  openPopupForRecord(recordId) {
+    if (!this.map || !this.markerCluster) return;
+
+    const marker = this.markers.find(m => m._recordId === recordId);
+    if (!marker) return;
+
+    // Use zoomToShowLayer to uncluster and show the marker, then open popup
+    this.markerCluster.zoomToShowLayer(marker, () => {
+      marker.openPopup();
+    });
   },
 
   /**

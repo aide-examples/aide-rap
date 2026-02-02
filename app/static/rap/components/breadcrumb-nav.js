@@ -200,6 +200,10 @@ const BreadcrumbNav = {
           if (record) {
             DetailPanel.showRecord(crumb.entity, record);
           }
+          // For map view, open the marker popup after map initializes
+          if (crumb.viewMode === 'map' && typeof EntityMap !== 'undefined') {
+            setTimeout(() => EntityMap.openPopupForRecord(crumb.selectedId), 200);
+          }
         }
         break;
 
@@ -219,30 +223,53 @@ const BreadcrumbNav = {
 
           await EntityExplorer.onViewChange(crumb.view.name, crumb.view.base, crumb.view.color);
         }
-        // Restore view mode
+        // IMPORTANT: Set selectedId BEFORE setViewMode so tree renderer knows which record to expand
+        if (crumb.selectedId) {
+          EntityExplorer.selectedId = crumb.selectedId;
+        }
+        // Restore view mode (triggers renderCurrentView which uses selectedId)
         if (crumb.viewMode) {
           EntityExplorer.setViewMode(crumb.viewMode);
         }
-        // Restore selected row if any
+        // Update selection highlight and show in detail panel
         if (crumb.selectedId) {
-          EntityExplorer.selectedId = crumb.selectedId;
           EntityExplorer.updateSelection();
+          // For map view, open the marker popup after map initializes
+          if (crumb.viewMode === 'map' && typeof EntityMap !== 'undefined') {
+            setTimeout(() => EntityMap.openPopupForRecord(crumb.selectedId), 200);
+          }
         }
         break;
 
       case 'record':
         // Navigate to specific record in tree view
         await EntityExplorer.selectEntityWithoutBreadcrumb(crumb.entity);
+        // Set selectedId BEFORE viewMode so tree knows which record to expand
         if (crumb.recordId) {
           EntityExplorer.selectedId = crumb.recordId;
+          // Set up tree state to expand and select the record node
+          if (typeof EntityTree !== 'undefined') {
+            const nodeId = `${crumb.entity}-${crumb.recordId}`;
+            EntityTree.state.clear();
+            EntityTree.state.expand(nodeId);
+            EntityTree.state.setSelection(nodeId);
+          }
+        }
+        // Restore view mode - force re-render to show expanded record
+        if (crumb.viewMode) {
+          EntityExplorer.setViewMode(crumb.viewMode);
+          // Tree needs explicit re-render since state wasn't set during initial load
+          const isTree = crumb.viewMode === 'tree-h' || crumb.viewMode === 'tree-v';
+          if (isTree && crumb.recordId) {
+            EntityExplorer.renderTree();
+          }
+        }
+        // Show record in detail panel
+        if (crumb.recordId) {
           const record = EntityExplorer.records.find(r => r.id === crumb.recordId);
           if (record) {
             DetailPanel.showRecord(crumb.entity, record);
           }
-        }
-        // Restore view mode
-        if (crumb.viewMode) {
-          EntityExplorer.setViewMode(crumb.viewMode);
         }
         break;
 
@@ -261,6 +288,10 @@ const BreadcrumbNav = {
         if (crumb.selectedId) {
           EntityExplorer.selectedId = crumb.selectedId;
           EntityExplorer.updateSelection();
+          // For map view, open the marker popup after map initializes
+          if (crumb.viewMode === 'map' && typeof EntityMap !== 'undefined') {
+            setTimeout(() => EntityMap.openPopupForRecord(crumb.selectedId), 200);
+          }
         }
         break;
     }
@@ -545,6 +576,7 @@ const BreadcrumbNav = {
       recordLabel,
       filter: compact.f || null,
       viewMode: compact.m || 'table',
+      selectedId: compact.s || null,
       color
     });
   }

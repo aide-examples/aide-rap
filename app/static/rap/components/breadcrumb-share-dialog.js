@@ -162,13 +162,19 @@ const BreadcrumbShareDialog = {
       if (c.recordId) compact.r = c.recordId;
       if (c.filter) compact.f = c.filter;
 
-      // For the last crumb, use current viewMode from EntityExplorer
-      // (user may have switched viewMode after breadcrumb was created)
+      // For the last crumb, use current viewMode and selectedId from EntityExplorer
+      // (user may have switched viewMode or selection after breadcrumb was created)
       const isLast = index === stack.length - 1;
       const viewMode = isLast && typeof EntityExplorer !== 'undefined'
         ? EntityExplorer.viewMode
         : c.viewMode;
       if (viewMode) compact.m = viewMode;
+
+      // Include selected record ID (for map marker popup restore)
+      const selectedId = isLast && typeof EntityExplorer !== 'undefined'
+        ? EntityExplorer.selectedId
+        : c.selectedId;
+      if (selectedId) compact.s = selectedId;
 
       return compact;
     });
