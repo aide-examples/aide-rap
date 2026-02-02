@@ -297,6 +297,7 @@ async function tryUrlLogin() {
 
     // Initialize RAP components
     await EntityExplorer.init();
+    DetailPanel.init();  // Must init before loadFromUrl (restoreState uses DetailPanel)
     BreadcrumbNav.init();
     BreadcrumbShareDialog.init();
 
@@ -304,7 +305,6 @@ async function tryUrlLogin() {
     const crumbsLoaded = await BreadcrumbNav.loadFromUrl();
     // If crumbs were loaded, EntityExplorer state is already set
 
-    DetailPanel.init();
     ConfirmDialog.init();
     ConflictDialog.init();
     ContextMenu.init();
