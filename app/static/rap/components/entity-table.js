@@ -21,6 +21,7 @@ const EntityTable = {
   onServerFilterRequest: null,  // Callback: (columnFilters) => void
   filterDebounceTimer: null,    // Timer for debounced server filter
   filterDebounceMs: 2000,       // Debounce delay (configurable via setPaginationConfig)
+  lastServerFilters: {},        // Filters from last server query (for narrowing vs loosening check)
 
   // Sort settings (shared with EntityTree)
   attributeOrder: 'schema', // 'schema' or 'alpha'
@@ -88,10 +89,43 @@ const EntityTable = {
     }
     if (state.onServerFilterRequest !== undefined) {
       this.onServerFilterRequest = state.onServerFilterRequest;
+      // Reset last server filters when callback changes (new entity/view loaded)
+      if (state.onServerFilterRequest) {
+        this.lastServerFilters = {};
+      }
     }
     if (state.filterDebounceMs !== undefined) {
       this.filterDebounceMs = state.filterDebounceMs;
     }
+  },
+
+  /**
+   * Check if filters are being loosened (need server query) vs narrowed (no server query needed)
+   * Loosened = filter removed or text shortened
+   * Narrowed = filter added or text lengthened
+   */
+  isFilterLoosened(newFilters) {
+    const oldFilters = this.lastServerFilters;
+
+    // First server query (no previous filters) - always query
+    if (Object.keys(oldFilters).length === 0) {
+      return true;
+    }
+
+    // Check if any previous filter was removed or shortened
+    for (const [col, oldValue] of Object.entries(oldFilters)) {
+      const newValue = newFilters[col] || '';
+      const oldTrimmed = (oldValue || '').trim().toLowerCase();
+      const newTrimmed = newValue.trim().toLowerCase();
+
+      // Filter was cleared, shortened, or changed (not just appended) - loosened
+      if (oldTrimmed && (!newTrimmed || !newTrimmed.startsWith(oldTrimmed))) {
+        return true;
+      }
+    }
+
+    // All filters are same or narrowed (text got longer) - no server query needed
+    return false;
   },
 
   /**
@@ -941,12 +975,13 @@ const EntityTable = {
           newInput.setSelectionRange(cursorPos, cursorPos);
         }
 
-        // Server-side filter: debounced
-        // Trigger if callback exists (original dataset was large enough for pagination)
-        // This covers both cases: narrowing filters AND removing/changing filters
-        if (this.onServerFilterRequest) {
+        // Server-side filter: debounced, only if filters are LOOSENED
+        // Narrowing (adding text) doesn't need server query - current results are superset
+        // Loosening (removing text, clearing filter) needs server query - may have more results
+        if (this.onServerFilterRequest && this.isFilterLoosened(this.columnFilters)) {
           clearTimeout(this.filterDebounceTimer);
           this.filterDebounceTimer = setTimeout(() => {
+            this.lastServerFilters = { ...this.columnFilters };
             this.onServerFilterRequest(this.columnFilters);
           }, this.filterDebounceMs);
         }

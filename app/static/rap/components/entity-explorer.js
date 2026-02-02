@@ -41,6 +41,7 @@ const EntityExplorer = {
   requiredFilterFields: null, // Array of column paths for required filter dialog (always shown)
   paginationConfig: null, // { threshold, pageSize } from config.json
   prefilterValues: {}, // { columnPath: selectedValue } for active prefilters
+  serverFilterEnabled: false, // true if initial dataset needed pagination (keeps callback even after filtering)
 
   /**
    * Get pagination config from server
@@ -899,6 +900,9 @@ const EntityExplorer = {
       // Determine if we need pagination
       const needsPagination = this.totalRecords > config.threshold;
 
+      // Track if server-side filtering should be enabled (initial view load, no filter yet)
+      this.serverFilterEnabled = needsPagination;
+
       // Apply default sort from view config
       if (viewSchema.defaultSort) {
         this.currentSort = viewSchema.defaultSort.column;
@@ -955,13 +959,14 @@ const EntityExplorer = {
       }
 
       // Set pagination state on EntityTable for server-side filtering (views)
+      // Callback remains if serverFilterEnabled (initial dataset was large) - changing filters may expand results
       const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
       EntityTable.setPaginationState({
         allRecordsLoaded,
         filterDebounceMs: config.filterDebounceMs,
-        onServerFilterRequest: allRecordsLoaded ? null : (columnFilters) => {
+        onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
-        }
+        } : null
       });
 
       await EntityTable.loadView(viewName, viewSchema, this.records);
@@ -1020,6 +1025,11 @@ const EntityExplorer = {
       // Determine if we need pagination
       const needsPagination = this.totalRecords > config.threshold;
 
+      // Track if server-side filtering should be enabled (set on initial load, preserved on filter reloads)
+      if (!filter) {
+        this.serverFilterEnabled = needsPagination;
+      }
+
       const loadOptions = {};
       if (filter) loadOptions.filter = filter;
       if (options.sort) loadOptions.sort = options.sort;
@@ -1036,13 +1046,14 @@ const EntityExplorer = {
       this.hasMore = needsPagination && this.records.length < this.totalRecords;
 
       // Set pagination state on EntityTable for server-side filtering
+      // Callback remains if serverFilterEnabled (initial dataset was large) - changing filters may expand results
       const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
       EntityTable.setPaginationState({
         allRecordsLoaded,
         filterDebounceMs: config.filterDebounceMs,
-        onServerFilterRequest: allRecordsLoaded ? null : (columnFilters) => {
+        onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
-        }
+        } : null
       });
 
       // Execute [CALCULATED] fields from entity schema
@@ -1186,11 +1197,12 @@ const EntityExplorer = {
       }
 
       // Update pagination state
+      // Callback remains if serverFilterEnabled (initial dataset was large) - changing filters may expand results
       const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
       EntityTable.setPaginationState({
         allRecordsLoaded,
         filterDebounceMs: config.filterDebounceMs,
-        onServerFilterRequest: allRecordsLoaded ? null : (columnFilters) => {
+        onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
         }
       });
