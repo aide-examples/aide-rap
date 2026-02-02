@@ -100,6 +100,7 @@
     "admin_panel": "Admin-Panel öffnen",
     "views": "Ansichten",
     "records_count": "%{count} Datensätze",
+    "records_count_partial": "%{loaded} von %{total} Datensätzen",
     "loading_more": "Lade weitere...",
 
     "geo_no_coordinates": "Keine Koordinaten vorhanden. Bitte erst eine Adresse suchen.",
@@ -148,6 +149,7 @@
     "admin_load_all": "Alle laden",
     "admin_clear_all": "Alle leeren",
     "admin_reset_all": "Alle zurücksetzen",
+    "admin_load_import": "Import laden...",
 
     "dep_satisfied": "Abhängigkeiten erfüllt",
     "dep_missing": "Fehlend: %{deps}",

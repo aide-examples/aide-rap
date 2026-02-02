@@ -52,10 +52,14 @@ const EntityExplorer = {
       if (resp.ok) {
         this.paginationConfig = await resp.json();
       } else {
-        this.paginationConfig = { threshold: 500, pageSize: 200 };
+        this.paginationConfig = { threshold: 500, pageSize: 200, filterDebounceMs: 2000 };
       }
     } catch (e) {
-      this.paginationConfig = { threshold: 500, pageSize: 200 };
+      this.paginationConfig = { threshold: 500, pageSize: 200, filterDebounceMs: 2000 };
+    }
+    // Ensure filterDebounceMs has a default
+    if (!this.paginationConfig.filterDebounceMs) {
+      this.paginationConfig.filterDebounceMs = 2000;
     }
     return this.paginationConfig;
   },
@@ -861,7 +865,7 @@ const EntityExplorer = {
 
       // First, get total count (for pagination threshold check)
       const countResult = await ApiClient.getViewData(viewName, { limit: 0 });
-      this.totalRecords = countResult.total || 0;
+      this.totalRecords = countResult.totalCount || 0;
 
       // Check if we need filter dialog (same logic as entities):
       // 1. requiredFilter: always show dialog (regardless of record count)
@@ -889,7 +893,7 @@ const EntityExplorer = {
       // Re-get total count with filter applied
       if (filter) {
         const filteredCount = await ApiClient.getViewData(viewName, { limit: 0, filter });
-        this.totalRecords = filteredCount.total || 0;
+        this.totalRecords = filteredCount.totalCount || 0;
       }
 
       // Determine if we need pagination
@@ -981,7 +985,7 @@ const EntityExplorer = {
       const countOptions = { limit: 0 };
       if (filter) countOptions.filter = filter;
       const countResult = await ApiClient.getAll(this.currentEntity, countOptions);
-      this.totalRecords = countResult.total || 0;
+      this.totalRecords = countResult.totalCount || 0;
 
       // Check if we need filter dialog:
       // 1. requiredFilter: always show dialog (regardless of record count)
@@ -1021,6 +1025,16 @@ const EntityExplorer = {
       this.records = result.data || [];
       this.hasMore = needsPagination && this.records.length < this.totalRecords;
 
+      // Set pagination state on EntityTable for server-side filtering
+      const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
+      EntityTable.setPaginationState({
+        allRecordsLoaded,
+        filterDebounceMs: config.filterDebounceMs,
+        onServerFilterRequest: allRecordsLoaded ? null : (columnFilters) => {
+          this.reloadWithColumnFilters(columnFilters);
+        }
+      });
+
       // Execute [CALCULATED] fields from entity schema
       await this.executeCalculatedFields();
 
@@ -1052,6 +1066,50 @@ const EntityExplorer = {
     this.currentSort = sort;
     this.currentOrder = order;
     await this.loadRecords(filter, { sort, order });
+  },
+
+  /**
+   * Reload records with column filters from EntityTable (server-side)
+   * Converts column filters { col: "value" } to server filter format "~col:value"
+   * For FK columns (ending in _id), uses the _label column for LIKE matching
+   */
+  async reloadWithColumnFilters(columnFilters) {
+    // Convert column filters to server filter format
+    const filterParts = Object.entries(columnFilters)
+      .filter(([_, value]) => value && value.trim())
+      .map(([col, value]) => {
+        // Check if this is an FK column that should use _label for filtering
+        if (col.endsWith('_id') && this.currentEntitySchema) {
+          const colDef = this.currentEntitySchema.columns.find(c => c.name === col);
+          if (colDef?.foreignKey) {
+            // Use the label column for LIKE matching (server-side views have _label fields)
+            const labelCol = col.replace(/_id$/, '') + '_label';
+            return `~${labelCol}:${value.trim()}`;
+          }
+        }
+        return `~${col}:${value.trim()}`;
+      });
+
+    // Combine with existing prefilter if present
+    let filter = filterParts.join('&&');
+    if (this.prefilterValues && Object.keys(this.prefilterValues).length > 0) {
+      const prefilterStr = this.buildPrefilterString(this.prefilterValues);
+      filter = filter ? `${prefilterStr}&&${filter}` : prefilterStr;
+    }
+
+    // Store column filters for re-application after reload
+    this.activeColumnFilters = columnFilters;
+
+    // Reload with combined filter
+    await this.loadRecords(filter, {
+      sort: this.currentSort,
+      order: this.currentOrder
+    });
+
+    // Re-apply column filters to EntityTable after reload
+    if (this.activeColumnFilters) {
+      EntityTable.columnFilters = { ...this.activeColumnFilters };
+    }
   },
 
   setViewMode(mode) {
@@ -1356,7 +1414,14 @@ const EntityExplorer = {
     if (this.viewMode === 'table' && (this.currentEntity || this.currentView) && this.records.length > 0) {
       // Use provided count or get from EntityTable (which may be filtered)
       const displayCount = count !== null ? count : this.records.length;
-      recordsEl.textContent = i18n.t('records_count', { count: displayCount });
+      const total = this.totalRecords || displayCount;
+
+      // Show "X of Y" if not all records are loaded
+      if (total > displayCount) {
+        recordsEl.textContent = i18n.t('records_count_partial', { loaded: displayCount, total });
+      } else {
+        recordsEl.textContent = i18n.t('records_count', { count: displayCount });
+      }
       if (sepEl) sepEl.style.display = '';
     } else {
       recordsEl.textContent = '';

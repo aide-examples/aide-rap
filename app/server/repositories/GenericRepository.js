@@ -144,8 +144,8 @@ function findAll(entityName, options = {}) {
 
   // Read from View (includes _label fields for FKs)
   const viewName = entity.tableName + '_view';
-  let sql = `SELECT * FROM ${viewName}`;
   const params = [];
+  let whereClause = '';
 
   // Filter: supports multiple formats joined with && (AND):
   // 1. "column:value" - exact match on entity column (e.g., "type_id:5")
@@ -211,9 +211,12 @@ function findAll(entityName, options = {}) {
     }
 
     if (conditions.length > 0) {
-      sql += ` WHERE ${conditions.join(' AND ')}`;
+      whereClause = ` WHERE ${conditions.join(' AND ')}`;
     }
   }
+
+  // Build data query with WHERE, ORDER BY, and pagination
+  let sql = `SELECT * FROM ${viewName}${whereClause}`;
 
   // Sorting
   if (options.sort) {
@@ -226,44 +229,29 @@ function findAll(entityName, options = {}) {
     sql += ' ORDER BY id ASC';
   }
 
-  // Pagination
+  // Pagination params (separate from filter params)
+  const queryParams = [...params];
   if (options.limit) {
     sql += ' LIMIT ?';
-    params.push(options.limit);
+    queryParams.push(options.limit);
   }
   if (options.offset) {
     sql += ' OFFSET ?';
-    params.push(options.offset);
+    queryParams.push(options.offset);
   }
 
-  const rows = db.prepare(sql).all(...params);
+  const rows = db.prepare(sql).all(...queryParams);
 
   // Enrich with enum display values
   const enrichedRows = enrichRecords(entityName, rows);
 
-  // Get total count
-  let countSql = `SELECT COUNT(*) as count FROM ${entity.tableName}`;
-  if (options.filter) {
-    const stringColumns = entity.columns
-      .filter(c => c.jsType === 'string' && c.name !== 'id')
-      .map(c => c.name);
-
-    if (stringColumns.length > 0) {
-      const filterConditions = stringColumns.map(col => `${col} LIKE ?`);
-      countSql += ` WHERE (${filterConditions.join(' OR ')})`;
-    }
-  }
-
-  const filterValue = options.filter ? `%${options.filter}%` : null;
-  const countParams = options.filter
-    ? entity.columns.filter(c => c.jsType === 'string' && c.name !== 'id').map(() => filterValue)
-    : [];
-
-  const { count } = db.prepare(countSql).get(...countParams);
+  // Get total count using the SAME WHERE clause (without LIMIT/OFFSET)
+  const countSql = `SELECT COUNT(*) as count FROM ${viewName}${whereClause}`;
+  const { count: totalCount } = db.prepare(countSql).get(...params);
 
   return {
     data: enrichedRows,
-    total: count,
+    totalCount,
     limit: options.limit || null,
     offset: options.offset || 0
   };

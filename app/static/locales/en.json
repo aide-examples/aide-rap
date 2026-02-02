@@ -100,6 +100,7 @@
     "admin_panel": "Open Admin Panel",
     "views": "Views",
     "records_count": "%{count} records",
+    "records_count_partial": "%{loaded} of %{total} records",
     "loading_more": "Loading more...",
 
     "geo_no_coordinates": "No coordinates available. Please search for an address first.",
@@ -148,6 +149,7 @@
     "admin_load_all": "Load All",
     "admin_clear_all": "Clear All",
     "admin_reset_all": "Reset All",
+    "admin_load_import": "Load Import...",
 
     "dep_satisfied": "Dependencies satisfied",
     "dep_missing": "Missing: %{deps}",

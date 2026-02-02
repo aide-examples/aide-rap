@@ -15,7 +15,8 @@
     },
     "pagination": {
         "threshold": 100,
-        "pageSize": 100
+        "pageSize": 100,
+        "filterDebounceMs": 2000
     },
     "pwa": {
         "enabled": false,

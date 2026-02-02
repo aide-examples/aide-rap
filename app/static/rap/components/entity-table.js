@@ -16,6 +16,12 @@ const EntityTable = {
   columnFilters: {}, // { columnName: filterValue }
   showSystem: false, // Show system columns (version, created_at, updated_at)
 
+  // Server-side filter support (for paginated datasets)
+  allRecordsLoaded: true,       // false when only partial data loaded (pagination)
+  onServerFilterRequest: null,  // Callback: (columnFilters) => void
+  filterDebounceTimer: null,    // Timer for debounced server filter
+  filterDebounceMs: 2000,       // Debounce delay (configurable via setPaginationConfig)
+
   // Sort settings (shared with EntityTree)
   attributeOrder: 'schema', // 'schema' or 'alpha'
   referencePosition: 'end', // 'start', 'end', or 'inline'
@@ -69,6 +75,22 @@ const EntityTable = {
         sessionStorage.setItem('showSystem', this.showSystem);
         this.render();
       });
+    }
+  },
+
+  /**
+   * Set pagination state for server-side filtering
+   * @param {Object} state - { allRecordsLoaded, onServerFilterRequest, filterDebounceMs }
+   */
+  setPaginationState(state) {
+    if (state.allRecordsLoaded !== undefined) {
+      this.allRecordsLoaded = state.allRecordsLoaded;
+    }
+    if (state.onServerFilterRequest !== undefined) {
+      this.onServerFilterRequest = state.onServerFilterRequest;
+    }
+    if (state.filterDebounceMs !== undefined) {
+      this.filterDebounceMs = state.filterDebounceMs;
     }
   },
 
@@ -908,12 +930,23 @@ const EntityTable = {
         const column = input.dataset.column;
         const cursorPos = e.target.selectionStart;
         this.columnFilters[column] = e.target.value;
+
+        // Client-side filter: immediate (for loaded records)
         this.render();
+
         // Restore focus and cursor position after render
         const newInput = this.container.querySelector(`.column-filter[data-column="${column}"]`);
         if (newInput) {
           newInput.focus();
           newInput.setSelectionRange(cursorPos, cursorPos);
+        }
+
+        // Server-side filter: debounced (when not all records are loaded)
+        if (!this.allRecordsLoaded && this.onServerFilterRequest) {
+          clearTimeout(this.filterDebounceTimer);
+          this.filterDebounceTimer = setTimeout(() => {
+            this.onServerFilterRequest(this.columnFilters);
+          }, this.filterDebounceMs);
         }
       });
       // Prevent click from triggering row selection

@@ -92,6 +92,7 @@
     "admin_panel": "Abrir panel de administración",
     "views": "Vistas",
     "records_count": "%{count} registros",
+    "records_count_partial": "%{loaded} de %{total} registros",
     "loading_more": "Cargando más...",
 
     "geo_no_coordinates": "No hay coordenadas disponibles. Por favor busque una dirección primero.",
@@ -140,6 +141,7 @@
     "admin_load_all": "Cargar Todo",
     "admin_clear_all": "Limpiar Todo",
     "admin_reset_all": "Resetear Todo",
+    "admin_load_import": "Cargar Importación...",
 
     "dep_satisfied": "Dependencias satisfechas",
     "dep_missing": "Faltante: %{deps}",

@@ -616,7 +616,7 @@ Use `app/config_sample.json` as template for new systems.
     "sessionSecret": "change-in-production",
     "sessionTimeout": 86400
   },
-  "pagination": { "threshold": 100, "pageSize": 100 },
+  "pagination": { "threshold": 100, "pageSize": 100, "filterDebounceMs": 2000 },
   "tree": { "backRefPreviewLimit": 10 },
   "pwa": {
     "enabled": true,
@@ -629,6 +629,16 @@ Use `app/config_sample.json` as template for new systems.
   "helpEditable": false
 }
 ```
+
+### Pagination Settings
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `threshold` | 500 | Show filter dialog and use pagination when record count exceeds this |
+| `pageSize` | 200 | Number of records per page (infinite scroll) |
+| `filterDebounceMs` | 2000 | Delay before server-side filter query (ms) |
+
+**Server-Side Filtering**: When not all records are loaded (pagination active), column filters trigger a server query after `filterDebounceMs` of inactivity. The status bar shows "X of Y records" to indicate partial loading.
 
 ### UI Configuration (Markdown)
 
