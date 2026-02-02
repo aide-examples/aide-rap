@@ -2460,6 +2460,20 @@
     color: var(--color-gray-550);
 }
 
+.seed-table .source-status {
+    text-align: center;
+    width: 50px;
+}
+
+.seed-table .source-ready {
+    color: #059669;
+    font-weight: bold;
+}
+
+.seed-table .source-missing {
+    color: #dc2626;
+}
+
 .seed-table .seed-count.active,
 .seed-table th.active {
     background: #e0f2fe;

@@ -292,6 +292,12 @@ if (authEnabled) {
 }
 app.use(require('./server/routers/seed.router')(cfg));
 
+// XLSX Import Router (admin only)
+if (authEnabled) {
+    app.use('/api/import', authMiddleware, requireRole('admin'));
+}
+app.use(require('./server/routers/import.router')(cfg));
+
 // Prompt Builder Router (instruction + prompt routes)
 // Note: /api/seed/* routes are already protected by seed middleware above
 if (authEnabled) {

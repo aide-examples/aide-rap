@@ -29,7 +29,9 @@ const SeedManager = {
       <div class="context-menu-item" data-action="export">📤 Export...</div>
       <div class="context-menu-item" data-action="generate">🤖 Generate...</div>
       <div class="context-menu-separator"></div>
-      <div class="context-menu-item" data-action="load">▶️ Load...</div>
+      <div class="context-menu-item" data-action="run-import">🔄 Run Import (XLSX→JSON)...</div>
+      <div class="context-menu-item" data-action="load">▶️ Load Seed...</div>
+      <div class="context-menu-item" data-action="load-import">📥 Load Import...</div>
       <div class="context-menu-item" data-action="restore">🔄 Restore from Backup</div>
       <div class="context-menu-item" data-action="clear">🗑️ Clear</div>
     `;
@@ -51,18 +53,26 @@ const SeedManager = {
   /**
    * Show context menu at position
    */
-  showContextMenu(x, y, entityName, hasSeeds, hasBackup) {
+  showContextMenu(x, y, entityName, hasSeeds, hasBackup, hasImport, hasSource) {
     this.selectedEntity = entityName;
     this.contextMenu.style.left = x + 'px';
     this.contextMenu.style.top = y + 'px';
     this.contextMenu.classList.add('visible');
 
-    // Enable/disable load and export based on seed availability
+    // Enable/disable actions based on file availability
     const loadItem = this.contextMenu.querySelector('[data-action="load"]');
+    const loadImportItem = this.contextMenu.querySelector('[data-action="load-import"]');
+    const runImportItem = this.contextMenu.querySelector('[data-action="run-import"]');
     const exportItem = this.contextMenu.querySelector('[data-action="export"]');
     const restoreItem = this.contextMenu.querySelector('[data-action="restore"]');
     if (loadItem) {
       loadItem.classList.toggle('disabled', !hasSeeds);
+    }
+    if (loadImportItem) {
+      loadImportItem.classList.toggle('disabled', !hasImport);
+    }
+    if (runImportItem) {
+      runImportItem.classList.toggle('disabled', !hasSource);
     }
     if (exportItem) {
       exportItem.classList.toggle('disabled', !hasSeeds);
@@ -93,8 +103,14 @@ const SeedManager = {
       case 'generate':
         await this.openGenerator(entityName);
         break;
+      case 'run-import':
+        await this.runImport(entityName);
+        break;
       case 'load':
-        this.openLoadPreview(entityName);
+        this.openLoadPreview(entityName, 'seed');
+        break;
+      case 'load-import':
+        this.openLoadPreview(entityName, 'import');
         break;
       case 'restore':
         await this.restoreEntity(entityName);
@@ -129,14 +145,38 @@ const SeedManager = {
 
   /**
    * Open load preview for an entity
+   * @param {string} entityName - Entity name
+   * @param {string} sourceDir - Source directory ('seed' or 'import')
    */
-  openLoadPreview(entityName) {
+  openLoadPreview(entityName, sourceDir = 'seed') {
     if (typeof SeedPreviewDialog !== 'undefined') {
       SeedPreviewDialog.showLoad(entityName, async (mode) => {
-        await this.loadEntity(entityName, mode);
-      });
+        await this.loadEntity(entityName, mode, sourceDir);
+      }, sourceDir);
     } else {
       this.showMessage('Preview dialog not loaded', true);
+    }
+  },
+
+  /**
+   * Run XLSX → JSON import for an entity
+   * @param {string} entityName - Entity name
+   */
+  async runImport(entityName) {
+    try {
+      this.showMessage(`Running import for ${entityName}...`);
+      const response = await fetch(`/api/import/run/${entityName}`, { method: 'POST' });
+      const data = await response.json();
+
+      if (data.success) {
+        const msg = `${entityName}: ${data.recordsWritten} records written` +
+          (data.recordsFiltered > 0 ? ` (${data.recordsFiltered} filtered out)` : '');
+        await this.refreshAndMessage(msg);
+      } else {
+        this.showMessage(`Import failed: ${data.error}`, true);
+      }
+    } catch (err) {
+      this.showMessage(`Import error: ${err.message}`, true);
     }
   },
 
@@ -167,13 +207,40 @@ const SeedManager = {
   },
 
   /**
-   * Load status from API
+   * Load status from API (seed status + import definitions)
    */
   async loadStatus() {
     try {
-      const response = await fetch('/api/seed/status');
-      const data = await response.json();
-      this.entities = data.entities || [];
+      // Fetch seed status and import definitions in parallel
+      const [seedResponse, importResponse] = await Promise.all([
+        fetch('/api/seed/status'),
+        fetch('/api/import/status')
+      ]);
+
+      const seedData = await seedResponse.json();
+      const importData = await importResponse.json();
+
+      this.entities = seedData.entities || [];
+
+      // Build lookup map for import definitions
+      const importMap = {};
+      for (const imp of (importData.imports || [])) {
+        importMap[imp.entity] = imp;
+      }
+
+      // Merge import source info into entities
+      for (const entity of this.entities) {
+        const importDef = importMap[entity.name];
+        if (importDef) {
+          entity.hasImportDef = importDef.hasDefinition;
+          entity.hasSource = importDef.hasSource;
+          entity.sourceFile = importDef.sourceFile;
+        } else {
+          entity.hasImportDef = false;
+          entity.hasSource = false;
+          entity.sourceFile = null;
+        }
+      }
     } catch (err) {
       console.error('Failed to load seed status:', err);
       this.entities = [];
@@ -201,6 +268,9 @@ const SeedManager = {
       const hasSeeds = e.seedTotal !== null && e.seedTotal > 0;
       const hasInvalid = hasSeeds && e.seedValid !== null && e.seedValid < e.seedTotal;
       const hasBackup = e.backupTotal !== null && e.backupTotal > 0;
+      const hasImport = e.importTotal !== null && e.importTotal > 0;
+      const hasImportInvalid = hasImport && e.importValid !== null && e.importValid < e.importTotal;
+      const hasSource = e.hasSource === true;
 
       // Display format: "5 / 8" if there are invalid records, otherwise just the total
       let seedDisplay = '--';
@@ -212,7 +282,24 @@ const SeedManager = {
         }
       }
 
+      let importDisplay = '--';
+      if (e.importTotal !== null) {
+        if (hasImportInvalid) {
+          importDisplay = `<span class="seed-valid">${e.importValid}</span> / ${e.importTotal}`;
+        } else {
+          importDisplay = String(e.importTotal);
+        }
+      }
+
       const backupDisplay = hasBackup ? String(e.backupTotal) : '--';
+
+      // Source indicator: show checkmark if XLSX source exists
+      let sourceDisplay = '--';
+      if (e.hasImportDef) {
+        sourceDisplay = hasSource
+          ? `<span class="source-ready" title="${e.sourceFile}">✓</span>`
+          : `<span class="source-missing" title="Source file missing: ${e.sourceFile || '?'}">✗</span>`;
+      }
 
       // Dependency readiness dot
       let depDot = '';
@@ -225,10 +312,12 @@ const SeedManager = {
       }
 
       return `
-        <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}" data-has-backup="${hasBackup}">
+        <tr data-entity="${e.name}" data-has-seeds="${hasSeeds}" data-has-backup="${hasBackup}" data-has-import="${hasImport}" data-has-source="${hasSource}">
           <td class="dep-status">${depDot}</td>
           <td class="entity-name">${e.name}</td>
           <td class="seed-count">${seedDisplay}</td>
+          <td class="import-count">${importDisplay}</td>
+          <td class="source-status">${sourceDisplay}</td>
           <td class="backup-count">${backupDisplay}</td>
           <td class="row-count">${e.rowCount}</td>
         </tr>
@@ -250,6 +339,8 @@ const SeedManager = {
                   <th></th>
                   <th>Entity</th>
                   <th>Seed</th>
+                  <th>Import</th>
+                  <th>Source</th>
                   <th>Backup</th>
                   <th>DB Rows</th>
                 </tr>
@@ -299,7 +390,9 @@ const SeedManager = {
         const entityName = row.dataset.entity;
         const hasSeeds = row.dataset.hasSeeds === 'true';
         const hasBackup = row.dataset.hasBackup === 'true';
-        this.showContextMenu(e.pageX, e.pageY, entityName, hasSeeds, hasBackup);
+        const hasImport = row.dataset.hasImport === 'true';
+        const hasSource = row.dataset.hasSource === 'true';
+        this.showContextMenu(e.pageX, e.pageY, entityName, hasSeeds, hasBackup, hasImport, hasSource);
       };
       row.addEventListener('click', showMenu);
       row.addEventListener('contextmenu', showMenu);
@@ -347,14 +440,21 @@ const SeedManager = {
   },
 
   /**
-   * Load seed data for a single entity
+   * Load seed/import data for a single entity
+   * @param {string} entityName - Entity name
+   * @param {string} mode - Load mode ('replace', 'merge', 'skip_conflicts')
+   * @param {string} sourceDir - Source directory ('seed' or 'import')
    */
-  async loadEntity(entityName, mode) {
+  async loadEntity(entityName, mode, sourceDir = 'seed') {
     try {
       const fetchOptions = { method: 'POST' };
-      if (mode) {
+      const body = {};
+      if (mode) body.mode = mode;
+      if (sourceDir) body.sourceDir = sourceDir;
+
+      if (Object.keys(body).length > 0) {
         fetchOptions.headers = { 'Content-Type': 'application/json' };
-        fetchOptions.body = JSON.stringify({ mode });
+        fetchOptions.body = JSON.stringify(body);
       }
       const response = await fetch(`/api/seed/load/${entityName}`, fetchOptions);
       const data = await response.json();

@@ -13,6 +13,7 @@ const SeedPreviewDialog = {
   dbRowCount: 0,
   conflictCount: 0,
   selectedLoadMode: 'skip', // 'skip' = keep existing, 'merge' = overwrite existing
+  sourceDir: 'seed', // 'seed' or 'import' - source directory for loading
 
   /**
    * Initialize the preview dialog
@@ -22,12 +23,16 @@ const SeedPreviewDialog = {
   },
 
   /**
-   * Show dialog for load preview (shows seed file content)
+   * Show dialog for load preview (shows seed/import file content)
+   * @param {string} entityName - Entity name
+   * @param {function} onConfirm - Callback with mode parameter
+   * @param {string} sourceDir - Source directory ('seed' or 'import')
    */
-  async showLoad(entityName, onConfirm) {
+  async showLoad(entityName, onConfirm, sourceDir = 'seed') {
     this.entityName = entityName;
     this.mode = 'load';
     this.onConfirm = onConfirm;
+    this.sourceDir = sourceDir;
     await this.loadSeedContent();
     this.render();
   },
@@ -44,11 +49,12 @@ const SeedPreviewDialog = {
   },
 
   /**
-   * Load seed file content from server (for Load mode)
+   * Load seed/import file content from server (for Load mode)
    */
   async loadSeedContent() {
     try {
-      const response = await fetch(`/api/seed/content/${this.entityName}`);
+      const url = `/api/seed/content/${this.entityName}?sourceDir=${this.sourceDir}`;
+      const response = await fetch(url);
       const data = await response.json();
       this.records = data.records || [];
       this.dbRowCount = data.dbRowCount || 0;
@@ -133,16 +139,17 @@ const SeedPreviewDialog = {
       this.modalElement.remove();
     }
 
+    const sourceLabel = this.sourceDir === 'import' ? 'import' : 'seed';
     const title = this.mode === 'load'
-      ? `Load Preview: ${this.entityName}`
+      ? `Load ${sourceLabel === 'import' ? 'Import' : 'Seed'}: ${this.entityName}`
       : `Export: ${this.entityName}`;
 
     const sourceInfo = this.mode === 'load'
-      ? `${this.records.length} records in seed file`
+      ? `${this.records.length} records in ${sourceLabel} file`
       : `${this.records.length} records in database`;
 
     const emptyMessage = this.mode === 'load'
-      ? 'No records in seed file'
+      ? `No records in ${sourceLabel} file`
       : 'No records in database';
 
     // Conflict info for load mode

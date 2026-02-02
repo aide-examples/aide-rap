@@ -218,6 +218,14 @@ function getBackupDir() {
 }
 
 /**
+ * Get the import directory (sibling of seed directory)
+ * @returns {string} - The import directory path
+ */
+function getImportDir() {
+  return path.join(path.dirname(getSeedDir()), 'import');
+}
+
+/**
  * Get database and schema from the database module
  */
 function getDbAndSchema() {
@@ -394,6 +402,7 @@ function getStatus() {
   const entities = [];
 
   const backupDir = getBackupDir();
+  const importDir = getImportDir();
 
   for (const entity of schema.orderedEntities) {
     const rowCount = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get().count;
@@ -417,13 +426,31 @@ function getStatus() {
     const backupPath = path.join(backupDir, seedFile);
     const backupTotal = countSeedFile(backupPath);
 
+    // Count import records
+    const importPath = path.join(importDir, seedFile);
+    const importTotal = countSeedFile(importPath);
+
+    // Calculate valid count if import file exists
+    let importValid = null;
+    if (importTotal !== null && importTotal > 0) {
+      try {
+        const records = JSON.parse(fs.readFileSync(importPath, 'utf-8'));
+        const validation = validateImport(entity.className, records);
+        importValid = validation.validCount;
+      } catch {
+        importValid = 0;
+      }
+    }
+
     entities.push({
       name: entity.className,
       tableName: entity.tableName,
       rowCount,
       seedTotal,      // Total records in seed file
       seedValid,      // Valid records (can be loaded)
-      backupTotal     // Total records in backup file
+      backupTotal,    // Total records in backup file
+      importTotal,    // Total records in import file
+      importValid     // Valid records in import file
     });
   }
 
@@ -782,9 +809,10 @@ function findExistingByUnique(entityName, record) {
  * Count how many seed records conflict with existing DB records (by unique constraint).
  * Used by the preview dialog to warn about duplicates before loading.
  * @param {string} entityName
+ * @param {string} sourceDir - Source directory ('seed', 'import', or 'backup')
  * @returns {{ dbRowCount: number, conflictCount: number }}
  */
-function countSeedConflicts(entityName) {
+function countSeedConflicts(entityName, sourceDir = 'seed') {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
 
@@ -793,8 +821,18 @@ function countSeedConflicts(entityName) {
   const dbRowCount = db.prepare(`SELECT COUNT(*) as cnt FROM ${entity.tableName}`).get().cnt;
   if (dbRowCount === 0) return { dbRowCount: 0, conflictCount: 0 };
 
-  // Read seed file
-  const seedFile = path.join(getSeedDir(), `${entityName}.json`);
+  // Determine source directory
+  let sourceDirectory;
+  if (sourceDir === 'import') {
+    sourceDirectory = getImportDir();
+  } else if (sourceDir === 'backup') {
+    sourceDirectory = getBackupDir();
+  } else {
+    sourceDirectory = getSeedDir();
+  }
+
+  // Read seed/import file
+  const seedFile = path.join(sourceDirectory, `${entityName}.json`);
   if (!fs.existsSync(seedFile)) return { dbRowCount, conflictCount: 0 };
 
   const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
@@ -826,24 +864,35 @@ function countSeedConflicts(entityName) {
  *
  * @param {string} entityName - Entity name
  * @param {object} lookups - Pre-built label lookups for FK resolution (optional)
- * @param {object} options - { skipInvalid, mode: 'replace'|'merge'|'skip_conflicts' }
+ * @param {object} options - { skipInvalid, mode: 'replace'|'merge'|'skip_conflicts', sourceDir: 'seed'|'import'|'backup' }
  *   - replace: INSERT OR REPLACE (default, may break FK refs)
  *   - merge: UPDATE existing records (preserve id), INSERT new ones
  *   - skip_conflicts: Skip records that would conflict with existing ones
+ *   - sourceDir: Directory to load from ('seed' (default), 'import', or 'backup')
  * @returns {Promise<object>} - { loaded, updated, skipped }
  */
 async function loadEntity(entityName, lookups = null, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-  const { skipInvalid = false, mode = 'replace', preserveSystemColumns = false } = options;
+  const { skipInvalid = false, mode = 'replace', preserveSystemColumns = false, sourceDir = 'seed' } = options;
 
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
 
-  const seedFile = path.join(getSeedDir(), `${entityName}.json`);
+  // Determine source directory
+  let sourceDirectory;
+  if (sourceDir === 'import') {
+    sourceDirectory = getImportDir();
+  } else if (sourceDir === 'backup') {
+    sourceDirectory = getBackupDir();
+  } else {
+    sourceDirectory = getSeedDir();
+  }
+
+  const seedFile = path.join(sourceDirectory, `${entityName}.json`);
   if (!fs.existsSync(seedFile)) {
-    throw new Error(`No seed file found for ${entityName}`);
+    throw new Error(`No ${sourceDir} file found for ${entityName}`);
   }
 
   const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
@@ -1366,6 +1415,7 @@ module.exports = {
   setMediaService,
   getSeedDir,
   getBackupDir,
+  getImportDir,
   getStatus,
   validateImport,
   loadEntity,

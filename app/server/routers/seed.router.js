@@ -29,20 +29,33 @@ module.exports = function(cfg) {
         }
     });
 
-    // Get seed file content for preview/export (includes conflict detection)
+    // Get seed/import file content for preview/export (includes conflict detection)
+    // Query param: sourceDir = 'seed' (default) | 'import' | 'backup'
     router.get('/api/seed/content/:entity', (req, res) => {
         try {
-            const seedFile = path.join(SeedManager.getSeedDir(), `${req.params.entity}.json`);
+            const sourceDir = req.query.sourceDir || 'seed';
+
+            // Determine source directory
+            let sourceDirectory;
+            if (sourceDir === 'import') {
+                sourceDirectory = SeedManager.getImportDir();
+            } else if (sourceDir === 'backup') {
+                sourceDirectory = SeedManager.getBackupDir();
+            } else {
+                sourceDirectory = SeedManager.getSeedDir();
+            }
+
+            const seedFile = path.join(sourceDirectory, `${req.params.entity}.json`);
 
             if (!fs.existsSync(seedFile)) {
-                return res.status(404).json({ error: 'No seed file found', records: [] });
+                return res.status(404).json({ error: `No ${sourceDir} file found`, records: [] });
             }
 
             const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
             const recordsArray = Array.isArray(records) ? records : [];
 
             // Check for conflicts with existing DB data
-            const { dbRowCount, conflictCount } = SeedManager.countSeedConflicts(req.params.entity);
+            const { dbRowCount, conflictCount } = SeedManager.countSeedConflicts(req.params.entity, sourceDir);
 
             res.json({ records: recordsArray, dbRowCount, conflictCount });
         } catch (e) {
@@ -51,16 +64,18 @@ module.exports = function(cfg) {
         }
     });
 
-    // Load seed data for a specific entity
-    // Options: { skipInvalid: boolean, mode: 'replace'|'merge'|'skip_conflicts' }
+    // Load seed/import data for a specific entity
+    // Options: { skipInvalid: boolean, mode: 'replace'|'merge'|'skip_conflicts', sourceDir: 'seed'|'import' }
     // - replace: INSERT OR REPLACE (default, may break FK refs if id changes)
     // - merge: UPDATE existing records (preserve id), INSERT new ones
     // - skip_conflicts: Skip records that conflict with existing ones
+    // - sourceDir: 'seed' (default) or 'import'
     router.post('/api/seed/load/:entity', async (req, res) => {
         try {
             const options = {
                 skipInvalid: req.body?.skipInvalid === true,
-                mode: req.body?.mode || 'replace'
+                mode: req.body?.mode || 'replace',
+                sourceDir: req.body?.sourceDir || 'seed'
             };
             const result = await SeedManager.loadEntity(req.params.entity, null, options);
             res.json({ success: true, ...result });
