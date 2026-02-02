@@ -31,12 +31,12 @@ const EntityChart = {
     }
 
     if (!schema.chart) {
-      this.container.innerHTML = '<p class="empty-message">No chart configuration found</p>';
+      this.container.innerHTML = `<p class="empty-message">${i18n.t('chart_no_config')}</p>`;
       return;
     }
 
     if (!records || records.length === 0) {
-      this.container.innerHTML = '<p class="empty-message">No data available for chart</p>';
+      this.container.innerHTML = `<p class="empty-message">${i18n.t('chart_no_data')}</p>`;
       return;
     }
 
@@ -70,7 +70,7 @@ const EntityChart = {
       this.view = result.view;
     } catch (err) {
       console.error('Chart rendering failed:', err);
-      this.container.innerHTML = `<p class="empty-message">Chart error: ${err.message}</p>`;
+      this.container.innerHTML = `<p class="empty-message">${i18n.t('chart_error', { message: err.message })}</p>`;
     }
   },
 

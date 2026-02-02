@@ -63,7 +63,7 @@ const EntityMap = {
     const lngCol = columns.find(c => c.aggregateField === 'longitude');
 
     if (!latCol || !lngCol) {
-      this.container.innerHTML = '<p class="empty-message">No geo columns found (need latitude + longitude)</p>';
+      this.container.innerHTML = `<p class="empty-message">${i18n.t('map_no_geo_columns')}</p>`;
       return;
     }
 

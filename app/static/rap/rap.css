@@ -94,6 +94,115 @@
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Settings dropdown in header */
+.header-settings-dropdown {
+    position: relative;
+}
+
+.header-settings-btn {
+    background: none;
+    border: 1px solid transparent;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #555;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.header-settings-btn:hover {
+    background: var(--color-slate-100);
+    border-color: var(--color-slate-300);
+}
+
+.header-settings-btn .dropdown-arrow {
+    font-size: 0.7em;
+    margin-left: 2px;
+    opacity: 0.7;
+}
+
+.header-settings-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: white;
+    border: 1px solid var(--border-color-dark);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    padding: 12px;
+    min-width: 220px;
+    z-index: 10000;
+}
+
+.header-settings-menu.open {
+    display: block;
+}
+
+.settings-section {
+    margin-bottom: 10px;
+}
+
+.settings-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-gray-500);
+    margin-bottom: 4px;
+}
+
+.settings-select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--color-slate-300);
+    border-radius: 4px;
+    background: #fff;
+    font-size: 0.85rem;
+    color: var(--color-gray-650);
+    cursor: pointer;
+}
+
+.settings-select:hover {
+    border-color: var(--color-primary);
+}
+
+.settings-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.settings-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 10px 0;
+}
+
+.settings-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--color-gray-650);
+}
+
+.settings-checkbox:hover {
+    color: var(--color-primary);
+}
+
+.settings-checkbox input[type="checkbox"] {
+    margin: 0;
+    margin-top: 2px;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.settings-checkbox small {
+    color: var(--color-gray-500);
+    font-size: 0.75rem;
+}
+
 /* Status widget (footer) - always at bottom */
 .status-widget {
     flex-shrink: 0;
@@ -1997,6 +2106,21 @@
 .status-user-role {
     text-transform: capitalize;
     font-weight: 500;
+}
+
+.status-admin-link {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-gray-650);
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.status-admin-link:hover {
+    background: var(--color-slate-200);
+    color: #1e40af;
 }
 
 .status-powered-by {

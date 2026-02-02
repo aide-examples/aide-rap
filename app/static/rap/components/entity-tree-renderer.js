@@ -200,7 +200,7 @@ const TreeRenderer = {
                  data-entity="${targetEntity}"
                  data-record-id="${fkId}">
               <div class="tree-fk-header disabled" style="background-color: ${areaColor};">
-                <span class="cycle-icon" title="Cycle detected - already visited">&#8635;</span>
+                <span class="cycle-icon" title="${i18n.t('tooltip_cycle_detected')}">&#8635;</span>
                 <span class="attr-name">${col.name}:</span>
                 <span class="fk-label">${DomUtils.escapeHtml(refLabel)}</span>
                 <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
@@ -397,7 +397,7 @@ const TreeRenderer = {
                 let expandCell;
                 if (isCycle) {
                     expandCell = `
-                <td class="expand-cell cycle-cell" title="Cycle detected - already visited">
+                <td class="expand-cell cycle-cell" title="${i18n.t('tooltip_cycle_detected')}">
                   <span class="cycle-icon">&#8635;</span>
                 </td>
               `;

@@ -64,13 +64,13 @@ const EntityForm = {
             <legend>
               ${groupName} <span class="aggregate-type">(${typeName})</span>
               ${isGeo ? `
-                <button type="button" class="geo-search-btn btn-icon" title="Search address">🔍</button>
-                <button type="button" class="geo-reverse-btn btn-icon" title="Show address">📍</button>
-                <button type="button" class="geo-map-toggle btn-icon" title="Toggle map">🗺️</button>
+                <button type="button" class="geo-search-btn btn-icon" title="${i18n.t('tooltip_search_address')}">🔍</button>
+                <button type="button" class="geo-reverse-btn btn-icon" title="${i18n.t('tooltip_show_address')}">📍</button>
+                <button type="button" class="geo-map-toggle btn-icon" title="${i18n.t('tooltip_toggle_map')}">🗺️</button>
               ` : ''}
               ${isAddress ? `
-                <button type="button" class="address-search-btn btn-icon" title="Search address">🔍</button>
-                <button type="button" class="address-map-btn btn-icon" title="Show on map">🗺️</button>
+                <button type="button" class="address-search-btn btn-icon" title="${i18n.t('tooltip_search_address')}">🔍</button>
+                <button type="button" class="address-map-btn btn-icon" title="${i18n.t('tooltip_show_on_map')}">🗺️</button>
               ` : ''}
             </legend>
             ${isGeo ? `
@@ -303,7 +303,7 @@ const EntityForm = {
           const lng = parseFloat(lngInput?.value);
 
           if (isNaN(lat) || isNaN(lng)) {
-            alert('Keine Koordinaten vorhanden. Bitte erst eine Adresse suchen.');
+            alert(i18n.t('geo_no_coordinates'));
             return;
           }
 
@@ -350,11 +350,11 @@ const EntityForm = {
     modal.innerHTML = `
       <div class="geo-search-dialog">
         <div class="geo-search-header">
-          <h3>Adresse suchen</h3>
+          <h3>${i18n.t('geo_search_title')}</h3>
           <button type="button" class="geo-search-close btn-icon">×</button>
         </div>
         <div class="geo-search-input-row">
-          <input type="text" class="geo-search-input" placeholder="Adresse eingeben..." autofocus>
+          <input type="text" class="geo-search-input" placeholder="${i18n.t('geo_search_placeholder')}" autofocus>
           <button type="button" class="geo-search-submit btn-icon">🔍</button>
         </div>
         <div class="geo-search-results"></div>
@@ -377,14 +377,14 @@ const EntityForm = {
       const query = input.value.trim();
       if (!query) return;
 
-      resultsDiv.innerHTML = '<div class="loading">Suche...</div>';
+      resultsDiv.innerHTML = `<div class="loading">${i18n.t('geo_searching')}</div>`;
 
       try {
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5`;
         const results = await this.throttledGeoRequest(url);
 
         if (results.length === 0) {
-          resultsDiv.innerHTML = '<div class="no-results">Keine Ergebnisse gefunden</div>';
+          resultsDiv.innerHTML = `<div class="no-results">${i18n.t('geo_no_results')}</div>`;
           return;
         }
 
@@ -404,7 +404,7 @@ const EntityForm = {
           });
         });
       } catch (err) {
-        resultsDiv.innerHTML = `<div class="error">Fehler: ${err.message}</div>`;
+        resultsDiv.innerHTML = `<div class="error">${i18n.t('error_generic', { message: err.message })}</div>`;
       }
     };
 
@@ -550,14 +550,14 @@ const EntityForm = {
     dialog.className = 'geo-search-dialog';
     dialog.innerHTML = `
       <div class="dialog-content">
-        <h3>🔍 Adresse suchen</h3>
+        <h3>🔍 ${i18n.t('geo_search_title')}</h3>
         <div class="geo-search-form">
-          <input type="text" class="form-input geo-search-input" placeholder="Adresse eingeben..." autofocus>
-          <button type="button" class="btn-primary geo-search-submit">Suchen</button>
+          <input type="text" class="form-input geo-search-input" placeholder="${i18n.t('geo_search_placeholder')}" autofocus>
+          <button type="button" class="btn-primary geo-search-submit">${i18n.t('geo_search_btn')}</button>
         </div>
         <div class="geo-search-results"></div>
         <div class="dialog-buttons">
-          <button type="button" class="btn-secondary geo-search-cancel">Abbrechen</button>
+          <button type="button" class="btn-secondary geo-search-cancel">${i18n.t('cancel')}</button>
         </div>
       </div>
     `;
@@ -572,14 +572,14 @@ const EntityForm = {
       const query = input.value.trim();
       if (!query) return;
 
-      resultsDiv.innerHTML = '<div class="loading">Suche...</div>';
+      resultsDiv.innerHTML = `<div class="loading">${i18n.t('geo_searching')}</div>`;
 
       try {
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`;
         const results = await this.throttledGeoRequest(url);
 
         if (results.length === 0) {
-          resultsDiv.innerHTML = '<div class="no-results">Keine Ergebnisse gefunden</div>';
+          resultsDiv.innerHTML = `<div class="no-results">${i18n.t('geo_no_results')}</div>`;
           return;
         }
 
@@ -601,7 +601,7 @@ const EntityForm = {
         });
 
       } catch (err) {
-        resultsDiv.innerHTML = `<div class="error">Fehler: ${err.message}</div>`;
+        resultsDiv.innerHTML = `<div class="error">${i18n.t('error_generic', { message: err.message })}</div>`;
       }
     };
 
@@ -664,13 +664,13 @@ const EntityForm = {
     const lng = parseFloat(lngInput?.value);
 
     if (isNaN(lat) || isNaN(lng)) {
-      addressDisplay.textContent = 'Keine Koordinaten vorhanden';
+      addressDisplay.textContent = i18n.t('geo_no_results');
       addressDisplay.classList.remove('hidden');
       setTimeout(() => addressDisplay.classList.add('hidden'), 3000);
       return;
     }
 
-    addressDisplay.textContent = 'Lade Adresse...';
+    addressDisplay.textContent = i18n.t('geo_loading_address');
     addressDisplay.classList.remove('hidden');
 
     try {
@@ -682,14 +682,14 @@ const EntityForm = {
       } else {
         addressDisplay.innerHTML = `
           <span class="geo-address-text">${result.display_name}</span>
-          <button type="button" class="geo-address-close btn-icon" title="Schließen">×</button>
+          <button type="button" class="geo-address-close btn-icon" title="${i18n.t('cancel')}">×</button>
         `;
         addressDisplay.querySelector('.geo-address-close').addEventListener('click', () => {
           addressDisplay.classList.add('hidden');
         });
       }
     } catch (err) {
-      addressDisplay.textContent = `Fehler: ${err.message}`;
+      addressDisplay.textContent = i18n.t('error_generic', { message: err.message });
       setTimeout(() => addressDisplay.classList.add('hidden'), 3000);
     }
   },
@@ -850,7 +850,7 @@ const EntityForm = {
 
     // Show uploading state
     const originalDropzoneHtml = dropzone.innerHTML;
-    dropzone.innerHTML = '<span class="uploading">Lade URL...</span>';
+    dropzone.innerHTML = `<span class="uploading">${i18n.t('media_loading_url')}</span>`;
 
     try {
       const response = await fetch('/api/media/from-url', {
@@ -896,7 +896,7 @@ const EntityForm = {
       dropzone.innerHTML = `<span class="error">${errorMessage}</span>`;
     }
     setTimeout(() => {
-      dropzone.innerHTML = '<span>Datei hierher ziehen</span><input type="file" class="media-file-input">';
+      dropzone.innerHTML = `<span>${i18n.t('media_drag_file')}</span><input type="file" class="media-file-input">`;
       // Reattach file input handler
       const newFileInput = dropzone.querySelector('.media-file-input');
       newFileInput.addEventListener('change', () => {
@@ -920,7 +920,7 @@ const EntityForm = {
     const filenameSpan = fieldElement.querySelector('.media-filename');
 
     // Show uploading state
-    dropzone.innerHTML = '<span class="uploading">Hochladen...</span>';
+    dropzone.innerHTML = `<span class="uploading">${i18n.t('media_uploading')}</span>`;
 
     try {
       const formData = new FormData();
@@ -1210,19 +1210,19 @@ const EntityForm = {
                  src="${hasValue ? `/api/media/${mediaId}/thumbnail` : ''}"
                  onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
             <span class="media-filename"></span>
-            <button type="button" class="media-remove btn-icon" ${disabled} title="Entfernen">&times;</button>
+            <button type="button" class="media-remove btn-icon" ${disabled} title="${i18n.t('delete')}">&times;</button>
           </div>
           <div class="media-input-area ${hasValue ? 'hidden' : ''}" ${isReadonly ? 'style="display:none"' : ''}>
             <div class="media-dropzone" tabindex="0">
-              <span>Datei hierher ziehen</span>
+              <span>${i18n.t('media_drag_file')}</span>
               <input type="file" class="media-file-input">
             </div>
             <div class="media-buttons-row">
-              <button type="button" class="media-file-btn btn-small">📁 Datei wählen</button>
+              <button type="button" class="media-file-btn btn-small">📁 ${i18n.t('media_select_files')}</button>
             </div>
             <div class="media-url-row">
-              <input type="text" class="media-url-input form-input" placeholder="URL einfügen...">
-              <button type="button" class="media-url-load btn-small">Laden</button>
+              <input type="text" class="media-url-input form-input" placeholder="URL...">
+              <button type="button" class="media-url-load btn-small">${i18n.t('media_load')}</button>
             </div>
           </div>
         </div>

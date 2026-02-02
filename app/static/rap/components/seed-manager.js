@@ -218,9 +218,9 @@ const SeedManager = {
       let depDot = '';
       if (e.dependencies && e.dependencies.length > 0) {
         if (e.ready) {
-          depDot = '<span class="dep-dot dep-ready" title="Dependencies satisfied">&#9679;</span>';
+          depDot = `<span class="dep-dot dep-ready" title="${i18n.t('dep_satisfied')}">&#9679;</span>`;
         } else {
-          depDot = `<span class="dep-dot dep-missing" title="Missing: ${e.missingDeps.join(', ')}">&#9679;</span>`;
+          depDot = `<span class="dep-dot dep-missing" title="${i18n.t('dep_missing', { deps: e.missingDeps.join(', ') })}">&#9679;</span>`;
         }
       }
 
@@ -260,16 +260,16 @@ const SeedManager = {
             </table>
           </div>
           <div class="modal-footer">
-            <button class="btn-seed btn-new-system" title="Create a new AIDE RAP system">+ New System</button>
+            <button class="btn-seed btn-new-system" title="${i18n.t('admin_new_system_tooltip')}">+ ${i18n.t('admin_new_system')}</button>
             <span class="footer-spacer"></span>
-            <button class="btn-seed btn-backup" title="Backup all DB data to JSON files">Backup</button>
-            <button class="btn-seed btn-restore" title="Restore all data from backup files">Restore</button>
-            <button class="btn-seed btn-restore-media" title="Restore media links from manifest refs">Restore Media</button>
-            <button class="btn-seed btn-load-all">Load All</button>
-            <button class="btn-seed btn-clear-all">Clear All</button>
-            <button class="btn-seed btn-reset-all">Reset All</button>
-            <button class="btn-seed btn-reinit" title="Re-read data model and rebuild schema">Reinitialize</button>
-            <button class="btn-seed btn-reload-views" title="Reload Views.md without restart">Reload Views</button>
+            <button class="btn-seed btn-backup" title="${i18n.t('admin_backup_tooltip')}">${i18n.t('admin_backup')}</button>
+            <button class="btn-seed btn-restore" title="${i18n.t('admin_restore_tooltip')}">${i18n.t('admin_restore')}</button>
+            <button class="btn-seed btn-restore-media" title="${i18n.t('admin_restore_media_tooltip')}">${i18n.t('admin_restore_media')}</button>
+            <button class="btn-seed btn-load-all">${i18n.t('admin_load_all')}</button>
+            <button class="btn-seed btn-clear-all">${i18n.t('admin_clear_all')}</button>
+            <button class="btn-seed btn-reset-all">${i18n.t('admin_reset_all')}</button>
+            <button class="btn-seed btn-reinit" title="${i18n.t('admin_reinit_tooltip')}">${i18n.t('admin_reinit')}</button>
+            <button class="btn-seed btn-reload-views" title="${i18n.t('admin_reload_views_tooltip')}">${i18n.t('admin_reload_views')}</button>
           </div>
         </div>
       </div>

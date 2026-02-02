@@ -428,7 +428,7 @@ const EntityExplorer = {
         indicator = document.createElement('div');
         indicator.id = 'pagination-loading';
         indicator.className = 'pagination-loading';
-        indicator.innerHTML = '<span class="spinner"></span> Loading more...';
+        indicator.innerHTML = `<span class="spinner"></span> ${i18n.t('loading_more')}`;
         this.tableContainer.appendChild(indicator);
       }
       indicator.style.display = 'flex';
@@ -612,7 +612,7 @@ const EntityExplorer = {
     this.currentView = null;
     this.viewSelectorValue = '';
     const viewText = this.viewSelectorTrigger.querySelector('.view-selector-text');
-    if (viewText) viewText.textContent = 'Views';
+    if (viewText) viewText.textContent = i18n.t('select_view');
     this.viewSelectorTrigger.style.backgroundColor = '';
     this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
       item.classList.remove('selected');
@@ -903,7 +903,7 @@ const EntityExplorer = {
       }
     } catch (err) {
       console.error('Failed to load view:', err);
-      this.tableContainer.innerHTML = `<p class="empty-message">Error: ${err.message}</p>`;
+      this.tableContainer.innerHTML = `<p class="empty-message">${i18n.t('error_generic', { message: err.message })}</p>`;
     }
   },
 
@@ -1077,7 +1077,7 @@ const EntityExplorer = {
       return;
     }
 
-    this.mapContainer.innerHTML = `<p class="empty-message">Select a view or entity with geo data</p>`;
+    this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('map_select_view')}</p>`;
   },
 
   renderChart() {
@@ -1091,7 +1091,7 @@ const EntityExplorer = {
       return;
     }
 
-    this.chartContainer.innerHTML = `<p class="empty-message">Select a view with chart configuration</p>`;
+    this.chartContainer.innerHTML = `<p class="empty-message">${i18n.t('chart_select_view')}</p>`;
   },
 
   async renderTable() {
@@ -1145,8 +1145,8 @@ const EntityExplorer = {
       // Hide edit/delete buttons for readonly entities
       const actionsHtml = isReadonly ? '' : `
           <div class="entity-row-actions">
-            <button class="btn-row-action btn-edit" data-id="${record.id}" title="Edit">&#9998;</button>
-            <button class="btn-row-action danger btn-delete" data-id="${record.id}" title="Delete">&#128465;</button>
+            <button class="btn-row-action btn-edit" data-id="${record.id}" title="${i18n.t('edit')}">&#9998;</button>
+            <button class="btn-row-action danger btn-delete" data-id="${record.id}" title="${i18n.t('delete')}">&#128465;</button>
           </div>`;
 
       return `
@@ -1300,7 +1300,7 @@ const EntityExplorer = {
     if (this.viewMode === 'table' && (this.currentEntity || this.currentView) && this.records.length > 0) {
       // Use provided count or get from EntityTable (which may be filtered)
       const displayCount = count !== null ? count : this.records.length;
-      recordsEl.textContent = `${displayCount} records`;
+      recordsEl.textContent = i18n.t('records_count', { count: displayCount });
       if (sepEl) sepEl.style.display = '';
     } else {
       recordsEl.textContent = '';

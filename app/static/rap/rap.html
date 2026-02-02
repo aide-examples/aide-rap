@@ -28,37 +28,8 @@
         <!-- Framework Header Widget -->
         <div id="app-header"></div>
 
-        <!-- Menu Bar for RAP-specific navigation -->
+        <!-- Breadcrumb Bar (reserved for navigation) -->
         <nav id="rap-menu-bar" class="rap-menu-bar">
-            <a href="/about?doc=requirements/DataModel.md" class="menu-item" data-i18n="data_model">Model</a>
-            <a href="/layout-editor" class="menu-item" data-i18n="layout_editor">Layout</a>
-            <a href="/rap" class="menu-item" data-i18n="rap_docs">RAP Docs</a>
-            <span class="menu-separator">|</span>
-            <label class="menu-label" data-i18n="menu_sort">Sort:</label>
-            <select id="sort-attributes" class="menu-select" title="Attribute order" data-i18n-title="tooltip_attr_order">
-                <option value="schema" data-i18n="sort_attr_schema">Schema</option>
-                <option value="alpha" data-i18n="sort_attr_alpha">ABC</option>
-            </select>
-            <select id="sort-references" class="menu-select" title="References position" data-i18n-title="tooltip_ref_position">
-                <option value="end" data-i18n="sort_ref_end">References at end</option>
-                <option value="start" data-i18n="sort_ref_start">References first</option>
-                <option value="inline" data-i18n="sort_ref_inline">References inline</option>
-            </select>
-            <span class="menu-separator">|</span>
-            <label class="menu-checkbox" title="Show technical IDs in detail panel" data-i18n-title="tooltip_show_ids">
-                <input type="checkbox" id="show-ids-toggle">
-                <span>IDs</span>
-            </label>
-            <label class="menu-checkbox" title="Show cycle references (otherwise hidden)" data-i18n-title="tooltip_show_cycles">
-                <input type="checkbox" id="show-cycles-toggle">
-                <span style="font-size: 1.1em;">&#x21bb;</span>
-            </label>
-            <label class="menu-checkbox" title="Show timestamps and version" data-i18n-title="tooltip_show_system">
-                <input type="checkbox" id="show-system-toggle">
-                <span style="font-size: 1.1em;">&#x25F7;</span>
-            </label>
-            <span class="menu-separator">|</span>
-            <a href="#" id="menu-tools" class="menu-item" data-i18n="menu_admin">Admin</a>
         </nav>
 
         <!-- Modal Container (for Seed Manager and other tools) -->
@@ -113,14 +84,14 @@
                                     <rect x="12" y="2" width="2" height="12"/>
                                 </svg>
                             </button>
-                            <label id="map-labels-toggle" class="map-labels-toggle" style="display:none" title="Show marker labels">
+                            <label id="map-labels-toggle" class="map-labels-toggle" style="display:none" title="Show marker labels" data-i18n-title="tooltip_show_labels">
                                 <input type="checkbox" id="map-show-labels" checked>
-                                <span>Labels</span>
+                                <span data-i18n="map_labels">Labels</span>
                             </label>
                         </div>
                         <div id="view-selector" class="view-selector-dropdown" style="display:none">
                             <button class="view-selector-trigger">
-                                <span class="view-selector-text">Views</span>
+                                <span class="view-selector-text" data-i18n="select_view">Select View...</span>
                             </button>
                             <div class="view-selector-menu"></div>
                         </div>

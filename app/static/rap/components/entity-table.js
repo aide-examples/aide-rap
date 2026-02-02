@@ -632,13 +632,13 @@ const EntityTable = {
     // Back-reference columns
     for (const ref of backRefs) {
       // Use conceptual name (without _id suffix), replace underscores with <br> for line breaks
-      const fieldName = (ref.column.endsWith('_id')
+      const fieldNamePlain = ref.column.endsWith('_id')
         ? ref.column.slice(0, -3)
-        : ref.column
-      ).replace(/_/g, '<br>');
+        : ref.column;
+      const fieldName = fieldNamePlain.replace(/_/g, '<br>');
       // Use area color of the referencing entity
       const bgColor = ref.areaColor || '#fef3c7';
-      html += `<th class="backref-column" style="background-color: ${bgColor}" title="Records in ${ref.entity} referencing this via ${fieldName}">
+      html += `<th class="backref-column" style="background-color: ${bgColor}" title="${i18n.t('backref_column_hint', { entity: ref.entity, field: fieldNamePlain })}">
         <span class="backref-entity">${DomUtils.splitCamelCase(ref.entity)}</span>
         <span class="backref-field">${fieldName}</span>
       </th>`;
@@ -722,7 +722,7 @@ const EntityTable = {
           // Media: Thumbnail link (with max-height if mediaRowHeight is configured)
           const imgStyle = mediaRowHeight ? ` style="max-height: ${mediaRowHeight - 8}px;"` : '';
           html += `<td class="media-cell">
-            <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="Datei oeffnen">
+            <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="${i18n.t('tooltip_open_file')}">
               <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"${imgStyle}
                    onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
             </a>
@@ -860,7 +860,7 @@ const EntityTable = {
                   data-action="filter-navigate"
                   data-entity="${refEntity}"
                   data-filter="${refColumn}:${recordId}"
-                  title="Show ${count} ${refEntity} records">
+                  title="${i18n.t('backref_show_records', { count, entity: refEntity })}">
               ${count}
             </span>
           `;
