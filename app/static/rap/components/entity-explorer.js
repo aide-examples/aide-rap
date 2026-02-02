@@ -954,6 +954,16 @@ const EntityExplorer = {
         }
       }
 
+      // Set pagination state on EntityTable for server-side filtering (views)
+      const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
+      EntityTable.setPaginationState({
+        allRecordsLoaded,
+        filterDebounceMs: config.filterDebounceMs,
+        onServerFilterRequest: allRecordsLoaded ? null : (columnFilters) => {
+          this.reloadWithColumnFilters(columnFilters);
+        }
+      });
+
       await EntityTable.loadView(viewName, viewSchema, this.records);
       this.updateRecordStatus();
 
@@ -1071,44 +1081,128 @@ const EntityExplorer = {
   /**
    * Reload records with column filters from EntityTable (server-side)
    * Converts column filters { col: "value" } to server filter format "~col:value"
-   * For FK columns (ending in _id), uses the _label column for LIKE matching
+   * Works for both entity mode and view mode
    */
   async reloadWithColumnFilters(columnFilters) {
     // Convert column filters to server filter format
     const filterParts = Object.entries(columnFilters)
       .filter(([_, value]) => value && value.trim())
       .map(([col, value]) => {
-        // Check if this is an FK column that should use _label for filtering
-        if (col.endsWith('_id') && this.currentEntitySchema) {
+        // Entity mode: convert FK _id columns to _label for LIKE matching
+        if (this.currentEntitySchema && col.endsWith('_id')) {
           const colDef = this.currentEntitySchema.columns.find(c => c.name === col);
           if (colDef?.foreignKey) {
-            // Use the label column for LIKE matching (server-side views have _label fields)
             const labelCol = col.replace(/_id$/, '') + '_label';
             return `~${labelCol}:${value.trim()}`;
           }
         }
+        // View mode: column keys are already sqlAlias (no conversion needed)
         return `~${col}:${value.trim()}`;
       });
 
     // Combine with existing prefilter if present
     let filter = filterParts.join('&&');
     if (this.prefilterValues && Object.keys(this.prefilterValues).length > 0) {
-      const prefilterStr = this.buildPrefilterString(this.prefilterValues);
+      const isView = !!this.currentView;
+      const prefilterStr = this.buildPrefilterString(this.prefilterValues, isView);
       filter = filter ? `${prefilterStr}&&${filter}` : prefilterStr;
     }
 
     // Store column filters for re-application after reload
     this.activeColumnFilters = columnFilters;
 
-    // Reload with combined filter
-    await this.loadRecords(filter, {
-      sort: this.currentSort,
-      order: this.currentOrder
-    });
+    // Reload data (entity or view)
+    if (this.currentView) {
+      await this.reloadViewData(filter);
+    } else {
+      await this.loadRecords(filter, {
+        sort: this.currentSort,
+        order: this.currentOrder
+      });
+    }
 
     // Re-apply column filters to EntityTable after reload
     if (this.activeColumnFilters) {
       EntityTable.columnFilters = { ...this.activeColumnFilters };
+    }
+  },
+
+  /**
+   * Reload view data with filter (for server-side filtering in views)
+   */
+  async reloadViewData(filter) {
+    const viewName = this.currentView.name;
+    const viewSchema = this.currentViewSchema;
+    const config = await this.getPaginationConfig();
+
+    try {
+      // Get total count with filter
+      const countResult = await ApiClient.getViewData(viewName, { limit: 0, filter });
+      this.totalRecords = countResult.totalCount || 0;
+
+      // Determine pagination
+      const needsPagination = this.totalRecords > config.threshold;
+
+      const loadOptions = { filter };
+      if (this.currentSort) loadOptions.sort = this.currentSort;
+      if (this.currentOrder) loadOptions.order = this.currentOrder;
+      if (needsPagination) {
+        loadOptions.limit = config.pageSize;
+        loadOptions.offset = 0;
+      }
+
+      const result = await ApiClient.getViewData(viewName, loadOptions);
+      this.records = result.data || [];
+      this.hasMore = needsPagination && this.records.length < this.totalRecords;
+
+      // Normalize keys and run calculations
+      this.normalizeRecordKeys(viewSchema);
+
+      const calcCols = viewSchema.columns.filter(c => c.calculated);
+      for (const col of calcCols) {
+        try {
+          const fn = new Function('data', col.calculated.code);
+          fn(this.records);
+          const lowercaseKey = col.key.toLowerCase().replace(/ /g, '_');
+          if (lowercaseKey !== col.key) {
+            for (const record of this.records) {
+              if (record[lowercaseKey] !== undefined) {
+                record[col.key] = record[lowercaseKey];
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Calculation error for ${col.key}:`, e);
+        }
+      }
+
+      if (viewSchema.calculator) {
+        try {
+          const fn = new Function('data', 'schema', viewSchema.calculator);
+          fn(this.records, viewSchema);
+        } catch (e) {
+          console.error(`Calculator error:`, e);
+        }
+      }
+
+      // Update pagination state
+      const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
+      EntityTable.setPaginationState({
+        allRecordsLoaded,
+        filterDebounceMs: config.filterDebounceMs,
+        onServerFilterRequest: allRecordsLoaded ? null : (columnFilters) => {
+          this.reloadWithColumnFilters(columnFilters);
+        }
+      });
+
+      await EntityTable.loadView(viewName, viewSchema, this.records);
+      this.updateRecordStatus();
+
+      if (needsPagination) {
+        setTimeout(() => this.setupScrollObserver(), 100);
+      }
+    } catch (err) {
+      console.error('Failed to reload view data:', err);
     }
   },
 

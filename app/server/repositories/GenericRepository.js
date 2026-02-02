@@ -13,6 +13,7 @@ const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const ColumnUtils = require('../../static/rap/utils/ColumnUtils');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 const { ForeignKeyConstraintError, UniqueConstraintError } = require('../errors/ConflictError');
+const { parseFilter, buildWhereClause } = require('../utils/FilterParser');
 const logger = require('../utils/logger');
 
 // Shared validator instance
@@ -144,76 +145,23 @@ function findAll(entityName, options = {}) {
 
   // Read from View (includes _label fields for FKs)
   const viewName = entity.tableName + '_view';
-  const params = [];
-  let whereClause = '';
 
-  // Filter: supports multiple formats joined with && (AND):
-  // 1. "column:value" - exact match on entity column (e.g., "type_id:5")
-  // 2. "~column:value" - LIKE match on any view column (e.g., "~meter_label:Gas")
-  // 3. "=column:value" - exact match on any view column (e.g., "=meter_label:Wasser")
-  // 4. "@Ycolumn:value" - year filter using strftime (e.g., "@Yreading_at:2024")
-  // 5. "@Mcolumn:value" - month filter using strftime (e.g., "@Mreading_at:2024-03")
-  // 6. "text" - LIKE search across all string columns
-  // Multiple filters can be joined with && for AND logic
-  if (options.filter) {
-    const filterParts = options.filter.split('&&');
-    const conditions = [];
+  // Parse filter using shared FilterParser
+  const { conditions, params } = parseFilter(options.filter, {
+    // For ~, =, @Y, @M: use column name directly (view has all columns)
+    resolveColumn: (colName) => ({ sqlName: colName, jsType: 'string' }),
+    // For plain "column:value": validate against entity schema
+    validateEntityColumn: (colName) => {
+      const col = entity.columns.find(c => c.name === colName);
+      return col ? { sqlName: col.name, jsType: col.jsType } : null;
+    },
+    // For global text search: use entity's string columns
+    getStringColumns: () => entity.columns
+      .filter(c => c.jsType === 'string' && c.name !== 'id')
+      .map(c => c.name)
+  });
 
-    for (const part of filterParts) {
-      const trimmedPart = part.trim();
-      if (!trimmedPart) continue;
-
-      // Check filter prefix type
-      const yearMatch = trimmedPart.match(/^@Y(.+?):(.+)$/);
-      const monthMatch = trimmedPart.match(/^@M(.+?):(.+)$/);
-      const likeMatch = trimmedPart.match(/^~(.+?):(.+)$/);
-      const exactViewMatch = trimmedPart.match(/^=(.+?):(.+)$/);
-      const colonMatch = trimmedPart.match(/^([^~=@].+?):(.+)$/);
-
-      if (yearMatch) {
-        const [, columnName, value] = yearMatch;
-        conditions.push(`strftime('%Y', "${columnName}") = ?`);
-        params.push(value);
-      } else if (monthMatch) {
-        const [, columnName, value] = monthMatch;
-        conditions.push(`strftime('%Y-%m', "${columnName}") = ?`);
-        params.push(value);
-      } else if (exactViewMatch) {
-        const [, columnName, value] = exactViewMatch;
-        conditions.push(`"${columnName}" = ?`);
-        params.push(value);
-      } else if (likeMatch) {
-        const [, columnName, value] = likeMatch;
-        conditions.push(`"${columnName}" LIKE ?`);
-        params.push(`%${value}%`);
-      } else if (colonMatch) {
-        const [, columnName, value] = colonMatch;
-        const validColumn = entity.columns.find(c => c.name === columnName);
-
-        if (validColumn) {
-          conditions.push(`${columnName} = ?`);
-          const paramValue = validColumn.jsType === 'number' ? parseInt(value, 10) : value;
-          params.push(paramValue);
-        }
-      } else {
-        // LIKE search across string columns
-        const stringColumns = entity.columns
-          .filter(c => c.jsType === 'string' && c.name !== 'id')
-          .map(c => c.name);
-
-        if (stringColumns.length > 0) {
-          const textConditions = stringColumns.map(col => `${col} LIKE ?`);
-          conditions.push(`(${textConditions.join(' OR ')})`);
-          const filterValue = `%${trimmedPart}%`;
-          params.push(...stringColumns.map(() => filterValue));
-        }
-      }
-    }
-
-    if (conditions.length > 0) {
-      whereClause = ` WHERE ${conditions.join(' AND ')}`;
-    }
-  }
+  const whereClause = buildWhereClause(conditions);
 
   // Build data query with WHERE, ORDER BY, and pagination
   let sql = `SELECT * FROM ${viewName}${whereClause}`;

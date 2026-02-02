@@ -8,6 +8,7 @@
 
 const express = require('express');
 const logger = require('../utils/logger');
+const { parseFilter, buildWhereClause } = require('../utils/FilterParser');
 
 module.exports = function() {
   const router = express.Router();
@@ -158,72 +159,20 @@ module.exports = function() {
       const db = getDatabase();
       const { sort, order, filter, limit, offset } = req.query;
 
-      let sql = `SELECT * FROM ${view.sqlName}`;
-      const params = [];
+      // Parse filter using shared FilterParser
+      const { conditions, params } = parseFilter(filter, {
+        // Resolve column by sqlAlias or label
+        resolveColumn: (colName) => {
+          const col = view.columns.find(c => c.sqlAlias === colName || c.label === colName);
+          return col ? { sqlName: col.sqlAlias, jsType: col.jsType } : null;
+        },
+        // For global text search: use view's string columns
+        getStringColumns: () => view.columns
+          .filter(c => c.jsType === 'string')
+          .map(c => c.sqlAlias)
+      });
 
-      // Filter - supports multiple filters joined with && (AND)
-      if (filter) {
-        const filterParts = filter.split('&&');
-        const conditions = [];
-
-        for (const part of filterParts) {
-          const trimmedPart = part.trim();
-          if (!trimmedPart) continue;
-
-          // Check filter prefix type:
-          // @Y = year filter (strftime year extraction)
-          // @M = month filter (strftime year-month extraction)
-          // ~ = LIKE match
-          // (none) = exact match
-          const yearMatch = trimmedPart.match(/^@Y(.+?):(.+)$/);
-          const monthMatch = trimmedPart.match(/^@M(.+?):(.+)$/);
-          const likeMatch = trimmedPart.match(/^~(.+?):(.+)$/);
-          const exactMatch = trimmedPart.match(/^([^~@].+?):(.+)$/);
-
-          if (yearMatch) {
-            const [, colLabel, value] = yearMatch;
-            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
-            if (col) {
-              conditions.push(`strftime('%Y', "${col.sqlAlias}") = ?`);
-              params.push(value);
-            }
-          } else if (monthMatch) {
-            const [, colLabel, value] = monthMatch;
-            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
-            if (col) {
-              conditions.push(`strftime('%Y-%m', "${col.sqlAlias}") = ?`);
-              params.push(value);
-            }
-          } else if (likeMatch) {
-            const [, colLabel, value] = likeMatch;
-            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
-            if (col) {
-              conditions.push(`"${col.sqlAlias}" LIKE ?`);
-              params.push(`%${value}%`);
-            }
-          } else if (exactMatch) {
-            const [, colLabel, value] = exactMatch;
-            const col = view.columns.find(c => c.sqlAlias === colLabel || c.label === colLabel);
-            if (col) {
-              conditions.push(`"${col.sqlAlias}" = ?`);
-              params.push(value);
-            }
-          } else {
-            // Global LIKE search across all text columns
-            const textCols = view.columns.filter(c => c.jsType === 'string');
-            if (textCols.length > 0) {
-              const textConditions = textCols.map(c => `"${c.sqlAlias}" LIKE ?`);
-              conditions.push(`(${textConditions.join(' OR ')})`);
-              const filterValue = `%${trimmedPart}%`;
-              params.push(...textCols.map(() => filterValue));
-            }
-          }
-        }
-
-        if (conditions.length > 0) {
-          sql += ` WHERE ${conditions.join(' AND ')}`;
-        }
-      }
+      let sql = `SELECT * FROM ${view.sqlName}${buildWhereClause(conditions)}`;
 
       // Sort
       if (sort) {
