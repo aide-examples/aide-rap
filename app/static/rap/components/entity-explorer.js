@@ -1204,7 +1204,7 @@ const EntityExplorer = {
         filterDebounceMs: config.filterDebounceMs,
         onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
-        }
+        } : null
       });
 
       await EntityTable.loadView(viewName, viewSchema, this.records);
