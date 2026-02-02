@@ -1132,9 +1132,10 @@ const EntityExplorer = {
       });
     }
 
-    // Re-apply column filters to EntityTable after reload
+    // Re-apply column filters to EntityTable after reload and re-render to show them
     if (this.activeColumnFilters) {
       EntityTable.columnFilters = { ...this.activeColumnFilters };
+      EntityTable.render();
     }
   },
 
