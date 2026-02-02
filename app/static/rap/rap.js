@@ -15,13 +15,14 @@ async function tryUrlLogin() {
   const password = params.get('password');
   const pwh = params.get('pwh');
 
-  // Need user role and either password or pre-hashed password
-  if (!user || (!password && !pwh)) {
+  // Need user role (password optional for guest)
+  if (!user) {
     return false;
   }
 
   // IMMEDIATELY clean URL to remove credentials from browser history
   // This must happen before any async operations (hash, fetch) that could fail
+  // Keep crumbs parameter for deep-linking
   const otherParams = new URLSearchParams(location.search);
   otherParams.delete('user');
   otherParams.delete('password');
@@ -30,7 +31,7 @@ async function tryUrlLogin() {
   history.replaceState({}, '', cleanUrl);
 
   try {
-    // Use pre-hashed password or hash the plaintext password
+    // Use pre-hashed password, hash plaintext, or empty string for passwordless guest
     const hash = pwh || (password ? await sha256(password) : '');
 
     const res = await fetch('/api/auth/login', {

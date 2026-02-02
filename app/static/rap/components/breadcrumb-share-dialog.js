@@ -151,7 +151,7 @@ const BreadcrumbShareDialog = {
    * @returns {Array} Compact representation
    */
   serializeStack(stack) {
-    return stack.map(c => {
+    return stack.map((c, index) => {
       const compact = {
         t: c.type[0]  // 'e', 'v', 'r', 'f'
       };
@@ -161,7 +161,14 @@ const BreadcrumbShareDialog = {
       if (c.view?.name) compact.v = c.view.name;
       if (c.recordId) compact.r = c.recordId;
       if (c.filter) compact.f = c.filter;
-      if (c.viewMode) compact.m = c.viewMode;
+
+      // For the last crumb, use current viewMode from EntityExplorer
+      // (user may have switched viewMode after breadcrumb was created)
+      const isLast = index === stack.length - 1;
+      const viewMode = isLast && typeof EntityExplorer !== 'undefined'
+        ? EntityExplorer.viewMode
+        : c.viewMode;
+      if (viewMode) compact.m = viewMode;
 
       return compact;
     });
