@@ -153,5 +153,10 @@
     "dep_missing": "Fehlend: %{deps}",
 
     "backref_column_hint": "Datensätze in %{entity} mit Verweis über %{field}",
-    "backref_show_records": "%{count} %{entity}-Datensätze anzeigen"
+    "backref_show_records": "%{count} %{entity}-Datensätze anzeigen",
+
+    "settings_breadcrumb_display": "Breadcrumb-Anzeige:",
+    "settings_breadcrumb_full": "Vollständig (Entity + Label)",
+    "settings_breadcrumb_label": "Nur Label",
+    "settings_breadcrumb_entity": "Nur Entity"
 }

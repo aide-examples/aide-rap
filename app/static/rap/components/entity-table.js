@@ -1059,6 +1059,10 @@ const EntityTable = {
    * Handle FK navigation - navigate to tree view with first level expanded
    */
   onNavigate(entityName, recordId) {
+    // Remember current selection in breadcrumb before navigating
+    if (typeof BreadcrumbNav !== 'undefined' && EntityExplorer.selectedId) {
+      BreadcrumbNav.updateCurrentSelection(EntityExplorer.selectedId, EntityExplorer.viewMode);
+    }
     // Navigate to tree view and expand first level
     EntityTree.onNavigateAndExpand(entityName, recordId, { expandLevels: 1 });
     // Switch to tree view mode
@@ -1069,14 +1073,43 @@ const EntityTable = {
    * Handle back-reference navigation with filter
    * Switches to target entity and applies filter to show only referencing records
    */
-  onFilterNavigate(entityName, filter) {
-    // Switch to the target entity
-    EntityExplorer.selectEntity(entityName);
-    setTimeout(() => {
-      // Apply the filter
-      EntityExplorer.filterInput.value = filter;
-      EntityExplorer.loadRecords(filter);
-    }, 300);
+  async onFilterNavigate(entityName, filter) {
+    // Get entity color for breadcrumb
+    const item = EntityExplorer.selectorMenu?.querySelector(`[data-value="${entityName}"]`);
+    const color = item?.dataset.color || '#f5f5f5';
+
+    // Parse filter to get human-readable label (e.g., "aircraft_id:42" -> try to get label)
+    let filterLabel = filter;
+    const filterParts = filter.split(':');
+    if (filterParts.length === 2) {
+      const [colName, refId] = filterParts;
+      // Try to get the referenced record's label
+      const fieldName = colName.endsWith('_id') ? colName.slice(0, -3) : colName;
+      filterLabel = `${fieldName}: #${refId}`;
+    }
+
+    // Remember current selection in breadcrumb before navigating
+    if (typeof BreadcrumbNav !== 'undefined') {
+      if (EntityExplorer.selectedId) {
+        BreadcrumbNav.updateCurrentSelection(EntityExplorer.selectedId, EntityExplorer.viewMode);
+      }
+      // Push filtered crumb
+      BreadcrumbNav.push({
+        type: 'filtered',
+        entity: entityName,
+        filter: filter,
+        filterLabel: filterLabel,
+        color: color,
+        viewMode: EntityExplorer.viewMode
+      });
+    }
+
+    // Switch to the target entity (this will NOT set a new base crumb because we already pushed)
+    // We need to call selectEntity without the breadcrumb setting
+    await EntityExplorer.selectEntityWithoutBreadcrumb(entityName);
+    // Apply the filter
+    EntityExplorer.filterInput.value = filter;
+    await EntityExplorer.loadRecords(filter);
   },
 
   /**

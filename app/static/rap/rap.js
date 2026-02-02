@@ -119,6 +119,15 @@ async function tryUrlLogin() {
               <input type="checkbox" id="show-system-toggle">
               <span><span data-i18n="settings_show_system">Show System Attributes</span><br><small data-i18n="settings_show_system_hint">(modification times, version)</small></span>
             </label>
+            <div class="settings-divider"></div>
+            <div class="settings-row">
+              <label class="settings-label" data-i18n="settings_breadcrumb_display">Breadcrumb display:</label>
+              <select id="breadcrumb-display" class="settings-select">
+                <option value="full" data-i18n="settings_breadcrumb_full">Full (Entity + Label)</option>
+                <option value="label-only" data-i18n="settings_breadcrumb_label">Label only</option>
+                <option value="entity-only" data-i18n="settings_breadcrumb_entity">Entity only</option>
+              </select>
+            </div>
           </div>
         `;
         headerRight.insertBefore(settingsDropdown, aboutLink);
@@ -172,6 +181,21 @@ async function tryUrlLogin() {
             });
           }
         });
+
+        // Persist breadcrumb display setting
+        const breadcrumbSelect = document.getElementById('breadcrumb-display');
+        if (breadcrumbSelect) {
+          const savedBreadcrumb = localStorage.getItem('rap-settings-breadcrumb-display');
+          if (savedBreadcrumb) breadcrumbSelect.value = savedBreadcrumb;
+
+          breadcrumbSelect.addEventListener('change', () => {
+            localStorage.setItem('rap-settings-breadcrumb-display', breadcrumbSelect.value);
+            // Re-render breadcrumbs with new display mode
+            if (typeof BreadcrumbNav !== 'undefined') {
+              BreadcrumbNav.render();
+            }
+          });
+        }
       }
     }
 
@@ -272,6 +296,7 @@ async function tryUrlLogin() {
 
     // Initialize RAP components
     await EntityExplorer.init();
+    BreadcrumbNav.init();
     DetailPanel.init();
     ConfirmDialog.init();
     ConflictDialog.init();

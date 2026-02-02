@@ -422,8 +422,17 @@ const EntityTree = {
     async onNavigateAndExpand(entityName, recordId, options = {}) {
         const expandLevels = options.expandLevels || 0;
 
-        // Switch to the target entity and wait for records to load
-        await EntityExplorer.selectEntity(entityName);
+        // Remember current selection in breadcrumb before navigating
+        if (typeof BreadcrumbNav !== 'undefined' && EntityExplorer.selectedId) {
+            BreadcrumbNav.updateCurrentSelection(EntityExplorer.selectedId, EntityExplorer.viewMode);
+        }
+
+        // Get entity color for breadcrumb before switching
+        const item = EntityExplorer.selectorMenu?.querySelector(`[data-value="${entityName}"]`);
+        const color = item?.dataset.color || '#f5f5f5';
+
+        // Switch to the target entity WITHOUT updating breadcrumb
+        await EntityExplorer.selectEntityWithoutBreadcrumb(entityName);
 
         const nodeId = `${entityName}-${recordId}`;
         // Add to expanded nodes so it will be expanded when rendered
@@ -434,6 +443,20 @@ const EntityTree = {
         EntityExplorer.selectedId = recordId;
         const record = EntityExplorer.records.find(r => r.id === recordId);
         if (record) {
+            // Push record crumb to breadcrumb trail
+            if (typeof BreadcrumbNav !== 'undefined') {
+                const schema = EntityExplorer.currentEntitySchema;
+                const label = ColumnUtils.getRecordLabel(record, schema);
+                BreadcrumbNav.push({
+                    type: 'record',
+                    entity: entityName,
+                    recordId: recordId,
+                    recordLabel: label.title,
+                    viewMode: 'tree-h',
+                    color: color
+                });
+            }
+
             DetailPanel.showRecord(entityName, record);
 
             // Expand FK levels if requested

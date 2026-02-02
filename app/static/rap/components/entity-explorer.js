@@ -618,6 +618,16 @@ const EntityExplorer = {
       item.classList.remove('selected');
     });
 
+    // Update breadcrumb: set base crumb for entity (include current viewMode)
+    if (typeof BreadcrumbNav !== 'undefined') {
+      BreadcrumbNav.setBase({
+        type: 'entity',
+        entity: name,
+        color: areaColor || '#f5f5f5',
+        viewMode: this.viewMode
+      });
+    }
+
     await this.onEntityChange();
   },
 
@@ -626,6 +636,42 @@ const EntityExplorer = {
     if (item) {
       await this.selectEntityFromDropdown(entityName, item.dataset.color);
     }
+  },
+
+  /**
+   * Select entity without updating breadcrumb (used for programmatic navigation)
+   */
+  async selectEntityWithoutBreadcrumb(entityName) {
+    const item = this.selectorMenu.querySelector(`[data-value="${entityName}"]`);
+    if (!item) return;
+
+    const areaColor = item.dataset.color;
+    this.selectorValue = entityName;
+
+    // Update trigger text
+    const textSpan = this.selectorTrigger.querySelector('.entity-selector-text');
+    if (textSpan) textSpan.textContent = entityName;
+    this.selectorTrigger.style.backgroundColor = areaColor || '';
+
+    // Update selected state in menu
+    this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(el => {
+      el.classList.toggle('selected', el.dataset.value === entityName);
+    });
+
+    this.closeDropdown();
+
+    // Deselect view when an entity is selected
+    this.currentView = null;
+    this.viewSelectorValue = '';
+    const viewText = this.viewSelectorTrigger.querySelector('.view-selector-text');
+    if (viewText) viewText.textContent = i18n.t('select_view');
+    this.viewSelectorTrigger.style.backgroundColor = '';
+    this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(el => {
+      el.classList.remove('selected');
+    });
+
+    // NO breadcrumb update here - caller is responsible
+    await this.onEntityChange();
   },
 
   async loadViews() {
@@ -694,6 +740,16 @@ const EntityExplorer = {
     this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
       item.classList.remove('selected');
     });
+
+    // Update breadcrumb: set base crumb for view (include current viewMode)
+    if (typeof BreadcrumbNav !== 'undefined') {
+      BreadcrumbNav.setBase({
+        type: 'view',
+        view: { name: viewName, base: baseName, color: color },
+        color: color || '#f5f5f5',
+        viewMode: this.viewMode
+      });
+    }
 
     this.onViewChange(viewName, baseName, color);
   },
@@ -1312,12 +1368,33 @@ const EntityExplorer = {
    * Show a record in horizontal tree view with specified expansion depth
    */
   async showInTreeView(recordId, expandLevels = 2) {
+    // Remember current selection and viewMode in breadcrumb before switching
+    if (typeof BreadcrumbNav !== 'undefined') {
+      // Save the current table view state (the row we're coming from)
+      BreadcrumbNav.updateCurrentSelection(this.selectedId || recordId, this.viewMode);
+    }
+
     this.selectedId = recordId;
 
     // Switch to tree-h mode
     this.viewMode = 'tree-h';
     sessionStorage.setItem('viewMode', this.viewMode);
     this.updateViewToggle();
+
+    // Get record label for breadcrumb
+    const record = this.records.find(r => r.id === recordId);
+    if (record && typeof BreadcrumbNav !== 'undefined') {
+      const schema = this.currentEntitySchema;
+      const label = ColumnUtils.getRecordLabel(record, schema);
+      BreadcrumbNav.push({
+        type: 'record',
+        entity: this.currentEntity,
+        recordId: recordId,
+        recordLabel: label.title,
+        viewMode: 'tree-h',
+        color: schema?.areaColor || '#f5f5f5'
+      });
+    }
 
     // Render tree with expanded levels
     const options = {
