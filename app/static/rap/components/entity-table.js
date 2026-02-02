@@ -941,8 +941,10 @@ const EntityTable = {
           newInput.setSelectionRange(cursorPos, cursorPos);
         }
 
-        // Server-side filter: debounced (when not all records are loaded)
-        if (!this.allRecordsLoaded && this.onServerFilterRequest) {
+        // Server-side filter: debounced
+        // Trigger if callback exists (original dataset was large enough for pagination)
+        // This covers both cases: narrowing filters AND removing/changing filters
+        if (this.onServerFilterRequest) {
           clearTimeout(this.filterDebounceTimer);
           this.filterDebounceTimer = setTimeout(() => {
             this.onServerFilterRequest(this.columnFilters);
