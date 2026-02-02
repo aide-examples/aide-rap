@@ -200,6 +200,35 @@ Aircraft D-AINA
 
 **Focused Navigation** keeps the tree manageable – opening a new branch automatically closes sibling branches.
 
+### Breadcrumb Navigation
+
+Navigate through your exploration history with a visual breadcrumb trail:
+
+```
+[Aircraft] › [Aircraft D-ABCD] › [AircraftType Boeing 737]
+     ↑              ↑                      ↑
+  Base crumb    Record crumb         Current position
+```
+
+**How it works:**
+- **Dropdown selection** sets the base crumb (entity or view) and clears the navigation stack
+- **FK link clicks** push new crumbs onto the stack (record navigation)
+- **Back-reference counts** push filtered crumbs (e.g., "5 Flights" → Flights filtered by aircraft)
+- **Crumb clicks** truncate the stack and restore that state
+- **Browser back/forward** buttons navigate through the history
+
+**State Preservation:**
+When navigating back, the system restores:
+- **View mode** (table, tree-v, tree-h, map, chart)
+- **Selected row** – highlights the row you navigated from in table view
+
+**Display Options** (Settings → Breadcrumb display):
+| Option | Display | Tooltip |
+|--------|---------|---------|
+| **Full** | Entity + Label | – |
+| **Label only** | Just the label | Entity type |
+| **Entity only** | Just the entity | Label |
+
 **FK Label Resolution:** Instead of showing raw IDs, the system creates database views that join display labels:
 
 ```sql
@@ -700,6 +729,7 @@ See [Views Configuration](procedures/views-config.md) for syntax details.
 See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configuration.
 
 ### UI Enhancements
+- [x] **Breadcrumb Navigation** – Visual navigation trail with browser back/forward support, state preservation (viewMode, selected row), configurable display
 - [ ] Keyboard shortcuts (arrow keys, Enter for details)
 - [ ] Column visibility toggle
 - [ ] Drag & Drop column reordering
