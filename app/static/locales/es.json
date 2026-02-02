@@ -150,5 +150,11 @@
     "settings_breadcrumb_display": "Visualización breadcrumb:",
     "settings_breadcrumb_full": "Completo (Entity + Label)",
     "settings_breadcrumb_label": "Solo etiqueta",
-    "settings_breadcrumb_entity": "Solo entidad"
+    "settings_breadcrumb_entity": "Solo entidad",
+
+    "share_title": "Compartir estado de navegación",
+    "share_copy_url": "Copiar URL",
+    "share_include_auth": "Incluir auth (acceso invitado)",
+    "share_copied": "¡Copiado!",
+    "close": "Cerrar"
 }

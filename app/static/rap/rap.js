@@ -297,6 +297,12 @@ async function tryUrlLogin() {
     // Initialize RAP components
     await EntityExplorer.init();
     BreadcrumbNav.init();
+    BreadcrumbShareDialog.init();
+
+    // Check for deep-link URL parameter
+    const crumbsLoaded = await BreadcrumbNav.loadFromUrl();
+    // If crumbs were loaded, EntityExplorer state is already set
+
     DetailPanel.init();
     ConfirmDialog.init();
     ConflictDialog.init();

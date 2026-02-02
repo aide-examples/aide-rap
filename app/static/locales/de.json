@@ -158,5 +158,11 @@
     "settings_breadcrumb_display": "Breadcrumb-Anzeige:",
     "settings_breadcrumb_full": "Vollständig (Entity + Label)",
     "settings_breadcrumb_label": "Nur Label",
-    "settings_breadcrumb_entity": "Nur Entity"
+    "settings_breadcrumb_entity": "Nur Entity",
+
+    "share_title": "Navigationszustand teilen",
+    "share_copy_url": "URL kopieren",
+    "share_include_auth": "Auth inkludieren (Gastzugang)",
+    "share_copied": "Kopiert!",
+    "close": "Schließen"
 }

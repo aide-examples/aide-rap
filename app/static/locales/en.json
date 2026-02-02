@@ -158,5 +158,11 @@
     "settings_breadcrumb_display": "Breadcrumb display:",
     "settings_breadcrumb_full": "Full (Entity + Label)",
     "settings_breadcrumb_label": "Label only",
-    "settings_breadcrumb_entity": "Entity only"
+    "settings_breadcrumb_entity": "Entity only",
+
+    "share_title": "Share Navigation State",
+    "share_copy_url": "Copy URL",
+    "share_include_auth": "Include auth (guest access)",
+    "share_copied": "Copied!",
+    "close": "Close"
 }

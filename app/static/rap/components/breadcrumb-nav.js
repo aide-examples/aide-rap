@@ -389,10 +389,163 @@ const BreadcrumbNav = {
       });
     });
 
+    // Attach right-click handlers for share dialog
+    this.container.querySelectorAll('.breadcrumb-item').forEach((btn, index) => {
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (typeof BreadcrumbShareDialog !== 'undefined') {
+          BreadcrumbShareDialog.show(index);
+        }
+      });
+    });
+
     // Auto-scroll to show the newest crumb (right side)
     const trail = this.container.querySelector('.breadcrumb-trail');
     if (trail) {
       trail.scrollLeft = trail.scrollWidth;
     }
+  },
+
+  /**
+   * Load breadcrumb stack from URL parameter
+   * @returns {Promise<boolean>} true if crumbs were loaded from URL
+   */
+  async loadFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const crumbsParam = params.get('crumbs');
+
+    if (!crumbsParam) return false;
+
+    try {
+      // Decode base64 and parse JSON
+      const json = atob(crumbsParam);
+      const compactStack = JSON.parse(json);
+
+      if (!Array.isArray(compactStack) || compactStack.length === 0) {
+        return false;
+      }
+
+      // Clean URL (remove crumbs parameter)
+      const cleanParams = new URLSearchParams(location.search);
+      cleanParams.delete('crumbs');
+      const cleanUrl = location.pathname + (cleanParams.size ? '?' + cleanParams.toString() : '');
+      history.replaceState({ rapBreadcrumb: false }, '', cleanUrl);
+
+      // Restore the stack
+      await this.restoreFromCompact(compactStack);
+
+      return true;
+    } catch (e) {
+      console.error('BreadcrumbNav: Invalid crumbs parameter:', e);
+      return false;
+    }
+  },
+
+  /**
+   * Restore breadcrumb stack from compact format
+   * @param {Array} compactStack - Array of compact crumb objects
+   */
+  async restoreFromCompact(compactStack) {
+    this.stack = [];
+
+    for (const compact of compactStack) {
+      try {
+        const crumb = await this.expandCompactCrumb(compact);
+        if (crumb) {
+          this.stack.push(crumb);
+        }
+      } catch (e) {
+        console.warn('BreadcrumbNav: Failed to expand crumb:', compact, e);
+        // Continue with next crumb
+      }
+    }
+
+    if (this.stack.length > 0) {
+      // Restore top-of-stack state
+      const current = this.getCurrent();
+      await this.restoreState(current);
+
+      // Update browser history
+      history.pushState({ rapBreadcrumb: true, rapCrumbId: current.id }, '');
+
+      this.render();
+    }
+  },
+
+  /**
+   * Expand compact crumb to full crumb object
+   * @param {Object} compact - Compact crumb { t, e, v, r, f, m }
+   * @returns {Promise<Object>} Full crumb object
+   */
+  async expandCompactCrumb(compact) {
+    // Map type abbreviation to full type
+    const typeMap = { e: 'entity', v: 'view', r: 'record', f: 'filtered' };
+    const type = typeMap[compact.t];
+
+    if (!type) {
+      throw new Error(`Unknown crumb type: ${compact.t}`);
+    }
+
+    // Get entity metadata for color
+    let color = '#f5f5f5';
+    let recordLabel = null;
+
+    if (compact.e) {
+      // Fetch entity schema for color
+      try {
+        const schema = await ApiClient.getEntitySchema(compact.e);
+        color = schema.areaColor || color;
+      } catch (e) {
+        // Use default color if schema fetch fails
+      }
+
+      // For record crumbs, fetch the record to get label
+      if (type === 'record' && compact.r) {
+        try {
+          const record = await ApiClient.getEntity(compact.e, compact.r);
+          if (record && EntityExplorer.extendedSchema) {
+            // Try to get label from labelField
+            const labelField = EntityExplorer.extendedSchema.labelField;
+            if (labelField && record[labelField]) {
+              recordLabel = String(record[labelField]);
+            }
+          }
+        } catch (e) {
+          // Record might not exist anymore
+          console.warn(`Record ${compact.e}#${compact.r} not found`);
+        }
+      }
+    }
+
+    // Handle view crumbs
+    let view = null;
+    if (type === 'view' && compact.v) {
+      try {
+        const viewsRes = await fetch('/api/views');
+        const viewsData = await viewsRes.json();
+        const viewInfo = viewsData.views?.find(v => v.name === compact.v);
+        if (viewInfo) {
+          view = {
+            name: viewInfo.name,
+            base: viewInfo.base,
+            color: viewInfo.color || '#e3f2fd'
+          };
+          color = view.color;
+        }
+      } catch (e) {
+        // Use default
+      }
+    }
+
+    return this.createCrumb({
+      type,
+      entity: compact.e || null,
+      view,
+      recordId: compact.r || null,
+      recordLabel,
+      filter: compact.f || null,
+      viewMode: compact.m || 'table',
+      color
+    });
   }
 };

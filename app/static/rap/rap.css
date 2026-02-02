@@ -381,6 +381,169 @@
 }
 
 /* -----------------------------------------------------------------------------
+   Breadcrumb Share Dialog
+   ----------------------------------------------------------------------------- */
+.breadcrumb-share-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.breadcrumb-share-overlay.visible {
+    display: flex;
+}
+
+.breadcrumb-share-dialog {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 480px;
+    overflow: hidden;
+}
+
+.share-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--color-gray-100);
+    border-bottom: 1px solid var(--color-gray-200);
+}
+
+.share-dialog-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.share-dialog-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--color-gray-500);
+    line-height: 1;
+    padding: 0;
+}
+
+.share-dialog-close:hover {
+    color: var(--color-gray-700);
+}
+
+.share-dialog-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.share-url-container {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+}
+
+.share-url-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: var(--color-gray-50);
+}
+
+.share-url-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.share-copy-btn {
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.share-copy-btn:hover {
+    background: var(--primary-color-dark, #1565c0);
+}
+
+.share-copy-btn.copied {
+    background: #388e3c;
+}
+
+.share-qr-container {
+    padding: 16px;
+    background: white;
+    border: 1px solid var(--color-gray-200);
+    border-radius: 8px;
+}
+
+.share-qr-code {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+    min-width: 300px;
+}
+
+.share-qr-code img {
+    display: block;
+}
+
+.share-options {
+    width: 100%;
+}
+
+.share-auth-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--color-gray-600);
+}
+
+.share-auth-checkbox {
+    width: 16px;
+    height: 16px;
+}
+
+.share-dialog-footer {
+    padding: 12px 16px;
+    background: var(--color-gray-50);
+    border-top: 1px solid var(--color-gray-200);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.share-close-btn {
+    padding: 8px 20px;
+    background: var(--color-gray-200);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.share-close-btn:hover {
+    background: var(--color-gray-300);
+}
+
+/* -----------------------------------------------------------------------------
    Main Content Split Layout
    ----------------------------------------------------------------------------- */
 .main-content {

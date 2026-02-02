@@ -229,6 +229,18 @@ When navigating back, the system restores:
 | **Label only** | Just the label | Entity type |
 | **Entity only** | Just the entity | Label |
 
+**Deep Linking & Sharing:**
+Right-click any breadcrumb to share the navigation state:
+- **Share Dialog** shows a URL with the current breadcrumb stack encoded as base64 JSON
+- **QR Code** (300×300px) for quick mobile access
+- **Guest Auth Option** – include `?user=guest` for anonymous access
+- **URL Parameter** `?crumbs=...` – open directly to a specific navigation state
+
+Example URL:
+```
+https://myapp.com/rap?user=guest&crumbs=W3sidCI6ImUiLCJlIjoiQWlyY3JhZnQifV0=
+```
+
 **FK Label Resolution:** Instead of showing raw IDs, the system creates database views that join display labels:
 
 ```sql
@@ -730,6 +742,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 
 ### UI Enhancements
 - [x] **Breadcrumb Navigation** – Visual navigation trail with browser back/forward support, state preservation (viewMode, selected row), configurable display
+- [x] **Deep Linking** – Share navigation state via URL parameter + QR code dialog (right-click on breadcrumb)
 - [ ] Keyboard shortcuts (arrow keys, Enter for details)
 - [ ] Column visibility toggle
 - [ ] Drag & Drop column reordering
