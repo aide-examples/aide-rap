@@ -14,8 +14,13 @@ const fs = require('fs');
 const path = require('path');
 
 class ImportManager {
-  constructor(systemDir) {
+  /**
+   * @param {string} systemDir - Path to system directory
+   * @param {Object} [logger] - Logger instance (defaults to console)
+   */
+  constructor(systemDir, logger = null) {
     this.systemDir = systemDir;
+    this.logger = logger || console;
     this.importsDir = path.join(systemDir, 'imports');
     this.externDir = path.join(systemDir, 'data', 'extern');
     this.importDir = path.join(systemDir, 'data', 'import');
@@ -193,7 +198,7 @@ class ImportManager {
         return str;
 
       default:
-        console.warn(`Unknown transform: ${transform}`);
+        this.logger.warn(`Unknown transform: ${transform}`);
         return value;
     }
   }
@@ -242,10 +247,10 @@ class ImportManager {
         }
       }
 
-      console.warn(`Could not parse date: ${str} with format ${format}`);
+      this.logger.warn(`Could not parse date: ${str} with format ${format}`);
       return str;
     } catch (e) {
-      console.warn(`Date parse error: ${str}`, e);
+      this.logger.warn(`Date parse error: ${str}`, { error: e.message });
       return str;
     }
   }
@@ -329,7 +334,7 @@ class ImportManager {
       const filterFn = new Function('row', `return ${jsExpr};`);
       return filterFn;
     } catch (e) {
-      console.error('Failed to parse filter:', whereClause, e);
+      this.logger.error('Failed to parse filter:', { whereClause, error: e.message });
       return () => true; // Return all rows on parse error
     }
   }
@@ -368,8 +373,10 @@ class ImportManager {
     }
 
     try {
-      // Read XLSX (synchronous - large files may take time)
-      const workbook = XLSX.readFile(sourcePath);
+      // Read XLSX with row limit to avoid processing empty rows
+      // (Excel files sometimes have range extending to max rows due to formatting)
+      const maxRows = 100000;  // Configurable if needed
+      const workbook = XLSX.readFile(sourcePath, { sheetRows: maxRows });
 
       // Select sheet
       let sheetName = definition.sheet;
@@ -385,6 +392,7 @@ class ImportManager {
       // Convert to JSON (array of objects with original column names)
       const rawData = XLSX.utils.sheet_to_json(sheet, { defval: null });
       const recordsRead = rawData.length;
+      this.logger.debug('XLSX parsed:', { recordsRead });
 
       // Apply mapping with transforms
       const mappedData = rawData.map(row => {
@@ -409,7 +417,7 @@ class ImportManager {
         try {
           return filterFn(row);
         } catch (e) {
-          console.warn('Filter error for row:', row, e);
+          this.logger.warn('Filter error for row:', { row, error: e.message });
           return false;
         }
       });
@@ -429,7 +437,7 @@ class ImportManager {
         outputFile: `import/${entityName}.json`
       };
     } catch (e) {
-      console.error('Import error:', e);
+      this.logger.error('Import error:', { error: e.message });
       return { success: false, error: e.message };
     }
   }

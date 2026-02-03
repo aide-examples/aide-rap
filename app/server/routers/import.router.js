@@ -7,12 +7,13 @@
 
 const express = require('express');
 const ImportManager = require('../utils/ImportManager');
+const logger = require('../utils/logger');
 
 module.exports = function(cfg) {
   const router = express.Router();
 
-  // Initialize ImportManager with system directory
-  const importManager = new ImportManager(cfg.systemDir);
+  // Initialize ImportManager with system directory and logger
+  const importManager = new ImportManager(cfg.systemDir, logger);
 
   /**
    * GET /api/import/status

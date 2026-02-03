@@ -52,6 +52,7 @@ args.addCommonArgs(program);  // Adds --log-level, --config, --regenerate-icons
 program.requiredOption('-s, --system <name>', 'System name (required, subdirectory in systems/)');
 program.option('-p, --port <number>', 'Override port', parseInt);
 program.option('--noauth', 'Disable authentication (for development)');
+program.option('--import [entity]', 'Run import in batch mode (entity name or "all")');
 program.parse();
 
 const opts = program.opts();
@@ -117,6 +118,28 @@ if (opts.port) {
 // Initialize logger with system-specific logs directory
 const logger = require('./server/utils/logger');
 logger.init(cfg.paths.logs);
+
+// =============================================================================
+// 5a. IMPORT BATCH MODE (--import)
+// =============================================================================
+
+if (opts.import) {
+    const ImportCLI = require('./server/utils/ImportCLI');
+    const importCLI = new ImportCLI(cfg, logger);
+
+    const entity = opts.import === true ? 'all' : opts.import;
+    console.log(`AIDE RAP - Import Batch Mode (${systemName})`);
+
+    importCLI.run(entity).then(results => {
+        process.exit(results.failed > 0 ? 1 : 0);
+    }).catch(err => {
+        logger.error('Import batch failed', { error: err.message });
+        process.exit(1);
+    });
+
+    // Don't continue to server setup
+    return;
+}
 
 console.log(`Starting AIDE RAP - System: ${systemName}`);
 
