@@ -3256,6 +3256,11 @@
     font-size: 0.9rem;
 }
 
+/* Override max-height for preview table in Load tab */
+.load-content .result-table-wrapper {
+    max-height: 350px;
+}
+
 .load-content p {
     margin: 0 0 16px 0;
     color: var(--color-gray-550);

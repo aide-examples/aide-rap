@@ -49,6 +49,7 @@ WHERE status IN ('Asset Fleet', 'Fixed Deliveries', 'Out Plan')
 | `Source:` | Yes | Path to XLSX file relative to `data/` |
 | `Sheet:` | No | Sheet name (default: first sheet) |
 | `MaxRows:` | No | Row limit for large files (default: 100000) |
+| `First:` | No | Deduplicate rows by this source column (keep first occurrence) |
 
 ---
 
@@ -64,22 +65,46 @@ The **Source** column in the mapping table supports several expression types:
 | Random Number | `random(min,max)` | `random(1000,2000)` | Random integer in range |
 | Random Choice | `random("a","b")` | `random("A","B","C")` | Random selection from strings |
 | Random Enum | `random(EnumType)` | `random(CurrencyCode)` | Random internal value from enum type |
+| Concat | `concat(a, b, ...)` | `concat(First, " ", Last)` | Combine columns with separators |
 
 ### Examples
 
 ```markdown
-| Source                    | Target              | Transform       |
-|---------------------------|---------------------|-----------------|
-| Machine Serial Number     | serial_number       |                 |
-| "DLH"                     | current_operator    |                 |
-| random(1000,5000)         | total_flight_hours  |                 |
-| random("A","B","C")       | maintenance_grade   |                 |
-| random(OperationalStatus) | status              |                 |
+| Source                        | Target              | Transform       |
+|-------------------------------|---------------------|-----------------|
+| Machine Serial Number         | serial_number       |                 |
+| "DLH"                         | current_operator    |                 |
+| random(1000,5000)             | total_flight_hours  |                 |
+| random("A","B","C")           | maintenance_grade   |                 |
+| random(OperationalStatus)     | status              |                 |
+| concat(Code, "-", Year)       | reference           |                 |
+| concat(First, " ", Last)      | full_name           |                 |
 ```
+
+### Concat Function
+
+`concat(arg1, arg2, ...)` combines multiple values into a single string:
+- **Column names** (without quotes): Read value from XLSX column
+- **String literals** (with quotes): Fixed separator or prefix/suffix
+
+NULL values in columns are converted to empty strings.
 
 ### Enum Resolution
 
 `random(EnumType)` uses the TypeRegistry to find enum values. It returns the **internal** value (the database-stored value), not the external/display value.
+
+### Multiple Targets from Same Source
+
+The same source expression can be used multiple times to map to different target columns:
+
+```markdown
+| Source        | Target    |
+|---------------|-----------|
+| Name          | label     |
+| Name          | display   |
+| 0             | count_a   |
+| 0             | count_b   |
+```
 
 ---
 
@@ -109,6 +134,64 @@ The **Transform** column applies conversions to source values:
 | `trim` | Remove whitespace | — |
 
 Excel serial dates (numeric) are automatically converted when a date transform is specified.
+
+---
+
+## Source Filter
+
+The `## Source Filter` section filters XLSX rows **before** mapping, using regex patterns on source columns:
+
+```markdown
+## Source Filter
+
+Aircraft Status: /^(Active|In Service)$/
+Registration: /^D-/
+```
+
+### Syntax
+
+Each line specifies a column and regex pattern:
+```
+ColumnName: /pattern/flags
+```
+
+- **ColumnName**: Exact XLSX column name
+- **/pattern/**: JavaScript regex pattern
+- **flags**: Optional regex flags (g, i, m, s, u, y)
+
+Multiple filters are **AND-ed** together (all must match).
+
+### Examples
+
+```markdown
+## Source Filter
+
+Status: /Active/i
+Country Code: /^(DE|AT|CH)$/
+Serial Number: /^\d{5,}$/
+```
+
+### Use Cases
+
+Source Filter is useful when:
+- You want to filter by XLSX columns that aren't mapped to the target
+- You need regex-based pattern matching (not just equality)
+- You want to reduce data volume **before** the mapping step
+
+For simple equality filters on **target** columns (after mapping), use the `## Filter` section instead.
+
+---
+
+## Deduplication (First)
+
+The `First:` header directive keeps only the first occurrence of each unique value in a source column:
+
+```markdown
+Source: extern/data.xlsx
+First: Serial Number
+```
+
+This is useful for denormalized source data where multiple rows have the same key but you only need one record per key. The first row (in XLSX order) is kept, duplicates are discarded.
 
 ---
 
@@ -148,6 +231,9 @@ The import validation checks mapping rules against both source and target schema
 |-------|----------|
 | Column not in XLSX | Error |
 | Unknown ENUM type in `random(Enum)` | Error |
+| Source filter column not in XLSX | Error |
+| Invalid regex in source filter | Error |
+| First column not in XLSX | Error |
 | Unused XLSX columns | Info |
 
 ### Target Validation
@@ -173,8 +259,10 @@ The import pipeline has distinct stages, each with different validation responsi
 │  ImportManager.runImport()                                              │
 │                                                                         │
 │  ✓ Parse XLSX file                                                      │
-│  ✓ Apply column mapping                                                 │
-│  ✓ Apply filter clause                                                  │
+│  ✓ Apply source filter (regex on XLSX columns, before mapping)          │
+│  ✓ Apply deduplication (First: directive)                               │
+│  ✓ Apply column mapping (with transforms)                               │
+│  ✓ Apply target filter clause (SQL-like, after mapping)                 │
 │  ✗ NO FK validation (values are stored as-is)                           │
 │                                                                         │
 │  Output: data/import/{Entity}.json                                      │

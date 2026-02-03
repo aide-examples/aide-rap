@@ -183,13 +183,15 @@ class ImportManager {
       source: null,
       sheet: null,
       maxRows: null,  // Optional row limit for large files
-      mapping: {},
-      transforms: {},  // sourceCol -> transform type
+      first: null,    // Column name for deduplication (keep first occurrence)
+      mapping: [],    // Array of { source, target, transform } - allows same source multiple times
+      sourceFilter: [],  // Array of { column, regex } - pre-mapping filter on XLSX columns
       filter: null
     };
 
     let inMapping = false;
     let inFilter = false;
+    let inSourceFilter = false;
     let filterLines = [];
 
     for (const line of lines) {
@@ -216,6 +218,12 @@ class ImportManager {
         continue;
       }
 
+      // Parse First: directive (deduplication - keep first occurrence per value)
+      if (trimmed.startsWith('First:')) {
+        definition.first = trimmed.substring(6).trim();
+        continue;
+      }
+
       // Detect section headers
       if (trimmed.startsWith('## Mapping')) {
         inMapping = true;
@@ -226,12 +234,21 @@ class ImportManager {
       if (trimmed.startsWith('## Filter')) {
         inMapping = false;
         inFilter = true;
+        inSourceFilter = false;
+        continue;
+      }
+
+      if (trimmed.startsWith('## Source Filter')) {
+        inMapping = false;
+        inFilter = false;
+        inSourceFilter = true;
         continue;
       }
 
       if (trimmed.startsWith('## ') || trimmed.startsWith('# ')) {
         inMapping = false;
         inFilter = false;
+        inSourceFilter = false;
         continue;
       }
 
@@ -244,10 +261,7 @@ class ImportManager {
           const transform = cells[2] || null;
           // Skip header row
           if (source.toLowerCase() !== 'source' && target.toLowerCase() !== 'target') {
-            definition.mapping[source] = target;
-            if (transform) {
-              definition.transforms[source] = transform;
-            }
+            definition.mapping.push({ source, target, transform });
           }
         }
       }
@@ -255,6 +269,17 @@ class ImportManager {
       // Collect filter lines
       if (inFilter && trimmed) {
         filterLines.push(trimmed);
+      }
+
+      // Parse Source Filter lines: ColumnName: /regex/
+      if (inSourceFilter && trimmed) {
+        const match = trimmed.match(/^(.+?):\s*\/(.+)\/([gimsuy]*)$/);
+        if (match) {
+          const column = match[1].trim();
+          const pattern = match[2];
+          const flags = match[3] || '';
+          definition.sourceFilter.push({ column, pattern, flags });
+        }
       }
     }
 
@@ -390,6 +415,12 @@ class ImportManager {
       return this.parseRandomExpression(randomMatch[1]);
     }
 
+    // concat(...)
+    const concatMatch = expr.match(/^concat\((.+)\)$/i);
+    if (concatMatch) {
+      return this.parseConcatExpression(concatMatch[1]);
+    }
+
     // Otherwise: XLSX column name
     return { type: 'column', name: expr };
   }
@@ -421,6 +452,58 @@ class ImportManager {
 
     // Otherwise: ENUM type name: random(CurrencyCode)
     return { type: 'randomEnum', enumName: args };
+  }
+
+  /**
+   * Parse concat(...) expression arguments
+   * Supports: concat(Col1, " ", Col2, "-", Col3)
+   * - Column names without quotes
+   * - String literals with quotes
+   * @param {string} args - The arguments inside concat(...)
+   * @returns {Object} - { type: 'concat', parts: [...] }
+   */
+  parseConcatExpression(args) {
+    const parts = [];
+    let current = '';
+    let inQuotes = false;
+    let quoteChar = null;
+
+    for (let i = 0; i < args.length; i++) {
+      const ch = args[i];
+
+      if (!inQuotes && (ch === '"' || ch === "'")) {
+        // Start of string literal
+        inQuotes = true;
+        quoteChar = ch;
+      } else if (inQuotes && ch === quoteChar) {
+        // End of string literal
+        parts.push({ type: 'literal', value: current });
+        current = '';
+        inQuotes = false;
+        quoteChar = null;
+      } else if (!inQuotes && ch === ',') {
+        // Separator - flush current if non-empty (column name)
+        const trimmed = current.trim();
+        if (trimmed) {
+          parts.push({ type: 'column', name: trimmed });
+        }
+        current = '';
+      } else if (inQuotes) {
+        // Inside quotes - collect everything
+        current += ch;
+      } else if (ch !== ' ' || current.length > 0) {
+        // Outside quotes - collect non-leading spaces
+        current += ch;
+      }
+    }
+
+    // Handle remaining content (last column name)
+    const trimmed = current.trim();
+    if (trimmed) {
+      parts.push({ type: 'column', name: trimmed });
+    }
+
+    return { type: 'concat', parts };
   }
 
   /**
@@ -456,6 +539,19 @@ class ImportManager {
         }
         const idx = Math.floor(Math.random() * enumValues.length);
         return enumValues[idx].internal;
+      }
+
+      case 'concat': {
+        const values = sourceExpr.parts.map(part => {
+          if (part.type === 'literal') {
+            return part.value;
+          } else if (part.type === 'column') {
+            const val = row[part.name];
+            return val === null || val === undefined ? '' : String(val);
+          }
+          return '';
+        });
+        return values.join('');
       }
 
       default:
@@ -614,21 +710,56 @@ class ImportManager {
       }
 
       // Convert to JSON (array of objects with original column names)
-      const rawData = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      let rawData = XLSX.utils.sheet_to_json(sheet, { defval: null });
       const recordsRead = rawData.length;
       this.logger.debug('XLSX parsed:', { recordsRead });
 
+      // Apply source filter (regex-based filter on XLSX columns, before mapping)
+      let recordsSourceFiltered = 0;
+      if (definition.sourceFilter.length > 0) {
+        const sourceFilterFns = definition.sourceFilter.map(({ column, pattern, flags }) => {
+          const regex = new RegExp(pattern, flags);
+          return (row) => {
+            const value = row[column];
+            if (value === null || value === undefined) return false;
+            return regex.test(String(value));
+          };
+        });
+        const beforeCount = rawData.length;
+        // All source filters are AND-ed together
+        rawData = rawData.filter(row => sourceFilterFns.every(fn => fn(row)));
+        recordsSourceFiltered = beforeCount - rawData.length;
+        this.logger.debug('Source filter applied:', { recordsSourceFiltered, remaining: rawData.length });
+      }
+
+      // Apply First: deduplication (keep first occurrence per unique value)
+      let recordsDeduplicated = 0;
+      if (definition.first) {
+        const seen = new Set();
+        const beforeCount = rawData.length;
+        rawData = rawData.filter(row => {
+          const key = row[definition.first];
+          if (key === null || key === undefined) return true; // Keep rows with null/undefined
+          const keyStr = String(key);
+          if (seen.has(keyStr)) return false;
+          seen.add(keyStr);
+          return true;
+        });
+        recordsDeduplicated = beforeCount - rawData.length;
+        this.logger.debug('First deduplication applied:', { column: definition.first, recordsDeduplicated, remaining: rawData.length });
+      }
+
       // Apply mapping with transforms
       // Source expressions can be: column names, literals, or random() generators
+      // Mapping is an array to allow same source column mapped to multiple targets
       const mappedData = rawData.map(row => {
         const mapped = {};
-        for (const [sourceExprStr, targetCol] of Object.entries(definition.mapping)) {
+        for (const { source: sourceExprStr, target: targetCol, transform } of definition.mapping) {
           const sourceExpr = this.parseSourceExpression(sourceExprStr);
           let value = this.resolveSourceValue(sourceExpr, row);
 
           if (value !== undefined) {
             // Apply transform if specified
-            const transform = definition.transforms[sourceExprStr];
             if (transform) {
               value = this.applyTransform(value, transform);
             }
@@ -659,6 +790,8 @@ class ImportManager {
       return {
         success: true,
         recordsRead,
+        recordsSourceFiltered,
+        recordsDeduplicated,
         recordsFiltered,
         recordsWritten,
         outputFile: `import/${entityName}.json`

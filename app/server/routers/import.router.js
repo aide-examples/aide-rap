@@ -153,15 +153,14 @@ module.exports = function(cfg) {
       const sourceColumns = sourceSchema.columns || [];
       const sourceColumnSet = new Set(sourceColumns);
 
-      // Get mapping columns
-      const mappedSourceExprs = Object.keys(definition.mapping);
-      const mappedTargetCols = new Set(Object.values(definition.mapping));
+      // Get mapping columns (mapping is now an array of {source, target, transform})
+      const mappedTargetCols = new Set(definition.mapping.map(m => m.target));
 
       // Track which XLSX columns are actually used
       const usedXlsxColumns = new Set();
 
       // Check source expressions in mapping
-      for (const sourceExprStr of mappedSourceExprs) {
+      for (const { source: sourceExprStr } of definition.mapping) {
         const sourceExpr = importManager.parseSourceExpression(sourceExprStr);
 
         if (sourceExpr.type === 'column') {
@@ -183,8 +182,55 @@ module.exports = function(cfg) {
               message: `Unknown ENUM type: ${sourceExpr.enumName}`
             });
           }
+        } else if (sourceExpr.type === 'concat') {
+          // Validate each column reference in concat
+          for (const part of sourceExpr.parts) {
+            if (part.type === 'column') {
+              if (!sourceColumnSet.has(part.name)) {
+                errors.source.push({
+                  column: part.name,
+                  message: `Source column "${part.name}" not found in XLSX (in concat)`
+                });
+              } else {
+                usedXlsxColumns.add(part.name);
+              }
+            }
+          }
         }
         // Literals and randomNumber/randomChoice don't need validation
+      }
+
+      // Check source filter columns
+      for (const { column, pattern, flags } of (definition.sourceFilter || [])) {
+        if (!sourceColumnSet.has(column)) {
+          errors.source.push({
+            column,
+            message: `Source filter column "${column}" not found in XLSX`
+          });
+        } else {
+          usedXlsxColumns.add(column);
+        }
+        // Validate regex syntax
+        try {
+          new RegExp(pattern, flags);
+        } catch (e) {
+          errors.source.push({
+            column,
+            message: `Invalid regex in source filter for "${column}": ${e.message}`
+          });
+        }
+      }
+
+      // Check First: column for deduplication
+      if (definition.first) {
+        if (!sourceColumnSet.has(definition.first)) {
+          errors.source.push({
+            column: definition.first,
+            message: `First column "${definition.first}" not found in XLSX`
+          });
+        } else {
+          usedXlsxColumns.add(definition.first);
+        }
       }
 
       // Find unused source columns (in XLSX but not used by any column mapping)
@@ -270,7 +316,7 @@ module.exports = function(cfg) {
         unusedSourceColumns,
         unmappedTargetColumns,
         unmappedRequiredColumns,
-        mappingCount: mappedSourceExprs.length,
+        mappingCount: definition.mapping.length,
         sourceColumns: sourceColumns.length,
         targetColumns: entity?.columns?.length || 0
       });

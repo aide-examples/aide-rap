@@ -590,13 +590,23 @@ const SeedImportDialog = {
       const result = await res.json();
 
       if (result.success) {
+        let details = `Records read: ${result.recordsRead}<br>`;
+        if (result.recordsSourceFiltered > 0) {
+          details += `Source filtered: ${result.recordsSourceFiltered}<br>`;
+        }
+        if (result.recordsDeduplicated > 0) {
+          details += `Deduplicated (First): ${result.recordsDeduplicated}<br>`;
+        }
+        if (result.recordsFiltered > 0) {
+          details += `Target filtered: ${result.recordsFiltered}<br>`;
+        }
+        details += `Records written: ${result.recordsWritten}<br>`;
+        details += `Output: ${result.outputFile}`;
+
         resultDiv.innerHTML = `
           <div class="run-success">
             <strong>Success!</strong><br>
-            Records read: ${result.recordsRead}<br>
-            Records filtered: ${result.recordsFiltered}<br>
-            Records written: ${result.recordsWritten}<br>
-            Output: ${result.outputFile}
+            ${details}
           </div>
         `;
         this.log('success', `Import complete: ${result.recordsWritten} records written`);
@@ -661,11 +671,12 @@ const SeedImportDialog = {
       const columns = Object.keys(this.importData[0]);
       const previewRows = this.importData.slice(0, 10);
 
-      const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
+      // Replace underscores with spaces in headers to allow word wrapping
+      const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c.replace(/_/g, ' '))}</th>`).join('');
       const rows = previewRows.map(record => {
         return '<tr>' + columns.map(col => {
           const val = record[col];
-          return `<td>${val === null ? '' : DomUtils.escapeHtml(String(val))}</td>`;
+          return `<td>${val === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(val))}</td>`;
         }).join('') + '</tr>';
       }).join('');
 
@@ -676,8 +687,8 @@ const SeedImportDialog = {
 
       let html = `
         <div class="load-info">${this.importData.length} records in import file — ${conflictInfo}</div>
-        <div class="import-preview-table">
-          <table class="preview-table">
+        <div class="result-table-wrapper">
+          <table class="seed-preview-table">
             <thead><tr>${headerCells}</tr></thead>
             <tbody>${rows}</tbody>
           </table>
