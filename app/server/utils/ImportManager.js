@@ -89,6 +89,7 @@ class ImportManager {
     const definition = {
       source: null,
       sheet: null,
+      maxRows: null,  // Optional row limit for large files
       mapping: {},
       transforms: {},  // sourceCol -> transform type
       filter: null
@@ -110,6 +111,15 @@ class ImportManager {
       // Parse Sheet: directive
       if (trimmed.startsWith('Sheet:')) {
         definition.sheet = trimmed.substring(6).trim();
+        continue;
+      }
+
+      // Parse MaxRows: directive (optional limit for large files)
+      if (trimmed.startsWith('MaxRows:')) {
+        const val = parseInt(trimmed.substring(8).trim(), 10);
+        if (!isNaN(val) && val > 0) {
+          definition.maxRows = val;
+        }
         continue;
       }
 
@@ -375,7 +385,7 @@ class ImportManager {
     try {
       // Read XLSX with row limit to avoid processing empty rows
       // (Excel files sometimes have range extending to max rows due to formatting)
-      const maxRows = 100000;  // Configurable if needed
+      const maxRows = definition.maxRows || 100000;
       const workbook = XLSX.readFile(sourcePath, { sheetRows: maxRows });
 
       // Select sheet
