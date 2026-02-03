@@ -8,6 +8,7 @@
 const express = require('express');
 const ImportManager = require('../utils/ImportManager');
 const logger = require('../utils/logger');
+const { getSchema } = require('../config/database');
 
 module.exports = function(cfg) {
   const router = express.Router();
@@ -127,6 +128,90 @@ module.exports = function(cfg) {
       }
     } catch (e) {
       console.error(`Failed to get schema for ${req.params.entity}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * GET /api/import/validate/:entity
+   * Validates import rule mapping against source schema and entity schema
+   * Returns: { valid, sourceErrors[], targetErrors[] }
+   */
+  router.get('/api/import/validate/:entity', (req, res) => {
+    try {
+      const entityName = req.params.entity;
+      const errors = { source: [], target: [] };
+
+      // Get parsed import definition
+      const definition = importManager.parseImportDefinition(entityName);
+      if (!definition) {
+        return res.json({ valid: false, error: 'No import definition found', sourceErrors: [], targetErrors: [] });
+      }
+
+      // Get XLSX source schema
+      const sourceSchema = importManager.getSourceSchema(entityName);
+      const sourceColumns = sourceSchema.columns || [];
+      const sourceColumnSet = new Set(sourceColumns);
+
+      // Get mapping columns
+      const mappedSourceCols = new Set(Object.keys(definition.mapping));
+      const mappedTargetCols = new Set(Object.values(definition.mapping));
+
+      // Check source columns in mapping
+      for (const sourceCol of mappedSourceCols) {
+        if (!sourceColumnSet.has(sourceCol)) {
+          errors.source.push({
+            column: sourceCol,
+            message: `Source column "${sourceCol}" not found in XLSX`
+          });
+        }
+      }
+
+      // Find unused source columns (in XLSX but not in mapping)
+      const unusedSourceColumns = sourceColumns.filter(col => !mappedSourceCols.has(col));
+
+      // Get entity schema
+      const schema = getSchema();
+      const entity = schema?.entities?.[entityName];
+      let unmappedTargetColumns = [];
+
+      if (entity) {
+        const entityColumns = entity.columns.map(c => c.name);
+        const entityColumnSet = new Set(entityColumns);
+
+        // Check target columns in mapping
+        for (const targetCol of mappedTargetCols) {
+          if (!entityColumnSet.has(targetCol)) {
+            errors.target.push({
+              column: targetCol,
+              message: `Target column "${targetCol}" not found in entity ${entityName}`
+            });
+          }
+        }
+
+        // Find unmapped target columns (in entity but not filled by mapping)
+        // Exclude 'id' as it's auto-generated
+        unmappedTargetColumns = entityColumns.filter(col => col !== 'id' && !mappedTargetCols.has(col));
+      } else {
+        errors.target.push({
+          column: null,
+          message: `Entity "${entityName}" not found in schema`
+        });
+      }
+
+      const valid = errors.source.length === 0 && errors.target.length === 0;
+      res.json({
+        valid,
+        sourceErrors: errors.source,
+        targetErrors: errors.target,
+        unusedSourceColumns,
+        unmappedTargetColumns,
+        mappingCount: mappedSourceCols.size,
+        sourceColumns: sourceColumns.length,
+        targetColumns: entity?.columns?.length || 0
+      });
+    } catch (e) {
+      console.error(`Failed to validate import for ${req.params.entity}:`, e);
       res.status(500).json({ error: e.message });
     }
   });

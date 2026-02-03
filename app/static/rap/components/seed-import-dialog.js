@@ -410,6 +410,9 @@ const SeedImportDialog = {
       pathSpan.textContent = data.path;
       saveBtn.disabled = true;
       this.log('info', 'Rule definition loaded');
+
+      // Run validation
+      this.validateRule();
     } catch (err) {
       editor.value = '';
       editor.placeholder = 'Failed to load definition';
@@ -426,6 +429,44 @@ const SeedImportDialog = {
 
     this.ruleModified = editor.value !== this.ruleOriginalContent;
     saveBtn.disabled = !this.ruleModified;
+  },
+
+  async validateRule() {
+    try {
+      const res = await fetch(`/api/import/validate/${this.entityName}`);
+      const result = await res.json();
+
+      if (result.error) {
+        this.log('warning', `Validation: ${result.error}`);
+        return;
+      }
+
+      // Report source errors (columns in mapping not found in XLSX)
+      for (const err of result.sourceErrors || []) {
+        this.log('error', `Source: ${err.message}`);
+      }
+
+      // Report target errors (columns in mapping not found in entity)
+      for (const err of result.targetErrors || []) {
+        this.log('error', `Target: ${err.message}`);
+      }
+
+      // Report unused source columns
+      if (result.unusedSourceColumns?.length > 0) {
+        this.log('info', `Unused source columns: ${result.unusedSourceColumns.join(', ')}`);
+      }
+
+      // Report unmapped target columns
+      if (result.unmappedTargetColumns?.length > 0) {
+        this.log('info', `Unmapped target columns: ${result.unmappedTargetColumns.join(', ')}`);
+      }
+
+      if (result.valid) {
+        this.log('success', `Mapping valid: ${result.mappingCount || '?'} columns mapped`);
+      }
+    } catch (err) {
+      this.log('warning', `Validation failed: ${err.message}`);
+    }
   },
 
   async saveRule() {
