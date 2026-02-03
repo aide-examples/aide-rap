@@ -28,6 +28,7 @@ const SeedManager = {
       <div class="context-menu-item" data-action="import">📥 Import...</div>
       <div class="context-menu-item" data-action="export">📤 Export...</div>
       <div class="context-menu-item" data-action="generate">🤖 Generate...</div>
+      <div class="context-menu-item" data-action="complete">✨ Complete...</div>
       <div class="context-menu-separator"></div>
       <div class="context-menu-item" data-action="load">▶️ Load Seed...</div>
       <div class="context-menu-item" data-action="restore">🔄 Restore from Backup</div>
@@ -91,7 +92,10 @@ const SeedManager = {
         this.openExportDialog(entityName);
         break;
       case 'generate':
-        await this.openGenerator(entityName);
+        await this.openGenerator(entityName, 'generate');
+        break;
+      case 'complete':
+        await this.openGenerator(entityName, 'complete');
         break;
       case 'load':
         this.openLoadPreview(entityName, 'seed');
@@ -615,12 +619,14 @@ const SeedManager = {
   },
 
   /**
-   * Open the AI generator dialog for an entity
+   * Open the AI generator/completer dialog for an entity
+   * @param {string} entityName - Entity name
+   * @param {string} mode - 'generate' or 'complete'
    */
-  async openGenerator(entityName) {
+  async openGenerator(entityName, mode = 'generate') {
     if (typeof SeedGeneratorDialog !== 'undefined') {
       SeedGeneratorDialog.init('modal-container');
-      await SeedGeneratorDialog.open(entityName);
+      await SeedGeneratorDialog.open(entityName, mode);
     } else {
       this.showMessage('Generator dialog not loaded', true);
     }

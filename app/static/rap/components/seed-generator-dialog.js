@@ -1,11 +1,16 @@
 /**
- * Seed Generator Dialog
- * Modal for generating seed data via interactive copy/paste workflow:
+ * Seed Generator/Completer Dialog
+ * Modal for generating or completing seed data via interactive copy/paste workflow:
  * 1. Write instruction → 2. Build prompt, copy, paste AI response → 3. Review & save
+ *
+ * Modes:
+ * - 'generate': Create new records from scratch (uses ## Data Generator)
+ * - 'complete': Fill missing attributes in existing records (uses ## Data Completer)
  */
 const SeedGeneratorDialog = {
   container: null,
   entityName: null,
+  mode: 'generate',  // 'generate' or 'complete'
   schema: null,
   instruction: '',
   generatedData: null,
@@ -31,9 +36,12 @@ const SeedGeneratorDialog = {
 
   /**
    * Open the dialog for an entity
+   * @param {string} entityName - Entity name
+   * @param {string} mode - 'generate' or 'complete'
    */
-  async open(entityName) {
+  async open(entityName, mode = 'generate') {
     this.entityName = entityName;
+    this.mode = mode;
     this.generatedData = null;
     this.lastPrompt = null;
     this.activeTab = 'instruction';
@@ -42,9 +50,12 @@ const SeedGeneratorDialog = {
     // Load schema
     this.schema = await SchemaCache.getExtended(entityName);
 
-    // Load instruction from markdown
+    // Load instruction from markdown (different endpoint based on mode)
+    const endpoint = mode === 'complete'
+      ? `/api/entity/${entityName}/completer-instruction`
+      : `/api/entity/${entityName}/generator-instruction`;
     try {
-      const resp = await fetch(`/api/entity/${entityName}/generator-instruction`);
+      const resp = await fetch(endpoint);
       const data = await resp.json();
       this.instruction = data.instruction || '';
       this.hasInstruction = data.hasInstruction || false;
@@ -90,12 +101,13 @@ const SeedGeneratorDialog = {
 
     const areaColor = this.schema?.areaColor || '#f5f5f5';
     const hasResult = this.generatedData && this.generatedData.length > 0;
+    const modeLabel = this.mode === 'complete' ? 'Complete' : 'Generate';
 
     this.container.innerHTML = `
       <div class="modal-overlay">
         <div class="modal-dialog seed-generator-dialog">
           <div class="modal-header" style="background-color: ${areaColor};">
-            <h2>Generate: ${this.entityName}</h2>
+            <h2>${modeLabel}: ${this.entityName}</h2>
             <button class="modal-close" data-action="close">&times;</button>
           </div>
 
@@ -131,15 +143,23 @@ const SeedGeneratorDialog = {
    */
   renderTabContent() {
     switch (this.activeTab) {
-      case 'instruction':
+      case 'instruction': {
+        const sectionName = this.mode === 'complete' ? 'Data Completer' : 'Data Generator';
+        const statusText = this.hasInstruction
+          ? `✓ ${sectionName} instruction found in Markdown`
+          : `No ${sectionName} instruction defined yet — write one below.`;
+        const placeholder = this.mode === 'complete'
+          ? 'Describe which fields to fill and how...'
+          : 'Describe what data to generate...';
         return `
           <div class="tab-content-instruction">
             <div class="instruction-status ${this.hasInstruction ? 'has-instruction' : 'no-instruction'}">
-              ${this.hasInstruction ? '✓ Instruction found in Markdown' : 'No instruction defined yet — write one below.'}
+              ${statusText}
             </div>
-            <textarea id="generator-instruction" rows="6" placeholder="Describe what data to generate...">${DomUtils.escapeHtml(this.instruction)}</textarea>
+            <textarea id="generator-instruction" rows="6" placeholder="${placeholder}">${DomUtils.escapeHtml(this.instruction)}</textarea>
           </div>
         `;
+      }
 
       case 'prompt':
         return `
@@ -425,8 +445,12 @@ const SeedGeneratorDialog = {
       return;
     }
 
+    const endpoint = this.mode === 'complete'
+      ? `/api/entity/${this.entityName}/completer-instruction`
+      : `/api/entity/${this.entityName}/generator-instruction`;
+
     try {
-      const resp = await fetch(`/api/entity/${this.entityName}/generator-instruction`, {
+      const resp = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instruction })
@@ -435,6 +459,7 @@ const SeedGeneratorDialog = {
 
       if (result.success) {
         this.instruction = instruction;
+        this.hasInstruction = true;
         this.showMessage('Instruction saved to markdown');
       } else {
         this.showMessage(result.error || 'Failed to save', true);
@@ -454,8 +479,12 @@ const SeedGeneratorDialog = {
       return;
     }
 
+    const endpoint = this.mode === 'complete'
+      ? `/api/seed/complete-prompt/${this.entityName}`
+      : `/api/seed/prompt/${this.entityName}`;
+
     try {
-      const resp = await fetch(`/api/seed/prompt/${this.entityName}`, {
+      const resp = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instruction })

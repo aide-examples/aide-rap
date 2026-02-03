@@ -1,6 +1,6 @@
 /**
  * Instruction Parser
- * Extracts and updates '## Data Generator' sections in entity markdown files
+ * Extracts and updates markdown sections (Data Generator, Data Completer) in entity files
  */
 
 const fs = require('fs');
@@ -38,19 +38,33 @@ function getEntityMdPath(entityName) {
 }
 
 /**
+ * Extract a named section from markdown content
+ * @param {string} markdownContent - Full markdown content
+ * @param {string} sectionName - Section header name (e.g., "Data Generator")
+ * @returns {string|null} Section content or null if not found
+ */
+function extractSection(markdownContent, sectionName) {
+  const regex = new RegExp(`## ${sectionName}\\s*\\n([\\s\\S]*?)(?=\\n## |\\n#+ |$)`);
+  const match = markdownContent.match(regex);
+  return match && match[1] ? match[1].trim() : null;
+}
+
+/**
  * Extract the Data Generator instruction from markdown content
  * @param {string} markdownContent - Full markdown content
  * @returns {string|null} Instruction text or null if not found
  */
 function extractGeneratorInstruction(markdownContent) {
-  // Match ## Data Generator section until next ## or end of file
-  const match = markdownContent.match(/## Data Generator\s*\n([\s\S]*?)(?=\n## |\n#+ |$)/);
+  return extractSection(markdownContent, 'Data Generator');
+}
 
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-
-  return null;
+/**
+ * Extract the Data Completer instruction from markdown content
+ * @param {string} markdownContent - Full markdown content
+ * @returns {string|null} Instruction text or null if not found
+ */
+function extractCompleterInstruction(markdownContent) {
+  return extractSection(markdownContent, 'Data Completer');
 }
 
 /**
@@ -93,46 +107,59 @@ function parseSeedContext(markdownContent) {
 }
 
 /**
+ * Update or add a named section in markdown content
+ * @param {string} markdownContent - Full markdown content
+ * @param {string} sectionName - Section header name (e.g., "Data Generator")
+ * @param {string} newContent - New section content
+ * @returns {string} Updated markdown content
+ */
+function updateSection(markdownContent, sectionName, newContent) {
+  const hasSection = markdownContent.includes(`## ${sectionName}`);
+
+  if (hasSection) {
+    const regex = new RegExp(`## ${sectionName}\\s*\\n[\\s\\S]*?(?=\\n## |\\n#+ |$)`);
+    return markdownContent.replace(regex, `## ${sectionName}\n\n${newContent}\n`);
+  } else {
+    const trimmed = markdownContent.trimEnd();
+    return `${trimmed}\n\n## ${sectionName}\n\n${newContent}\n`;
+  }
+}
+
+/**
  * Update or add the Data Generator instruction in markdown content
  * @param {string} markdownContent - Full markdown content
  * @param {string} newInstruction - New instruction text
  * @returns {string} Updated markdown content
  */
 function updateGeneratorInstruction(markdownContent, newInstruction) {
-  const hasSection = markdownContent.includes('## Data Generator');
-
-  if (hasSection) {
-    // Replace existing section content
-    return markdownContent.replace(
-      /## Data Generator\s*\n[\s\S]*?(?=\n## |\n#+ |$)/,
-      `## Data Generator\n\n${newInstruction}\n`
-    );
-  } else {
-    // Append new section at end
-    const trimmed = markdownContent.trimEnd();
-    return `${trimmed}\n\n## Data Generator\n\n${newInstruction}\n`;
-  }
+  return updateSection(markdownContent, 'Data Generator', newInstruction);
 }
 
 /**
- * Read generator instruction from entity markdown file
+ * Update or add the Data Completer instruction in markdown content
+ * @param {string} markdownContent - Full markdown content
+ * @param {string} newInstruction - New instruction text
+ * @returns {string} Updated markdown content
+ */
+function updateCompleterInstruction(markdownContent, newInstruction) {
+  return updateSection(markdownContent, 'Data Completer', newInstruction);
+}
+
+/**
+ * Read instruction from entity markdown file (generic)
  * @param {string} entityName - Entity class name
+ * @param {string} sectionName - Section name ('Data Generator' or 'Data Completer')
  * @returns {Object} { instruction, hasInstruction, mdPath, exists }
  */
-function readEntityInstruction(entityName) {
+function readEntitySectionInstruction(entityName, sectionName) {
   const mdPath = getEntityMdPath(entityName);
 
   if (!fs.existsSync(mdPath)) {
-    return {
-      instruction: null,
-      hasInstruction: false,
-      mdPath,
-      exists: false
-    };
+    return { instruction: null, hasInstruction: false, mdPath, exists: false };
   }
 
   const content = fs.readFileSync(mdPath, 'utf-8');
-  const instruction = extractGeneratorInstruction(content);
+  const instruction = extractSection(content, sectionName);
 
   return {
     instruction,
@@ -143,47 +170,87 @@ function readEntityInstruction(entityName) {
 }
 
 /**
+ * Write instruction to entity markdown file (generic)
+ * @param {string} entityName - Entity class name
+ * @param {string} sectionName - Section name ('Data Generator' or 'Data Completer')
+ * @param {string} instruction - Instruction text
+ * @returns {Object} { success, mdPath, error }
+ */
+function writeEntitySectionInstruction(entityName, sectionName, instruction) {
+  const mdPath = getEntityMdPath(entityName);
+
+  try {
+    if (!fs.existsSync(mdPath)) {
+      return { success: false, mdPath, error: `Markdown file not found: ${mdPath}` };
+    }
+
+    const content = fs.readFileSync(mdPath, 'utf-8');
+    const updatedContent = updateSection(content, sectionName, instruction);
+    fs.writeFileSync(mdPath, updatedContent, 'utf-8');
+
+    return { success: true, mdPath };
+  } catch (error) {
+    return { success: false, mdPath, error: error.message };
+  }
+}
+
+/**
+ * Read generator instruction from entity markdown file
+ * @param {string} entityName - Entity class name
+ * @returns {Object} { instruction, hasInstruction, mdPath, exists }
+ */
+function readEntityInstruction(entityName) {
+  return readEntitySectionInstruction(entityName, 'Data Generator');
+}
+
+/**
  * Write generator instruction to entity markdown file
  * @param {string} entityName - Entity class name
  * @param {string} instruction - Instruction text
  * @returns {Object} { success, mdPath, error }
  */
 function writeEntityInstruction(entityName, instruction) {
-  const mdPath = getEntityMdPath(entityName);
+  return writeEntitySectionInstruction(entityName, 'Data Generator', instruction);
+}
 
-  try {
-    if (!fs.existsSync(mdPath)) {
-      return {
-        success: false,
-        mdPath,
-        error: `Markdown file not found: ${mdPath}`
-      };
-    }
+/**
+ * Read completer instruction from entity markdown file
+ * @param {string} entityName - Entity class name
+ * @returns {Object} { instruction, hasInstruction, mdPath, exists }
+ */
+function readEntityCompleterInstruction(entityName) {
+  return readEntitySectionInstruction(entityName, 'Data Completer');
+}
 
-    const content = fs.readFileSync(mdPath, 'utf-8');
-    const updatedContent = updateGeneratorInstruction(content, instruction);
-    fs.writeFileSync(mdPath, updatedContent, 'utf-8');
-
-    return {
-      success: true,
-      mdPath
-    };
-  } catch (error) {
-    return {
-      success: false,
-      mdPath,
-      error: error.message
-    };
-  }
+/**
+ * Write completer instruction to entity markdown file
+ * @param {string} entityName - Entity class name
+ * @param {string} instruction - Instruction text
+ * @returns {Object} { success, mdPath, error }
+ */
+function writeEntityCompleterInstruction(entityName, instruction) {
+  return writeEntitySectionInstruction(entityName, 'Data Completer', instruction);
 }
 
 module.exports = {
   init,
   getClassesDir,
   getEntityMdPath,
+  // Generic section functions
+  extractSection,
+  updateSection,
+  readEntitySectionInstruction,
+  writeEntitySectionInstruction,
+  // Generator-specific (backward compatible)
   extractGeneratorInstruction,
   updateGeneratorInstruction,
   readEntityInstruction,
   writeEntityInstruction,
+  // Completer-specific
+  extractCompleterInstruction,
+  updateCompleterInstruction,
+  readEntityCompleterInstruction,
+  writeEntityCompleterInstruction,
+  // Seed context
   parseSeedContext
 };

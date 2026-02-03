@@ -103,6 +103,85 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
 }
 
 /**
+ * Build the prompt for AI-based seed data completion (filling missing attributes)
+ * @param {string} entityName - Name of entity to complete
+ * @param {Object} schema - Entity schema with columns and types
+ * @param {string} instruction - Data completer instruction
+ * @param {Array} existingRecords - Current records to complete (with IDs)
+ * @param {Object} fkData - FK reference data
+ * @param {Object} contextData - Seed context data (validation/constraint entities)
+ */
+function buildCompletePrompt(entityName, schema, instruction, existingRecords, fkData = {}, contextData = {}) {
+  // Filter out computed columns (same logic as buildPrompt)
+  const isComputedColumn = (col) => {
+    if (col.foreignKey) return false;
+    if (col.computed) return true;
+    const desc = col.description || '';
+    return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
+  };
+
+  const columnInfo = schema.columns
+    .filter(col => !isComputedColumn(col))
+    .map(col => {
+      const info = { name: col.name, type: col.type, nullable: col.nullable };
+      if (col.foreignKey) info.foreignKey = col.foreignKey;
+      return info;
+    });
+
+  const typeDefinitions = schema.types || {};
+
+  // Build FK reference summary (same as buildPrompt)
+  const fkSummary = {};
+  for (const [refEntity, entityData] of Object.entries(fkData)) {
+    const records = Array.isArray(entityData) ? entityData : entityData.records;
+    const labelFields = Array.isArray(entityData) ? null : entityData.labelFields;
+
+    if (records && records.length > 0) {
+      fkSummary[refEntity] = records.map(r => {
+        let label = null;
+        const primaryField = labelFields?.primary || (Array.isArray(labelFields) ? labelFields[0] : null);
+        if (primaryField) label = r[primaryField];
+        if (!label) {
+          label = r.name || r.title || r.designation || r.registration || r.serial_number || r.icao_code || `#${r.id}`;
+        }
+        return { id: r.id, label };
+      });
+    }
+  }
+
+  return `Complete missing data for the entity "${entityName}".
+
+## Entity Schema
+${JSON.stringify(columnInfo, null, 2)}
+
+## Type Definitions (patterns and enums must be respected!)
+${JSON.stringify(typeDefinitions, null, 2)}
+
+## Instruction
+${instruction}
+
+## Available Foreign Key References
+${Object.keys(fkSummary).length > 0 ? JSON.stringify(fkSummary, null, 2) : 'None - no referenced entities have data.'}
+${buildSeedContextSection(contextData)}
+## Existing Records to Complete
+The following records need completion. Fill in NULL or missing values as instructed.
+IMPORTANT: Keep the "id" field unchanged for each record!
+
+${JSON.stringify(existingRecords, null, 2)}
+
+## Requirements
+- Return the COMPLETE list of records with filled-in values
+- Keep ALL existing "id" values unchanged - this is critical for database updates
+- Only modify fields that are NULL or missing (unless instruction says otherwise)
+- Respect all type constraints (patterns, enums)
+- For foreign keys, use LABEL values (not IDs) - they will be resolved automatically
+- Generate realistic, plausible values based on the instruction and other field values
+
+## Output Format
+Return ONLY a valid JSON array containing ALL records (with their original IDs). No markdown, no explanation.`;
+}
+
+/**
  * Build the Seed Context section of the prompt
  * @param {Object} contextData - { EntityName: { records, attributes } }
  * @returns {string} Formatted context section or empty string
@@ -382,6 +461,7 @@ function loadBackReferenceData(entityName, getDatabase, fullSchema) {
 
 module.exports = {
   buildPrompt,
+  buildCompletePrompt,
   buildSeedContextSection,
   buildBackReferenceSection,
   loadSeedContext,
