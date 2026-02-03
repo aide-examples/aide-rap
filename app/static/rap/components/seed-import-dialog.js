@@ -552,6 +552,8 @@ const SeedImportDialog = {
         this.ruleOriginalContent = editor.value;
         this.ruleModified = false;
         this.log('success', 'Rule saved');
+        // Re-run validation after save
+        this.validateRule();
       }
     } catch (err) {
       this.log('error', `Save failed: ${err.message}`);
