@@ -117,6 +117,57 @@ const SeedImportDialog = {
   },
 
   /**
+   * Initialize resizer for split view
+   */
+  initResizer() {
+    const resizer = this.modalElement.querySelector('#import-resizer');
+    const container = this.modalElement.querySelector('.import-split-container');
+    const contentArea = this.modalElement.querySelector('.import-content-area');
+    const logContainer = this.modalElement.querySelector('.import-log-container');
+
+    if (!resizer || !container || !contentArea || !logContainer) return;
+
+    let isResizing = false;
+    let startY = 0;
+    let startContentHeight = 0;
+
+    const onMouseDown = (e) => {
+      isResizing = true;
+      startY = e.clientY;
+      startContentHeight = contentArea.offsetHeight;
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    };
+
+    const onMouseMove = (e) => {
+      if (!isResizing) return;
+
+      const deltaY = e.clientY - startY;
+      const containerHeight = container.offsetHeight;
+      const newContentHeight = Math.max(100, Math.min(containerHeight - 80, startContentHeight + deltaY));
+      const newLogHeight = containerHeight - newContentHeight - 6; // 6px for resizer
+
+      contentArea.style.flex = 'none';
+      contentArea.style.height = `${newContentHeight}px`;
+      logContainer.style.flex = 'none';
+      logContainer.style.height = `${newLogHeight}px`;
+    };
+
+    const onMouseUp = () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    resizer.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  },
+
+  /**
    * Render the dialog
    */
   render() {
@@ -145,7 +196,9 @@ const SeedImportDialog = {
               <button class="import-tab active" data-tab="paste">Paste</button>
             </div>
 
-            <div class="import-tab-content" id="tab-schema" style="display: none;">
+            <div class="import-split-container">
+              <div class="import-content-area">
+                <div class="import-tab-content" id="tab-schema" style="display: none;">
               <div class="tab-content-scroll">
                 <div id="schema-content" class="schema-content">
                   ${this.hasDefinition ? '<div class="loading">Loading schema...</div>' : '<div class="no-definition">No import definition</div>'}
@@ -226,14 +279,18 @@ const SeedImportDialog = {
                 <button class="btn-seed btn-save" id="btn-save">Save & Load</button>
               </div>
             </div>
-
-            <div class="import-log-container">
-              <div class="import-log-header">
-                <span>Log</span>
-                <button class="btn-clear-log" id="btn-clear-log">Clear</button>
               </div>
-              <div class="import-log-content" id="import-log-content">
-                <div class="log-empty">No messages</div>
+
+              <div class="import-resizer" id="import-resizer"></div>
+
+              <div class="import-log-container">
+                <div class="import-log-header">
+                  <span>Log</span>
+                  <button class="btn-clear-log" id="btn-clear-log">Clear</button>
+                </div>
+                <div class="import-log-content" id="import-log-content">
+                  <div class="log-empty">No messages</div>
+                </div>
               </div>
             </div>
           </div>
@@ -271,6 +328,9 @@ const SeedImportDialog = {
 
     // Clear log
     this.modalElement.querySelector('#btn-clear-log')?.addEventListener('click', () => this.clearLog());
+
+    // Resizer for split view
+    this.initResizer();
 
     // Drop zone
     const dropZone = this.modalElement.querySelector('#import-drop-zone');
