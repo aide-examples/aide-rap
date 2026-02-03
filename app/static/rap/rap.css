@@ -2880,6 +2880,22 @@
     font-style: italic;
 }
 
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--color-primary);
+    cursor: pointer;
+    text-decoration: underline;
+    font-size: inherit;
+    font-style: normal;
+    padding: 0;
+    margin-left: 8px;
+}
+
+.btn-link:hover {
+    color: var(--color-primary-hover);
+}
+
 /* Preview Warnings */
 .preview-warnings {
     display: block;
