@@ -742,14 +742,12 @@ const SeedImportDialog = {
         this.log('error', result.error || 'Load failed');
       }
 
-      // Show FK resolution errors prominently
+      // Show FK resolution errors prominently (aggregated by unique value)
       if (result.fkErrors?.length > 0) {
-        const totalErrors = result.fkErrorsTotal || result.fkErrors.length;
-        this.log('warning', `FK resolution failed for ${totalErrors} record(s):`);
-        result.fkErrors.slice(0, 5).forEach(e => this.log('error', e.message));
-        if (totalErrors > 5) {
-          this.log('warning', `... and ${totalErrors - 5} more FK errors`);
-        }
+        const totalRecords = result.fkErrorsTotal || result.fkErrors.reduce((sum, e) => sum + (e.count || 1), 0);
+        const uniqueErrors = result.fkErrors.length;
+        this.log('warning', `FK resolution failed: ${uniqueErrors} invalid value(s) affecting ${totalRecords} record(s)`);
+        result.fkErrors.forEach(e => this.log('error', e.message));
       }
 
       if (result.errors?.length > 0) {

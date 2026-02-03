@@ -966,7 +966,7 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   let skipped = 0;
   const errors = [];
   const mediaErrors = [];
-  const fkErrors = [];
+  const fkErrorMap = new Map();  // key: "field|value|targetEntity" -> { field, value, targetEntity, count }
 
   // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
   const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
@@ -998,15 +998,17 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
     const { resolved, fkWarnings } = resolveConceptualFKs(entityName, record, lookups);
 
-    // Collect FK resolution errors with row context
+    // Collect FK resolution errors - aggregate by unique (field, value, targetEntity)
     for (const fkWarn of fkWarnings) {
-      if (fkErrors.length < 10) { // Limit to first 10 FK errors
-        fkErrors.push({
-          row: i + 1,
+      const key = `${fkWarn.field}|${fkWarn.value}|${fkWarn.targetEntity}`;
+      if (fkErrorMap.has(key)) {
+        fkErrorMap.get(key).count++;
+      } else {
+        fkErrorMap.set(key, {
           field: fkWarn.field,
           value: fkWarn.value,
           targetEntity: fkWarn.targetEntity,
-          message: `Row ${i + 1}: "${fkWarn.value}" not found in ${fkWarn.targetEntity} (field: ${fkWarn.field})`
+          count: 1
         });
       }
     }
@@ -1066,23 +1068,47 @@ async function loadEntity(entityName, lookups = null, options = {}) {
 
   const result = { loaded, updated, skipped, replaced, errors };
 
-  // Add validation warnings (FK lookup failures from validateImport)
+  // Add validation warnings (FK lookup failures from validateImport) - aggregated by unique value
   if (validationWarnings.length > 0) {
-    result.fkErrors = validationWarnings.slice(0, 10).map(w => ({
-      row: w.row,
-      field: w.field,
-      value: w.value,
-      targetEntity: w.targetEntity,
-      message: `Row ${w.row}: "${w.value}" not found in ${w.targetEntity} (field: ${w.field})`
-    }));
-    if (validationWarnings.length > 10) {
-      result.fkErrorsTotal = validationWarnings.length;
+    const warningMap = new Map();
+    for (const w of validationWarnings) {
+      const key = `${w.field}|${w.value}|${w.targetEntity}`;
+      if (warningMap.has(key)) {
+        warningMap.get(key).count++;
+      } else {
+        warningMap.set(key, {
+          field: w.field,
+          value: w.value,
+          targetEntity: w.targetEntity,
+          count: 1
+        });
+      }
     }
+    result.fkErrors = Array.from(warningMap.values())
+      .sort((a, b) => b.count - a.count)  // Sort by count descending
+      .map(e => ({
+        field: e.field,
+        value: e.value,
+        targetEntity: e.targetEntity,
+        count: e.count,
+        message: `"${e.value}" not found in ${e.targetEntity} (${e.count} records)`
+      }));
+    result.fkErrorsTotal = validationWarnings.length;
   }
 
   // Add FK resolution errors if any occurred (from resolveConceptualFKs during load)
-  if (fkErrors.length > 0 && !result.fkErrors) {
+  if (fkErrorMap.size > 0 && !result.fkErrors) {
+    const fkErrors = Array.from(fkErrorMap.values())
+      .sort((a, b) => b.count - a.count)  // Sort by count descending
+      .map(e => ({
+        field: e.field,
+        value: e.value,
+        targetEntity: e.targetEntity,
+        count: e.count,
+        message: `"${e.value}" not found in ${e.targetEntity} (${e.count} records)`
+      }));
     result.fkErrors = fkErrors;
+    result.fkErrorsTotal = fkErrors.reduce((sum, e) => sum + e.count, 0);
   }
 
   // Add media errors if any occurred
