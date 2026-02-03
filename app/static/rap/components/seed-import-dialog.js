@@ -21,6 +21,8 @@ const SeedImportDialog = {
   // Load tab state
   importData: null,
   importConflicts: [],
+  importMeta: null,  // { conflictCount, dbRowCount }
+  previewLimit: 100,  // Default preview limit, null = show all
 
   // Rule tab state
   ruleOriginalContent: null,
@@ -68,6 +70,8 @@ const SeedImportDialog = {
     this.selectedMode = 'merge';
     this.importData = null;
     this.importConflicts = [];
+    this.importMeta = null;
+    this.previewLimit = 100;
     this.logMessages = [];
     this.ruleOriginalContent = null;
     this.ruleModified = false;
@@ -634,7 +638,6 @@ const SeedImportDialog = {
 
   async loadPreview() {
     const previewDiv = this.modalElement.querySelector('#load-preview');
-    const actionsDiv = this.modalElement.querySelector('#load-actions');
     const btn = this.modalElement.querySelector('#btn-load-preview');
 
     btn.disabled = true;
@@ -653,7 +656,8 @@ const SeedImportDialog = {
       }
 
       this.importData = data.records || [];
-      this.importConflicts = [];
+      this.importConflicts = data.conflictCount > 0 ? (data.conflicts || []) : [];
+      this.importMeta = { conflictCount: data.conflictCount || 0, dbRowCount: data.dbRowCount || 0 };
 
       if (this.importData.length === 0) {
         previewDiv.innerHTML = '<div class="load-empty">No import data available. Run import first.</div>';
@@ -662,44 +666,7 @@ const SeedImportDialog = {
         return;
       }
 
-      // Check for conflicts
-      if (data.conflictCount > 0) {
-        this.importConflicts = data.conflicts || [];
-      }
-
-      // Build preview table
-      const columns = Object.keys(this.importData[0]);
-      const previewRows = this.importData.slice(0, 10);
-
-      // Replace underscores with spaces in headers to allow word wrapping
-      const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c.replace(/_/g, ' '))}</th>`).join('');
-      const rows = previewRows.map(record => {
-        return '<tr>' + columns.map(col => {
-          const val = record[col];
-          return `<td>${val === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(val))}</td>`;
-        }).join('') + '</tr>';
-      }).join('');
-
-      // Show conflict info in preview
-      const conflictInfo = data.conflictCount > 0
-        ? `🔗 ${data.conflictCount} record(s) would overwrite existing data`
-        : `📥 ${data.dbRowCount || 0} existing records in database`;
-
-      let html = `
-        <div class="load-info">${this.importData.length} records in import file — ${conflictInfo}</div>
-        <div class="result-table-wrapper">
-          <table class="seed-preview-table">
-            <thead><tr>${headerCells}</tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `;
-
-      if (this.importData.length > 10) {
-        html += `<div class="preview-truncated">... and ${this.importData.length - 10} more records</div>`;
-      }
-
-      previewDiv.innerHTML = html;
+      this.renderLoadPreview();
       this.log('success', `Preview: ${this.importData.length} records`);
     } catch (err) {
       previewDiv.innerHTML = `<div class="load-error">${DomUtils.escapeHtml(err.message)}</div>`;
@@ -707,6 +674,54 @@ const SeedImportDialog = {
     }
 
     btn.disabled = false;
+  },
+
+  renderLoadPreview() {
+    const previewDiv = this.modalElement.querySelector('#load-preview');
+    if (!this.importData?.length) return;
+
+    const columns = Object.keys(this.importData[0]);
+    const limit = this.previewLimit;
+    const showingAll = !limit || limit >= this.importData.length;
+    const previewRows = showingAll ? this.importData : this.importData.slice(0, limit);
+
+    // Replace underscores with spaces in headers to allow word wrapping
+    const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c.replace(/_/g, ' '))}</th>`).join('');
+    const rows = previewRows.map(record => {
+      return '<tr>' + columns.map(col => {
+        const val = record[col];
+        return `<td>${val === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(val))}</td>`;
+      }).join('') + '</tr>';
+    }).join('');
+
+    // Show conflict info in preview
+    const meta = this.importMeta || {};
+    const conflictInfo = meta.conflictCount > 0
+      ? `🔗 ${meta.conflictCount} record(s) would overwrite existing data`
+      : `📥 ${meta.dbRowCount || 0} existing records in database`;
+
+    let html = `
+      <div class="load-info">${this.importData.length} records in import file — ${conflictInfo}</div>
+      <div class="result-table-wrapper">
+        <table class="seed-preview-table">
+          <thead><tr>${headerCells}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+
+    if (!showingAll) {
+      const remaining = this.importData.length - limit;
+      html += `<div class="preview-truncated">... and ${remaining} more records <button class="btn-link" id="btn-show-all">Show All</button></div>`;
+    }
+
+    previewDiv.innerHTML = html;
+
+    // Attach "Show All" button handler
+    previewDiv.querySelector('#btn-show-all')?.addEventListener('click', () => {
+      this.previewLimit = null;
+      this.renderLoadPreview();
+    });
   },
 
   async loadIntoDb() {
