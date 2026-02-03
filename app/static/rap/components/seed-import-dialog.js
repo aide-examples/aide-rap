@@ -22,6 +22,10 @@ const SeedImportDialog = {
   importData: null,
   importConflicts: [],
 
+  // Rule tab state
+  ruleOriginalContent: null,
+  ruleModified: false,
+
   /**
    * Show the import dialog for an entity
    */
@@ -58,6 +62,8 @@ const SeedImportDialog = {
     this.importData = null;
     this.importConflicts = [];
     this.logMessages = [];
+    this.ruleOriginalContent = null;
+    this.ruleModified = false;
   },
 
   /**
@@ -148,10 +154,14 @@ const SeedImportDialog = {
             </div>
 
             <div class="import-tab-content" id="tab-rule" style="display: none;">
-              <div class="tab-content-scroll">
-                <div id="rule-content" class="rule-content">
-                  ${this.hasDefinition ? '<div class="loading">Loading definition...</div>' : '<div class="no-definition">No import definition</div>'}
-                </div>
+              <div class="rule-toolbar">
+                <span class="rule-path" id="rule-path"></span>
+                <button class="btn-seed btn-save-rule" id="btn-save-rule" disabled>Save</button>
+              </div>
+              <div id="rule-content" class="rule-content">
+                ${this.hasDefinition
+                  ? '<textarea id="rule-editor" class="rule-editor" placeholder="Loading..."></textarea>'
+                  : '<div class="no-definition">No import definition</div>'}
               </div>
             </div>
 
@@ -301,6 +311,11 @@ const SeedImportDialog = {
     // Load into DB button
     this.modalElement.querySelector('#btn-load-db')?.addEventListener('click', () => this.loadIntoDb());
 
+    // Rule editor
+    const ruleEditor = this.modalElement.querySelector('#rule-editor');
+    ruleEditor?.addEventListener('input', () => this.onRuleEditorChange());
+    this.modalElement.querySelector('#btn-save-rule')?.addEventListener('click', () => this.saveRule());
+
     // Ctrl+Enter in textarea
     this.modalElement.querySelector('#import-text-input')?.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'Enter') {
@@ -372,44 +387,77 @@ const SeedImportDialog = {
   // ========== RULE TAB ==========
 
   async loadRule() {
-    const contentDiv = this.modalElement.querySelector('#rule-content');
-    try {
-      const res = await fetch(`/api/import/definition/${this.entityName}`);
-      const def = await res.json();
+    const editor = this.modalElement.querySelector('#rule-editor');
+    const pathSpan = this.modalElement.querySelector('#rule-path');
+    const saveBtn = this.modalElement.querySelector('#btn-save-rule');
 
-      if (def.error) {
-        contentDiv.innerHTML = `<div class="rule-error">${DomUtils.escapeHtml(def.error)}</div>`;
+    if (!editor) return;
+
+    try {
+      const res = await fetch(`/api/import/definition/${this.entityName}/raw`);
+      const data = await res.json();
+
+      if (data.error) {
+        editor.value = '';
+        editor.placeholder = data.error;
+        editor.disabled = true;
         return;
       }
 
-      // Format mapping as table
-      const mappingRows = Object.entries(def.mapping).map(([src, tgt]) => {
-        const transform = def.transforms?.[src] || '';
-        return `<tr><td>${DomUtils.escapeHtml(src)}</td><td>${DomUtils.escapeHtml(tgt)}</td><td>${DomUtils.escapeHtml(transform)}</td></tr>`;
-      }).join('');
-
-      contentDiv.innerHTML = `
-        <div class="rule-section">
-          <strong>Source:</strong> ${DomUtils.escapeHtml(def.source || '-')}
-        </div>
-        <div class="rule-section">
-          <strong>Sheet:</strong> ${DomUtils.escapeHtml(def.sheet || '(first)')}
-        </div>
-        ${def.maxRows ? `<div class="rule-section"><strong>MaxRows:</strong> ${def.maxRows}</div>` : ''}
-        <div class="rule-section">
-          <strong>Mapping:</strong>
-          <table class="rule-mapping-table">
-            <thead><tr><th>Source</th><th>Target</th><th>Transform</th></tr></thead>
-            <tbody>${mappingRows}</tbody>
-          </table>
-        </div>
-        ${def.filter ? `<div class="rule-section"><strong>Filter:</strong><pre>${DomUtils.escapeHtml(def.filter)}</pre></div>` : ''}
-      `;
+      editor.value = data.content;
+      this.ruleOriginalContent = data.content;
+      this.ruleModified = false;
+      pathSpan.textContent = data.path;
+      saveBtn.disabled = true;
       this.log('info', 'Rule definition loaded');
     } catch (err) {
-      contentDiv.innerHTML = `<div class="rule-error">Failed to load definition</div>`;
+      editor.value = '';
+      editor.placeholder = 'Failed to load definition';
+      editor.disabled = true;
       this.log('error', `Rule: ${err.message}`);
     }
+  },
+
+  onRuleEditorChange() {
+    const editor = this.modalElement.querySelector('#rule-editor');
+    const saveBtn = this.modalElement.querySelector('#btn-save-rule');
+
+    if (!editor || !saveBtn) return;
+
+    this.ruleModified = editor.value !== this.ruleOriginalContent;
+    saveBtn.disabled = !this.ruleModified;
+  },
+
+  async saveRule() {
+    const editor = this.modalElement.querySelector('#rule-editor');
+    const saveBtn = this.modalElement.querySelector('#btn-save-rule');
+
+    if (!editor || !this.ruleModified) return;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    try {
+      const res = await fetch(`/api/import/definition/${this.entityName}/raw`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editor.value })
+      });
+      const result = await res.json();
+
+      if (result.error) {
+        this.log('error', `Save failed: ${result.error}`);
+      } else {
+        this.ruleOriginalContent = editor.value;
+        this.ruleModified = false;
+        this.log('success', 'Rule saved');
+      }
+    } catch (err) {
+      this.log('error', `Save failed: ${err.message}`);
+    }
+
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = !this.ruleModified;
   },
 
   // ========== RUN TAB ==========

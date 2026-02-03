@@ -72,6 +72,40 @@ class ImportManager {
   }
 
   /**
+   * Get raw markdown content of import definition
+   * @param {string} entityName - Entity name
+   * @returns {Object} - { content, path } or { error }
+   */
+  getRawDefinition(entityName) {
+    const mdPath = path.join(this.importsDir, `${entityName}.md`);
+
+    if (!fs.existsSync(mdPath)) {
+      return { error: `No import definition found for ${entityName}` };
+    }
+
+    const content = fs.readFileSync(mdPath, 'utf-8');
+    return { content, path: `imports/${entityName}.md` };
+  }
+
+  /**
+   * Save raw markdown content of import definition
+   * @param {string} entityName - Entity name
+   * @param {string} content - Markdown content
+   * @returns {Object} - { success } or { error }
+   */
+  saveRawDefinition(entityName, content) {
+    const mdPath = path.join(this.importsDir, `${entityName}.md`);
+
+    try {
+      fs.writeFileSync(mdPath, content, 'utf-8');
+      return { success: true, path: `imports/${entityName}.md` };
+    } catch (e) {
+      this.logger.error('Failed to save import definition:', { error: e.message });
+      return { error: e.message };
+    }
+  }
+
+  /**
    * Get column names (schema) from the XLSX source file
    * @param {string} entityName - Entity name
    * @returns {Object} - { columns, sourceFile, sheet, error }
