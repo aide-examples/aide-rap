@@ -68,5 +68,24 @@ module.exports = function(cfg) {
     }
   });
 
+  /**
+   * GET /api/import/schema/:entity
+   * Returns column names from the XLSX source file
+   */
+  router.get('/api/import/schema/:entity', (req, res) => {
+    try {
+      const result = importManager.getSourceSchema(req.params.entity);
+
+      if (result.error) {
+        res.status(400).json(result);
+      } else {
+        res.json(result);
+      }
+    } catch (e) {
+      console.error(`Failed to get schema for ${req.params.entity}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   return router;
 };

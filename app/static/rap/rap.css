@@ -2995,6 +2995,359 @@
 }
 
 /* =============================================================================
+   UNIFIED IMPORT DIALOG
+   ============================================================================= */
+
+.unified-import {
+    width: 90%;
+    max-width: 900px;
+    height: 85vh;
+    max-height: 700px;
+}
+
+.unified-import .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 16px;
+}
+
+/* Main Tab Bar */
+.import-tabs-bar {
+    display: flex;
+    gap: 4px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 12px;
+}
+
+.import-tabs-bar .import-tab {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
+
+.import-tabs-bar .import-tab.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Tab Content Area */
+.tab-content-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px;
+}
+
+/* Schema Tab */
+.schema-content {
+    font-size: 0.9rem;
+}
+
+.schema-info {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--table-row-hover);
+    border-radius: 6px;
+}
+
+.schema-columns {
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 6px;
+}
+
+.schema-columns ul {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+    max-height: 200px;
+    overflow-y: auto;
+    columns: 2;
+    column-gap: 20px;
+}
+
+.schema-columns li {
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 2px 0;
+    break-inside: avoid;
+}
+
+.schema-error {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-danger-hover);
+}
+
+/* Rule Tab */
+.rule-content {
+    font-size: 0.9rem;
+}
+
+.rule-section {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: var(--table-row-hover);
+    border-radius: 6px;
+}
+
+.rule-section pre {
+    margin: 8px 0 0 0;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    overflow-x: auto;
+}
+
+.rule-mapping-table {
+    width: 100%;
+    margin-top: 8px;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.rule-mapping-table th {
+    background: #f1f5f9;
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.rule-mapping-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    font-family: monospace;
+}
+
+.rule-error {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-danger-hover);
+}
+
+/* Run Tab */
+.run-content {
+    font-size: 0.9rem;
+}
+
+.run-content p {
+    margin: 0 0 16px 0;
+    color: var(--color-gray-550);
+}
+
+.btn-run-import {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    padding: 10px 20px;
+}
+
+#run-result {
+    margin-top: 16px;
+}
+
+.run-success {
+    padding: 16px;
+    background: #dcfce7;
+    border-radius: 6px;
+    color: #166534;
+}
+
+.run-error {
+    padding: 16px;
+    background: #fee2e2;
+    border-radius: 6px;
+    color: var(--color-danger-hover);
+}
+
+/* Load Tab */
+.load-content {
+    font-size: 0.9rem;
+}
+
+.load-content p {
+    margin: 0 0 16px 0;
+    color: var(--color-gray-550);
+}
+
+.btn-load-preview {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+#load-preview {
+    margin-top: 16px;
+}
+
+.load-info {
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.load-error,
+.load-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-gray-400);
+}
+
+.load-error {
+    color: var(--color-danger-hover);
+    background: #fee2e2;
+    border-radius: 6px;
+}
+
+#load-actions {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Paste Tab */
+.paste-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.paste-tabs {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+}
+
+.paste-tab {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--color-gray-550);
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.paste-tab:hover {
+    background: var(--table-header-bg);
+}
+
+.paste-tab.active {
+    background: #e0e7ff;
+    color: #4338ca;
+    font-weight: 500;
+}
+
+.paste-tab-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+#tab-paste .import-textarea {
+    height: 150px;
+    flex: none;
+}
+
+.paste-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Log Container */
+.import-log-container {
+    margin-top: auto;
+    border-top: 1px solid var(--border-color);
+    padding-top: 8px;
+}
+
+.import-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-gray-550);
+}
+
+.btn-clear-log {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--color-gray-550);
+}
+
+.btn-clear-log:hover {
+    background: var(--table-row-hover);
+}
+
+.import-log-content {
+    height: 100px;
+    overflow-y: auto;
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+.log-empty {
+    color: var(--color-gray-400);
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}
+
+.log-entry {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+}
+
+.log-icon {
+    flex-shrink: 0;
+    width: 16px;
+}
+
+.log-message {
+    flex: 1;
+    word-break: break-word;
+}
+
+.log-success .log-icon { color: var(--color-success); }
+.log-warning .log-icon { color: #d97706; }
+.log-error .log-icon { color: var(--color-danger-hover); }
+.log-info .log-icon { color: var(--color-primary); }
+
+.log-error .log-message { color: var(--color-danger-hover); }
+
+.loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-gray-400);
+}
+
+.no-definition {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--color-gray-400);
+    font-style: italic;
+}
+
+/* =============================================================================
    SEED PREVIEW DIALOG (Load Preview & Export)
    ============================================================================= */
 

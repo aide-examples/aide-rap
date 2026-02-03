@@ -29,9 +29,7 @@ const SeedManager = {
       <div class="context-menu-item" data-action="export">📤 Export...</div>
       <div class="context-menu-item" data-action="generate">🤖 Generate...</div>
       <div class="context-menu-separator"></div>
-      <div class="context-menu-item" data-action="run-import">🔄 Run Import (XLSX→JSON)...</div>
       <div class="context-menu-item" data-action="load">▶️ Load Seed...</div>
-      <div class="context-menu-item" data-action="load-import">📥 Load Import...</div>
       <div class="context-menu-item" data-action="restore">🔄 Restore from Backup</div>
       <div class="context-menu-item" data-action="clear">🗑️ Clear</div>
     `;
@@ -61,18 +59,10 @@ const SeedManager = {
 
     // Enable/disable actions based on file availability
     const loadItem = this.contextMenu.querySelector('[data-action="load"]');
-    const loadImportItem = this.contextMenu.querySelector('[data-action="load-import"]');
-    const runImportItem = this.contextMenu.querySelector('[data-action="run-import"]');
     const exportItem = this.contextMenu.querySelector('[data-action="export"]');
     const restoreItem = this.contextMenu.querySelector('[data-action="restore"]');
     if (loadItem) {
       loadItem.classList.toggle('disabled', !hasSeeds);
-    }
-    if (loadImportItem) {
-      loadImportItem.classList.toggle('disabled', !hasImport);
-    }
-    if (runImportItem) {
-      runImportItem.classList.toggle('disabled', !hasSource);
     }
     if (exportItem) {
       exportItem.classList.toggle('disabled', !hasSeeds);
@@ -103,14 +93,8 @@ const SeedManager = {
       case 'generate':
         await this.openGenerator(entityName);
         break;
-      case 'run-import':
-        await this.runImport(entityName);
-        break;
       case 'load':
         this.openLoadPreview(entityName, 'seed');
-        break;
-      case 'load-import':
-        this.openLoadPreview(entityName, 'import');
         break;
       case 'restore':
         await this.restoreEntity(entityName);

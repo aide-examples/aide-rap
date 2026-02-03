@@ -1,34 +1,47 @@
 /**
- * Seed Import Dialog Component
- * Modal for importing seed data via paste or file drop
- * Auto-detects JSON vs CSV format
- * Shows preview with FK validation before saving
+ * Unified Import Dialog Component
+ * Tabs: Schema | Rule | Run | Load | Paste
+ * Persistent log at bottom
  */
 const SeedImportDialog = {
   modalElement: null,
   entityName: null,
+  hasDefinition: false,
+  logMessages: [],
+
+  // Paste tab state
   parsedData: null,
   fkWarnings: [],
   invalidRows: [],
   validCount: 0,
   detectedFormat: null,
-  conflicts: [],       // Records that would overwrite existing with back-refs
-  selectedMode: 'merge', // 'merge' | 'replace' | 'skip_conflicts'
+  conflicts: [],
+  selectedMode: 'merge',
 
-  /**
-   * Initialize the import dialog
-   */
-  init(containerId) {
-    // No longer uses container - creates own modal element
-  },
+  // Load tab state
+  importData: null,
+  importConflicts: [],
 
   /**
    * Show the import dialog for an entity
    */
-  show(entityName) {
+  async show(entityName) {
     this.entityName = entityName;
     this.reset();
+    await this.checkDefinition();
     this.render();
+  },
+
+  /**
+   * Check if entity has import definition
+   */
+  async checkDefinition() {
+    try {
+      const res = await fetch(`/api/import/definition/${this.entityName}`);
+      this.hasDefinition = res.ok;
+    } catch {
+      this.hasDefinition = false;
+    }
   },
 
   /**
@@ -42,6 +55,9 @@ const SeedImportDialog = {
     this.detectedFormat = null;
     this.conflicts = [];
     this.selectedMode = 'merge';
+    this.importData = null;
+    this.importConflicts = [];
+    this.logMessages = [];
   },
 
   /**
@@ -55,61 +71,159 @@ const SeedImportDialog = {
   },
 
   /**
+   * Add message to log
+   */
+  log(type, message) {
+    const icons = { success: '✓', warning: '⚠', error: '✗', info: 'ℹ' };
+    this.logMessages.push({ type, message, icon: icons[type] || '•', time: new Date() });
+    this.renderLog();
+  },
+
+  /**
+   * Clear log
+   */
+  clearLog() {
+    this.logMessages = [];
+    this.renderLog();
+  },
+
+  /**
+   * Render log container
+   */
+  renderLog() {
+    const logDiv = this.modalElement?.querySelector('#import-log-content');
+    if (!logDiv) return;
+
+    if (this.logMessages.length === 0) {
+      logDiv.innerHTML = '<div class="log-empty">No messages</div>';
+      return;
+    }
+
+    logDiv.innerHTML = this.logMessages.map(m => `
+      <div class="log-entry log-${m.type}">
+        <span class="log-icon">${m.icon}</span>
+        <span class="log-message">${DomUtils.escapeHtml(m.message)}</span>
+      </div>
+    `).join('');
+
+    // Auto-scroll to bottom
+    logDiv.scrollTop = logDiv.scrollHeight;
+  },
+
+  /**
    * Render the dialog
    */
   render() {
-    // Remove existing modal if any
     if (this.modalElement) {
       this.modalElement.remove();
     }
 
-    // Create new modal element
+    const disabledClass = this.hasDefinition ? '' : 'disabled';
+    const disabledAttr = this.hasDefinition ? '' : 'disabled';
+
     this.modalElement = document.createElement('div');
     this.modalElement.className = 'modal-container active';
     this.modalElement.innerHTML = `
       <div class="modal-overlay">
-        <div class="modal-dialog seed-import-modal">
+        <div class="modal-dialog seed-import-modal unified-import">
           <div class="modal-header">
             <h2>Import: ${this.entityName}</h2>
             <button class="modal-close" data-action="close">&times;</button>
           </div>
           <div class="modal-body">
-            <div class="import-toolbar">
-              <div class="drop-zone-compact" id="import-drop-zone">
-                <span class="drop-zone-icon">📁</span>
-                <span class="drop-zone-text">Drop file or click</span>
-              </div>
-              <div class="import-tabs">
-                <button class="import-tab active" data-tab="source">Source</button>
-                <button class="import-tab" data-tab="preview">Preview</button>
-              </div>
-              <div class="import-toolbar-actions">
-                <button class="btn-seed btn-parse" id="btn-parse">Preview</button>
-              </div>
+            <div class="import-tabs-bar">
+              <button class="import-tab ${disabledClass}" data-tab="schema" ${disabledAttr}>Schema</button>
+              <button class="import-tab ${disabledClass}" data-tab="rule" ${disabledAttr}>Rule</button>
+              <button class="import-tab ${disabledClass}" data-tab="run" ${disabledAttr}>Run</button>
+              <button class="import-tab ${disabledClass}" data-tab="load" ${disabledAttr}>Load</button>
+              <button class="import-tab active" data-tab="paste">Paste</button>
             </div>
 
-            <div class="import-tab-content" id="tab-source">
-              <textarea id="import-text-input" class="import-textarea"
-                placeholder="Paste JSON or CSV data here..."></textarea>
-            </div>
-
-            <div class="import-tab-content" id="tab-preview" style="display: none;">
-              <div id="import-preview" class="import-preview">
-                <div class="import-preview-table" id="preview-table">
-                  <div class="preview-empty">Paste data in Source tab, then click "Preview"</div>
+            <div class="import-tab-content" id="tab-schema" style="display: none;">
+              <div class="tab-content-scroll">
+                <div id="schema-content" class="schema-content">
+                  ${this.hasDefinition ? '<div class="loading">Loading schema...</div>' : '<div class="no-definition">No import definition</div>'}
                 </div>
               </div>
             </div>
 
-            <div id="import-status" class="import-status" style="display: none;">
-              <span id="preview-info"></span>
-              <div id="preview-warnings" class="preview-warnings"></div>
+            <div class="import-tab-content" id="tab-rule" style="display: none;">
+              <div class="tab-content-scroll">
+                <div id="rule-content" class="rule-content">
+                  ${this.hasDefinition ? '<div class="loading">Loading definition...</div>' : '<div class="no-definition">No import definition</div>'}
+                </div>
+              </div>
             </div>
 
-            <div class="import-footer">
-              <div class="import-footer-buttons">
-                <button class="btn-seed btn-save-only" id="btn-save-only" disabled>Save only</button>
-                <button class="btn-seed btn-save" id="btn-save" disabled>Save & Load</button>
+            <div class="import-tab-content" id="tab-run" style="display: none;">
+              <div class="tab-content-scroll">
+                <div id="run-content" class="run-content">
+                  ${this.hasDefinition ? `
+                    <p>Convert XLSX source file to JSON import file.</p>
+                    <button class="btn-seed btn-run-import" id="btn-run-import">Run Import (XLSX → JSON)</button>
+                    <div id="run-result"></div>
+                  ` : '<div class="no-definition">No import definition</div>'}
+                </div>
+              </div>
+            </div>
+
+            <div class="import-tab-content" id="tab-load" style="display: none;">
+              <div class="tab-content-scroll">
+                <div id="load-content" class="load-content">
+                  ${this.hasDefinition ? `
+                    <p>Load data from import file into database.</p>
+                    <button class="btn-seed btn-load-preview" id="btn-load-preview">Preview Import Data</button>
+                    <div id="load-preview"></div>
+                    <div id="load-actions" style="display: none;">
+                      <button class="btn-seed btn-save" id="btn-load-db">Load into Database</button>
+                    </div>
+                  ` : '<div class="no-definition">No import definition</div>'}
+                </div>
+              </div>
+            </div>
+
+            <div class="import-tab-content" id="tab-paste" style="display: block;">
+              <div class="paste-toolbar">
+                <div class="drop-zone-compact" id="import-drop-zone">
+                  <span class="drop-zone-icon">📁</span>
+                  <span class="drop-zone-text">Drop file or click</span>
+                </div>
+                <div class="paste-tabs">
+                  <button class="paste-tab active" data-paste-tab="source">Source</button>
+                  <button class="paste-tab" data-paste-tab="preview">Preview</button>
+                </div>
+                <button class="btn-seed btn-parse" id="btn-parse">Parse</button>
+              </div>
+
+              <div class="paste-tab-content" id="paste-tab-source">
+                <textarea id="import-text-input" class="import-textarea"
+                  placeholder="Paste JSON or CSV data here..."></textarea>
+              </div>
+
+              <div class="paste-tab-content" id="paste-tab-preview" style="display: none;">
+                <div id="paste-preview" class="import-preview">
+                  <div class="preview-empty">Paste data, then click "Parse"</div>
+                </div>
+              </div>
+
+              <div id="paste-status" class="import-status" style="display: none;">
+                <span id="paste-info"></span>
+                <div id="paste-warnings" class="preview-warnings"></div>
+              </div>
+
+              <div class="paste-actions" id="paste-actions" style="display: none;">
+                <button class="btn-seed btn-save-only" id="btn-save-only">Save only</button>
+                <button class="btn-seed btn-save" id="btn-save">Save & Load</button>
+              </div>
+            </div>
+
+            <div class="import-log-container">
+              <div class="import-log-header">
+                <span>Log</span>
+                <button class="btn-clear-log" id="btn-clear-log">Clear</button>
+              </div>
+              <div class="import-log-content" id="import-log-content">
+                <div class="log-empty">No messages</div>
               </div>
             </div>
           </div>
@@ -120,157 +234,413 @@ const SeedImportDialog = {
 
     document.body.appendChild(this.modalElement);
     this.attachEventHandlers();
+
+    // Load initial data if definition exists
+    if (this.hasDefinition) {
+      this.loadSchema();
+      this.loadRule();
+    }
   },
 
   /**
    * Attach event handlers
    */
   attachEventHandlers() {
-    // Modal dialog: do NOT close on overlay click
-    // Dialog can only be closed via X button
-
     // Close button
-    this.modalElement.querySelectorAll('.modal-close').forEach(el => {
-      el.addEventListener('click', () => this.hide());
-    });
+    this.modalElement.querySelector('.modal-close')?.addEventListener('click', () => this.hide());
 
-    // Tab switching
-    this.modalElement.querySelectorAll('.import-tab').forEach(tab => {
+    // Main tab switching
+    this.modalElement.querySelectorAll('.import-tabs-bar .import-tab:not(.disabled)').forEach(tab => {
       tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
     });
+
+    // Paste sub-tabs
+    this.modalElement.querySelectorAll('.paste-tab').forEach(tab => {
+      tab.addEventListener('click', () => this.switchPasteTab(tab.dataset.pasteTab));
+    });
+
+    // Clear log
+    this.modalElement.querySelector('#btn-clear-log')?.addEventListener('click', () => this.clearLog());
 
     // Drop zone
     const dropZone = this.modalElement.querySelector('#import-drop-zone');
     const fileInput = this.modalElement.querySelector('#import-file-input');
 
-    dropZone.addEventListener('click', () => fileInput.click());
-
-    dropZone.addEventListener('dragover', (e) => {
+    dropZone?.addEventListener('click', () => fileInput?.click());
+    dropZone?.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('dragover');
     });
-
-    dropZone.addEventListener('dragleave', () => {
-      dropZone.classList.remove('dragover');
-    });
-
-    dropZone.addEventListener('drop', (e) => {
+    dropZone?.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone?.addEventListener('drop', (e) => {
       e.preventDefault();
       dropZone.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file) this.handleFile(file);
+      if (e.dataTransfer.files[0]) this.handleFile(e.dataTransfer.files[0]);
     });
-
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) this.handleFile(file);
+    fileInput?.addEventListener('change', (e) => {
+      if (e.target.files[0]) this.handleFile(e.target.files[0]);
       e.target.value = '';
     });
 
     // Parse button
     this.modalElement.querySelector('#btn-parse')?.addEventListener('click', () => {
       const text = this.modalElement.querySelector('#import-text-input')?.value;
-      if (text?.trim()) {
-        this.parseInput(text);
-      }
+      if (text?.trim()) this.parseInput(text);
     });
 
-    // Save & Load button
-    this.modalElement.querySelector('#btn-save')?.addEventListener('click', () => {
-      this.saveAndLoad();
-    });
+    // Paste: Save & Load
+    this.modalElement.querySelector('#btn-save')?.addEventListener('click', () => this.saveAndLoad());
+    this.modalElement.querySelector('#btn-save-only')?.addEventListener('click', () => this.saveOnly());
 
-    // Save only button
-    this.modalElement.querySelector('#btn-save-only')?.addEventListener('click', () => {
-      this.saveOnly();
-    });
+    // Run Import button
+    this.modalElement.querySelector('#btn-run-import')?.addEventListener('click', () => this.runImport());
 
-    // Parse on Ctrl+Enter in textarea
+    // Load Preview button
+    this.modalElement.querySelector('#btn-load-preview')?.addEventListener('click', () => this.loadPreview());
+
+    // Load into DB button
+    this.modalElement.querySelector('#btn-load-db')?.addEventListener('click', () => this.loadIntoDb());
+
+    // Ctrl+Enter in textarea
     this.modalElement.querySelector('#import-text-input')?.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'Enter') {
         const text = e.target.value;
-        if (text?.trim()) {
-          this.parseInput(text);
-        }
+        if (text?.trim()) this.parseInput(text);
       }
     });
   },
 
   /**
-   * Switch between Source and Preview tabs
+   * Switch main tabs
    */
   switchTab(tabName) {
-    // Update tab buttons
-    this.modalElement.querySelectorAll('.import-tab').forEach(tab => {
+    this.modalElement.querySelectorAll('.import-tabs-bar .import-tab').forEach(tab => {
       tab.classList.toggle('active', tab.dataset.tab === tabName);
     });
 
-    // Update tab content
-    this.modalElement.querySelector('#tab-source').style.display = tabName === 'source' ? 'block' : 'none';
-    this.modalElement.querySelector('#tab-preview').style.display = tabName === 'preview' ? 'block' : 'none';
+    ['schema', 'rule', 'run', 'load', 'paste'].forEach(name => {
+      const el = this.modalElement.querySelector(`#tab-${name}`);
+      if (el) el.style.display = name === tabName ? 'block' : 'none';
+    });
   },
 
   /**
-   * Handle file selection
+   * Switch paste sub-tabs
    */
+  switchPasteTab(tabName) {
+    this.modalElement.querySelectorAll('.paste-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.pasteTab === tabName);
+    });
+
+    this.modalElement.querySelector('#paste-tab-source').style.display = tabName === 'source' ? 'block' : 'none';
+    this.modalElement.querySelector('#paste-tab-preview').style.display = tabName === 'preview' ? 'block' : 'none';
+  },
+
+  // ========== SCHEMA TAB ==========
+
+  async loadSchema() {
+    const contentDiv = this.modalElement.querySelector('#schema-content');
+    try {
+      const res = await fetch(`/api/import/schema/${this.entityName}`);
+      const data = await res.json();
+
+      if (data.error) {
+        contentDiv.innerHTML = `<div class="schema-error">${DomUtils.escapeHtml(data.error)}</div>`;
+        this.log('error', `Schema: ${data.error}`);
+        return;
+      }
+
+      contentDiv.innerHTML = `
+        <div class="schema-info">
+          <strong>Source:</strong> ${DomUtils.escapeHtml(data.sourceFile)}<br>
+          <strong>Sheet:</strong> ${DomUtils.escapeHtml(data.sheet)}
+        </div>
+        <div class="schema-columns">
+          <strong>Columns (${data.columns.length}):</strong>
+          <ul>
+            ${data.columns.map(c => `<li>${DomUtils.escapeHtml(c)}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+      this.log('success', `Schema loaded: ${data.columns.length} columns`);
+    } catch (err) {
+      contentDiv.innerHTML = `<div class="schema-error">Failed to load schema</div>`;
+      this.log('error', `Schema: ${err.message}`);
+    }
+  },
+
+  // ========== RULE TAB ==========
+
+  async loadRule() {
+    const contentDiv = this.modalElement.querySelector('#rule-content');
+    try {
+      const res = await fetch(`/api/import/definition/${this.entityName}`);
+      const def = await res.json();
+
+      if (def.error) {
+        contentDiv.innerHTML = `<div class="rule-error">${DomUtils.escapeHtml(def.error)}</div>`;
+        return;
+      }
+
+      // Format mapping as table
+      const mappingRows = Object.entries(def.mapping).map(([src, tgt]) => {
+        const transform = def.transforms?.[src] || '';
+        return `<tr><td>${DomUtils.escapeHtml(src)}</td><td>${DomUtils.escapeHtml(tgt)}</td><td>${DomUtils.escapeHtml(transform)}</td></tr>`;
+      }).join('');
+
+      contentDiv.innerHTML = `
+        <div class="rule-section">
+          <strong>Source:</strong> ${DomUtils.escapeHtml(def.source || '-')}
+        </div>
+        <div class="rule-section">
+          <strong>Sheet:</strong> ${DomUtils.escapeHtml(def.sheet || '(first)')}
+        </div>
+        ${def.maxRows ? `<div class="rule-section"><strong>MaxRows:</strong> ${def.maxRows}</div>` : ''}
+        <div class="rule-section">
+          <strong>Mapping:</strong>
+          <table class="rule-mapping-table">
+            <thead><tr><th>Source</th><th>Target</th><th>Transform</th></tr></thead>
+            <tbody>${mappingRows}</tbody>
+          </table>
+        </div>
+        ${def.filter ? `<div class="rule-section"><strong>Filter:</strong><pre>${DomUtils.escapeHtml(def.filter)}</pre></div>` : ''}
+      `;
+      this.log('info', 'Rule definition loaded');
+    } catch (err) {
+      contentDiv.innerHTML = `<div class="rule-error">Failed to load definition</div>`;
+      this.log('error', `Rule: ${err.message}`);
+    }
+  },
+
+  // ========== RUN TAB ==========
+
+  async runImport() {
+    const resultDiv = this.modalElement.querySelector('#run-result');
+    const btn = this.modalElement.querySelector('#btn-run-import');
+
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    resultDiv.innerHTML = '<div class="loading">Processing XLSX...</div>';
+    this.log('info', 'Starting XLSX → JSON conversion...');
+
+    try {
+      const res = await fetch(`/api/import/run/${this.entityName}`, { method: 'POST' });
+      const result = await res.json();
+
+      if (result.success) {
+        resultDiv.innerHTML = `
+          <div class="run-success">
+            <strong>Success!</strong><br>
+            Records read: ${result.recordsRead}<br>
+            Records filtered: ${result.recordsFiltered}<br>
+            Records written: ${result.recordsWritten}<br>
+            Output: ${result.outputFile}
+          </div>
+        `;
+        this.log('success', `Import complete: ${result.recordsWritten} records written`);
+      } else {
+        resultDiv.innerHTML = `<div class="run-error">${DomUtils.escapeHtml(result.error)}</div>`;
+        this.log('error', `Import failed: ${result.error}`);
+      }
+    } catch (err) {
+      resultDiv.innerHTML = `<div class="run-error">${DomUtils.escapeHtml(err.message)}</div>`;
+      this.log('error', `Import error: ${err.message}`);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Run Import (XLSX → JSON)';
+  },
+
+  // ========== LOAD TAB ==========
+
+  async loadPreview() {
+    const previewDiv = this.modalElement.querySelector('#load-preview');
+    const actionsDiv = this.modalElement.querySelector('#load-actions');
+    const btn = this.modalElement.querySelector('#btn-load-preview');
+
+    btn.disabled = true;
+    previewDiv.innerHTML = '<div class="loading">Loading import data...</div>';
+    this.log('info', 'Loading import file preview...');
+
+    try {
+      const res = await fetch(`/api/seed/content/${this.entityName}?sourceDir=import`);
+      const data = await res.json();
+
+      if (data.error) {
+        previewDiv.innerHTML = `<div class="load-error">${DomUtils.escapeHtml(data.error)}</div>`;
+        this.log('error', data.error);
+        btn.disabled = false;
+        return;
+      }
+
+      this.importData = data.records || [];
+      this.importConflicts = [];
+
+      if (this.importData.length === 0) {
+        previewDiv.innerHTML = '<div class="load-empty">No import data available. Run import first.</div>';
+        this.log('warning', 'No import data found');
+        btn.disabled = false;
+        return;
+      }
+
+      // Check for conflicts
+      if (data.conflictCount > 0) {
+        this.importConflicts = data.conflicts || [];
+      }
+
+      // Build preview table
+      const columns = Object.keys(this.importData[0]);
+      const previewRows = this.importData.slice(0, 10);
+
+      const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
+      const rows = previewRows.map(record => {
+        return '<tr>' + columns.map(col => {
+          const val = record[col];
+          return `<td>${val === null ? '' : DomUtils.escapeHtml(String(val))}</td>`;
+        }).join('') + '</tr>';
+      }).join('');
+
+      let html = `
+        <div class="load-info">${this.importData.length} records in import file</div>
+        <div class="import-preview-table">
+          <table class="preview-table">
+            <thead><tr>${headerCells}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+
+      if (this.importData.length > 10) {
+        html += `<div class="preview-truncated">... and ${this.importData.length - 10} more records</div>`;
+      }
+
+      if (data.conflictCount > 0) {
+        html += `
+          <div class="conflict-section">
+            <div class="conflict-header">
+              <span class="conflict-icon">🔗</span>
+              <span class="conflict-text">${data.conflictCount} record(s) would overwrite existing data</span>
+            </div>
+            <div class="conflict-mode-selector">
+              <label><input type="radio" name="load-mode" value="merge" checked> <strong>Merge</strong></label>
+              <label><input type="radio" name="load-mode" value="skip_conflicts"> <strong>Skip</strong></label>
+              <label><input type="radio" name="load-mode" value="replace"> <strong>Replace</strong></label>
+            </div>
+          </div>
+        `;
+      }
+
+      previewDiv.innerHTML = html;
+      actionsDiv.style.display = 'block';
+      this.log('success', `Preview: ${this.importData.length} records`);
+    } catch (err) {
+      previewDiv.innerHTML = `<div class="load-error">${DomUtils.escapeHtml(err.message)}</div>`;
+      this.log('error', err.message);
+    }
+
+    btn.disabled = false;
+  },
+
+  async loadIntoDb() {
+    const btn = this.modalElement.querySelector('#btn-load-db');
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+
+    const modeRadio = this.modalElement.querySelector('input[name="load-mode"]:checked');
+    const mode = modeRadio?.value || 'merge';
+
+    this.log('info', `Loading into database (mode: ${mode})...`);
+
+    try {
+      const res = await fetch(`/api/seed/load/${this.entityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceDir: 'import', mode, skipInvalid: true })
+      });
+      const result = await res.json();
+
+      if (result.success) {
+        this.log('success', `Loaded: ${result.loaded} records`);
+        if (result.updated) this.log('info', `Updated: ${result.updated} records`);
+        if (result.skipped) this.log('info', `Skipped: ${result.skipped} records`);
+
+        // Refresh seed manager
+        if (typeof SeedManager !== 'undefined') {
+          SeedManager.refresh();
+        }
+      } else {
+        this.log('error', result.error || 'Load failed');
+      }
+
+      if (result.errors?.length > 0) {
+        result.errors.slice(0, 5).forEach(e => this.log('error', e));
+      }
+    } catch (err) {
+      this.log('error', err.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Load into Database';
+  },
+
+  // ========== PASTE TAB ==========
+
   async handleFile(file) {
     try {
       const text = await file.text();
       this.modalElement.querySelector('#import-text-input').value = text;
       this.parseInput(text);
     } catch (err) {
-      this.showError(`Failed to read file: ${err.message}`);
+      this.log('error', `File read failed: ${err.message}`);
     }
   },
 
-  /**
-   * Parse input text (JSON or CSV)
-   */
   async parseInput(text) {
     this.detectedFormat = CsvParser.detectFormat(text);
+    this.log('info', `Parsing ${this.detectedFormat.toUpperCase()}...`);
 
     try {
       if (this.detectedFormat === 'json') {
         let data = JSON.parse(text);
-        // Wrap single object in array
-        if (!Array.isArray(data)) {
-          data = [data];
-        }
+        if (!Array.isArray(data)) data = [data];
         this.parsedData = data;
       } else {
         this.parsedData = CsvParser.parse(text);
       }
 
       if (this.parsedData.length === 0) {
-        this.showError('No records found in input');
+        this.log('error', 'No records found');
         return;
       }
 
-      // Validate with server
       await this.validateWithServer();
-      this.renderPreview();
+      this.renderPastePreview();
+      this.log('success', `Parsed: ${this.parsedData.length} records`);
     } catch (err) {
-      this.showError(`Parse error: ${err.message}`);
+      this.log('error', `Parse error: ${err.message}`);
     }
   },
 
-  /**
-   * Validate import data with server (FK checks + conflict detection)
-   */
   async validateWithServer() {
     try {
-      const response = await fetch(`/api/seed/validate/${this.entityName}`, {
+      const res = await fetch(`/api/seed/validate/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: this.parsedData })
       });
-      const result = await response.json();
+      const result = await res.json();
       this.fkWarnings = result.warnings || [];
       this.invalidRows = result.invalidRows || [];
       this.validCount = result.validCount ?? this.parsedData.length;
       this.conflicts = result.conflicts || [];
+
+      if (this.fkWarnings.length > 0) {
+        this.log('warning', `${this.fkWarnings.length} FK warnings`);
+      }
+      if (this.conflicts.length > 0) {
+        this.log('warning', `${this.conflicts.length} conflicts detected`);
+      }
     } catch (err) {
-      console.error('Validation error:', err);
       this.fkWarnings = [];
       this.invalidRows = [];
       this.validCount = this.parsedData.length;
@@ -278,52 +648,39 @@ const SeedImportDialog = {
     }
   },
 
-  /**
-   * Render preview table
-   */
-  renderPreview() {
-    const tableDiv = this.modalElement.querySelector('#preview-table');
-    const statusDiv = this.modalElement.querySelector('#import-status');
-    const infoDiv = this.modalElement.querySelector('#preview-info');
-    const warningsDiv = this.modalElement.querySelector('#preview-warnings');
+  renderPastePreview() {
+    const previewDiv = this.modalElement.querySelector('#paste-preview');
+    const statusDiv = this.modalElement.querySelector('#paste-status');
+    const infoDiv = this.modalElement.querySelector('#paste-info');
+    const warningsDiv = this.modalElement.querySelector('#paste-warnings');
+    const actionsDiv = this.modalElement.querySelector('#paste-actions');
 
     if (!this.parsedData) return;
 
-    // Show status bar and enable buttons
     statusDiv.style.display = 'flex';
-    this.modalElement.querySelector('#btn-save').disabled = false;
-    this.modalElement.querySelector('#btn-save-only').disabled = false;
+    actionsDiv.style.display = 'block';
+    this.switchPasteTab('preview');
 
-    // Switch to preview tab
-    this.switchTab('preview');
-
-    // Info line - show valid/total if there are invalid records
+    // Info
     const formatLabel = this.detectedFormat === 'json' ? 'JSON' : 'CSV';
     const total = this.parsedData.length;
     const hasInvalid = this.invalidRows.length > 0;
-    if (hasInvalid) {
-      infoDiv.innerHTML = `<strong>${this.validCount} valid</strong> / ${total} total (${formatLabel})`;
-    } else {
-      infoDiv.textContent = `${total} records (${formatLabel})`;
-    }
+    infoDiv.innerHTML = hasInvalid
+      ? `<strong>${this.validCount} valid</strong> / ${total} total (${formatLabel})`
+      : `${total} records (${formatLabel})`;
 
-    // Build warning lookup: row -> field -> warning
+    // Warning lookup
     const warningLookup = {};
     for (const w of this.fkWarnings) {
       if (!warningLookup[w.row]) warningLookup[w.row] = {};
       warningLookup[w.row][w.field] = w;
     }
-
-    // Build invalid row set for quick lookup
     const invalidRowSet = new Set(this.invalidRows);
 
-    // Get columns from first record
+    // Table
     const columns = this.parsedData.length > 0 ? Object.keys(this.parsedData[0]) : [];
-
-    // Limit preview to first 10 rows
     const previewRows = this.parsedData.slice(0, 10);
 
-    // Build table
     const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
     const rows = previewRows.map((record, idx) => {
       const rowNum = idx + 1;
@@ -341,197 +698,130 @@ const SeedImportDialog = {
         return `<td>${DomUtils.escapeHtml(displayValue)}</td>`;
       }).join('');
 
-      const rowClass = isInvalidRow ? 'class="invalid-row"' : '';
-      return `<tr ${rowClass}>${cells}</tr>`;
+      return `<tr ${isInvalidRow ? 'class="invalid-row"' : ''}>${cells}</tr>`;
     }).join('');
 
-    tableDiv.innerHTML = `
+    previewDiv.innerHTML = `
       <table class="preview-table">
         <thead><tr>${headerCells}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
 
-    // Show remaining count if truncated
     if (this.parsedData.length > 10) {
-      tableDiv.innerHTML += `<div class="preview-truncated">... and ${this.parsedData.length - 10} more records</div>`;
+      previewDiv.innerHTML += `<div class="preview-truncated">... and ${this.parsedData.length - 10} more</div>`;
     }
 
-    // Warnings summary (FK warnings + conflicts)
+    // Warnings
     let warningHtml = '';
-
-    // FK warnings
     if (this.fkWarnings.length > 0) {
       const uniqueWarnings = new Map();
       for (const w of this.fkWarnings) {
         const key = `${w.field}:${w.value}`;
-        if (!uniqueWarnings.has(key)) {
-          uniqueWarnings.set(key, w);
-        }
+        if (!uniqueWarnings.has(key)) uniqueWarnings.set(key, w);
       }
-
-      const warningLines = Array.from(uniqueWarnings.values())
-        .slice(0, 3)
-        .map(w => `"${w.value}" not found in ${w.targetEntity}`)
-        .join('<br>');
-
-      warningHtml += `<div class="warning-section"><div class="warning-icon">⚠</div><div class="warning-text">${warningLines}`;
-      if (uniqueWarnings.size > 3) {
-        warningHtml += `<br><span class="warning-more">... and ${uniqueWarnings.size - 3} more FK warnings</span>`;
-      }
+      const lines = Array.from(uniqueWarnings.values()).slice(0, 3)
+        .map(w => `"${w.value}" not found in ${w.targetEntity}`).join('<br>');
+      warningHtml += `<div class="warning-section"><div class="warning-icon">⚠</div><div class="warning-text">${lines}`;
+      if (uniqueWarnings.size > 3) warningHtml += `<br><span class="warning-more">... and ${uniqueWarnings.size - 3} more</span>`;
       warningHtml += '</div></div>';
     }
 
-    // Conflict warnings with mode selector
     if (this.conflicts.length > 0) {
-      const conflictCount = this.conflicts.length;
       const totalBackRefs = this.conflicts.reduce((sum, c) => sum + c.backRefs, 0);
-
       warningHtml += `
         <div class="conflict-section">
           <div class="conflict-header">
             <span class="conflict-icon">🔗</span>
-            <span class="conflict-text">${conflictCount} record(s) would overwrite existing data with ${totalBackRefs} back-reference(s)</span>
+            <span class="conflict-text">${this.conflicts.length} conflict(s), ${totalBackRefs} back-ref(s)</span>
           </div>
           <div class="conflict-mode-selector">
-            <label><input type="radio" name="import-mode" value="merge" ${this.selectedMode === 'merge' ? 'checked' : ''}> <strong>Merge</strong> - Update existing, add new (preserves IDs)</label>
-            <label><input type="radio" name="import-mode" value="skip_conflicts" ${this.selectedMode === 'skip_conflicts' ? 'checked' : ''}> <strong>Skip</strong> - Only add new records</label>
-            <label><input type="radio" name="import-mode" value="replace" ${this.selectedMode === 'replace' ? 'checked' : ''}> <strong>Replace</strong> - Overwrite all (may break references!)</label>
+            <label><input type="radio" name="paste-mode" value="merge" ${this.selectedMode === 'merge' ? 'checked' : ''}> Merge</label>
+            <label><input type="radio" name="paste-mode" value="skip_conflicts" ${this.selectedMode === 'skip_conflicts' ? 'checked' : ''}> Skip</label>
+            <label><input type="radio" name="paste-mode" value="replace" ${this.selectedMode === 'replace' ? 'checked' : ''}> Replace</label>
           </div>
         </div>
       `;
     }
 
-    if (warningHtml) {
-      warningsDiv.innerHTML = warningHtml;
-      warningsDiv.style.display = 'block';
+    warningsDiv.innerHTML = warningHtml;
+    warningsDiv.style.display = warningHtml ? 'block' : 'none';
 
-      // Attach mode selector handlers
-      this.modalElement.querySelectorAll('input[name="import-mode"]').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-          this.selectedMode = e.target.value;
-        });
-      });
-    } else {
-      warningsDiv.style.display = 'none';
-    }
+    // Mode selector handler
+    this.modalElement.querySelectorAll('input[name="paste-mode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => { this.selectedMode = e.target.value; });
+    });
 
-    // Update button text to reflect valid count
+    // Update button text
     const saveBtn = this.modalElement.querySelector('#btn-save');
     if (saveBtn) {
-      if (hasInvalid) {
-        saveBtn.textContent = `Save & Load ${this.validCount}`;
-      } else {
-        saveBtn.textContent = 'Save & Load';
-      }
+      saveBtn.textContent = hasInvalid ? `Save & Load ${this.validCount}` : 'Save & Load';
     }
   },
 
-  /**
-   * Save data to seed file only (without loading into database)
-   */
   async saveOnly() {
-    if (!this.parsedData || this.parsedData.length === 0) {
-      this.showError('No data to save');
-      return;
-    }
+    if (!this.parsedData?.length) return;
 
+    this.log('info', 'Saving to seed file...');
     try {
-      const response = await fetch(`/api/seed/upload/${this.entityName}`, {
+      const res = await fetch(`/api/seed/upload/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.parsedData)
       });
-      const result = await response.json();
+      const result = await res.json();
 
       if (result.success) {
-        this.hide();
-        // Refresh seed manager if open
-        if (typeof SeedManager !== 'undefined') {
-          SeedManager.refresh();
-        }
+        this.log('success', 'Saved to seed file');
+        if (typeof SeedManager !== 'undefined') SeedManager.refresh();
       } else {
-        this.showError(result.error || 'Failed to save');
+        this.log('error', result.error || 'Save failed');
       }
     } catch (err) {
-      this.showError(`Error: ${err.message}`);
+      this.log('error', err.message);
     }
   },
 
-  /**
-   * Save data to server and load into database
-   */
   async saveAndLoad() {
-    if (!this.parsedData || this.parsedData.length === 0) {
-      this.showError('No data to save');
-      return;
-    }
+    if (!this.parsedData?.length) return;
 
+    this.log('info', 'Saving and loading...');
     try {
-      // Step 1: Save to seed file
-      const uploadResponse = await fetch(`/api/seed/upload/${this.entityName}`, {
+      // Save
+      const uploadRes = await fetch(`/api/seed/upload/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.parsedData)
       });
-      const uploadResult = await uploadResponse.json();
+      const uploadResult = await uploadRes.json();
 
       if (!uploadResult.success) {
-        this.showError(uploadResult.error || 'Failed to save');
+        this.log('error', uploadResult.error || 'Save failed');
         return;
       }
+      this.log('success', 'Saved to seed file');
 
-      // Step 2: Load into database (skip invalid records, use selected mode)
-      const loadResponse = await fetch(`/api/seed/load/${this.entityName}`, {
+      // Load
+      const mode = this.conflicts.length > 0 ? this.selectedMode : 'replace';
+      const loadRes = await fetch(`/api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          skipInvalid: true,
-          mode: this.conflicts.length > 0 ? this.selectedMode : 'replace'
-        })
+        body: JSON.stringify({ skipInvalid: true, mode })
       });
-      const loadResult = await loadResponse.json();
+      const loadResult = await loadRes.json();
 
       if (loadResult.success) {
-        const hasErrors = loadResult.errors && loadResult.errors.length > 0;
-        if (hasErrors && loadResult.loaded === 0) {
-          this.showError(`Load failed: ${loadResult.errors[0]}`);
-        } else if (hasErrors) {
-          this.showError(loadResult.errors[0]);
-        } else {
-          this.hide();
-          if (typeof SeedManager !== 'undefined') {
-            SeedManager.refresh();
-          }
-        }
+        this.log('success', `Loaded: ${loadResult.loaded} records`);
+        if (typeof SeedManager !== 'undefined') SeedManager.refresh();
       } else {
-        this.showError(loadResult.error || 'Saved but failed to load');
+        this.log('error', loadResult.error || 'Load failed');
+      }
+
+      if (loadResult.errors?.length > 0) {
+        loadResult.errors.slice(0, 3).forEach(e => this.log('error', e));
       }
     } catch (err) {
-      this.showError(`Error: ${err.message}`);
+      this.log('error', err.message);
     }
-  },
-
-  /**
-   * Show error message
-   */
-  showError(message) {
-    const tableDiv = this.modalElement.querySelector('#preview-table');
-    const statusDiv = this.modalElement.querySelector('#import-status');
-
-    // Switch to preview tab to show error
-    this.switchTab('preview');
-
-    if (tableDiv) {
-      tableDiv.innerHTML = `<div class="import-error">${DomUtils.escapeHtml(message)}</div>`;
-    }
-    if (statusDiv) {
-      statusDiv.style.display = 'none';
-    }
-
-    // Disable save buttons on error
-    this.modalElement.querySelector('#btn-save').disabled = true;
-    this.modalElement.querySelector('#btn-save-only').disabled = true;
-  },
-
+  }
 };

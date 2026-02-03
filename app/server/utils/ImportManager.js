@@ -72,6 +72,65 @@ class ImportManager {
   }
 
   /**
+   * Get column names (schema) from the XLSX source file
+   * @param {string} entityName - Entity name
+   * @returns {Object} - { columns, sourceFile, sheet, error }
+   */
+  getSourceSchema(entityName) {
+    const definition = this.parseImportDefinition(entityName);
+
+    if (!definition) {
+      return { error: `No import definition found for ${entityName}` };
+    }
+
+    if (!definition.source) {
+      return { error: 'No source file specified in import definition' };
+    }
+
+    const sourcePath = path.join(this.systemDir, 'data', definition.source);
+
+    if (!fs.existsSync(sourcePath)) {
+      return { error: `Source file not found: ${definition.source}` };
+    }
+
+    try {
+      // Read only first row (headers) for efficiency
+      const workbook = XLSX.readFile(sourcePath, { sheetRows: 2 });
+
+      let sheetName = definition.sheet;
+      if (!sheetName) {
+        sheetName = workbook.SheetNames[0];
+      }
+
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) {
+        return { error: `Sheet '${sheetName}' not found in XLSX` };
+      }
+
+      // Get column names from first row
+      const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+      const columns = [];
+
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        const cell = sheet[cellAddress];
+        if (cell && cell.v !== undefined) {
+          columns.push(String(cell.v));
+        }
+      }
+
+      return {
+        columns,
+        sourceFile: definition.source,
+        sheet: sheetName
+      };
+    } catch (e) {
+      this.logger.error('Failed to read source schema:', { error: e.message });
+      return { error: e.message };
+    }
+  }
+
+  /**
    * Parse import definition from MD file
    * @param {string} entityName - Entity name (without .md extension)
    * @returns {Object|null} - { source, sheet, mapping, transforms, filter }
