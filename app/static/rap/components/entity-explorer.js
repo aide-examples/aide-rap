@@ -1304,11 +1304,13 @@ const EntityExplorer = {
   renderChart() {
     // Charts are only available for views with chart config
     if (this.currentView && this.currentViewSchema && this.currentViewSchema.chart) {
-      if (this.records.length === 0) {
+      // Use filtered records from EntityTable (respects column filters)
+      const filteredRecords = EntityTable.getViewFilteredRecords(this.currentViewSchema.columns);
+      if (filteredRecords.length === 0) {
         this.chartContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
         return;
       }
-      EntityChart.load(this.currentViewSchema, this.records);
+      EntityChart.load(this.currentViewSchema, filteredRecords);
       return;
     }
 
@@ -1318,7 +1320,13 @@ const EntityExplorer = {
   async renderTable() {
     // View mode: render view table
     if (this.currentView && this.currentViewSchema) {
-      await EntityTable.loadView(this.currentView.name, this.currentViewSchema, this.records);
+      // Check if same view is already loaded (just switching view modes)
+      // In that case, only re-render to preserve filters
+      if (EntityTable.currentViewConfig === this.currentViewSchema) {
+        EntityTable.renderView();
+      } else {
+        await EntityTable.loadView(this.currentView.name, this.currentViewSchema, this.records);
+      }
       return;
     }
 
@@ -1328,7 +1336,12 @@ const EntityExplorer = {
       return;
     }
 
-    await EntityTable.loadEntity(this.currentEntity, this.records);
+    // Check if same entity is already loaded (just switching view modes)
+    if (EntityTable.currentEntity === this.currentEntity && EntityTable.records === this.records) {
+      EntityTable.render();
+    } else {
+      await EntityTable.loadEntity(this.currentEntity, this.records);
+    }
   },
 
   renderList() {

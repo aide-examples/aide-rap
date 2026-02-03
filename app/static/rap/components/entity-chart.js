@@ -49,6 +49,7 @@ const EntityChart = {
       $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
       width: 'container',
       height: 400,
+      padding: { left: 40, right: 20, top: 20, bottom: 40 },
       data: { values: this.prepareData(schema, records) },
       ...schema.chart
     };

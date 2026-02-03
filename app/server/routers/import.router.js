@@ -33,9 +33,9 @@ module.exports = function(cfg) {
    * Runs XLSX → JSON conversion for an entity
    * Returns: { success, recordsRead, recordsFiltered, recordsWritten }
    */
-  router.post('/api/import/run/:entity', (req, res) => {
+  router.post('/api/import/run/:entity', async (req, res) => {
     try {
-      const result = importManager.runImport(req.params.entity);
+      const result = await importManager.runImport(req.params.entity);
 
       if (result.success) {
         res.json(result);

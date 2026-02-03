@@ -337,9 +337,9 @@ class ImportManager {
   /**
    * Run import for an entity
    * @param {string} entityName - Entity name
-   * @returns {Object} - { success, recordsRead, recordsFiltered, recordsWritten, error }
+   * @returns {Promise<Object>} - { success, recordsRead, recordsFiltered, recordsWritten, error }
    */
-  runImport(entityName) {
+  async runImport(entityName) {
     const definition = this.parseImportDefinition(entityName);
 
     if (!definition) {
@@ -356,8 +356,19 @@ class ImportManager {
       return { success: false, error: `Source file not found: ${definition.source}` };
     }
 
+    // Check for LibreOffice/Excel lock file
+    const sourceDir = path.dirname(sourcePath);
+    const sourceFile = path.basename(sourcePath);
+    const lockFile = path.join(sourceDir, `.~lock.${sourceFile}#`);
+    if (fs.existsSync(lockFile)) {
+      return {
+        success: false,
+        error: `File is locked (open in another application): ${sourceFile}. Please close the file and try again.`
+      };
+    }
+
     try {
-      // Read XLSX
+      // Read XLSX (synchronous - large files may take time)
       const workbook = XLSX.readFile(sourcePath);
 
       // Select sheet

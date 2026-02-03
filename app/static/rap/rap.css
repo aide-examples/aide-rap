@@ -4869,7 +4869,9 @@
     min-height: 0;
     position: relative;
     padding: 16px;
+    padding-bottom: 60px;  /* Extra space for angled axis labels */
     background: #fff;
+    overflow: auto;  /* Allow scrolling if chart is larger */
 }
 
 .entity-chart-canvas {
@@ -4878,6 +4880,7 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
+    padding-bottom: 40px;  /* Space for angled x-axis labels */
 }
 
 .entity-chart-canvas > div {
