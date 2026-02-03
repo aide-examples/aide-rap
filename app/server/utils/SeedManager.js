@@ -329,15 +329,16 @@ function buildLabelLookupFromSeed(entityName) {
  * @param {string} entityName - The entity being seeded
  * @param {object} record - The seed record (may have conceptual or technical FK names)
  * @param {object} lookups - Pre-built lookup maps for all entities
- * @returns {object} - Record with resolved FK IDs
+ * @returns {object} - { resolved: record with resolved FK IDs, fkWarnings: array of unresolved FKs }
  */
 function resolveConceptualFKs(entityName, record, lookups) {
   const { schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
 
-  if (!entity) return record;
+  if (!entity) return { resolved: record, fkWarnings: [] };
 
   const resolved = { ...record };
+  const fkWarnings = [];
 
   for (const fk of entity.foreignKeys) {
     const conceptualName = fk.displayName;  // e.g., "manufacturer"
@@ -357,6 +358,9 @@ function resolveConceptualFKs(entityName, record, lookups) {
       } else {
         console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
         eventBus.emit('seed:resolve:warning', { entityName, field: conceptualName, value: labelValue, targetEntity });
+        fkWarnings.push({ field: conceptualName, value: labelValue, targetEntity });
+        // Remove the unresolvable field to prevent SQL type errors
+        delete resolved[conceptualName];
       }
     }
     // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
@@ -371,11 +375,14 @@ function resolveConceptualFKs(entityName, record, lookups) {
       } else {
         console.warn(`  Warning: Could not resolve ${technicalName}="${labelValue}" for ${entityName}`);
         eventBus.emit('seed:resolve:warning', { entityName, field: technicalName, value: labelValue, targetEntity });
+        fkWarnings.push({ field: conceptualName || technicalName, value: labelValue, targetEntity });
+        // Set to NULL to prevent SQL type errors (string in INTEGER column)
+        resolved[technicalName] = null;
       }
     }
   }
 
-  return resolved;
+  return { resolved, fkWarnings };
 }
 
 /**
@@ -849,7 +856,7 @@ function countSeedConflicts(entityName, sourceDir = 'seed') {
   // Resolve FKs and check each record for conflicts
   let conflictCount = 0;
   for (const record of records) {
-    const resolved = resolveConceptualFKs(entityName, record, lookups);
+    const { resolved } = resolveConceptualFKs(entityName, record, lookups);
     if (findExistingByUnique(entityName, resolved)) {
       conflictCount++;
     }
@@ -921,9 +928,11 @@ async function loadEntity(entityName, lookups = null, options = {}) {
 
   // If skipInvalid is true, validate first and get invalid row indices
   let invalidRows = new Set();
+  let validationWarnings = [];
   if (skipInvalid) {
     const validation = validateImport(entityName, records);
     invalidRows = new Set(validation.invalidRows.map(r => r - 1)); // Convert to 0-based
+    validationWarnings = validation.warnings || [];
   }
 
   // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
@@ -957,6 +966,7 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   let skipped = 0;
   const errors = [];
   const mediaErrors = [];
+  const fkErrors = [];
 
   // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
   const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
@@ -986,7 +996,20 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     record = flattenAggregates(entityName, record);
 
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
-    const resolved = resolveConceptualFKs(entityName, record, lookups);
+    const { resolved, fkWarnings } = resolveConceptualFKs(entityName, record, lookups);
+
+    // Collect FK resolution errors with row context
+    for (const fkWarn of fkWarnings) {
+      if (fkErrors.length < 10) { // Limit to first 10 FK errors
+        fkErrors.push({
+          row: i + 1,
+          field: fkWarn.field,
+          value: fkWarn.value,
+          targetEntity: fkWarn.targetEntity,
+          message: `Row ${i + 1}: "${fkWarn.value}" not found in ${fkWarn.targetEntity} (field: ${fkWarn.field})`
+        });
+      }
+    }
 
     // SQLite3 cannot bind JS booleans — convert to 0/1
     const toSqlValue = (v) => v === true ? 1 : v === false ? 0 : v ?? null;
@@ -1042,6 +1065,25 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   }
 
   const result = { loaded, updated, skipped, replaced, errors };
+
+  // Add validation warnings (FK lookup failures from validateImport)
+  if (validationWarnings.length > 0) {
+    result.fkErrors = validationWarnings.slice(0, 10).map(w => ({
+      row: w.row,
+      field: w.field,
+      value: w.value,
+      targetEntity: w.targetEntity,
+      message: `Row ${w.row}: "${w.value}" not found in ${w.targetEntity} (field: ${w.field})`
+    }));
+    if (validationWarnings.length > 10) {
+      result.fkErrorsTotal = validationWarnings.length;
+    }
+  }
+
+  // Add FK resolution errors if any occurred (from resolveConceptualFKs during load)
+  if (fkErrors.length > 0 && !result.fkErrors) {
+    result.fkErrors = fkErrors;
+  }
 
   // Add media errors if any occurred
   if (mediaErrors.length > 0) {

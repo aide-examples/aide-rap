@@ -359,6 +359,127 @@ class ImportManager {
   }
 
   /**
+   * Parse a source expression from the mapping table
+   * Supported formats:
+   * - Column name: "Registration" → value from XLSX column
+   * - Number literal: 42 or 3.14 → fixed number
+   * - String literal: "text" or 'text' → fixed string
+   * - random(min,max) → random integer in range
+   * - random("a","b","c") → random choice from strings
+   * - random(EnumType) → random internal value from enum
+   * @param {string} expr - The source expression
+   * @returns {Object} - { type, value?, name?, min?, max?, values?, enumName? }
+   */
+  parseSourceExpression(expr) {
+    expr = expr.trim();
+
+    // Number literal: 42, -5, 3.14
+    if (/^-?\d+(\.\d+)?$/.test(expr)) {
+      return { type: 'literal', value: parseFloat(expr) };
+    }
+
+    // String literal: "text" or 'text'
+    const stringMatch = expr.match(/^["'](.*)["']$/);
+    if (stringMatch) {
+      return { type: 'literal', value: stringMatch[1] };
+    }
+
+    // random(...)
+    const randomMatch = expr.match(/^random\((.+)\)$/i);
+    if (randomMatch) {
+      return this.parseRandomExpression(randomMatch[1]);
+    }
+
+    // Otherwise: XLSX column name
+    return { type: 'column', name: expr };
+  }
+
+  /**
+   * Parse random(...) expression arguments
+   * @param {string} args - The arguments inside random(...)
+   * @returns {Object} - { type: 'randomNumber'|'randomChoice'|'randomEnum', ... }
+   */
+  parseRandomExpression(args) {
+    args = args.trim();
+
+    // Check for number range: random(1, 100)
+    const numberRangeMatch = args.match(/^(-?\d+)\s*,\s*(-?\d+)$/);
+    if (numberRangeMatch) {
+      return {
+        type: 'randomNumber',
+        min: parseInt(numberRangeMatch[1], 10),
+        max: parseInt(numberRangeMatch[2], 10)
+      };
+    }
+
+    // Check for string choices: random("A", "B", "C")
+    const stringMatches = args.match(/["']([^"']+)["']/g);
+    if (stringMatches && stringMatches.length > 0) {
+      const values = stringMatches.map(s => s.slice(1, -1));
+      return { type: 'randomChoice', values };
+    }
+
+    // Otherwise: ENUM type name: random(CurrencyCode)
+    return { type: 'randomEnum', enumName: args };
+  }
+
+  /**
+   * Resolve a source expression to a value for a given row
+   * @param {Object} sourceExpr - Parsed source expression from parseSourceExpression()
+   * @param {Object} row - The current XLSX row data
+   * @returns {any} - The resolved value
+   */
+  resolveSourceValue(sourceExpr, row) {
+    switch (sourceExpr.type) {
+      case 'literal':
+        return sourceExpr.value;
+
+      case 'column':
+        return row[sourceExpr.name];
+
+      case 'randomNumber': {
+        const min = sourceExpr.min;
+        const max = sourceExpr.max;
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      case 'randomChoice': {
+        const idx = Math.floor(Math.random() * sourceExpr.values.length);
+        return sourceExpr.values[idx];
+      }
+
+      case 'randomEnum': {
+        const enumValues = this.getEnumValues(sourceExpr.enumName);
+        if (!enumValues || enumValues.length === 0) {
+          this.logger.warn(`Unknown ENUM type: ${sourceExpr.enumName}`);
+          return null;
+        }
+        const idx = Math.floor(Math.random() * enumValues.length);
+        return enumValues[idx].internal;
+      }
+
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Get enum values from the TypeRegistry
+   * @param {string} enumName - The enum type name
+   * @returns {Array|null} - Array of { internal, external, description } or null
+   */
+  getEnumValues(enumName) {
+    try {
+      const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
+      const registry = getTypeRegistry();
+      return registry.getEnumValues(enumName);
+    } catch (e) {
+      this.logger.warn(`Could not get enum values for ${enumName}:`, e.message);
+      return null;
+    }
+  }
+
+  /**
    * Parse SQL-like WHERE clause into a filter function
    * Supports: =, !=, <, <=, >, >=, IN (...), NOT IN (...), AND, OR
    * @param {string} whereClause - SQL WHERE clause (without WHERE keyword)
@@ -498,13 +619,16 @@ class ImportManager {
       this.logger.debug('XLSX parsed:', { recordsRead });
 
       // Apply mapping with transforms
+      // Source expressions can be: column names, literals, or random() generators
       const mappedData = rawData.map(row => {
         const mapped = {};
-        for (const [sourceCol, targetCol] of Object.entries(definition.mapping)) {
-          if (sourceCol in row) {
-            let value = row[sourceCol];
+        for (const [sourceExprStr, targetCol] of Object.entries(definition.mapping)) {
+          const sourceExpr = this.parseSourceExpression(sourceExprStr);
+          let value = this.resolveSourceValue(sourceExpr, row);
+
+          if (value !== undefined) {
             // Apply transform if specified
-            const transform = definition.transforms[sourceCol];
+            const transform = definition.transforms[sourceExprStr];
             if (transform) {
               value = this.applyTransform(value, transform);
             }

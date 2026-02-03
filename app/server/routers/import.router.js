@@ -154,21 +154,41 @@ module.exports = function(cfg) {
       const sourceColumnSet = new Set(sourceColumns);
 
       // Get mapping columns
-      const mappedSourceCols = new Set(Object.keys(definition.mapping));
+      const mappedSourceExprs = Object.keys(definition.mapping);
       const mappedTargetCols = new Set(Object.values(definition.mapping));
 
-      // Check source columns in mapping
-      for (const sourceCol of mappedSourceCols) {
-        if (!sourceColumnSet.has(sourceCol)) {
-          errors.source.push({
-            column: sourceCol,
-            message: `Source column "${sourceCol}" not found in XLSX`
-          });
+      // Track which XLSX columns are actually used
+      const usedXlsxColumns = new Set();
+
+      // Check source expressions in mapping
+      for (const sourceExprStr of mappedSourceExprs) {
+        const sourceExpr = importManager.parseSourceExpression(sourceExprStr);
+
+        if (sourceExpr.type === 'column') {
+          // Column reference - validate against XLSX schema
+          if (!sourceColumnSet.has(sourceExpr.name)) {
+            errors.source.push({
+              column: sourceExpr.name,
+              message: `Source column "${sourceExpr.name}" not found in XLSX`
+            });
+          } else {
+            usedXlsxColumns.add(sourceExpr.name);
+          }
+        } else if (sourceExpr.type === 'randomEnum') {
+          // ENUM reference - validate enum type exists
+          const enumValues = importManager.getEnumValues(sourceExpr.enumName);
+          if (!enumValues || enumValues.length === 0) {
+            errors.source.push({
+              column: sourceExprStr,
+              message: `Unknown ENUM type: ${sourceExpr.enumName}`
+            });
+          }
         }
+        // Literals and randomNumber/randomChoice don't need validation
       }
 
-      // Find unused source columns (in XLSX but not in mapping)
-      const unusedSourceColumns = sourceColumns.filter(col => !mappedSourceCols.has(col));
+      // Find unused source columns (in XLSX but not used by any column mapping)
+      const unusedSourceColumns = sourceColumns.filter(col => !usedXlsxColumns.has(col));
 
       // Get entity schema
       const schema = getSchema();
@@ -177,11 +197,27 @@ module.exports = function(cfg) {
       let unmappedRequiredColumns = [];
 
       if (entity) {
-        const entityColumnSet = new Set(entity.columns.map(c => c.name));
+        // Build set of valid target names:
+        // - All column names (e.g., serial_number, current_operator_id)
+        // - FK displayNames (e.g., current_operator) which map to _id columns
+        const validTargetNames = new Set(entity.columns.map(c => c.name));
+
+        // Build FK mappings:
+        // - displayName → column (e.g., current_operator → current_operator_id)
+        // - column → displayName (reverse, for error messages)
+        const fkDisplayToColumn = new Map();
+        const fkColumnToDisplay = new Map();
+        for (const fk of (entity.foreignKeys || [])) {
+          if (fk.displayName && fk.column) {
+            validTargetNames.add(fk.displayName);
+            fkDisplayToColumn.set(fk.displayName, fk.column);
+            fkColumnToDisplay.set(fk.column, fk.displayName);
+          }
+        }
 
         // Check target columns in mapping
         for (const targetCol of mappedTargetCols) {
-          if (!entityColumnSet.has(targetCol)) {
+          if (!validTargetNames.has(targetCol)) {
             errors.target.push({
               column: targetCol,
               message: `Target column "${targetCol}" not found in entity ${entityName}`
@@ -189,21 +225,34 @@ module.exports = function(cfg) {
           }
         }
 
+        // Build set of "covered" columns (mapped directly or via FK displayName)
+        const coveredColumns = new Set();
+        for (const targetCol of mappedTargetCols) {
+          coveredColumns.add(targetCol);
+          // If it's a FK displayName, also mark the _id column as covered
+          if (fkDisplayToColumn.has(targetCol)) {
+            coveredColumns.add(fkDisplayToColumn.get(targetCol));
+          }
+        }
+
         // Find unmapped target columns (in entity but not filled by mapping)
         // Exclude 'id' as it's auto-generated
         for (const col of entity.columns) {
-          if (col.name === 'id' || mappedTargetCols.has(col.name)) continue;
+          if (col.name === 'id' || coveredColumns.has(col.name)) continue;
+
+          // Use displayName for FK columns in messages (more user-friendly)
+          const displayName = fkColumnToDisplay.get(col.name) || col.name;
 
           if (col.required) {
             // Required column not mapped - this is an error
-            unmappedRequiredColumns.push(col.name);
+            unmappedRequiredColumns.push(displayName);
             errors.target.push({
-              column: col.name,
-              message: `Required column "${col.name}" is not mapped`
+              column: displayName,
+              message: `Required column "${displayName}" is not mapped`
             });
           } else {
             // Optional column not mapped - just info
-            unmappedTargetColumns.push(col.name);
+            unmappedTargetColumns.push(displayName);
           }
         }
       } else {
@@ -221,7 +270,7 @@ module.exports = function(cfg) {
         unusedSourceColumns,
         unmappedTargetColumns,
         unmappedRequiredColumns,
-        mappingCount: mappedSourceCols.size,
+        mappingCount: mappedSourceExprs.length,
         sourceColumns: sourceColumns.length,
         targetColumns: entity?.columns?.length || 0
       });

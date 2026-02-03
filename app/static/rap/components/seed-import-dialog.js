@@ -27,6 +27,13 @@ const SeedImportDialog = {
   ruleModified: false,
 
   /**
+   * Initialize the dialog (called from rap.js)
+   */
+  init(containerId) {
+    // No persistent DOM needed - dialog is created on show()
+  },
+
+  /**
    * Show the import dialog for an entity
    */
   async show(entityName) {
@@ -234,12 +241,16 @@ const SeedImportDialog = {
               <div class="tab-content-scroll">
                 <div id="load-content" class="load-content">
                   ${this.hasDefinition ? `
-                    <p>Load data from import file into database.</p>
-                    <button class="btn-seed btn-load-preview" id="btn-load-preview">Preview Import Data</button>
-                    <div id="load-preview"></div>
-                    <div id="load-actions" style="display: none;">
+                    <div class="load-toolbar">
+                      <button class="btn-seed btn-load-preview" id="btn-load-preview">Preview</button>
+                      <div class="load-mode-options" id="load-mode-options">
+                        <label><input type="radio" name="load-mode" value="merge" checked> Merge</label>
+                        <label><input type="radio" name="load-mode" value="skip_conflicts"> Skip</label>
+                        <label><input type="radio" name="load-mode" value="replace"> Replace</label>
+                      </div>
                       <button class="btn-seed btn-save" id="btn-load-db">Load into Database</button>
                     </div>
+                    <div id="load-preview"></div>
                   ` : '<div class="no-definition">No import definition</div>'}
                 </div>
               </div>
@@ -589,6 +600,13 @@ const SeedImportDialog = {
           </div>
         `;
         this.log('success', `Import complete: ${result.recordsWritten} records written`);
+
+        // Auto-switch to Load tab and show preview
+        btn.disabled = false;
+        btn.textContent = 'Run Import (XLSX → JSON)';
+        this.switchTab('load');
+        this.loadPreview();
+        return;
       } else {
         resultDiv.innerHTML = `<div class="run-error">${DomUtils.escapeHtml(result.error)}</div>`;
         this.log('error', `Import failed: ${result.error}`);
@@ -651,8 +669,13 @@ const SeedImportDialog = {
         }).join('') + '</tr>';
       }).join('');
 
+      // Show conflict info in preview
+      const conflictInfo = data.conflictCount > 0
+        ? `🔗 ${data.conflictCount} record(s) would overwrite existing data`
+        : `📥 ${data.dbRowCount || 0} existing records in database`;
+
       let html = `
-        <div class="load-info">${this.importData.length} records in import file</div>
+        <div class="load-info">${this.importData.length} records in import file — ${conflictInfo}</div>
         <div class="import-preview-table">
           <table class="preview-table">
             <thead><tr>${headerCells}</tr></thead>
@@ -665,24 +688,7 @@ const SeedImportDialog = {
         html += `<div class="preview-truncated">... and ${this.importData.length - 10} more records</div>`;
       }
 
-      if (data.conflictCount > 0) {
-        html += `
-          <div class="conflict-section">
-            <div class="conflict-header">
-              <span class="conflict-icon">🔗</span>
-              <span class="conflict-text">${data.conflictCount} record(s) would overwrite existing data</span>
-            </div>
-            <div class="conflict-mode-selector">
-              <label><input type="radio" name="load-mode" value="merge" checked> <strong>Merge</strong></label>
-              <label><input type="radio" name="load-mode" value="skip_conflicts"> <strong>Skip</strong></label>
-              <label><input type="radio" name="load-mode" value="replace"> <strong>Replace</strong></label>
-            </div>
-          </div>
-        `;
-      }
-
       previewDiv.innerHTML = html;
-      actionsDiv.style.display = 'block';
       this.log('success', `Preview: ${this.importData.length} records`);
     } catch (err) {
       previewDiv.innerHTML = `<div class="load-error">${DomUtils.escapeHtml(err.message)}</div>`;
@@ -694,8 +700,10 @@ const SeedImportDialog = {
 
   async loadIntoDb() {
     const btn = this.modalElement.querySelector('#btn-load-db');
-    btn.disabled = true;
-    btn.textContent = 'Loading...';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+    }
 
     const modeRadio = this.modalElement.querySelector('input[name="load-mode"]:checked');
     const mode = modeRadio?.value || 'merge';
@@ -723,6 +731,16 @@ const SeedImportDialog = {
         this.log('error', result.error || 'Load failed');
       }
 
+      // Show FK resolution errors prominently
+      if (result.fkErrors?.length > 0) {
+        const totalErrors = result.fkErrorsTotal || result.fkErrors.length;
+        this.log('warning', `FK resolution failed for ${totalErrors} record(s):`);
+        result.fkErrors.slice(0, 5).forEach(e => this.log('error', e.message));
+        if (totalErrors > 5) {
+          this.log('warning', `... and ${totalErrors - 5} more FK errors`);
+        }
+      }
+
       if (result.errors?.length > 0) {
         result.errors.slice(0, 5).forEach(e => this.log('error', e));
       }
@@ -730,8 +748,10 @@ const SeedImportDialog = {
       this.log('error', err.message);
     }
 
-    btn.disabled = false;
-    btn.textContent = 'Load into Database';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Load into Database';
+    }
   },
 
   // ========== PASTE TAB ==========
