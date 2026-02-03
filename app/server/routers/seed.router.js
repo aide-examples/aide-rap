@@ -30,10 +30,13 @@ module.exports = function(cfg) {
     });
 
     // Get seed/import file content for preview/export (includes conflict detection)
-    // Query param: sourceDir = 'seed' (default) | 'import' | 'backup'
+    // Query params:
+    //   sourceDir = 'seed' (default) | 'import' | 'backup'
+    //   checkOnly = 'true' - only check if file exists and return count (no full content)
     router.get('/api/seed/content/:entity', (req, res) => {
         try {
             const sourceDir = req.query.sourceDir || 'seed';
+            const checkOnly = req.query.checkOnly === 'true';
 
             // Determine source directory
             let sourceDirectory;
@@ -46,8 +49,19 @@ module.exports = function(cfg) {
             }
 
             const seedFile = path.join(sourceDirectory, `${req.params.entity}.json`);
+            const exists = fs.existsSync(seedFile);
 
-            if (!fs.existsSync(seedFile)) {
+            // checkOnly mode: just return existence and count
+            if (checkOnly) {
+                if (!exists) {
+                    return res.json({ exists: false, count: 0 });
+                }
+                const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+                const count = Array.isArray(records) ? records.length : 0;
+                return res.json({ exists: true, count });
+            }
+
+            if (!exists) {
                 return res.status(404).json({ error: `No ${sourceDir} file found`, records: [] });
             }
 

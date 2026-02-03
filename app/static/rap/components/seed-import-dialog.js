@@ -252,6 +252,8 @@ const SeedImportDialog = {
                         <label><input type="radio" name="load-mode" value="skip_conflicts"> Skip</label>
                         <label><input type="radio" name="load-mode" value="replace"> Replace</label>
                       </div>
+                      <button class="btn-seed" id="btn-export-json" disabled>Export JSON</button>
+                      <button class="btn-seed" id="btn-export-csv" disabled>Export CSV</button>
                       <button class="btn-seed btn-save" id="btn-load-db">Load into Database</button>
                     </div>
                     <div id="load-preview"></div>
@@ -385,6 +387,10 @@ const SeedImportDialog = {
 
     // Load into DB button
     this.modalElement.querySelector('#btn-load-db')?.addEventListener('click', () => this.loadIntoDb());
+
+    // Export buttons
+    this.modalElement.querySelector('#btn-export-json')?.addEventListener('click', () => this.exportImportJson());
+    this.modalElement.querySelector('#btn-export-csv')?.addEventListener('click', () => this.exportImportCsv());
 
     // Rule editor
     const ruleEditor = this.modalElement.querySelector('#rule-editor');
@@ -668,6 +674,12 @@ const SeedImportDialog = {
 
       this.renderLoadPreview();
       this.log('success', `Preview: ${this.importData.length} records`);
+
+      // Enable export buttons
+      const exportJsonBtn = this.modalElement.querySelector('#btn-export-json');
+      const exportCsvBtn = this.modalElement.querySelector('#btn-export-csv');
+      if (exportJsonBtn) exportJsonBtn.disabled = false;
+      if (exportCsvBtn) exportCsvBtn.disabled = false;
     } catch (err) {
       previewDiv.innerHTML = `<div class="load-error">${DomUtils.escapeHtml(err.message)}</div>`;
       this.log('error', err.message);
@@ -680,40 +692,24 @@ const SeedImportDialog = {
     const previewDiv = this.modalElement.querySelector('#load-preview');
     if (!this.importData?.length) return;
 
-    const columns = Object.keys(this.importData[0]);
-    const limit = this.previewLimit;
-    const showingAll = !limit || limit >= this.importData.length;
-    const previewRows = showingAll ? this.importData : this.importData.slice(0, limit);
-
-    // Replace underscores with spaces in headers to allow word wrapping
-    const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c.replace(/_/g, ' '))}</th>`).join('');
-    const rows = previewRows.map(record => {
-      return '<tr>' + columns.map(col => {
-        const val = record[col];
-        return `<td>${val === null ? '<span class="null-value">NULL</span>' : DomUtils.escapeHtml(String(val))}</td>`;
-      }).join('') + '</tr>';
-    }).join('');
-
     // Show conflict info in preview
     const meta = this.importMeta || {};
     const conflictInfo = meta.conflictCount > 0
       ? `🔗 ${meta.conflictCount} record(s) would overwrite existing data`
       : `📥 ${meta.dbRowCount || 0} existing records in database`;
 
-    let html = `
-      <div class="load-info">${this.importData.length} records in import file — ${conflictInfo}</div>
-      <div class="result-table-wrapper">
-        <table class="seed-preview-table">
-          <thead><tr>${headerCells}</tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    `;
+    // Use DialogUtils for table rendering
+    const tableHtml = DialogUtils.renderDataTable(this.importData, {
+      limit: this.previewLimit,
+      showAllButton: true,
+      showAllId: 'btn-show-all',
+      replaceUnderscores: true
+    });
 
-    if (!showingAll) {
-      const remaining = this.importData.length - limit;
-      html += `<div class="preview-truncated">... and ${remaining} more records <button class="btn-link" id="btn-show-all">Show All</button></div>`;
-    }
+    const html = `
+      <div class="load-info">${this.importData.length} records in import file — ${conflictInfo}</div>
+      ${tableHtml}
+    `;
 
     previewDiv.innerHTML = html;
 
@@ -1018,5 +1014,31 @@ const SeedImportDialog = {
     } catch (err) {
       this.log('error', err.message);
     }
+  },
+
+  // ========== EXPORT (using DialogUtils) ==========
+
+  /**
+   * Export import data as JSON file
+   */
+  exportImportJson() {
+    if (!this.importData?.length) {
+      this.log('warning', 'No data to export');
+      return;
+    }
+    DialogUtils.exportJson(this.importData, `${this.entityName}_import.json`);
+    this.log('success', `Exported ${this.importData.length} records as JSON`);
+  },
+
+  /**
+   * Export import data as CSV file
+   */
+  exportImportCsv() {
+    if (!this.importData?.length) {
+      this.log('warning', 'No data to export');
+      return;
+    }
+    DialogUtils.exportCsv(this.importData, `${this.entityName}_import.csv`);
+    this.log('success', `Exported ${this.importData.length} records as CSV`);
   }
 };

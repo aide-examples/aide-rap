@@ -65,10 +65,11 @@ This prevents the main pitfall: loading the same seed file twice creates duplica
 
 ### Load Preview
 
-The "Load..." action opens a preview dialog showing:
-- All records from the seed file
+The **Load tab** in the Generate/Complete dialog shows:
+- All records from the seed file (with "Show All" for large files)
 - Conflict count (how many already exist in DB)
 - Mode selector (keep existing vs. overwrite)
+- Export buttons (JSON/CSV)
 
 **Load All** uses `merge` mode by default to prevent accidental duplicates.
 
@@ -110,21 +111,33 @@ The prompt sent to the AI includes:
 
 ## Generate & Complete Dialog
 
-The Seed Generator Dialog supports two modes accessible via context menu:
+The Seed Generator Dialog uses **4 navigable tabs** (Import-style) and supports multiple entry modes:
 
-| Mode | Menu Item | MD Section | Purpose |
-|------|-----------|------------|---------|
-| **Generate** | 🤖 Generate... | `## Data Generator` | Create new records from scratch |
-| **Complete** | ✨ Complete... | `## Data Completer` | Fill missing attributes in existing records |
+| Entry Mode | Menu Item | Opens At | Purpose |
+|------------|-----------|----------|---------|
+| **Generate** | 🤖 Generate... | Instruction tab | Create new records from scratch |
+| **Complete** | ✨ Complete... | Instruction tab | Fill missing attributes in existing records |
+| **Export** | 📤 Export... | Load tab | Export current DB data to file |
 
-### Workflow (Both Modes)
+### Tab Structure
 
-1. **Instruction Tab** — Shows instruction from entity markdown (editable, saveable)
-2. **Build AI Prompt** — Generates prompt including schema, FK references, context
-3. **Copy to Clipboard** — User pastes into external AI (Claude, GPT, Gemini)
-4. **Paste Response** — AI output is parsed and validated
-5. **Review Tab** — Shows parsed records with validation status
-6. **Save / Save & Load** — Writes to seed file and optionally loads to DB
+All 4 tabs are always visible; they enable/disable based on available data:
+
+| Tab | Enabled When | Content |
+|-----|--------------|---------|
+| **1. Instruction** | Always (generate/complete mode) | Edit `## Data Generator` or `## Data Completer` |
+| **2. Prompt** | After instruction exists | AI prompt text, copy button, AI service links |
+| **3. Response** | After prompt built | Paste textarea, parse & validate button |
+| **4. Load** | If seed file exists OR response parsed | Preview table, conflict detection, export, load to DB |
+
+### Workflow
+
+1. **Instruction Tab** — Edit instruction from entity markdown, save to MD
+2. **Prompt Tab** — Build AI prompt, copy to clipboard, open AI service
+3. **Response Tab** — Paste AI response (JSON/CSV), parse & validate
+4. **Load Tab** — Review records, choose conflict mode, export or load to DB
+
+If a seed file already exists, the **Load tab** is immediately accessible — users can skip the AI workflow and directly preview/load existing data.
 
 ### Complete Mode Differences
 
@@ -273,9 +286,9 @@ The **Restore** button clears all tables and reloads from `data/backup/` in depe
 | `app/server/services/prompt-builder.js` | Build AI prompts, parse responses, load FK/context data |
 | `app/server/routers/seed.router.js` | REST API for seed, backup, restore, reinitialize |
 | `app/server/routers/prompt.router.js` | REST API for prompt building and response parsing |
+| `app/static/rap/utils/DialogUtils.js` | Shared utilities: table rendering, warnings, export |
 | `app/static/rap/components/seed-manager.js` | UI: entity overview, context menu, bulk operations |
-| `app/static/rap/components/seed-generator-dialog.js` | UI: instruction → prompt → paste → review workflow |
-| `app/static/rap/components/seed-preview-dialog.js` | UI: load preview with conflict detection, export |
-| `app/static/rap/components/seed-import-dialog.js` | UI: paste/drop JSON or CSV, validate, save |
+| `app/static/rap/components/seed-generator-dialog.js` | UI: 4-tab dialog for generate, complete, export |
+| `app/static/rap/components/seed-import-dialog.js` | UI: paste/drop JSON or CSV, validate, save, export |
 | `app/systems/*/data/seed/*.json` | Seed data files (one per entity) |
 | `app/systems/*/data/backup/*.json` | Backup data files (auto or manual, gitignored) |

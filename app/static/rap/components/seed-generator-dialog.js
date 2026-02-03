@@ -1,22 +1,29 @@
 /**
  * Seed Generator/Completer Dialog
- * Modal for generating or completing seed data via interactive copy/paste workflow:
- * 1. Write instruction → 2. Build prompt, copy, paste AI response → 3. Review & save
+ * Modal for seed data operations with 4 navigable tabs:
+ * - Instruction: Edit AI instruction (## Data Generator / ## Data Completer)
+ * - Prompt: Build AI prompt, copy to clipboard
+ * - Response: Paste AI response, parse & validate
+ * - Load: Preview data, export, load into database
  *
- * Modes:
- * - 'generate': Create new records from scratch (uses ## Data Generator)
- * - 'complete': Fill missing attributes in existing records (uses ## Data Completer)
+ * Entry modes:
+ * - 'generate': Opens at Instruction tab, uses ## Data Generator
+ * - 'complete': Opens at Instruction tab, uses ## Data Completer
+ * - 'export': Opens at Load tab with current DB data
  */
 const SeedGeneratorDialog = {
   container: null,
   entityName: null,
-  mode: 'generate',  // 'generate' or 'complete'
+  entryMode: 'generate',  // 'generate', 'complete', or 'export'
+  instructionType: 'generator',  // 'generator' or 'completer'
   schema: null,
   instruction: '',
   generatedData: null,
   lastPrompt: null,
-  activeTab: 'instruction',  // instruction, prompt, result
+  activeTab: 'instruction',  // instruction, prompt, response, load
   hasInstruction: false,
+  hasSeedFile: false,
+  seedFileCount: 0,
   emptyFKs: [],
   seedOnlyFKs: [], // FK entities with data only in seed files (not loaded in DB)
   // Validation state (populated by /api/seed/parse)
@@ -26,6 +33,9 @@ const SeedGeneratorDialog = {
   validCount: 0,
   conflicts: [],
   selectedMode: 'merge',
+  // Load tab state
+  dbRowCount: 0,
+  conflictCount: 0,
 
   /**
    * Initialize the dialog
@@ -37,23 +47,58 @@ const SeedGeneratorDialog = {
   /**
    * Open the dialog for an entity
    * @param {string} entityName - Entity name
-   * @param {string} mode - 'generate' or 'complete'
+   * @param {string} entryMode - 'generate', 'complete', or 'export'
    */
-  async open(entityName, mode = 'generate') {
+  async open(entityName, entryMode = 'generate') {
     this.entityName = entityName;
-    this.mode = mode;
+    this.entryMode = entryMode;
     this.generatedData = null;
     this.lastPrompt = null;
-    this.activeTab = 'instruction';
     this.resetValidation();
 
     // Load schema
     this.schema = await SchemaCache.getExtended(entityName);
 
-    // Load instruction from markdown (different endpoint based on mode)
-    const endpoint = mode === 'complete'
-      ? `/api/entity/${entityName}/completer-instruction`
-      : `/api/entity/${entityName}/generator-instruction`;
+    // Check if seed file exists
+    await this.checkSeedFileExists();
+
+    if (entryMode === 'export') {
+      // Export: load DB data, go directly to Load tab
+      await this.loadDbContent();
+      this.instructionType = null;
+      this.activeTab = 'load';
+    } else {
+      // Generate/Complete: load instruction
+      this.instructionType = entryMode === 'complete' ? 'completer' : 'generator';
+      await this.loadInstruction();
+      this.activeTab = 'instruction';
+    }
+
+    this.render();
+  },
+
+  /**
+   * Check if seed file exists and get record count
+   */
+  async checkSeedFileExists() {
+    try {
+      const resp = await fetch(`/api/seed/content/${this.entityName}?checkOnly=true`);
+      const data = await resp.json();
+      this.hasSeedFile = data.exists || false;
+      this.seedFileCount = data.count || 0;
+    } catch (e) {
+      this.hasSeedFile = false;
+      this.seedFileCount = 0;
+    }
+  },
+
+  /**
+   * Load instruction from entity markdown
+   */
+  async loadInstruction() {
+    const endpoint = this.instructionType === 'completer'
+      ? `/api/entity/${this.entityName}/completer-instruction`
+      : `/api/entity/${this.entityName}/generator-instruction`;
     try {
       const resp = await fetch(endpoint);
       const data = await resp.json();
@@ -63,8 +108,6 @@ const SeedGeneratorDialog = {
       this.instruction = '';
       this.hasInstruction = false;
     }
-
-    this.render();
   },
 
   /**
@@ -79,6 +122,8 @@ const SeedGeneratorDialog = {
     this.validCount = 0;
     this.conflicts = [];
     this.selectedMode = 'merge';
+    this.dbRowCount = 0;
+    this.conflictCount = 0;
   },
 
   /**
@@ -100,8 +145,48 @@ const SeedGeneratorDialog = {
     if (!this.container) return;
 
     const areaColor = this.schema?.areaColor || '#f5f5f5';
-    const hasResult = this.generatedData && this.generatedData.length > 0;
-    const modeLabel = this.mode === 'complete' ? 'Complete' : 'Generate';
+
+    // Entry mode labels for title
+    const modeLabels = {
+      'generate': 'Generate',
+      'complete': 'Complete',
+      'export': 'Export'
+    };
+    const modeLabel = modeLabels[this.entryMode] || 'Seed';
+
+    // Tab enable/disable logic
+    const canPrompt = this.hasInstruction || this.instruction?.trim();
+    const canResponse = !!this.lastPrompt;
+    const canLoad = this.hasSeedFile || (this.generatedData && this.generatedData.length > 0);
+
+    // Record count badge for Load tab
+    const loadCount = this.generatedData?.length || this.seedFileCount || 0;
+    const loadBadge = loadCount > 0 ? ` (${loadCount})` : '';
+
+    const tabBar = `
+      <div class="generator-tabs">
+        <button class="generator-tab ${this.activeTab === 'instruction' ? 'active' : ''}"
+                data-tab="instruction"
+                ${this.entryMode === 'export' ? 'disabled' : ''}>
+          1. Instruction
+        </button>
+        <button class="generator-tab ${this.activeTab === 'prompt' ? 'active' : ''}"
+                data-tab="prompt"
+                ${!canPrompt || this.entryMode === 'export' ? 'disabled' : ''}>
+          2. Prompt
+        </button>
+        <button class="generator-tab ${this.activeTab === 'response' ? 'active' : ''}"
+                data-tab="response"
+                ${!canResponse || this.entryMode === 'export' ? 'disabled' : ''}>
+          3. Response
+        </button>
+        <button class="generator-tab ${this.activeTab === 'load' ? 'active' : ''} ${canLoad ? 'has-data' : ''}"
+                data-tab="load"
+                ${!canLoad ? 'disabled' : ''}>
+          4. Load${loadBadge}
+        </button>
+      </div>
+    `;
 
     this.container.innerHTML = `
       <div class="modal-overlay">
@@ -111,17 +196,7 @@ const SeedGeneratorDialog = {
             <button class="modal-close" data-action="close">&times;</button>
           </div>
 
-          <div class="generator-tabs">
-            <button class="generator-tab ${this.activeTab === 'instruction' ? 'active' : ''}" data-tab="instruction">
-              1. Instruction
-            </button>
-            <button class="generator-tab ${this.activeTab === 'prompt' ? 'active' : ''}" data-tab="prompt">
-              2. Prompt &amp; Paste
-            </button>
-            <button class="generator-tab ${this.activeTab === 'result' ? 'active' : ''} ${hasResult ? 'has-data' : ''}" data-tab="result" ${!hasResult ? 'disabled' : ''}>
-              3. Result ${hasResult ? `(${this.validCount}/${this.generatedData.length})` : ''}
-            </button>
-          </div>
+          ${tabBar}
 
           <div class="modal-body">
             ${this.renderTabContent()}
@@ -143,187 +218,138 @@ const SeedGeneratorDialog = {
    */
   renderTabContent() {
     switch (this.activeTab) {
-      case 'instruction': {
-        const sectionName = this.mode === 'complete' ? 'Data Completer' : 'Data Generator';
-        const statusText = this.hasInstruction
-          ? `✓ ${sectionName} instruction found in Markdown`
-          : `No ${sectionName} instruction defined yet — write one below.`;
-        const placeholder = this.mode === 'complete'
-          ? 'Describe which fields to fill and how...'
-          : 'Describe what data to generate...';
-        return `
-          <div class="tab-content-instruction">
-            <div class="instruction-status ${this.hasInstruction ? 'has-instruction' : 'no-instruction'}">
-              ${statusText}
-            </div>
-            <textarea id="generator-instruction" rows="6" placeholder="${placeholder}">${DomUtils.escapeHtml(this.instruction)}</textarea>
-          </div>
-        `;
-      }
-
+      case 'instruction':
+        return this.renderInstructionTab();
       case 'prompt':
-        return `
-          <div class="tab-content-prompt-paste">
-            ${this.emptyFKs.length > 0 ? `
-              <div class="fk-dependency-warning">⚠ No data for: ${this.emptyFKs.join(', ')} — FK references will be unresolvable.</div>
-            ` : ''}
-            ${this.seedOnlyFKs.length > 0 ? `
-              <div class="fk-dependency-warning seed-only">⚠ ${this.seedOnlyFKs.join(', ')} — not loaded in DB, using seed files. Load dependencies first or use "Load All".</div>
-            ` : ''}
-            <div class="prompt-section">
-              <div class="prompt-section-header">
-                <span class="prompt-section-label">AI Prompt</span>
-                ${DomUtils.renderAILinks(!!this.lastPrompt)}
-              </div>
-              <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${DomUtils.escapeHtml(this.lastPrompt || '')}</textarea>
-            </div>
-            <div class="paste-section" id="paste-drop-zone">
-              <div class="paste-section-header">
-                <span class="paste-section-label">AI Response</span>
-              </div>
-              <textarea id="ai-response-text" rows="8" placeholder="Paste JSON array or CSV data here..."></textarea>
-            </div>
-          </div>
-        `;
-
-      case 'result':
-        return `
-          <div class="tab-content-result">
-            <div class="result-content">
-              ${this.renderResultContent()}
-            </div>
-            ${this.renderValidationInfo()}
-          </div>
-        `;
-
+        return this.renderPromptTab();
+      case 'response':
+        return this.renderResponseTab();
+      case 'load':
+        return this.renderLoadTab();
       default:
         return '';
     }
   },
 
   /**
-   * Render footer buttons based on active tab
+   * Render Instruction tab content
    */
-  renderFooterButtons() {
-    const hasResult = this.generatedData && this.generatedData.length > 0;
-
-    switch (this.activeTab) {
-      case 'instruction':
-        return `
-          <button class="btn-seed" data-action="save-to-md">Save to MD</button>
-          <button class="btn-seed primary" data-action="build-prompt">Build AI Prompt →</button>
-        `;
-
-      case 'prompt':
-        return `
-          <button class="btn-seed primary" data-action="parse-response">Parse &amp; Validate →</button>
-        `;
-
-      case 'result':
-        return `
-          <button class="btn-seed" data-action="save-json">Save only</button>
-          <button class="btn-seed primary" data-action="save-and-load">${hasResult && this.invalidRows.length > 0 ? `Save & Load ${this.validCount}` : 'Save & Load'}</button>
-        `;
-
-      default:
-        return `<button class="btn-seed" data-action="close">Close</button>`;
-    }
-  },
-
-  /**
-   * Render the result content (table or placeholder)
-   */
-  renderResultContent() {
-    if (!this.generatedData) {
-      return '<p class="empty-result">No data yet. Paste AI response in the Prompt & Paste tab.</p>';
-    }
-
-    if (this.generatedData.length === 0) {
-      return '<p class="empty-result">No records found in response.</p>';
-    }
-
-    return this.renderResultTable();
-  },
-
-  /**
-   * Render the data as an HTML table with validation warnings
-   */
-  renderResultTable() {
-    if (!this.generatedData || !this.schema) return '';
-
-    // Build warning lookup: row -> field -> warning
-    const warningLookup = {};
-    for (const w of this.fkWarnings) {
-      if (!warningLookup[w.row]) warningLookup[w.row] = {};
-      warningLookup[w.row][w.field] = w;
-    }
-    const invalidRowSet = new Set(this.invalidRows);
-
-    // Collect columns from actual data
-    const dataKeys = new Set();
-    for (const record of this.generatedData) {
-      Object.keys(record).forEach(k => {
-        if (k !== 'id' && !k.startsWith('_')) dataKeys.add(k);
-      });
-    }
-
-    const columns = [...dataKeys];
-    const headerCells = columns.map(c => `<th>${DomUtils.escapeHtml(c)}</th>`).join('');
-
-    // Limit preview to first 50 rows
-    const previewRows = this.generatedData.slice(0, 50);
-
-    const rows = previewRows.map((record, idx) => {
-      const rowNum = idx + 1;
-      const rowWarnings = warningLookup[rowNum] || {};
-      const isInvalidRow = invalidRowSet.has(rowNum);
-
-      const cells = columns.map(col => {
-        const value = record[col];
-        const warning = rowWarnings[col];
-        if (value === null || value === undefined) {
-          return '<td class="null-value">-</td>';
-        }
-        const strValue = String(value);
-        const displayValue = strValue.length > 30 ? strValue.substring(0, 27) + '...' : strValue;
-        if (warning) {
-          return `<td class="fk-invalid" title="${DomUtils.escapeHtml(warning.message || '')}">${DomUtils.escapeHtml(displayValue)} ⚠</td>`;
-        }
-        return `<td title="${DomUtils.escapeHtml(strValue)}">${DomUtils.escapeHtml(displayValue)}</td>`;
-      }).join('');
-
-      const rowClass = isInvalidRow ? 'class="invalid-row"' : '';
-      return `<tr ${rowClass}>${cells}</tr>`;
-    }).join('');
-
-    let html = `
-      <div class="result-table-wrapper">
-        <table class="seed-preview-table">
-          <thead><tr>${headerCells}</tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
+  renderInstructionTab() {
+    const sectionName = this.instructionType === 'completer' ? 'Data Completer' : 'Data Generator';
+    const statusText = this.hasInstruction
+      ? `✓ ${sectionName} instruction found in Markdown`
+      : `No ${sectionName} instruction defined yet — write one below.`;
+    const placeholder = this.instructionType === 'completer'
+      ? 'Describe which fields to fill and how...'
+      : 'Describe what data to generate...';
+    return `
+      <div class="tab-content-instruction">
+        <div class="instruction-status ${this.hasInstruction ? 'has-instruction' : 'no-instruction'}">
+          ${statusText}
+        </div>
+        <textarea id="generator-instruction" rows="6" placeholder="${placeholder}">${DomUtils.escapeHtml(this.instruction)}</textarea>
       </div>
     `;
-
-    if (this.generatedData.length > 50) {
-      html += `<div class="preview-truncated">... and ${this.generatedData.length - 50} more records</div>`;
-    }
-
-    return html;
   },
 
   /**
-   * Render validation info below the result table
+   * Render Prompt tab content
    */
-  renderValidationInfo() {
+  renderPromptTab() {
+    return `
+      <div class="tab-content-prompt-paste">
+        ${this.emptyFKs.length > 0 ? `
+          <div class="fk-dependency-warning">⚠ No data for: ${this.emptyFKs.join(', ')} — FK references will be unresolvable.</div>
+        ` : ''}
+        ${this.seedOnlyFKs.length > 0 ? `
+          <div class="fk-dependency-warning seed-only">⚠ ${this.seedOnlyFKs.join(', ')} — not loaded in DB, using seed files. Load dependencies first or use "Load All".</div>
+        ` : ''}
+        <div class="prompt-section">
+          <div class="prompt-section-header">
+            <span class="prompt-section-label">AI Prompt</span>
+            ${DomUtils.renderAILinks(!!this.lastPrompt)}
+          </div>
+          <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${DomUtils.escapeHtml(this.lastPrompt || '')}</textarea>
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Render Response tab content (paste AI output, parse & validate)
+   */
+  renderResponseTab() {
+    return `
+      <div class="tab-content-response" id="paste-drop-zone">
+        <div class="paste-section-header">
+          <span class="paste-section-label">AI Response</span>
+        </div>
+        <textarea id="ai-response-text" rows="12" placeholder="Paste JSON array or CSV data here..."></textarea>
+      </div>
+    `;
+  },
+
+  /**
+   * Render Load tab content (preview, export, load)
+   */
+  renderLoadTab() {
+    // If no data, show hint
+    if (!this.generatedData && !this.hasSeedFile) {
+      return `
+        <div class="tab-content-load empty-state">
+          <p>No data available. Either:</p>
+          <ul>
+            <li>Complete the Instruction → Prompt → Response workflow</li>
+            <li>Or load an existing seed file</li>
+          </ul>
+        </div>
+      `;
+    }
+
+    // If we have seed file but no loaded data yet, offer to load it
+    if (!this.generatedData && this.hasSeedFile) {
+      return `
+        <div class="tab-content-load">
+          <div class="seed-file-info">
+            <p>Seed file contains ${this.seedFileCount} record${this.seedFileCount !== 1 ? 's' : ''}</p>
+            <button class="btn-seed" data-action="load-seed-preview">Load Preview</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Show data preview table using DialogUtils
+    const tableHtml = DialogUtils.renderDataTable(this.generatedData, {
+      limit: 100,
+      fkWarnings: this.fkWarnings,
+      invalidRows: this.invalidRows,
+      showAllButton: true,
+      showAllId: 'btn-show-all-load'
+    });
+
+    return `
+      <div class="tab-content-load">
+        <div class="result-content">
+          ${tableHtml}
+        </div>
+        ${this.renderLoadValidationInfo()}
+      </div>
+    `;
+  },
+
+  /**
+   * Render validation info for Load tab
+   */
+  renderLoadValidationInfo() {
     if (!this.generatedData || this.generatedData.length === 0) return '';
 
     let html = '<div class="generator-validation">';
+    const total = this.generatedData.length;
 
     // Summary line
-    const total = this.generatedData.length;
-    const hasInvalid = this.invalidRows.length > 0;
-    if (hasInvalid) {
+    if (this.entryMode === 'export') {
+      html += `<div class="validation-summary">${total} records in database</div>`;
+    } else if (this.invalidRows.length > 0) {
       html += `<div class="validation-summary"><strong>${this.validCount} valid</strong> / ${total} total</div>`;
     } else {
       html += `<div class="validation-summary">${total} records — all valid</div>`;
@@ -334,54 +360,78 @@ const SeedGeneratorDialog = {
       html += `<div class="warning-section seed-fallback-info">
         <div class="warning-icon">⚠</div>
         <div class="warning-text">FK labels resolved from seed files (not loaded in DB): <strong>${this.seedFallbacks.join(', ')}</strong>.
-          <br>Use "Save only", then load dependencies first or use "Load All".</div>
+          <br>Load dependencies first or use "Load All".</div>
       </div>`;
     }
 
-    // FK warnings
-    if (this.fkWarnings.length > 0) {
-      const uniqueWarnings = new Map();
-      for (const w of this.fkWarnings) {
-        const key = `${w.field}:${w.value}`;
-        if (!uniqueWarnings.has(key)) {
-          uniqueWarnings.set(key, w);
-        }
-      }
+    // FK warnings using DialogUtils
+    html += DialogUtils.renderFKWarnings(this.fkWarnings, 3);
 
-      const warningLines = Array.from(uniqueWarnings.values())
-        .slice(0, 3)
-        .map(w => `"${DomUtils.escapeHtml(w.value)}" not found in ${DomUtils.escapeHtml(w.targetEntity)}`)
-        .join('<br>');
-
-      html += `<div class="warning-section"><div class="warning-icon">⚠</div><div class="warning-text">${warningLines}`;
-      if (uniqueWarnings.size > 3) {
-        html += `<br><span class="warning-more">... and ${uniqueWarnings.size - 3} more FK warnings</span>`;
-      }
-      html += '</div></div>';
-    }
-
-    // Conflict warnings with mode selector
-    if (this.conflicts.length > 0) {
-      const conflictCount = this.conflicts.length;
-      const totalBackRefs = this.conflicts.reduce((sum, c) => sum + c.backRefs, 0);
-
-      html += `
-        <div class="conflict-section">
-          <div class="conflict-header">
-            <span class="conflict-icon">🔗</span>
-            <span class="conflict-text">${conflictCount} record(s) would overwrite existing data with ${totalBackRefs} back-reference(s)</span>
-          </div>
-          <div class="conflict-mode-selector">
-            <label><input type="radio" name="gen-import-mode" value="merge" ${this.selectedMode === 'merge' ? 'checked' : ''}> <strong>Merge</strong> - Update existing, add new (preserves IDs)</label>
-            <label><input type="radio" name="gen-import-mode" value="skip_conflicts" ${this.selectedMode === 'skip_conflicts' ? 'checked' : ''}> <strong>Skip</strong> - Only add new records</label>
-            <label><input type="radio" name="gen-import-mode" value="replace" ${this.selectedMode === 'replace' ? 'checked' : ''}> <strong>Replace</strong> - Overwrite all (may break references!)</label>
-          </div>
-        </div>
-      `;
+    // Conflict mode selector using DialogUtils
+    if (this.conflicts.length > 0 || this.conflictCount > 0) {
+      html += DialogUtils.renderConflictSelector({
+        conflicts: this.conflicts,
+        conflictCount: this.conflictCount,
+        totalRecords: total,
+        dbRowCount: this.dbRowCount,
+        selected: this.selectedMode,
+        radioName: 'gen-import-mode',
+        showDescriptions: this.conflicts.length > 0
+      });
     }
 
     html += '</div>';
     return html;
+  },
+
+  /**
+   * Render footer buttons based on active tab
+   */
+  renderFooterButtons() {
+    const hasData = this.generatedData && this.generatedData.length > 0;
+    const count = this.generatedData?.length || 0;
+
+    switch (this.activeTab) {
+      case 'instruction':
+        return `
+          <button class="btn-seed" data-action="save-to-md">Save to MD</button>
+          <button class="btn-seed primary" data-action="build-prompt">Build AI Prompt →</button>
+        `;
+
+      case 'prompt':
+        return `
+          <button class="btn-seed" data-action="close">Cancel</button>
+        `;
+
+      case 'response':
+        return `
+          <button class="btn-seed" data-action="close">Cancel</button>
+          <button class="btn-seed primary" data-action="parse-response">Parse &amp; Validate →</button>
+        `;
+
+      case 'load':
+        if (this.entryMode === 'export') {
+          return `
+            <button class="btn-seed" data-action="export-json">Export JSON</button>
+            <button class="btn-seed" data-action="export-csv">Export CSV</button>
+            <button class="btn-seed" data-action="close">Cancel</button>
+          `;
+        }
+        if (!hasData) {
+          return `<button class="btn-seed" data-action="close">Cancel</button>`;
+        }
+        const loadLabel = this.invalidRows.length > 0 ? `Load ${this.validCount}` : `Load ${count}`;
+        return `
+          <button class="btn-seed" data-action="export-json">Export JSON</button>
+          <button class="btn-seed" data-action="export-csv">Export CSV</button>
+          <span class="footer-separator"></span>
+          <button class="btn-seed" data-action="save-only">Save to Seed File</button>
+          <button class="btn-seed primary" data-action="save-and-load">${loadLabel} to DB</button>
+        `;
+
+      default:
+        return `<button class="btn-seed" data-action="close">Close</button>`;
+    }
   },
 
   /**
@@ -408,9 +458,29 @@ const SeedGeneratorDialog = {
       'save-to-md': () => this.saveToMarkdown(),
       'build-prompt': () => this.buildPrompt(),
       'parse-response': () => this.parseAndValidate(),
-      'save-json': () => this.saveOnly(),
+      'save-only': () => this.saveOnly(),
       'save-and-load': () => this.saveAndLoad(),
+      'export-json': () => this.exportJson(),
+      'export-csv': () => this.exportCsv(),
+      'load-seed-preview': () => this.loadSeedPreview(),
+      'close': () => this.close(),
     });
+
+    // Show All button in Load tab
+    const showAllBtn = this.container.querySelector('#btn-show-all-load');
+    if (showAllBtn) {
+      showAllBtn.addEventListener('click', () => {
+        // Re-render with no limit
+        const tableContainer = this.container.querySelector('.result-content');
+        if (tableContainer && this.generatedData) {
+          tableContainer.innerHTML = DialogUtils.renderDataTable(this.generatedData, {
+            limit: 0,  // No limit
+            fkWarnings: this.fkWarnings,
+            invalidRows: this.invalidRows
+          });
+        }
+      });
+    }
 
     // Copy prompt + AI service links
     DomUtils.attachAILinkHandlers(
@@ -445,7 +515,7 @@ const SeedGeneratorDialog = {
       return;
     }
 
-    const endpoint = this.mode === 'complete'
+    const endpoint = this.instructionType === 'completer'
       ? `/api/entity/${this.entityName}/completer-instruction`
       : `/api/entity/${this.entityName}/generator-instruction`;
 
@@ -461,6 +531,7 @@ const SeedGeneratorDialog = {
         this.instruction = instruction;
         this.hasInstruction = true;
         this.showMessage('Instruction saved to markdown');
+        this.render();  // Re-render to update tab states
       } else {
         this.showMessage(result.error || 'Failed to save', true);
       }
@@ -470,7 +541,7 @@ const SeedGeneratorDialog = {
   },
 
   /**
-   * Build prompt and switch to Prompt & Paste tab
+   * Build prompt and switch to Prompt tab
    */
   async buildPrompt() {
     const instruction = this.getCurrentInstruction();
@@ -479,7 +550,7 @@ const SeedGeneratorDialog = {
       return;
     }
 
-    const endpoint = this.mode === 'complete'
+    const endpoint = this.instructionType === 'completer'
       ? `/api/seed/complete-prompt/${this.entityName}`
       : `/api/seed/prompt/${this.entityName}`;
 
@@ -504,14 +575,6 @@ const SeedGeneratorDialog = {
     }
 
     this.render();
-  },
-
-  /**
-   * Copy prompt to clipboard
-   */
-  async copyPrompt() {
-    DomUtils.copyToClipboard(this.container, this.lastPrompt, '#llm-prompt-text',
-      (msg, err) => this.showMessage(msg, err));
   },
 
   /**
@@ -563,8 +626,10 @@ const SeedGeneratorDialog = {
         this.invalidRows = result.invalidRows || [];
         this.validCount = result.validCount ?? result.count;
         this.conflicts = result.conflicts || [];
-        this.selectedMode = this.conflicts.length > 0 ? 'merge' : 'replace';
-        this.activeTab = 'result';
+        this.conflictCount = result.conflictCount || this.conflicts.length;
+        this.dbRowCount = result.dbRowCount || 0;
+        this.selectedMode = this.conflicts.length > 0 || this.conflictCount > 0 ? 'merge' : 'replace';
+        this.activeTab = 'load';
         this.showMessage(`Parsed ${result.count} records${format === 'csv' ? ' (CSV)' : ''}`);
       } else {
         this.showMessage(result.error || 'Parse failed', true);
@@ -574,6 +639,26 @@ const SeedGeneratorDialog = {
     }
 
     this.render();
+  },
+
+  /**
+   * Load seed file preview for Load tab
+   */
+  async loadSeedPreview() {
+    try {
+      const url = `/api/seed/content/${this.entityName}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      this.generatedData = data.records || [];
+      this.dbRowCount = data.dbRowCount || 0;
+      this.conflictCount = data.conflictCount || 0;
+      this.validCount = this.generatedData.length;
+      this.selectedMode = this.conflictCount > 0 ? 'skip_conflicts' : 'replace';
+      this.render();
+    } catch (err) {
+      console.error('Failed to load seed preview:', err);
+      this.showMessage('Failed to load seed file', true);
+    }
   },
 
   /**
@@ -591,6 +676,8 @@ const SeedGeneratorDialog = {
       const result = await resp.json();
 
       if (result.success) {
+        this.hasSeedFile = true;
+        this.seedFileCount = this.generatedData.length;
         this.showMessage('Saved to seed file');
       } else {
         this.showMessage(result.error || 'Failed to save', true);
@@ -621,12 +708,13 @@ const SeedGeneratorDialog = {
       }
 
       // Step 2: Load into database
+      const mode = (this.conflicts.length > 0 || this.conflictCount > 0) ? this.selectedMode : 'replace';
       const loadResp = await fetch(`/api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           skipInvalid: true,
-          mode: this.conflicts.length > 0 ? this.selectedMode : 'replace'
+          mode: mode
         })
       });
       const loadResult = await loadResp.json();
@@ -661,6 +749,78 @@ const SeedGeneratorDialog = {
    */
   showMessage(message, isError = false) {
     DomUtils.showMessage(this.container, message, isError);
+  },
+
+  /**
+   * Load current DB content from server (for Export mode)
+   * Transforms to portable format:
+   * - Removes internal 'id'
+   * - Replaces FK IDs (manufacturer_id: 3) with conceptual names (manufacturer: "Airbus")
+   * - Removes computed _label and _display fields
+   */
+  async loadDbContent() {
+    try {
+      const response = await fetch(`/api/entities/${this.entityName}?limit=10000`);
+      const data = await response.json();
+      const rawRecords = data.data || [];
+
+      this.generatedData = rawRecords.map(record => {
+        const cleaned = {};
+
+        // First pass: identify FK columns by finding *_label fields with matching *_id fields
+        // API returns: manufacturer_id (FK), manufacturer_label (display)
+        // We want: manufacturer: "Airbus"
+        const fkColumns = {};
+        for (const [key, value] of Object.entries(record)) {
+          if (key.endsWith('_label')) {
+            const conceptualName = key.slice(0, -6); // remove '_label'
+            const fkIdColumn = conceptualName + '_id';
+            if (fkIdColumn in record) {
+              fkColumns[conceptualName] = value; // Store label value
+            }
+          }
+        }
+
+        // Second pass: build cleaned record
+        for (const [key, value] of Object.entries(record)) {
+          if (key === 'id') continue; // Skip internal ID
+          if (key.endsWith('_label') || key.endsWith('_display')) continue; // Skip computed fields
+          if (key.endsWith('_id') && (key.slice(0, -3) in fkColumns)) continue; // Skip FK IDs (replaced by labels)
+          cleaned[key] = value;
+        }
+
+        // Add FK conceptual names with label values
+        for (const [conceptualName, labelValue] of Object.entries(fkColumns)) {
+          cleaned[conceptualName] = labelValue;
+        }
+
+        return cleaned;
+      });
+
+      this.validCount = this.generatedData.length;
+    } catch (err) {
+      console.error('Failed to load DB content:', err);
+      this.generatedData = [];
+      this.validCount = 0;
+    }
+  },
+
+  /**
+   * Export as JSON file using DialogUtils
+   */
+  exportJson() {
+    if (!this.generatedData || this.generatedData.length === 0) return;
+    DialogUtils.exportJson(this.generatedData, `${this.entityName}.json`);
+    this.close();
+  },
+
+  /**
+   * Export as CSV file using DialogUtils
+   */
+  exportCsv() {
+    if (!this.generatedData || this.generatedData.length === 0) return;
+    DialogUtils.exportCsv(this.generatedData, `${this.entityName}.csv`);
+    this.close();
   },
 
 };

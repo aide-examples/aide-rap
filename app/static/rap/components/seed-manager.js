@@ -30,7 +30,6 @@ const SeedManager = {
       <div class="context-menu-item" data-action="generate">🤖 Generate...</div>
       <div class="context-menu-item" data-action="complete">✨ Complete...</div>
       <div class="context-menu-separator"></div>
-      <div class="context-menu-item" data-action="load">▶️ Load Seed...</div>
       <div class="context-menu-item" data-action="restore">🔄 Restore from Backup</div>
       <div class="context-menu-item" data-action="clear">🗑️ Clear</div>
     `;
@@ -59,12 +58,8 @@ const SeedManager = {
     this.contextMenu.classList.add('visible');
 
     // Enable/disable actions based on file availability
-    const loadItem = this.contextMenu.querySelector('[data-action="load"]');
     const exportItem = this.contextMenu.querySelector('[data-action="export"]');
     const restoreItem = this.contextMenu.querySelector('[data-action="restore"]');
-    if (loadItem) {
-      loadItem.classList.toggle('disabled', !hasSeeds);
-    }
     if (exportItem) {
       exportItem.classList.toggle('disabled', !hasSeeds);
     }
@@ -89,16 +84,13 @@ const SeedManager = {
         this.openImportDialog(entityName);
         break;
       case 'export':
-        this.openExportDialog(entityName);
+        await this.openGenerator(entityName, 'export');
         break;
       case 'generate':
         await this.openGenerator(entityName, 'generate');
         break;
       case 'complete':
         await this.openGenerator(entityName, 'complete');
-        break;
-      case 'load':
-        this.openLoadPreview(entityName, 'seed');
         break;
       case 'restore':
         await this.restoreEntity(entityName);
@@ -120,31 +112,6 @@ const SeedManager = {
     }
   },
 
-  /**
-   * Open export dialog for an entity
-   */
-  openExportDialog(entityName) {
-    if (typeof SeedPreviewDialog !== 'undefined') {
-      SeedPreviewDialog.showExport(entityName);
-    } else {
-      this.showMessage('Preview dialog not loaded', true);
-    }
-  },
-
-  /**
-   * Open load preview for an entity
-   * @param {string} entityName - Entity name
-   * @param {string} sourceDir - Source directory ('seed' or 'import')
-   */
-  openLoadPreview(entityName, sourceDir = 'seed') {
-    if (typeof SeedPreviewDialog !== 'undefined') {
-      SeedPreviewDialog.showLoad(entityName, async (mode) => {
-        await this.loadEntity(entityName, mode, sourceDir);
-      }, sourceDir);
-    } else {
-      this.showMessage('Preview dialog not loaded', true);
-    }
-  },
 
   /**
    * Run XLSX → JSON import for an entity

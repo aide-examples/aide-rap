@@ -310,7 +310,6 @@ async function tryUrlLogin() {
     ContextMenu.init();
     SeedManager.init('modal-container');
     SeedImportDialog.init('modal-container');
-    SeedPreviewDialog.init('modal-container');
 
     console.log('AIDE RAP initialized');
 
