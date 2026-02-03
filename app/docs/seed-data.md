@@ -108,6 +108,54 @@ The prompt sent to the AI includes:
 
 ---
 
+## Generate & Complete Dialog
+
+The Seed Generator Dialog supports two modes accessible via context menu:
+
+| Mode | Menu Item | MD Section | Purpose |
+|------|-----------|------------|---------|
+| **Generate** | 🤖 Generate... | `## Data Generator` | Create new records from scratch |
+| **Complete** | ✨ Complete... | `## Data Completer` | Fill missing attributes in existing records |
+
+### Workflow (Both Modes)
+
+1. **Instruction Tab** — Shows instruction from entity markdown (editable, saveable)
+2. **Build AI Prompt** — Generates prompt including schema, FK references, context
+3. **Copy to Clipboard** — User pastes into external AI (Claude, GPT, Gemini)
+4. **Paste Response** — AI output is parsed and validated
+5. **Review Tab** — Shows parsed records with validation status
+6. **Save / Save & Load** — Writes to seed file and optionally loads to DB
+
+### Complete Mode Differences
+
+The Complete mode prompt includes:
+
+- **Existing records** from the database (with their IDs)
+- Instruction to **keep IDs unchanged** (critical for UPDATE operations)
+- Instruction to only modify NULL/missing fields (unless stated otherwise)
+
+Example `## Data Completer` section:
+
+```markdown
+## Data Completer
+
+The values for number_of_engines may be wrong; max_passengers and max_range_nm
+only contain dummy values. Fill in correct and plausible values based on your
+knowledge and on additional research in the web. Keep all other values as they are.
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/entity/:name/generator-instruction` | GET/PUT | Read/write `## Data Generator` section |
+| `/api/entity/:name/completer-instruction` | GET/PUT | Read/write `## Data Completer` section |
+| `/api/seed/prompt/:entity` | POST | Build generate prompt (new records) |
+| `/api/seed/complete-prompt/:entity` | POST | Build complete prompt (includes existing records) |
+| `/api/seed/parse/:entity` | POST | Parse AI response, validate records |
+
+---
+
 ## Validation Pipeline
 
 When pasting AI output or importing data, validation checks:
