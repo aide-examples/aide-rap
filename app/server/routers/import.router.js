@@ -174,10 +174,10 @@ module.exports = function(cfg) {
       const schema = getSchema();
       const entity = schema?.entities?.[entityName];
       let unmappedTargetColumns = [];
+      let unmappedRequiredColumns = [];
 
       if (entity) {
-        const entityColumns = entity.columns.map(c => c.name);
-        const entityColumnSet = new Set(entityColumns);
+        const entityColumnSet = new Set(entity.columns.map(c => c.name));
 
         // Check target columns in mapping
         for (const targetCol of mappedTargetCols) {
@@ -191,7 +191,21 @@ module.exports = function(cfg) {
 
         // Find unmapped target columns (in entity but not filled by mapping)
         // Exclude 'id' as it's auto-generated
-        unmappedTargetColumns = entityColumns.filter(col => col !== 'id' && !mappedTargetCols.has(col));
+        for (const col of entity.columns) {
+          if (col.name === 'id' || mappedTargetCols.has(col.name)) continue;
+
+          if (col.required) {
+            // Required column not mapped - this is an error
+            unmappedRequiredColumns.push(col.name);
+            errors.target.push({
+              column: col.name,
+              message: `Required column "${col.name}" is not mapped`
+            });
+          } else {
+            // Optional column not mapped - just info
+            unmappedTargetColumns.push(col.name);
+          }
+        }
       } else {
         errors.target.push({
           column: null,
@@ -206,6 +220,7 @@ module.exports = function(cfg) {
         targetErrors: errors.target,
         unusedSourceColumns,
         unmappedTargetColumns,
+        unmappedRequiredColumns,
         mappingCount: mappedSourceCols.size,
         sourceColumns: sourceColumns.length,
         targetColumns: entity?.columns?.length || 0

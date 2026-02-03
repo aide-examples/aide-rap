@@ -516,9 +516,9 @@ const SeedImportDialog = {
         this.log('info', `Unused source columns: ${result.unusedSourceColumns.join(', ')}`);
       }
 
-      // Report unmapped target columns
+      // Report unmapped optional target columns
       if (result.unmappedTargetColumns?.length > 0) {
-        this.log('info', `Unmapped target columns: ${result.unmappedTargetColumns.join(', ')}`);
+        this.log('info', `Unmapped optional columns: ${result.unmappedTargetColumns.join(', ')}`);
       }
 
       if (result.valid) {
