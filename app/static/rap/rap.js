@@ -219,8 +219,8 @@ async function tryUrlLogin() {
       const authConfig = await authConfigRes.json();
 
       if (!authConfig.enabled && !authConfig.notConfigured) {
-        // Auth disabled (e.g., --noauth flag) - full access as "master"
-        window.currentUser = { role: 'master' };
+        // Auth disabled (e.g., --noauth flag) - full access as admin
+        window.currentUser = { role: 'admin', noauth: true };
       } else {
         // Auth enabled - check session
         const authRes = await fetch('/api/auth/me');
@@ -250,7 +250,7 @@ async function tryUrlLogin() {
 
         const userEl = document.createElement('span');
         userEl.className = 'status-user-indicator';
-        const isMaster = window.currentUser.role === 'master';
+        const isNoauth = window.currentUser.noauth === true;
         const ipDisplay = window.currentUser.ip ? ` @ ${window.currentUser.ip}` : '';
         userEl.innerHTML = `
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -1px; margin-right: 3px;">
@@ -258,7 +258,7 @@ async function tryUrlLogin() {
           </svg>
           <span class="status-user-role">${window.currentUser.role}${ipDisplay}</span>
         `;
-        if (isMaster) {
+        if (isNoauth) {
           userEl.title = 'Development mode (--noauth)';
         } else {
           userEl.title = 'Click to logout';
