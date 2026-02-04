@@ -18,6 +18,7 @@ const HierarchyTree = {
   state: null,  // TreeState for expansion tracking
   rootRecords: [],
   childrenCache: new Map(),  // parentId → children[]
+  knownLeaves: new Set(),    // recordIds confirmed to have no children
 
   init(containerId) {
     this.container = document.getElementById(containerId);
@@ -30,6 +31,7 @@ const HierarchyTree = {
     this.schema = await SchemaCache.getExtended(entityName);
     this.state.clear();
     this.childrenCache.clear();
+    this.knownLeaves.clear();
 
     // Load root nodes (where self-ref FK is NULL)
     try {
@@ -89,8 +91,10 @@ const HierarchyTree = {
     const areaColor = this.schema.areaColor || '#e5e7eb';
 
     // Check if node has potential children (we'll know for sure when expanded)
-    const hasChildren = !this.childrenCache.has(record.id) ||
-                        this.childrenCache.get(record.id).length > 0;
+    // knownLeaves contains IDs of nodes we've verified have no children
+    const hasChildren = !this.knownLeaves.has(record.id) &&
+                        (!this.childrenCache.has(record.id) ||
+                         this.childrenCache.get(record.id).length > 0);
 
     let html = `
       <div class="hierarchy-node" data-node-id="${nodeId}" data-record-id="${record.id}">
@@ -106,7 +110,7 @@ const HierarchyTree = {
         </div>
     `;
 
-    if (isExpanded) {
+    if (isExpanded && !this.knownLeaves.has(record.id)) {
       const children = await this.getChildren(record.id);
       if (children.length > 0) {
         html += '<div class="hierarchy-children">';
@@ -114,9 +118,8 @@ const HierarchyTree = {
           html += await this.renderNode(child, depth + 1);
         }
         html += '</div>';
-      } else {
-        html += `<div class="hierarchy-leaf" style="margin-left: ${(depth + 1) * 24}px">— keine Untertypen —</div>`;
       }
+      // No children: triangle removal happens in click handler with brief feedback
     }
 
     html += '</div>';
@@ -135,11 +138,26 @@ const HierarchyTree = {
         if (e.shiftKey && !this.state.isExpanded(nodeId)) {
           // Shift+Click: expand entire subtree recursively
           await this.expandSubtree(recordId);
+          await this.render();
         } else {
           // Normal click: toggle single node
+          const wasExpanded = this.state.isExpanded(nodeId);
           this.state.toggleNode(nodeId);
+
+          if (!wasExpanded) {
+            // Expanding: check if node has children
+            const children = await this.getChildren(recordId);
+            if (children.length === 0) {
+              // No children: show brief feedback, then mark as leaf
+              el.classList.add('hierarchy-leaf-feedback');
+              el.textContent = '○';  // Brief visual indicator
+              await new Promise(resolve => setTimeout(resolve, 800));
+              this.knownLeaves.add(recordId);
+              this.state.collapse(nodeId);  // Don't keep expanded state for leaf
+            }
+          }
+          await this.render();
         }
-        await this.render();
       };
     });
 

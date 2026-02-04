@@ -2,7 +2,7 @@
 
 Lines of code statistics for the AIDE RAP project.
 
-*Generated: 2026-02-04 21:13*
+*Generated: 2026-02-04 21:38*
 
 ## External Dependencies
 
@@ -16,13 +16,13 @@ Lines of code statistics for the AIDE RAP project.
 
 | Category | LOC |
 |----------|----:|
-| Python | 4152 |
-| JS Server | 4361 |
+| Python | 4163 |
+| JS Server | 4380 |
 | JS Browser | 540 |
 | CSS | 1006 |
 | HTML Templates | 727 |
 | Documentation | 2225 |
-| **Subtotal** | **13011** |
+| **Subtotal** | **13041** |
 
 ## AIDE-RAP Platform
 
@@ -30,10 +30,10 @@ Lines of code statistics for the AIDE RAP project.
 |----------|----:|
 | Server (app/server) | 17379 |
 | Shared (app/shared) | 1960 |
-| Frontend (app/static) | 21990 |
+| Frontend (app/static) | 22011 |
 | Tools | 1175 |
 | Config (package.json etc.) | 75 |
-| **Subtotal** | **42579** |
+| **Subtotal** | **42600** |
 
 ## Systems
 
@@ -49,9 +49,9 @@ Lines of code statistics for the AIDE RAP project.
 
 | Component | Own Code |
 |-----------|----------|
-| AIDE-FRAME | 13011 |
-| AIDE-RAP Platform | 42579 |
+| AIDE-FRAME | 13041 |
+| AIDE-RAP Platform | 42600 |
 | Systems (all) | 2381 |
-| **Total Own Code** | **57971** |
+| **Total Own Code** | **58022** |
 
 *Note: node_modules contains third-party dependencies and is excluded from own code counts.*

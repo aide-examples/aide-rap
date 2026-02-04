@@ -1893,6 +1893,16 @@
     visibility: hidden;
 }
 
+.hierarchy-toggle.hierarchy-leaf-feedback {
+    color: var(--color-gray-300);
+    animation: hierarchy-fade 0.8s ease-out;
+}
+
+@keyframes hierarchy-fade {
+    0% { color: var(--color-gray-400); }
+    100% { color: var(--color-gray-200); }
+}
+
 .hierarchy-color {
     width: 4px;
     height: 20px;
@@ -1939,13 +1949,6 @@
 .hierarchy-children {
     border-left: 1px dashed var(--color-gray-300);
     margin-left: 7px;
-}
-
-.hierarchy-leaf {
-    color: var(--color-gray-400);
-    font-style: italic;
-    font-size: 0.85em;
-    padding: 4px 8px;
 }
 
 .hierarchy-empty-state {
