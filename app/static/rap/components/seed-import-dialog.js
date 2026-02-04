@@ -271,7 +271,7 @@ const SeedImportDialog = {
               </div>
             </div>
 
-            <div class="import-tab-content" id="tab-paste" style="display: block;">
+            <div class="import-tab-content" id="tab-paste" style="display: flex;">
               <div class="paste-toolbar">
                 <div class="drop-zone-compact" id="import-drop-zone">
                   <span class="drop-zone-icon">📁</span>
@@ -426,7 +426,7 @@ const SeedImportDialog = {
 
     ['schema', 'preview', 'rule', 'run', 'load', 'paste'].forEach(name => {
       const el = this.modalElement.querySelector(`#tab-${name}`);
-      if (el) el.style.display = name === tabName ? 'block' : 'none';
+      if (el) el.style.display = name === tabName ? 'flex' : 'none';
     });
   },
 
