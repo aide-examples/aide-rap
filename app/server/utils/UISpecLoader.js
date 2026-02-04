@@ -45,7 +45,11 @@ function loadCrudConfig(requirementsDir) {
   const mdPath = path.join(requirementsDir, 'ui', 'Crud.md');
   if (!fs.existsSync(mdPath)) return null;
 
-  const content = fs.readFileSync(mdPath, 'utf-8');
+  let content = fs.readFileSync(mdPath, 'utf-8');
+
+  // Remove HTML comments before parsing (they may contain example entries)
+  content = content.replace(/<!--[\s\S]*?-->/g, '');
+
   const entities = [];
   const prefilters = {}; // { entityName: ['field1', 'field2:select'] }
   const requiredFilters = {}; // { entityName: ['field1', 'field2:select'] }
@@ -127,7 +131,11 @@ function loadViewsConfig(requirementsDir) {
   const mdPath = path.join(requirementsDir, 'ui', 'Views.md');
   if (!fs.existsSync(mdPath)) return null;
 
-  const content = fs.readFileSync(mdPath, 'utf-8');
+  let content = fs.readFileSync(mdPath, 'utf-8');
+
+  // Remove HTML comments before parsing (they may contain example entries)
+  content = content.replace(/<!--[\s\S]*?-->/g, '');
+
   const lines = content.split('\n');
   const result = [];
   let currentViewName = null;
