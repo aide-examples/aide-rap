@@ -7,6 +7,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { getSchema } = require('../config/database');
+const { filterColumnsForDiagram } = require('../utils/DiagramUtils');
 
 /**
  * Transform schema format to model format expected by Layout-Editor.
@@ -17,16 +18,32 @@ function schemaToModel(schema) {
     const classes = {};
 
     for (const [name, entity] of Object.entries(schema.entities)) {
+        const { regularColumns, aggregates } = filterColumnsForDiagram(entity.columns);
+
+        // Build attributes list
+        const attributes = regularColumns.map(col => ({
+            name: col.displayName || col.name,
+            type: col.foreignKey ? col.foreignKey.entity : col.type,
+            description: col.description || '',
+            optional: col.optional || false,
+            ui: col.ui || {}
+        }));
+
+        // Add collapsed aggregate entries
+        for (const [source, type] of aggregates) {
+            attributes.push({
+                name: source,
+                type: type,
+                description: '',
+                optional: true,
+                ui: {}
+            });
+        }
+
         classes[name] = {
             description: entity.description || '',
             area: entity.area,
-            attributes: entity.columns.map(col => ({
-                name: col.displayName || col.name,
-                type: col.foreignKey ? col.foreignKey.entity : col.type,
-                description: col.description || '',
-                optional: col.optional || false,
-                ui: col.ui || {}
-            })),
+            attributes,
             types: entity.localTypes || {}
         };
     }

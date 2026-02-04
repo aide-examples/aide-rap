@@ -12,6 +12,7 @@ Aggregate types allow you to define a single logical field in your data model th
 |----------------|------------|------------------|
 | `geo` | `{name}_latitude`, `{name}_longitude` | `"48.1371, 11.5754"` |
 | `address` | `{name}_street`, `{name}_city`, `{name}_zip`, `{name}_country` | `"{zip} {city}"` |
+| `contact` | `{name}_phone`, `{name}_email`, `{name}_fax` | `"{email} ({phone})"` |
 
 ---
 
@@ -236,6 +237,52 @@ headquarters_country TEXT
 ### Canonical Format
 
 The canonical display format is: `"{zip} {city}"` (e.g., "22335 Hamburg")
+
+---
+
+## Built-in: `contact`
+
+Contact information stored as three TEXT columns.
+
+### Usage in Entity Markdown
+
+```markdown
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| contact | contact | Contact information | info@shop.de (+49 40 123) |
+```
+
+### Generated Database Columns
+
+```sql
+contact_phone TEXT,
+contact_email TEXT,
+contact_fax TEXT
+```
+
+### Field Specification
+
+| Subfield | SQL Type | Description |
+|----------|----------|-------------|
+| `phone` | TEXT | Phone number |
+| `email` | TEXT | Email address |
+| `fax` | TEXT | Fax number (optional) |
+
+### Seed Data Format
+
+```json
+{
+  "contact": {
+    "phone": "+49 40 12345",
+    "email": "info@company.de",
+    "fax": "+49 40 12346"
+  }
+}
+```
+
+### Canonical Format
+
+The canonical display format is: `"{email} ({phone})"` (e.g., "info@shop.de (+49 40 123)")
 
 ---
 

@@ -151,39 +151,11 @@
 
         /**
          * Get visible attributes, sorted with self-references first.
-         * Filters out system columns (id, version, created_at, updated_at).
-         * Collapses aggregate/composite types (address, geo) into single entries.
+         * Note: System columns and aggregate collapsing are handled server-side
+         * in layout-editor.router.js schemaToModel().
          */
         getVisibleAttributes(attributes, className) {
-            const SYSTEM_COLUMNS = ['id', 'version', 'created_at', 'updated_at'];
-            let attrs = (attributes || []).filter(a => !SYSTEM_COLUMNS.includes(a.name));
-
-            // Collapse aggregate types (e.g., address_street, address_city → address)
-            const aggregateSources = new Map();  // aggregateSource → aggregateType
-            const nonAggregateAttrs = [];
-
-            for (const attr of attrs) {
-                if (attr.aggregateSource && attr.aggregateType) {
-                    // This is an expanded aggregate field - track the source
-                    if (!aggregateSources.has(attr.aggregateSource)) {
-                        aggregateSources.set(attr.aggregateSource, attr.aggregateType);
-                    }
-                } else {
-                    // Regular attribute
-                    nonAggregateAttrs.push(attr);
-                }
-            }
-
-            // Add collapsed aggregate entries
-            for (const [source, type] of aggregateSources) {
-                nonAggregateAttrs.push({
-                    name: source,
-                    type: type
-                });
-            }
-
-            attrs = nonAggregateAttrs;
-
+            const attrs = attributes || [];
             return attrs.slice().sort((a, b) => {
                 const aType = (a.type || '').replace(/\s*\[[^\]]+\]/g, '').trim();
                 const bType = (b.type || '').replace(/\s*\[[^\]]+\]/g, '').trim();

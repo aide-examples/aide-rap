@@ -5,6 +5,7 @@
 
 const express = require('express');
 const { getSchema, getSchemaHash, checkSchemaChanged, reloadSchema } = require('../config/database');
+const { filterColumnsForDiagram } = require('../utils/DiagramUtils');
 
 // Cache for generated Mermaid diagrams
 const diagramCache = new Map();
@@ -98,23 +99,7 @@ function generateMermaidClassDiagram(entityNames, schema) {
 
     lines.push(`    class ${name} {`);
 
-    // Collect aggregate sources and non-aggregate columns
-    const aggregateSources = new Map();  // source → type
-    const regularColumns = [];
-
-    for (const col of entity.columns) {
-      // Skip internal columns
-      if (['id', 'created_at', 'updated_at', 'version'].includes(col.name)) continue;
-
-      // Check if this is an aggregate field (e.g., address_street, geo_lat)
-      if (col.aggregateSource && col.aggregateType) {
-        if (!aggregateSources.has(col.aggregateSource)) {
-          aggregateSources.set(col.aggregateSource, col.aggregateType);
-        }
-      } else {
-        regularColumns.push(col);
-      }
-    }
+    const { regularColumns, aggregates } = filterColumnsForDiagram(entity.columns);
 
     // Add regular columns
     for (const col of regularColumns) {
@@ -130,9 +115,9 @@ function generateMermaidClassDiagram(entityNames, schema) {
       lines.push(`        ${prefix}${colName}`);
     }
 
-    // Add collapsed aggregate columns (e.g., "address" instead of address_street, address_city, etc.)
-    for (const [source, type] of aggregateSources) {
-      lines.push(`        ${source}`);
+    // Add collapsed aggregate columns with {name} notation to indicate structured type
+    for (const [source, type] of aggregates) {
+      lines.push(`        {${source}}`);
     }
 
     lines.push(`    }`);

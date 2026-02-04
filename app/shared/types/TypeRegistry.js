@@ -27,7 +27,7 @@ class TypeRegistry {
     /**
      * Built-in type names
      */
-    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media', 'geo', 'address'];
+    this.builtInTypes = ['int', 'string', 'date', 'bool', 'boolean', 'json', 'url', 'mail', 'media', 'geo', 'address', 'contact'];
 
     /**
      * Built-in type definitions
@@ -123,6 +123,16 @@ class TypeRegistry {
         ],
         canonical: '{zip} {city}, {street}',
         description: 'Postal address with geocoded coordinates'
+      },
+      contact: {
+        kind: 'aggregate',
+        fields: [
+          { name: 'phone', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'email', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'fax', type: 'string', sqlType: 'TEXT', required: false }
+        ],
+        canonical: '{email} ({phone})',
+        description: 'Contact information with phone, email and fax'
       }
     };
   }
