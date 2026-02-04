@@ -581,7 +581,7 @@ const EntityExplorer = {
         group.entities.forEach(e => {
           menuHtml += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">
             <span class="entity-name">${e.name}</span>
-            <span class="entity-count">${e.count}</span>
+            <span class="entity-count">${e.count || ''}</span>
           </div>`;
         });
         menuHtml += `</div>`;
