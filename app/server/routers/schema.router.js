@@ -115,9 +115,9 @@ function generateMermaidClassDiagram(entityNames, schema) {
       lines.push(`        ${prefix}${colName}`);
     }
 
-    // Add collapsed aggregate columns with {name} notation to indicate structured type
+    // Add collapsed aggregate columns with «name» notation to indicate structured type
     for (const [source, type] of aggregates) {
-      lines.push(`        {${source}}`);
+      lines.push(`        «${source}»`);
     }
 
     lines.push(`    }`);

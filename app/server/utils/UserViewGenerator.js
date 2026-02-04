@@ -6,13 +6,7 @@
  */
 
 const logger = require('./logger');
-
-/**
- * Convert PascalCase to snake_case
- */
-function toSnakeCase(str) {
-  return str.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
-}
+const { toSnakeCase } = require('./SchemaGenerator');
 
 /**
  * Convert view name to SQL-safe view name
@@ -27,6 +21,19 @@ function toSqlName(viewName) {
  */
 function titleCase(str) {
   return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
+ * Find FK column by segment name.
+ * Matches: displayName, name, or name + '_id' suffix.
+ * @param {Object} entity - Entity with columns array
+ * @param {string} segmentName - Path segment to match
+ * @returns {Object|undefined} - Matching FK column or undefined
+ */
+function findFKColumn(entity, segmentName) {
+  return entity.columns.find(
+    c => c.foreignKey && (c.displayName === segmentName || c.name === segmentName || c.name === segmentName + '_id')
+  );
 }
 
 /**
@@ -198,10 +205,8 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
     const seg = segments[i];
     pathParts.push(seg);
 
-    // Find FK column matching this segment name (displayName)
-    const fkCol = currentEntity.columns.find(
-      c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
-    );
+    // Find FK column matching this segment name
+    const fkCol = findFKColumn(currentEntity, seg);
 
     if (!fkCol || !fkCol.foreignKey) {
       throw new Error(
@@ -355,9 +360,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
   }
 
   // Find FK column in child entity that points to base entity
-  const fkCol = refEntity.columns.find(
-    c => c.foreignKey && (c.displayName === fkFieldName || c.name === fkFieldName || c.name === fkFieldName + '_id')
-  );
+  const fkCol = findFKColumn(refEntity, fkFieldName);
   if (!fkCol || !fkCol.foreignKey) {
     throw new Error(
       `FK "${fkFieldName}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
@@ -421,9 +424,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
         const seg = segments[i];
         pathParts.push(seg);
 
-        const innerFkCol = currentEntity.columns.find(
-          c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
-        );
+        const innerFkCol = findFKColumn(currentEntity, seg);
 
         if (!innerFkCol || !innerFkCol.foreignKey) {
           throw new Error(
@@ -593,9 +594,7 @@ function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPre
   }
 
   // Find FK column in child entity that points to base entity
-  const fkCol = refEntity.columns.find(
-    c => c.foreignKey && (c.displayName === fkFieldName || c.name === fkFieldName || c.name === fkFieldName + '_id')
-  );
+  const fkCol = findFKColumn(refEntity, fkFieldName);
   if (!fkCol || !fkCol.foreignKey) {
     throw new Error(
       `FK "${fkFieldName}" not found in entity "${refEntityName}" (back-ref: "${pathStr}")`
@@ -628,9 +627,7 @@ function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPre
       const seg = segments[i];
       pathParts.push(seg);
 
-      const innerFkCol = targetEntity.columns.find(
-        c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
-      );
+      const innerFkCol = findFKColumn(targetEntity, seg);
 
       if (!innerFkCol || !innerFkCol.foreignKey) {
         throw new Error(
@@ -789,9 +786,7 @@ function expandAggregateColumns(path, baseEntityName, schema, labelPrefix = null
     }
 
     // Not an aggregate, must be FK segment
-    const fkCol = currentEntity.columns.find(
-      c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
-    );
+    const fkCol = findFKColumn(currentEntity, seg);
 
     if (!fkCol || !fkCol.foreignKey) {
       throw new Error(
