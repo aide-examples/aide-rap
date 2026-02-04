@@ -274,7 +274,7 @@ const SeedManager = {
           <td class="import-count">${importDisplay}</td>
           <td class="source-status">${sourceDisplay}</td>
           <td class="backup-count">${backupDisplay}</td>
-          <td class="row-count">${e.rowCount}</td>
+          <td class="row-count">${e.rowCount || ''}</td>
         </tr>
       `;
     }).join('');
