@@ -98,11 +98,26 @@ function generateMermaidClassDiagram(entityNames, schema) {
 
     lines.push(`    class ${name} {`);
 
-    // Show all columns (excluding internal ones like id, created_at, updated_at, version)
+    // Collect aggregate sources and non-aggregate columns
+    const aggregateSources = new Map();  // source → type
+    const regularColumns = [];
+
     for (const col of entity.columns) {
       // Skip internal columns
       if (['id', 'created_at', 'updated_at', 'version'].includes(col.name)) continue;
 
+      // Check if this is an aggregate field (e.g., address_street, geo_lat)
+      if (col.aggregateSource && col.aggregateType) {
+        if (!aggregateSources.has(col.aggregateSource)) {
+          aggregateSources.set(col.aggregateSource, col.aggregateType);
+        }
+      } else {
+        regularColumns.push(col);
+      }
+    }
+
+    // Add regular columns
+    for (const col of regularColumns) {
       // For FK columns, show the display name (without _id suffix)
       const colName = col.foreignKey ? (col.displayName || col.name) : col.name;
 
@@ -113,6 +128,11 @@ function generateMermaidClassDiagram(entityNames, schema) {
       else if (col.foreignKey) prefix = '← '; // FK = reference (arrow pointing left)
 
       lines.push(`        ${prefix}${colName}`);
+    }
+
+    // Add collapsed aggregate columns (e.g., "address" instead of address_street, address_city, etc.)
+    for (const [source, type] of aggregateSources) {
+      lines.push(`        ${source}`);
     }
 
     lines.push(`    }`);
