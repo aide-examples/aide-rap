@@ -3281,7 +3281,6 @@
 /* Preview Tab (Sample Records) */
 .sample-content {
     font-size: 0.9rem;
-    overflow-y: auto;
 }
 
 .sample-info {
