@@ -132,10 +132,7 @@
                 const attrs = getVisibleAttributes(className);
                 let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
                 for (const attr of attrs) {
-                    const cleanType = ConnectionCalculator.extractBaseType(attr.type);
-                    const attrText = entityNames.includes(cleanType)
-                        ? attr.name
-                        : `${attr.name}: ${cleanType}`;
+                    const attrText = ConnectionCalculator.formatAttribute(attr, entityNames);
                     maxWidth = Math.max(maxWidth, measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY));
                 }
                 return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
@@ -490,10 +487,7 @@
                     );
                     let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
                     for (const attr of attrs) {
-                        const cleanType = ConnectionCalculator.extractBaseType(attr.type);
-                        const attrText = entityNames.includes(cleanType)
-                            ? attr.name
-                            : `${attr.name}: ${cleanType}`;
+                        const attrText = ConnectionCalculator.formatAttribute(attr, entityNames);
                         maxWidth = Math.max(maxWidth, measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY));
                     }
                     return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
@@ -675,6 +669,11 @@
                             // FK attribute: bold name only
                             displayText = fitToContent ? attr.name : truncateText(attr.name, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
                             parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold" fill="${fillColor}">${escapeXml(displayText)}</text>`);
+                        } else if (ConnectionCalculator.isAggregateType(cleanType)) {
+                            // Aggregate type: «name» notation
+                            const fullText = `«${attr.name}»`;
+                            displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="${fillColor}">${escapeXml(displayText)}</text>`);
                         } else {
                             const fullText = `${attr.name}: ${cleanType}`;
                             displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
@@ -857,6 +856,9 @@
                             // FK attribute: bold name only
                             line.textContent = attr.name;
                             line.style.fontWeight = 'bold';
+                        } else if (ConnectionCalculator.isAggregateType(baseType)) {
+                            // Aggregate type: «name» notation
+                            line.textContent = `«${attr.name}»`;
                         } else {
                             line.textContent = `${attr.name}: ${baseType}`;
                         }

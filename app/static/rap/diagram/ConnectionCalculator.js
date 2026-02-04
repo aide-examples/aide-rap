@@ -172,6 +172,36 @@
          */
         extractBaseType(typeStr) {
             return (typeStr || '').replace(/\s*\[[^\]]+\]/g, '').trim();
+        },
+
+        /**
+         * Built-in aggregate types (structured types with multiple DB columns).
+         */
+        AGGREGATE_TYPES: ['geo', 'address', 'contact'],
+
+        /**
+         * Check if a type is a built-in aggregate type.
+         */
+        isAggregateType(typeStr) {
+            const baseType = this.extractBaseType(typeStr);
+            return this.AGGREGATE_TYPES.includes(baseType);
+        },
+
+        /**
+         * Format attribute for display.
+         * - FK to entity: just the name
+         * - Aggregate type: «name»
+         * - Regular: name: type
+         */
+        formatAttribute(attr, entityNames) {
+            const cleanType = this.extractBaseType(attr.type);
+            if (entityNames.includes(cleanType)) {
+                return attr.name;  // FK reference
+            }
+            if (this.isAggregateType(cleanType)) {
+                return `«${attr.name}»`;  // Structured type with guillemets
+            }
+            return `${attr.name}: ${cleanType}`;  // Regular attribute
         }
     };
 

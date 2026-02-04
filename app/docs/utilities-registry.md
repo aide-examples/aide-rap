@@ -23,6 +23,8 @@
 | `TypeRegistry.getAggregateFields(name)` | shared/types/TypeRegistry.js | Aggregate-Felder holen |
 | `TypeRegistry.getSqlType(name)` | shared/types/TypeRegistry.js | JS-Typ → SQL-Typ |
 | `filterColumnsForDiagram(columns)` | server/utils/DiagramUtils.js | System-Spalten filtern, Aggregates kollabieren |
+| `ConnectionCalculator.isAggregateType(type)` | static/rap/diagram/ConnectionCalculator.js | Prüfen ob Aggregate-Typ (Browser) |
+| `ConnectionCalculator.formatAttribute(attr, entityNames)` | static/rap/diagram/ConnectionCalculator.js | Attribut formatieren: FK/Aggregate/Regular |
 
 **Built-in Aggregate Types:** `geo`, `address`, `contact`
 
