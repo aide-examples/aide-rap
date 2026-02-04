@@ -21,6 +21,8 @@ const EntityExplorer = {
   btnViewTreeV: null,
   btnViewMap: null,
   btnViewChart: null,
+  btnViewHierarchy: null,
+  selfRefFK: null, // Self-referential FK column name (for hierarchy view)
   currentEntity: null,
   currentEntitySchema: null, // Cached entity schema for map rendering
   currentView: null, // null = entity mode, object = view mode { name, base, color }
@@ -458,6 +460,7 @@ const EntityExplorer = {
     this.btnViewTreeV = document.getElementById('btn-view-tree-v');
     this.btnViewMap = document.getElementById('btn-view-map');
     this.btnViewChart = document.getElementById('btn-view-chart');
+    this.btnViewHierarchy = document.getElementById('btn-view-hierarchy');
     this.mapLabelsToggle = document.getElementById('map-labels-toggle');
     this.mapLabelsCheckbox = document.getElementById('map-show-labels');
 
@@ -465,6 +468,7 @@ const EntityExplorer = {
     EntityTree.init('entity-tree-container');
     EntityTable.init('entity-table-container');
     EntityChart.init('entity-chart-container');
+    HierarchyTree.init('entity-tree-container'); // Reuse tree container
 
     // Restore view mode from session (note: 'map' mode is not restored, requires active view)
     const savedViewMode = sessionStorage.getItem('viewMode');
@@ -499,6 +503,7 @@ const EntityExplorer = {
     this.btnViewTreeV.addEventListener('click', () => this.setViewMode('tree-v'));
     this.btnViewMap.addEventListener('click', () => this.setViewMode('map'));
     this.btnViewChart.addEventListener('click', () => this.setViewMode('chart'));
+    this.btnViewHierarchy?.addEventListener('click', () => this.setViewMode('hierarchy'));
     this.mapLabelsCheckbox.addEventListener('change', (e) => {
       EntityMap.togglePermanentLabels(e.target.checked);
     });
@@ -826,6 +831,17 @@ const EntityExplorer = {
       }
       // Hide chart button for entities (charts are view-only)
       this.btnViewChart.style.display = 'none';
+
+      // Show hierarchy button if entity has self-referential FK
+      this.selfRefFK = schema.selfRefFK || null;
+      if (this.btnViewHierarchy) {
+        this.btnViewHierarchy.style.display = this.selfRefFK ? '' : 'none';
+      }
+      // If we were in hierarchy mode but entity has no self-ref FK, switch back
+      if (this.viewMode === 'hierarchy' && !this.selfRefFK) {
+        this.viewMode = 'tree-v';
+        this.updateViewToggle();
+      }
     } catch (e) {
       this.currentEntitySchema = null;
       this.prefilterFields = null;
@@ -848,11 +864,13 @@ const EntityExplorer = {
     this.records = [];
     this.prefilterFields = null;
 
-    // Force table view, hide tree buttons, hide map/chart controls (will show if hasGeo/chart)
+    // Force table view, hide tree buttons, hide map/chart/hierarchy controls (will show if hasGeo/chart)
     this.btnViewTreeH.style.display = 'none';
     this.btnViewTreeV.style.display = 'none';
     this.btnViewMap.style.display = 'none';
     this.btnViewChart.style.display = 'none';
+    if (this.btnViewHierarchy) this.btnViewHierarchy.style.display = 'none';
+    this.selfRefFK = null;
     this.mapLabelsToggle.style.display = 'none';
     this.viewMode = 'table';
     this.updateViewToggle();
@@ -1245,9 +1263,13 @@ const EntityExplorer = {
     const oldMode = this.viewMode;
     const wasTree = oldMode === 'tree-h' || oldMode === 'tree-v';
     const isTree = mode === 'tree-h' || mode === 'tree-v';
+    const isHierarchy = mode === 'hierarchy';
 
     this.viewMode = mode;
-    sessionStorage.setItem('viewMode', this.viewMode);
+    // Don't persist hierarchy mode (it's entity-specific)
+    if (!isHierarchy) {
+      sessionStorage.setItem('viewMode', this.viewMode);
+    }
     this.updateViewToggle();
 
     // Only re-render if switching between table and tree
@@ -1265,6 +1287,7 @@ const EntityExplorer = {
     const isTree = this.viewMode === 'tree-h' || this.viewMode === 'tree-v';
     const isMap = this.viewMode === 'map';
     const isChart = this.viewMode === 'chart';
+    const isHierarchy = this.viewMode === 'hierarchy';
 
     // Update button states
     this.btnViewTable.classList.toggle('active', this.viewMode === 'table');
@@ -1272,10 +1295,11 @@ const EntityExplorer = {
     this.btnViewTreeV.classList.toggle('active', this.viewMode === 'tree-v');
     this.btnViewMap.classList.toggle('active', isMap);
     this.btnViewChart.classList.toggle('active', isChart);
+    this.btnViewHierarchy?.classList.toggle('active', isHierarchy);
 
     // Show/hide containers
     this.tableContainer.classList.toggle('hidden', this.viewMode !== 'table');
-    this.treeContainer.classList.toggle('hidden', !isTree);
+    this.treeContainer.classList.toggle('hidden', !isTree && !isHierarchy);
     this.mapContainer.classList.toggle('hidden', !isMap);
     this.chartContainer.classList.toggle('hidden', !isChart);
 
@@ -1293,6 +1317,8 @@ const EntityExplorer = {
       this.renderMap();
     } else if (this.viewMode === 'chart') {
       this.renderChart();
+    } else if (this.viewMode === 'hierarchy') {
+      this.renderHierarchy();
     } else {
       // Both tree-h and tree-v use the tree renderer
       this.renderTree();
@@ -1454,6 +1480,15 @@ const EntityExplorer = {
     // Pass selectedId to auto-expand the selected record and its outbound FKs
     const options = this.selectedId ? { selectedId: this.selectedId } : {};
     await EntityTree.loadEntity(this.currentEntity, this.records, options);
+  },
+
+  async renderHierarchy() {
+    if (!this.currentEntity || !this.selfRefFK) {
+      this.treeContainer.innerHTML = `<p class="empty-message">${i18n.t('no_hierarchy_available') || 'No hierarchy available for this entity'}</p>`;
+      return;
+    }
+
+    await HierarchyTree.loadEntity(this.currentEntity, this.selfRefFK);
   },
 
   getLabelFields(schema) {

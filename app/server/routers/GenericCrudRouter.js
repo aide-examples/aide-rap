@@ -143,6 +143,67 @@ router.get('/:entity/:id/references', validateEntity, (req, res, next) => {
 });
 
 /**
+ * GET /api/entities/:entity/hierarchy/roots - Get root nodes for hierarchy view
+ * Returns records where the self-referential FK is NULL
+ */
+router.get('/:entity/hierarchy/roots', validateEntity, (req, res, next) => {
+  try {
+    const { entity } = req.params;
+    const schema = service.getExtendedSchema(entity);
+
+    if (!schema.selfRefFK) {
+      return res.status(400).json({
+        error: {
+          code: 'NO_SELF_REF_FK',
+          message: `Entity '${entity}' has no self-referential foreign key`
+        }
+      });
+    }
+
+    // Use the FK column name directly (e.g., "super_type_id")
+    // Filter format: column:value where column is the actual DB column
+    const result = service.listEntities(entity, {
+      filter: `${schema.selfRefFK}:null`,
+      sort: schema.ui?.labelFields?.[0] || 'id'
+    }, req.correlationId);
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/entities/:entity/hierarchy/children/:parentId - Get children in hierarchy
+ * Returns records where the self-referential FK equals parentId
+ */
+router.get('/:entity/hierarchy/children/:parentId', validateEntity, (req, res, next) => {
+  try {
+    const { entity, parentId } = req.params;
+    const schema = service.getExtendedSchema(entity);
+
+    if (!schema.selfRefFK) {
+      return res.status(400).json({
+        error: {
+          code: 'NO_SELF_REF_FK',
+          message: `Entity '${entity}' has no self-referential foreign key`
+        }
+      });
+    }
+
+    // Use the FK column name directly (e.g., "super_type_id")
+    const result = service.listEntities(entity, {
+      filter: `${schema.selfRefFK}:${parentId}`,
+      sort: schema.ui?.labelFields?.[0] || 'id'
+    }, req.correlationId);
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/entities/:entity - List all records
  */
 router.get('/:entity', validateEntity, (req, res, next) => {

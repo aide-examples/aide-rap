@@ -63,8 +63,13 @@ function parseFilter(filter, options) {
       const [, colName, value] = exactViewMatch;
       const col = resolveColumn(colName);
       if (col) {
-        conditions.push(`"${col.sqlName}" = ?`);
-        params.push(value);
+        // Handle null specially for IS NULL queries
+        if (value.toLowerCase() === 'null') {
+          conditions.push(`"${col.sqlName}" IS NULL`);
+        } else {
+          conditions.push(`"${col.sqlName}" = ?`);
+          params.push(value);
+        }
       }
     } else if (likeMatch) {
       const [, colName, value] = likeMatch;
@@ -78,9 +83,14 @@ function parseFilter(filter, options) {
       // For entity exact match: use validateEntityColumn if provided
       const col = validateEntityColumn ? validateEntityColumn(colName) : resolveColumn(colName);
       if (col) {
-        conditions.push(`"${col.sqlName}" = ?`);
-        const paramValue = col.jsType === 'number' ? parseInt(value, 10) : value;
-        params.push(paramValue);
+        // Handle null specially for IS NULL queries (especially for FK columns)
+        if (value.toLowerCase() === 'null') {
+          conditions.push(`"${col.sqlName}" IS NULL`);
+        } else {
+          conditions.push(`"${col.sqlName}" = ?`);
+          const paramValue = col.jsType === 'number' ? parseInt(value, 10) : value;
+          params.push(paramValue);
+        }
       }
     } else {
       // Global LIKE search across all string columns

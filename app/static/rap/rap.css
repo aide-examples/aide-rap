@@ -1853,6 +1853,117 @@
 }
 
 /* -----------------------------------------------------------------------------
+   Hierarchy Tree (self-referential entity view)
+   ----------------------------------------------------------------------------- */
+.hierarchy-tree {
+    padding: 12px;
+}
+
+.hierarchy-node {
+    margin: 2px 0;
+}
+
+.hierarchy-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.hierarchy-header:hover {
+    background: var(--color-gray-100);
+}
+
+.hierarchy-header.hierarchy-selected {
+    background: var(--color-primary-light, #dbeafe);
+}
+
+.hierarchy-toggle {
+    width: 16px;
+    color: var(--color-gray-400);
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.hierarchy-toggle.hierarchy-no-children {
+    visibility: hidden;
+}
+
+.hierarchy-color {
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.hierarchy-label {
+    font-weight: 500;
+    color: var(--color-gray-900);
+}
+
+.hierarchy-label:hover {
+    text-decoration: underline;
+}
+
+.hierarchy-subtitle {
+    color: var(--color-gray-500);
+    font-size: 0.9em;
+}
+
+.hierarchy-navigate {
+    margin-left: 8px;
+    padding: 2px 8px;
+    color: var(--color-gray-500);
+    background: var(--color-gray-100);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+.hierarchy-header:hover .hierarchy-navigate {
+    color: var(--color-primary);
+    background: var(--color-gray-200);
+}
+
+.hierarchy-navigate:hover {
+    color: var(--color-primary);
+    background: var(--color-gray-100);
+    border-radius: 3px;
+}
+
+.hierarchy-children {
+    border-left: 1px dashed var(--color-gray-300);
+    margin-left: 7px;
+}
+
+.hierarchy-leaf {
+    color: var(--color-gray-400);
+    font-style: italic;
+    font-size: 0.85em;
+    padding: 4px 8px;
+}
+
+.hierarchy-empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--color-gray-500);
+}
+
+.hierarchy-empty-state p {
+    margin: 8px 0;
+}
+
+.hierarchy-hint {
+    font-size: 0.85em;
+    color: var(--color-gray-400);
+}
+
+/* -----------------------------------------------------------------------------
    Entity Table View
    ----------------------------------------------------------------------------- */
 .entity-table-wrapper {

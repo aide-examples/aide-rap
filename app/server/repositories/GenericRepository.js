@@ -520,7 +520,11 @@ function getExtendedSchemaInfo(entityName) {
     // Include prefilter fields for large dataset filtering
     prefilter: getEntityPrefilters()[entityName] || null,
     // Include required filter fields (always show dialog)
-    requiredFilter: getRequiredFilters()[entityName] || null
+    requiredFilter: getRequiredFilters()[entityName] || null,
+    // Self-referential FK column (for hierarchy view)
+    selfRefFK: (entity.foreignKeys || []).find(
+      fk => (fk.references?.entity || entityName) === entityName
+    )?.column || null
   };
 }
 

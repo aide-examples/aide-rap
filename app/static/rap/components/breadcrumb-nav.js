@@ -191,6 +191,11 @@ const BreadcrumbNav = {
         // Restore view mode
         if (crumb.viewMode) {
           EntityExplorer.setViewMode(crumb.viewMode);
+          // For hierarchy view, restore expanded state
+          if (crumb.viewMode === 'hierarchy' && crumb.hierarchyState && typeof HierarchyTree !== 'undefined') {
+            HierarchyTree.restoreExpandedState(crumb.hierarchyState);
+            await HierarchyTree.render();
+          }
         }
         // Restore selected row if any
         if (crumb.selectedId) {
@@ -230,6 +235,11 @@ const BreadcrumbNav = {
         // Restore view mode (triggers renderCurrentView which uses selectedId)
         if (crumb.viewMode) {
           EntityExplorer.setViewMode(crumb.viewMode);
+          // For hierarchy view, restore expanded state
+          if (crumb.viewMode === 'hierarchy' && crumb.hierarchyState && typeof HierarchyTree !== 'undefined') {
+            HierarchyTree.restoreExpandedState(crumb.hierarchyState);
+            await HierarchyTree.render();
+          }
         }
         // Update selection highlight and show in detail panel
         if (crumb.selectedId) {
@@ -283,6 +293,11 @@ const BreadcrumbNav = {
         // Restore view mode
         if (crumb.viewMode) {
           EntityExplorer.setViewMode(crumb.viewMode);
+          // For hierarchy view, restore expanded state
+          if (crumb.viewMode === 'hierarchy' && crumb.hierarchyState && typeof HierarchyTree !== 'undefined') {
+            HierarchyTree.restoreExpandedState(crumb.hierarchyState);
+            await HierarchyTree.render();
+          }
         }
         // Restore selected row if any
         if (crumb.selectedId) {

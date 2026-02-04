@@ -124,6 +124,20 @@ const ApiClient = {
   },
 
   /**
+   * Get hierarchy root nodes (where self-ref FK is NULL)
+   */
+  async getHierarchyRoots(entityName) {
+    return this.request(`${this.getEntityUrl(entityName)}/hierarchy/roots`);
+  },
+
+  /**
+   * Get hierarchy children (where self-ref FK = parentId)
+   */
+  async getHierarchyChildren(entityName, parentId) {
+    return this.request(`${this.getEntityUrl(entityName)}/hierarchy/children/${parentId}`);
+  },
+
+  /**
    * Get distinct values for a column (for prefilter dropdowns)
    * @param {string} entityName - Entity name
    * @param {string} columnPath - Column path (e.g., "meter" or "reading_at")
