@@ -165,6 +165,8 @@ const server = new HttpServer({
         viewerHooks: '/static/rap/viewer-hooks.js',
         // Point docs to system-specific directory
         docsDir: cfg.paths.docs,
+        // views/ has subdirectories (areas) that should stay nested, not become top-level sections
+        docsShallow: ['views'],
         // Add RAP platform docs as separate root
         customRoots: {
             'rap': {
