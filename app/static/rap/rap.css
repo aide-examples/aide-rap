@@ -5355,3 +5355,55 @@
     width: 100%;
     max-width: 800px;
 }
+
+/* ========================================
+ * Data Model Diagram Modal
+ * ======================================== */
+
+.diagram-overlay {
+    cursor: pointer;
+}
+
+.diagram-dialog {
+    max-width: 900px;
+    width: 90%;
+    max-height: 85vh;
+    cursor: auto;
+}
+
+.diagram-body {
+    padding: 0;
+    overflow: auto;
+    min-height: 400px;
+    background: #fafafa;
+}
+
+.diagram-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    padding: 20px;
+}
+
+.diagram-container svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.diagram-loading,
+.diagram-error {
+    color: var(--color-gray-500);
+    padding: 20px;
+    text-align: center;
+}
+
+.diagram-error {
+    color: var(--color-danger);
+}
+
+.diagram-info {
+    color: var(--color-gray-500);
+    font-size: 0.85rem;
+    margin-right: auto;
+}

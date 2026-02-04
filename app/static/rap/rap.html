@@ -22,6 +22,8 @@
     <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <!-- Mermaid for ER diagrams -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
     <div class="app-container page-fill">
@@ -95,6 +97,14 @@
                             </button>
                             <div class="view-selector-menu"></div>
                         </div>
+                        <button id="btn-data-model" class="btn-icon" title="Show data model" data-i18n-title="tooltip_data_model">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="7" height="5" rx="1"/>
+                                <rect x="15" y="3" width="7" height="5" rx="1"/>
+                                <rect x="8" y="16" width="8" height="5" rx="1"/>
+                                <path d="M5.5 8v4h13v-4M12 12v4"/>
+                            </svg>
+                        </button>
                         <div id="entity-selector" class="entity-selector-dropdown">
                             <button class="entity-selector-trigger">
                                 <span class="entity-selector-text" data-i18n="select_entity">Select Entity...</span>
@@ -200,6 +210,7 @@
     <script src="/static/rap/components/entity-map.js"></script>
     <script src="/static/rap/components/entity-chart.js"></script>
     <script src="/static/rap/components/entity-explorer.js"></script>
+    <script src="/static/rap/components/data-model-diagram.js"></script>
     <script src="/static/rap/components/breadcrumb-nav.js"></script>
     <script src="/static/rap/components/breadcrumb-share-dialog.js"></script>
     <script src="/static/rap/components/detail-panel.js"></script>

@@ -708,6 +708,10 @@ const SeedManager = {
       const response = await fetch('/api/seed/reinitialize', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
+        // Clear client-side diagram cache (schema changed)
+        if (typeof DataModelDiagram !== 'undefined') {
+          DataModelDiagram.clearCache();
+        }
         await this.refreshAndMessage(data.message);
       } else {
         this.showMessage(data.error || 'Reinitialize failed', true);

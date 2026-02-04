@@ -222,6 +222,7 @@ module.exports = function(cfg) {
         try {
             const { reinitialize } = require('../config/database');
             const ComputedFieldService = require('../services/ComputedFieldService');
+            const { clearDiagramCache } = require('./schema.router');
 
             const result = reinitialize();
 
@@ -233,6 +234,9 @@ module.exports = function(cfg) {
 
             // Re-initialize SeedManager with fresh schema
             SeedManager.init(cfg.paths.seed);
+
+            // Clear diagram cache (schema changed)
+            if (clearDiagramCache) clearDiagramCache();
 
             res.json({ success: true, message: `Reinitialized with ${result.entities} entities` });
         } catch (e) {

@@ -343,9 +343,17 @@ if (authEnabled) {
 }
 app.use(require('./server/routers/model-builder.router')(cfg));
 
-// Schema Router (check changes, reload schema) - admin only
+// Schema Router (check changes, reload schema)
+// Diagram endpoint accessible to all authenticated users; other routes admin-only
 if (authEnabled) {
-    app.use('/api/schema', authMiddleware, requireRole('admin'));
+    app.use('/api/schema', authMiddleware, (req, res, next) => {
+        // Diagram endpoint is read-only, accessible to all authenticated users
+        if (req.path.startsWith('/diagram')) {
+            return requireRole('guest', 'user', 'admin')(req, res, next);
+        }
+        // Other schema routes (reload, check-changes) are admin-only
+        return requireRole('admin')(req, res, next);
+    });
 }
 app.use(require('./server/routers/schema.router')(cfg));
 

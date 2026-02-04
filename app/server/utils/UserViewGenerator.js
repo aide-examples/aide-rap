@@ -961,7 +961,8 @@ function parseAllUserViews(viewsConfig, schema) {
                 selectExpr: expCol.selectExpr,
                 sqlAlias: expCol.label,
                 omit,
-                areaColor: colAreaColor
+                areaColor: colAreaColor,
+                entityName: expCol.entityName
               });
             }
           } else {
@@ -985,7 +986,8 @@ function parseAllUserViews(viewsConfig, schema) {
                 selectExpr: expCol.selectExpr,
                 sqlAlias: expCol.label,
                 omit,
-                areaColor: colAreaColor
+                areaColor: colAreaColor,
+                entityName: expCol.entityName
               });
 
               for (const join of expCol.joins) {
@@ -1027,6 +1029,7 @@ function parseAllUserViews(viewsConfig, schema) {
               sqlAlias: expCol.label,
               omit,
               areaColor: colAreaColor,
+              entityName: expCol.entityName,  // Entity this column belongs to (for diagrams)
               // Aggregate metadata for client-side grouping
               aggregateSource: expCol.aggregateSource,
               aggregateType: expCol.aggregateType,
@@ -1065,7 +1068,8 @@ function parseAllUserViews(viewsConfig, schema) {
           selectExpr: resolved.selectExpr,
           sqlAlias: label,
           omit,
-          areaColor: colAreaColor
+          areaColor: colAreaColor,
+          entityName: resolved.entityName  // Entity this column belongs to (for diagrams)
         };
 
         // Add FK link info for navigation (FK paths only)

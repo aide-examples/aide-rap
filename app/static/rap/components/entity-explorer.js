@@ -509,6 +509,15 @@ const EntityExplorer = {
       btnRefresh.addEventListener('click', () => this.refreshCounts());
     }
 
+    // Data model diagram button
+    const btnDataModel = document.getElementById('btn-data-model');
+    if (btnDataModel) {
+      btnDataModel.addEventListener('click', () => this.showDataModelDiagram());
+    }
+
+    // Initialize data model diagram component
+    DataModelDiagram.init();
+
     // Open views dropdown on start if views exist, otherwise entity dropdown
     if (this.viewSelector.style.display !== 'none') {
       this.toggleViewDropdown();
@@ -597,6 +606,19 @@ const EntityExplorer = {
     }
     // Keep dropdown open after refresh
     this.openDropdown();
+  },
+
+  /**
+   * Show data model diagram for current View or Entity
+   */
+  async showDataModelDiagram() {
+    if (this.currentView) {
+      // View mode: show entities used by view
+      await DataModelDiagram.open('view', this.currentView.name);
+    } else if (this.currentEntity) {
+      // Entity mode: show entity neighborhood (inbound + outbound)
+      await DataModelDiagram.open('entity', this.currentEntity);
+    }
   },
 
   async selectEntityFromDropdown(name, areaColor) {
