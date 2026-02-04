@@ -1221,7 +1221,7 @@ const EntityForm = {
               <button type="button" class="media-file-btn btn-small">📁 ${i18n.t('media_select_files')}</button>
             </div>
             <div class="media-url-row">
-              <input type="text" class="media-url-input form-input" placeholder="URL...">
+              <input type="text" class="media-url-input form-input" placeholder="${i18n.t('placeholder_url')}">
               <button type="button" class="media-url-load btn-small">${i18n.t('media_load')}</button>
             </div>
           </div>

@@ -253,7 +253,7 @@ const SeedManager = {
       if (e.hasImportDef) {
         sourceDisplay = hasSource
           ? `<span class="source-ready" title="${e.sourceFile}">✓</span>`
-          : `<span class="source-missing" title="Source file missing: ${e.sourceFile || '?'}">✗</span>`;
+          : `<span class="source-missing" title="${i18n.t('source_file_missing', { file: e.sourceFile || '?' })}">✗</span>`;
       }
 
       // Dependency readiness dot
@@ -312,6 +312,7 @@ const SeedManager = {
             <button class="btn-seed btn-restore" title="${i18n.t('admin_restore_tooltip')}">${i18n.t('admin_restore')}</button>
             <button class="btn-seed btn-restore-media" title="${i18n.t('admin_restore_media_tooltip')}">${i18n.t('admin_restore_media')}</button>
             <button class="btn-seed btn-load-all">${i18n.t('admin_load_all')}</button>
+            <button class="btn-seed btn-import-all" title="${i18n.t('admin_import_all_tooltip')}">${i18n.t('admin_import_all')}</button>
             <button class="btn-seed btn-clear-all">${i18n.t('admin_clear_all')}</button>
             <button class="btn-seed btn-reset-all">${i18n.t('admin_reset_all')}</button>
             <button class="btn-seed btn-reinit" title="${i18n.t('admin_reinit_tooltip')}">${i18n.t('admin_reinit')}</button>
@@ -355,6 +356,7 @@ const SeedManager = {
 
     // Bulk actions
     this.container.querySelector('.btn-load-all')?.addEventListener('click', () => this.loadAll());
+    this.container.querySelector('.btn-import-all')?.addEventListener('click', () => this.importAll());
     this.container.querySelector('.btn-clear-all')?.addEventListener('click', () => this.clearAll());
     this.container.querySelector('.btn-reset-all')?.addEventListener('click', () => this.resetAll());
     this.container.querySelector('.btn-backup')?.addEventListener('click', () => this.backupAll());
@@ -489,11 +491,11 @@ const SeedManager = {
   },
 
   /**
-   * Load all seed files
+   * Shared helper for bulk load operations (load-all, import-all)
    */
-  async loadAll() {
+  async _bulkLoad(endpoint, successKey) {
     try {
-      const response = await fetch('/api/seed/load-all', { method: 'POST' });
+      const response = await fetch(endpoint, { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -508,22 +510,36 @@ const SeedManager = {
           .flatMap(([name, r]) => r.mediaErrors.map(e => `${name} row ${e.row}: ${e.field} - ${e.error}`));
 
         const messages = [];
-        messages.push(`Loaded seed data for ${loaded} entities`);
+        messages.push(i18n.t(successKey, { count: loaded }));
         if (errorEntities.length > 0) {
-          messages.push(`Errors: ${errorEntities.join('; ')}`);
+          messages.push(`${i18n.t('errors')}: ${errorEntities.join('; ')}`);
         }
         if (mediaErrors.length > 0) {
-          messages.push(`Media download failed: ${mediaErrors.join('; ')}`);
+          messages.push(`${i18n.t('media_download_failed')}: ${mediaErrors.join('; ')}`);
         }
 
         const hasErrors = errorEntities.length > 0 || mediaErrors.length > 0;
         await this.refreshAndMessage(messages.join(' — '), hasErrors);
       } else {
-        this.showMessage(data.error || 'Failed to load all', true);
+        this.showMessage(data.error || i18n.t('operation_failed'), true);
       }
     } catch (err) {
       this.showMessage(err.message, true);
     }
+  },
+
+  /**
+   * Load all seed files
+   */
+  async loadAll() {
+    await this._bulkLoad('/api/seed/load-all', 'admin_loaded_entities');
+  },
+
+  /**
+   * Import all (prefers import/ over seed/)
+   */
+  async importAll() {
+    await this._bulkLoad('/api/seed/import-all', 'admin_imported_entities');
   },
 
   /**

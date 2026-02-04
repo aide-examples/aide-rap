@@ -164,20 +164,20 @@ const ModelBuilderDialog = {
                             <label for="system-name">System Name (snake_case)</label>
                             <input type="text" id="system-name" value="${DomUtils.escapeHtml(this.systemName)}"
                                    placeholder="my_system" pattern="[a-z][a-z0-9_]*" ${isEditing ? 'readonly' : ''}>
-                            <div class="field-hint">${isEditing ? 'System name cannot be changed after creation' : 'Lowercase letters, numbers, underscores. E.g., library, inventory_app'}</div>
+                            <div class="field-hint">${isEditing ? i18n.t('mb_system_name_readonly') : i18n.t('mb_system_name_hint')}</div>
                         </div>
                         <div class="form-group">
-                            <label for="display-name">Display Name</label>
+                            <label for="display-name">${i18n.t('mb_display_name')}</label>
                             <input type="text" id="display-name" value="${DomUtils.escapeHtml(this.displayName)}"
-                                   placeholder="My System">
+                                   placeholder="${i18n.t('mb_display_name_placeholder')}">
                         </div>
                         <div class="form-group">
-                            <label for="system-description">Description</label>
+                            <label for="system-description">${i18n.t('mb_description')}</label>
                             <input type="text" id="system-description" value="${DomUtils.escapeHtml(this.description)}"
-                                   placeholder="A brief description of what this system manages">
+                                   placeholder="${i18n.t('mb_description_placeholder')}">
                         </div>
                         <div class="form-group">
-                            <label for="theme-color">Theme Color</label>
+                            <label for="theme-color">${i18n.t('mb_theme_color')}</label>
                             <div class="color-picker-row">
                                 <input type="color" id="theme-color" value="${this.themeColor}">
                                 <span class="color-value">${this.themeColor}</span>
@@ -190,17 +190,11 @@ const ModelBuilderDialog = {
                 return `
                     <div class="tab-content-design">
                         <div class="form-group">
-                            <label for="design-brief">Design Brief</label>
+                            <label for="design-brief">${i18n.t('mb_design_brief')}</label>
                             <div class="field-hint" style="margin-bottom: 8px;">
-                                Describe your data model in natural language. You can write in your own language -
-                                the AI will generate English entity names.
+                                ${i18n.t('mb_design_brief_hint')}
                             </div>
-                            <textarea id="design-brief" rows="10" placeholder="Example:
-I need a library system with:
-- Books with title, ISBN, publication year
-- Authors with name and biography
-- Categories for organizing books
-- Each book has one author and can belong to multiple categories">${DomUtils.escapeHtml(this.designBrief)}</textarea>
+                            <textarea id="design-brief" rows="10" placeholder="${i18n.t('mb_design_brief_placeholder')}">${DomUtils.escapeHtml(this.designBrief)}</textarea>
                         </div>
                     </div>
                 `;
@@ -209,7 +203,7 @@ I need a library system with:
                 return `
                     <div class="tab-content-prompt">
                         <div class="prompt-section-header">
-                            <span class="prompt-section-label">AI Prompt</span>
+                            <span class="prompt-section-label">${i18n.t('mb_ai_prompt')}</span>
                             ${DomUtils.renderAILinks(!!this.prompt)}
                         </div>
                         <textarea id="ai-prompt-text" readonly rows="12">${DomUtils.escapeHtml(this.prompt || '')}</textarea>
@@ -220,28 +214,9 @@ I need a library system with:
                 return `
                     <div class="tab-content-paste" id="paste-drop-zone">
                         <div class="paste-hint">
-                            <strong>Download the markdown file</strong> from the AI, then <strong>drag &amp; drop</strong> it here or paste the contents.
-                            <br><small>Copying from rendered chat views loses the \`\`\`mermaid code block markers!</small>
+                            ${i18n.t('mb_paste_hint')}
                         </div>
-                        <textarea id="mermaid-response-text" rows="10" placeholder="Drag & drop the .md file here, or paste its contents...
-
-The file should contain:
-\`\`\`mermaid
-erDiagram
-    Author {
-        string name \"[LABEL] Author name\"
-        text biography \"Short bio\"
-    }
-    Book {
-        string title \"[LABEL] Book title\"
-        string isbn \"ISBN number\"
-    }
-    Author ||--o{ Book : \"author\"
-\`\`\`
-
-SEEDING:
-- Author: ...
-- Book: ...">${DomUtils.escapeHtml(this.mermaidCode)}</textarea>
+                        <textarea id="mermaid-response-text" rows="10" placeholder="${i18n.t('mb_paste_placeholder')}">${DomUtils.escapeHtml(this.mermaidCode)}</textarea>
                     </div>
                 `;
 

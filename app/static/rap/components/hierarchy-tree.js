@@ -96,13 +96,13 @@ const HierarchyTree = {
       <div class="hierarchy-node" data-node-id="${nodeId}" data-record-id="${record.id}">
         <div class="hierarchy-header" style="padding-left: ${depth * 24}px">
           <span class="hierarchy-toggle ${hasChildren ? '' : 'hierarchy-no-children'}" data-action="toggle"
-                title="Click to toggle, Shift+Click to expand all">
+                title="${i18n.t('hierarchy_toggle_tooltip')}">
             ${isExpanded ? '▼' : '▶'}
           </span>
           <span class="hierarchy-color" style="background: ${areaColor}"></span>
           <span class="hierarchy-label" data-action="select">${DomUtils.escapeHtml(label.title)}</span>
           ${label.subtitle && label.subtitle !== label.title ? `<span class="hierarchy-subtitle">${DomUtils.escapeHtml(label.subtitle)}</span>` : ''}
-          <span class="hierarchy-navigate" data-action="navigate" title="Open in Tree View">→</span>
+          <span class="hierarchy-navigate" data-action="navigate" title="${i18n.t('hierarchy_open_tree')}">→</span>
         </div>
     `;
 

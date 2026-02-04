@@ -1285,6 +1285,68 @@ async function loadAll() {
 }
 
 /**
+ * Import all available data files (prefers import/ over seed/)
+ * For each entity, checks import directory first, falls back to seed if not found.
+ * Builds label lookups incrementally for FK resolution.
+ */
+async function importAll() {
+  const { schema } = getDbAndSchema();
+  const results = {};
+
+  // Build lookups incrementally as entities are loaded (for FK resolution)
+  const lookups = {};
+
+  const importDir = getImportDir();
+  const seedDir = getSeedDir();
+
+  // Collect entities with either import or seed files
+  const entitiesToLoad = schema.orderedEntities
+    .filter(e =>
+      fs.existsSync(path.join(importDir, `${e.className}.json`)) ||
+      fs.existsSync(path.join(seedDir, `${e.className}.json`))
+    )
+    .map(e => e.className);
+
+  // Emit before event
+  eventBus.emit('seed:importAll:before', entitiesToLoad);
+
+  // Load in dependency order
+  for (const entity of schema.orderedEntities) {
+    const importFile = path.join(importDir, `${entity.className}.json`);
+    const seedFile = path.join(seedDir, `${entity.className}.json`);
+
+    // Prefer import file, fall back to seed file
+    const sourceFile = fs.existsSync(importFile) ? importFile :
+                       fs.existsSync(seedFile) ? seedFile : null;
+
+    if (sourceFile) {
+      try {
+        // Determine source type for result info
+        const source = sourceFile === importFile ? 'import' : 'seed';
+
+        // Load entity using loadEntity which handles both directories
+        const result = await loadEntity(entity.className, lookups, {
+          mode: 'merge',
+          sourceDirectory: path.dirname(sourceFile)
+        });
+
+        results[entity.className] = { ...result, source };
+
+        // Update lookup for this entity (so subsequent entities can reference it)
+        lookups[entity.className] = buildLabelLookup(entity.className);
+      } catch (err) {
+        results[entity.className] = { error: err.message };
+      }
+    }
+  }
+
+  // Emit after event
+  eventBus.emit('seed:importAll:after', results);
+
+  return results;
+}
+
+/**
  * Clear all entity data
  */
 function clearAll() {
@@ -1569,6 +1631,7 @@ module.exports = {
   loadEntity,
   clearEntity,
   loadAll,
+  importAll,
   clearAll,
   resetAll,
   uploadEntity,

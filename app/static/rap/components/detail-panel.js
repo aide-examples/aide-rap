@@ -150,6 +150,7 @@ const DetailPanel = {
 
       const value = record[col.name];
       let displayValue;
+      let customLabel = null; // Override label for special cases
       if (value === null || value === undefined) {
         displayValue = '';
       } else if (col.customType === 'url') {
@@ -159,11 +160,30 @@ const DetailPanel = {
         // Mail: Mailto link
         displayValue = `<a href="mailto:${DomUtils.escapeHtml(value)}">${DomUtils.escapeHtml(value)}</a>`;
       } else if (col.customType === 'json') {
-        // JSON: Pretty-printed code block
+        // JSON: Pretty-printed code block with diff support for AuditTrail
         try {
           const jsonObj = typeof value === 'object' ? value : JSON.parse(value);
-          const pretty = JSON.stringify(jsonObj, null, 2);
-          displayValue = `<pre class="json-value">${DomUtils.escapeHtml(pretty)}</pre>`;
+
+          // Special case: AuditTrail diff view
+          if (entityName === 'AuditTrail' && (col.name === 'before_data' || col.name === 'after_data')) {
+            const beforeData = col.name === 'before_data' ? jsonObj : (record.before_data || null);
+            const afterData = col.name === 'after_data' ? jsonObj : (record.after_data || null);
+
+            // Only show diff view for after_data (skip before_data as separate field)
+            if (col.name === 'after_data' && beforeData && afterData) {
+              displayValue = this.renderJsonDiff(beforeData, afterData);
+              customLabel = i18n.t('audit_changes');
+            } else if (col.name === 'before_data' && record.after_data) {
+              // Skip before_data when we have after_data (diff shown in after_data)
+              continue;
+            } else {
+              const pretty = JSON.stringify(jsonObj, null, 2);
+              displayValue = `<pre class="json-value">${DomUtils.escapeHtml(pretty)}</pre>`;
+            }
+          } else {
+            const pretty = JSON.stringify(jsonObj, null, 2);
+            displayValue = `<pre class="json-value">${DomUtils.escapeHtml(pretty)}</pre>`;
+          }
         } catch {
           displayValue = `<pre class="json-value">${DomUtils.escapeHtml(String(value))}</pre>`;
         }
@@ -200,7 +220,7 @@ const DetailPanel = {
 
       html += `
         <div class="detail-row">
-          <span class="detail-label">${col.name}</span>
+          <span class="detail-label">${customLabel || col.name}</span>
           <span class="detail-value">${displayValue}</span>
         </div>
       `;
@@ -246,6 +266,55 @@ const DetailPanel = {
     this.show();
     this.setTitle(i18n.t('edit_entity', { entity: entityName, id: record.id }));
     await EntityForm.render(this.content, entityName, record);
+  },
+
+  /**
+   * Render a JSON diff view comparing before and after data
+   * @param {Object} before - Before state
+   * @param {Object} after - After state
+   * @returns {string} HTML with diff highlighting
+   */
+  renderJsonDiff(before, after) {
+    const allKeys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+    let html = '<div class="json-diff">';
+
+    for (const key of allKeys) {
+      const beforeVal = before?.[key];
+      const afterVal = after?.[key];
+      const beforeStr = beforeVal !== undefined ? JSON.stringify(beforeVal) : undefined;
+      const afterStr = afterVal !== undefined ? JSON.stringify(afterVal) : undefined;
+
+      if (beforeStr === afterStr) {
+        // Unchanged
+        html += `<div class="diff-row diff-unchanged">
+          <span class="diff-key">${DomUtils.escapeHtml(key)}:</span>
+          <span class="diff-value">${DomUtils.escapeHtml(afterStr)}</span>
+        </div>`;
+      } else if (beforeStr === undefined) {
+        // Added
+        html += `<div class="diff-row diff-added">
+          <span class="diff-key">+ ${DomUtils.escapeHtml(key)}:</span>
+          <span class="diff-value">${DomUtils.escapeHtml(afterStr)}</span>
+        </div>`;
+      } else if (afterStr === undefined) {
+        // Removed
+        html += `<div class="diff-row diff-removed">
+          <span class="diff-key">- ${DomUtils.escapeHtml(key)}:</span>
+          <span class="diff-value">${DomUtils.escapeHtml(beforeStr)}</span>
+        </div>`;
+      } else {
+        // Changed
+        html += `<div class="diff-row diff-changed">
+          <span class="diff-key">${DomUtils.escapeHtml(key)}:</span>
+          <span class="diff-value diff-before">${DomUtils.escapeHtml(beforeStr)}</span>
+          <span class="diff-arrow">→</span>
+          <span class="diff-value diff-after">${DomUtils.escapeHtml(afterStr)}</span>
+        </div>`;
+      }
+    }
+
+    html += '</div>';
+    return html;
   },
 
 };
@@ -298,6 +367,66 @@ detailStyle.textContent = `
     font-size: 0.8em;
     color: #888;
     margin-left: 4px;
+  }
+
+  /* JSON Diff styling for AuditTrail */
+  .json-diff {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+  }
+  .diff-row {
+    padding: 2px 4px;
+    border-radius: 2px;
+    margin: 1px 0;
+  }
+  .diff-key {
+    color: #555;
+    margin-right: 4px;
+  }
+  .diff-value {
+    color: #333;
+  }
+  .diff-unchanged {
+    color: #666;
+  }
+  .diff-added {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  .diff-added .diff-key {
+    color: #155724;
+    font-weight: bold;
+  }
+  .diff-removed {
+    background-color: #f8d7da;
+    color: #721c24;
+    text-decoration: line-through;
+  }
+  .diff-removed .diff-key {
+    color: #721c24;
+    font-weight: bold;
+  }
+  .diff-changed {
+    background-color: #fff3cd;
+  }
+  .diff-changed .diff-key {
+    color: #856404;
+  }
+  .diff-before {
+    color: #721c24;
+    text-decoration: line-through;
+  }
+  .diff-after {
+    color: #155724;
+    font-weight: 500;
+  }
+  .diff-arrow {
+    color: #856404;
+    margin: 0 6px;
   }
 `;
 document.head.appendChild(detailStyle);

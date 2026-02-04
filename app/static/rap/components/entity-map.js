@@ -221,20 +221,12 @@ const EntityMap = {
     const lng = parseFloat(record[lngKey]);
     if (!isNaN(lat) && !isNaN(lng)) {
       html += `<tr>
-        <td class="map-popup-label">Position</td>
+        <td class="map-popup-label">${i18n.t('position')}</td>
         <td class="map-popup-value">${lat.toFixed(4)}, ${lng.toFixed(4)}</td>
       </tr>`;
     }
 
     html += '</table>';
-
-    // Add link to entity details if we have base entity and id
-    if (record.id) {
-      html += `<div class="map-popup-actions">
-        <a href="#" class="map-popup-link" data-id="${record.id}">View Details</a>
-      </div>`;
-    }
-
     html += '</div>';
     return html;
   },

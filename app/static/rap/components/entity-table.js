@@ -19,6 +19,7 @@ const EntityTable = {
   // Server-side filter support (for paginated datasets)
   allRecordsLoaded: true,       // false when only partial data loaded (pagination)
   onServerFilterRequest: null,  // Callback: (columnFilters) => void
+  onFilterChange: null,         // Callback: () => void - notifies when client-side filter changes
   filterDebounceTimer: null,    // Timer for debounced server filter
   filterDebounceMs: 2000,       // Debounce delay (configurable via setPaginationConfig)
   lastServerFilters: {},        // Filters from last server query (for narrowing vs loosening check)
@@ -218,7 +219,7 @@ const EntityTable = {
       const filterValue = this.columnFilters[col.key] || '';
       html += `<th class="filter-cell">
         <input type="text" class="column-filter" data-column="${col.key}"
-               value="${DomUtils.escapeHtml(filterValue)}" placeholder="Filter...">
+               value="${DomUtils.escapeHtml(filterValue)}" placeholder="${i18n.t('placeholder_filter')}">
       </th>`;
     }
     html += '</tr></thead>';
@@ -386,6 +387,8 @@ const EntityTable = {
           newInput.focus();
           newInput.setSelectionRange(cursorPos, cursorPos);
         }
+        // Notify listener (e.g., map view) of filter change
+        if (this.onFilterChange) this.onFilterChange();
       });
       input.addEventListener('click', (e) => e.stopPropagation());
     });
@@ -707,7 +710,7 @@ const EntityTable = {
       const filterValue = this.columnFilters[col.name] || '';
       html += `<th class="filter-cell">
         <input type="text" class="column-filter" data-column="${col.name}"
-               value="${DomUtils.escapeHtml(filterValue)}" placeholder="Filter...">
+               value="${DomUtils.escapeHtml(filterValue)}" placeholder="${i18n.t('placeholder_filter')}">
       </th>`;
     }
     // Empty cells for back-reference columns (no filtering)
@@ -974,6 +977,9 @@ const EntityTable = {
           newInput.focus();
           newInput.setSelectionRange(cursorPos, cursorPos);
         }
+
+        // Notify listener (e.g., map view) of filter change
+        if (this.onFilterChange) this.onFilterChange();
 
         // Server-side filter: debounced, only if filters are LOOSENED
         // Narrowing (adding text) doesn't need server query - current results are superset

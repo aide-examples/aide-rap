@@ -224,8 +224,8 @@ const SeedImportDialog = {
               </div>
               <div id="rule-content" class="rule-content">
                 ${this.hasDefinition
-                  ? '<textarea id="rule-editor" class="rule-editor" placeholder="Loading..."></textarea>'
-                  : '<div class="no-definition">No import definition</div>'}
+                  ? `<textarea id="rule-editor" class="rule-editor" placeholder="${i18n.t('loading')}"></textarea>`
+                  : `<div class="no-definition">${i18n.t('si_no_definition')}</div>`}
               </div>
             </div>
 
@@ -233,10 +233,10 @@ const SeedImportDialog = {
               <div class="tab-content-scroll">
                 <div id="run-content" class="run-content">
                   ${this.hasDefinition ? `
-                    <p>Convert XLSX source file to JSON import file.</p>
-                    <button class="btn-seed btn-run-import" id="btn-run-import">Run Import (XLSX → JSON)</button>
+                    <p>${i18n.t('si_run_description')}</p>
+                    <button class="btn-seed btn-run-import" id="btn-run-import">${i18n.t('si_run_import')}</button>
                     <div id="run-result"></div>
-                  ` : '<div class="no-definition">No import definition</div>'}
+                  ` : `<div class="no-definition">${i18n.t('si_no_definition')}</div>`}
                 </div>
               </div>
             </div>
@@ -266,7 +266,7 @@ const SeedImportDialog = {
               <div class="paste-toolbar">
                 <div class="drop-zone-compact" id="import-drop-zone">
                   <span class="drop-zone-icon">📁</span>
-                  <span class="drop-zone-text">Drop file or click</span>
+                  <span class="drop-zone-text">${i18n.t('si_drop_file')}</span>
                 </div>
                 <div class="paste-tabs">
                   <button class="paste-tab active" data-paste-tab="source">Source</button>
@@ -277,12 +277,12 @@ const SeedImportDialog = {
 
               <div class="paste-tab-content" id="paste-tab-source">
                 <textarea id="import-text-input" class="import-textarea"
-                  placeholder="Paste JSON or CSV data here..."></textarea>
+                  placeholder="${i18n.t('si_paste_placeholder')}"></textarea>
               </div>
 
               <div class="paste-tab-content" id="paste-tab-preview" style="display: none;">
                 <div id="paste-preview" class="import-preview">
-                  <div class="preview-empty">Paste data, then click "Parse"</div>
+                  <div class="preview-empty">${i18n.t('si_preview_empty')}</div>
                 </div>
               </div>
 

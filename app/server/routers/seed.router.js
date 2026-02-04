@@ -121,6 +121,17 @@ module.exports = function(cfg) {
         }
     });
 
+    // Import all (prefers import/ over seed/)
+    router.post('/api/seed/import-all', async (req, res) => {
+        try {
+            const results = await SeedManager.importAll();
+            res.json({ success: true, results });
+        } catch (e) {
+            console.error('Failed to import all:', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
     // Clear all entity data
     router.post('/api/seed/clear-all', (req, res) => {
         try {

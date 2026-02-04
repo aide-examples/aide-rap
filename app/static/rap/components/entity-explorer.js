@@ -160,7 +160,7 @@ const EntityExplorer = {
           <div class="prefilter-field">
             <label>${f.label}</label>
             <input type="text" data-field="${f.field}" data-type="text" class="prefilter-input"
-                   placeholder="Enter text to match...">
+                   placeholder="${i18n.t('placeholder_text_match')}">
           </div>
         `;
       }
@@ -169,13 +169,13 @@ const EntityExplorer = {
 
     dialog.innerHTML = `
       <div class="prefilter-header">
-        <h3>Filter ${contextName}</h3>
-        <p>${parsedFields.some(f => f.type === 'select') ? 'Select values to filter by' : 'Enter text to filter by (matches label field)'}</p>
+        <h3>${i18n.t('prefilter_title', { name: contextName })}</h3>
+        <p>${parsedFields.some(f => f.type === 'select') ? i18n.t('prefilter_select_hint') : i18n.t('prefilter_text_hint')}</p>
       </div>
       ${fieldsHtml}
       <div class="prefilter-actions">
-        <button type="button" class="btn-secondary" data-action="skip">Load All</button>
-        <button type="button" class="btn-primary" data-action="apply">Apply Filter</button>
+        <button type="button" class="btn-secondary" data-action="skip">${i18n.t('prefilter_load_all')}</button>
+        <button type="button" class="btn-primary" data-action="apply">${i18n.t('prefilter_apply')}</button>
       </div>
     `;
 
@@ -469,6 +469,13 @@ const EntityExplorer = {
     EntityTable.init('entity-table-container');
     EntityChart.init('entity-chart-container');
     HierarchyTree.init('entity-tree-container'); // Reuse tree container
+
+    // Update map when table filters change
+    EntityTable.onFilterChange = () => {
+      if (this.viewMode === 'map') {
+        this.renderMap();
+      }
+    };
 
     // Restore view mode from session (note: 'map' mode is not restored, requires active view)
     const savedViewMode = sessionStorage.getItem('viewMode');
@@ -1328,21 +1335,25 @@ const EntityExplorer = {
   renderMap() {
     // View mode
     if (this.currentView && this.currentViewSchema) {
-      if (this.records.length === 0) {
+      // Use filtered records from EntityTable (respects column filters)
+      const filteredRecords = EntityTable.getViewFilteredRecords(this.currentViewSchema.columns);
+      if (filteredRecords.length === 0) {
         this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
         return;
       }
-      EntityMap.load(this.currentViewSchema, this.records);
+      EntityMap.load(this.currentViewSchema, filteredRecords);
       return;
     }
 
     // Entity mode
     if (this.currentEntity && this.currentEntitySchema) {
-      if (this.records.length === 0) {
+      // Use filtered records from EntityTable (respects column filters)
+      const filteredRecords = EntityTable.getFilteredRecords();
+      if (filteredRecords.length === 0) {
         this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
         return;
       }
-      EntityMap.load(this.currentEntitySchema, this.records);
+      EntityMap.load(this.currentEntitySchema, filteredRecords);
       return;
     }
 

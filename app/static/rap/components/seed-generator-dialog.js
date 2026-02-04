@@ -266,10 +266,10 @@ const SeedGeneratorDialog = {
         ` : ''}
         <div class="prompt-section">
           <div class="prompt-section-header">
-            <span class="prompt-section-label">AI Prompt</span>
+            <span class="prompt-section-label">${i18n.t('sg_ai_prompt')}</span>
             ${DomUtils.renderAILinks(!!this.lastPrompt)}
           </div>
-          <textarea id="llm-prompt-text" readonly rows="8" placeholder="Build a prompt from the Instruction tab, or paste your AI response directly below.">${DomUtils.escapeHtml(this.lastPrompt || '')}</textarea>
+          <textarea id="llm-prompt-text" readonly rows="8" placeholder="${i18n.t('sg_prompt_placeholder')}">${DomUtils.escapeHtml(this.lastPrompt || '')}</textarea>
         </div>
       </div>
     `;
@@ -282,9 +282,9 @@ const SeedGeneratorDialog = {
     return `
       <div class="tab-content-response" id="paste-drop-zone">
         <div class="paste-section-header">
-          <span class="paste-section-label">AI Response</span>
+          <span class="paste-section-label">${i18n.t('sg_ai_response')}</span>
         </div>
-        <textarea id="ai-response-text" rows="12" placeholder="Paste JSON array or CSV data here..."></textarea>
+        <textarea id="ai-response-text" rows="12" placeholder="${i18n.t('sg_response_placeholder')}"></textarea>
       </div>
     `;
   },
