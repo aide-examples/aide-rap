@@ -88,15 +88,15 @@ if [ -n "$SYSTEM_NAME" ]; then
     fi
 
     # Count system-specific docs
-    docs_requirements=$(count_loc "$SYSTEM_DIR/docs/requirements" "*.md")
-    docs_classes=$(count_loc "$SYSTEM_DIR/docs/requirements/classes" "*.md")
+    docs_requirements=$(count_loc "$SYSTEM_DIR/docs" "*.md")
+    docs_classes=$(count_loc "$SYSTEM_DIR/docs/classes" "*.md")
     docs_other=$((docs_requirements - docs_classes))
     help_loc=$(count_loc "$SYSTEM_DIR/help" "*.md")
 
     # Config files
     config_json=$(wc -l "$SYSTEM_DIR/config.json" 2>/dev/null | awk '{print $1}' || echo 0)
-    config_yaml=$(wc -l "$SYSTEM_DIR/docs/requirements/DataModel.yaml" 2>/dev/null | awk '{print $1}' || echo 0)
-    config_layout=$(wc -l "$SYSTEM_DIR/docs/requirements/DataModel-layout.json" 2>/dev/null | awk '{print $1}' || echo 0)
+    config_yaml=$(wc -l "$SYSTEM_DIR/docs/DataModel.yaml" 2>/dev/null | awk '{print $1}' || echo 0)
+    config_layout=$(wc -l "$SYSTEM_DIR/docs/DataModel-layout.json" 2>/dev/null | awk '{print $1}' || echo 0)
     config_total=$((config_json + config_yaml + config_layout))
 
     system_total=$((docs_requirements + help_loc + config_total))
@@ -218,8 +218,8 @@ if [ -d "$SYSTEMS_ROOT" ]; then
             sdocs=$(count_loc "$system_dir/docs" "*.md")
             shelp=$(count_loc "$system_dir/help" "*.md")
             sconfig_json=$(wc -l "$system_dir/config.json" 2>/dev/null | awk '{print $1}' || echo 0)
-            sconfig_yaml=$(wc -l "$system_dir/docs/requirements/DataModel.yaml" 2>/dev/null | awk '{print $1}' || echo 0)
-            sconfig_layout=$(wc -l "$system_dir/docs/requirements/DataModel-layout.json" 2>/dev/null | awk '{print $1}' || echo 0)
+            sconfig_yaml=$(wc -l "$system_dir/docs/DataModel.yaml" 2>/dev/null | awk '{print $1}' || echo 0)
+            sconfig_layout=$(wc -l "$system_dir/docs/DataModel-layout.json" 2>/dev/null | awk '{print $1}' || echo 0)
             sconfig=$((sconfig_json + sconfig_yaml + sconfig_layout))
             stotal=$((sdocs + shelp + sconfig))
 

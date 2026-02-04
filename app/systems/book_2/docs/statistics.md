@@ -2,16 +2,16 @@
 
 Lines of code for the **book_2** system.
 
-*Generated: 2026-02-04 19:58*
+*Generated: 2026-02-04 20:30*
 
 ## Documentation
 
 | Category | LOC |
 |----------|----:|
 | Entity Classes (classes/*.md) | 169 |
-| Other Docs (requirements/*.md) | 70 |
+| Other Docs (requirements/*.md) | 121 |
 | Help | 114 |
-| **Subtotal** | **353** |
+| **Subtotal** | **404** |
 
 ## Configuration
 
@@ -26,4 +26,4 @@ Lines of code for the **book_2** system.
 
 | Category | LOC |
 |----------|----:|
-| **System Total** | **452** |
+| **System Total** | **503** |

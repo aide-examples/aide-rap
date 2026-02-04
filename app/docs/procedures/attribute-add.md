@@ -14,7 +14,7 @@ ATTR_TYPE   = <type>             # Data type (string, int, date, bool, or FK ent
 
 ## Step 1: Add Attribute to Markdown Table
 
-In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, add a new row to the attribute table:
+In `app/systems/<system>/docs/classes/ENTITY_NAME.md`, add a new row to the attribute table:
 
 ```markdown
 | Attribute | Type | Description | Example |
@@ -109,7 +109,7 @@ Computed fields are stored in the database but calculated automatically:
 
 These require `ALTER TABLE ADD COLUMN` but values are computed by ComputedFieldService.
 
-See [ComputedReferences.md](../systems/irma/docs/requirements/ComputedReferences.md) for full syntax.
+See [ComputedReferences.md](../systems/irma/docs/ComputedReferences.md) for full syntax.
 
 ### Seed Data
 

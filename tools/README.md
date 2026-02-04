@@ -40,12 +40,12 @@ layout.drawio         →  extract-layout.js   →  layout.json
 
 | File | Type | Purpose |
 |------|------|---------|
-| `app/docs/requirements/DataModel.md` | **Source** | Classes, attributes, areas (edit this!) |
-| `app/docs/requirements/layout.drawio` | **Source** | Box positions (edit visually) |
-| `app/docs/requirements/DataModel.yaml` | Generated | Machine-readable model |
-| `app/docs/requirements/layout.json` | Generated | Positions as JSON |
-| `app/docs/requirements/diagram.svg` | Generated | Compact diagram |
-| `app/docs/requirements/diagram-detailed.svg` | Generated | Diagram with attributes |
+| `app/docs/DataModel.md` | **Source** | Classes, attributes, areas (edit this!) |
+| `app/docs/layout.drawio` | **Source** | Box positions (edit visually) |
+| `app/docs/DataModel.yaml` | Generated | Machine-readable model |
+| `app/docs/layout.json` | Generated | Positions as JSON |
+| `app/docs/diagram.svg` | Generated | Compact diagram |
+| `app/docs/diagram-detailed.svg` | Generated | Diagram with attributes |
 
 ---
 
@@ -107,7 +107,7 @@ Relationships are automatically detected from attributes!
 #### Option B: draw.io (for complex layouts)
 
 1. **Open draw.io file:**
-   - In VS Code: Open `app/docs/requirements/layout.drawio`
+   - In VS Code: Open `app/docs/layout.drawio`
    - Or in browser: https://app.diagrams.net → Open file
 
 2. **Move boxes:**
@@ -116,7 +116,7 @@ Relationships are automatically detected from attributes!
 
 3. **Extract positions:**
    ```bash
-   node tools/extract-layout.js -i app/docs/requirements/layout.drawio
+   node tools/extract-layout.js -i app/docs/layout.drawio
    ```
 
 4. **Open Layout Editor** and click "Save" for SVG generation
@@ -144,7 +144,7 @@ Relationships are automatically detected from attributes!
 Reads positions from draw.io file and updates layout.json.
 
 ```bash
-node tools/extract-layout.js -i app/docs/requirements/layout.drawio
+node tools/extract-layout.js -i app/docs/layout.drawio
 ```
 
 ### generate-drawio.js
@@ -152,7 +152,7 @@ node tools/extract-layout.js -i app/docs/requirements/layout.drawio
 Generates draw.io file from DataModel.yaml + layout.json (for new classes).
 
 ```bash
-node tools/generate-drawio.js -o app/docs/requirements/layout.drawio
+node tools/generate-drawio.js -o app/docs/layout.drawio
 ```
 
 ---
@@ -168,6 +168,6 @@ node tools/generate-drawio.js -o app/docs/requirements/layout.drawio
 # 3. Click "Save" → SVG diagrams are generated
 
 # After layout changes in draw.io:
-node tools/extract-layout.js -i app/docs/requirements/layout.drawio
+node tools/extract-layout.js -i app/docs/layout.drawio
 # Then open Layout Editor and click "Save"
 ```

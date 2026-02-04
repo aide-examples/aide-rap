@@ -22,10 +22,10 @@ app/systems/*/data/backup/
 *.zip
 
 # Generated documentation artifacts
-app/systems/*/docs/requirements/DataModel-diagram*.svg
-app/systems/*/docs/requirements/DataModel-layout.*
-app/systems/*/docs/requirements/EntityCards.pdf
-app/systems/*/docs/requirements/EntityCards.docx
+app/systems/*/docs/DataModel-diagram*.svg
+app/systems/*/docs/DataModel-layout.*
+app/systems/*/docs/EntityCards.pdf
+app/systems/*/docs/EntityCards.docx
 
 # Claude Code session data
 .claude/

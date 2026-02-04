@@ -29,7 +29,7 @@ const logger = require('./utils/logger');
  * @param {Object} config.requiredFilters - Required filter fields per entity { entityName: ['field1'] }
  * @param {Object} config.paths - System-specific paths
  * @param {string} config.paths.data - Data directory
- * @param {string} config.paths.docs - Docs/requirements directory
+ * @param {string} config.paths.docs - Docs directory (contains DataModel.md, classes/, ui/, imports/)
  * @param {string} config.paths.database - Database filename
  */
 function init(app, config) {
@@ -37,7 +37,7 @@ function init(app, config) {
 
   // Paths (use config paths if provided, fallback to legacy paths)
   const dbPath = paths ? path.join(paths.data, paths.database) : path.join(appDir, 'data', 'rap.sqlite');
-  const dataModelPath = paths ? path.join(paths.docs, 'DataModel.md') : path.join(appDir, 'docs', 'requirements', 'DataModel.md');
+  const dataModelPath = paths ? path.join(paths.docs, 'DataModel.md') : path.join(appDir, 'docs', 'DataModel.md');
 
   // Initialize database
   initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, entityTableOptions);

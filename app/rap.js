@@ -78,7 +78,7 @@ if (!fs.existsSync(SYSTEM_DIR)) {
 
 // System-specific paths (can be overridden in config)
 const systemPaths = {
-    docs: path.join(SYSTEM_DIR, 'docs', 'requirements'),
+    docs: path.join(SYSTEM_DIR, 'docs'),
     data: path.join(SYSTEM_DIR, 'data'),
     seed: path.join(SYSTEM_DIR, 'data', 'seed'),
     media: path.join(SYSTEM_DIR, 'data', 'media'),
@@ -149,7 +149,7 @@ console.log(`Starting AIDE RAP - System: ${systemName}`);
 
 // Register system-specific paths with aide-frame BEFORE HttpServer
 // This prevents auto-registration from using default app/docs and app/help paths
-paths.register('DOCS_DIR', path.join(cfg.paths.docs, '..'));  // docs/ not requirements/
+paths.register('DOCS_DIR', cfg.paths.docs);
 paths.register('HELP_DIR', cfg.paths.help);
 paths.register('RAP_DOCS_DIR', path.join(APP_DIR, 'docs'));   // Generic RAP platform docs
 

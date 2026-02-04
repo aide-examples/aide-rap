@@ -91,7 +91,7 @@ cp -r app/systems/book app/systems/SYSTEM_NAME
 nano app/systems/SYSTEM_NAME/config.json
 
 # Edit data model
-nano app/systems/SYSTEM_NAME/docs/requirements/DataModel.md
+nano app/systems/SYSTEM_NAME/docs/DataModel.md
 ```
 
 ---
@@ -102,8 +102,8 @@ nano app/systems/SYSTEM_NAME/docs/requirements/DataModel.md
 |------|--------------|
 | `config.json` | Tab 1 (Save & Continue) |
 | `design.md` | Tab 2 (Save & Build Prompt) |
-| `docs/requirements/classes/*.md` | Tab 5 (Import) |
-| `docs/requirements/DataModel.md` | Tab 5 (Import) |
+| `docs/classes/*.md` | Tab 5 (Import) |
+| `docs/DataModel.md` | Tab 5 (Import) |
 | `docs/index.md` | Tab 5 (Import) |
 | `help/index.md` | Tab 5 (Import) |
 | `data/seed/*.json` | Tab 5 (empty arrays) |

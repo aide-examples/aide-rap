@@ -347,9 +347,8 @@ function generateSystem(systemName, displayName, description, entities, seedingI
         path.join(systemDir, 'data'),
         path.join(systemDir, 'data', 'seed'),
         path.join(systemDir, 'docs'),
-        path.join(systemDir, 'docs', 'requirements'),
-        path.join(systemDir, 'docs', 'requirements', 'classes'),
-        path.join(systemDir, 'docs', 'requirements', 'ui'),
+        path.join(systemDir, 'docs', 'classes'),
+        path.join(systemDir, 'docs', 'ui'),
         path.join(systemDir, 'help')
     ];
 
@@ -367,13 +366,13 @@ function generateSystem(systemName, displayName, description, entities, seedingI
     // Generate Crud.md (entity list for CRUD UI)
     const crudContent = generateCrudMd(entities);
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'requirements', 'ui', 'Crud.md'),
+        path.join(systemDir, 'docs', 'ui', 'Crud.md'),
         crudContent
     );
 
     // Generate Views.md (empty, no views initially)
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'requirements', 'ui', 'Views.md'),
+        path.join(systemDir, 'docs', 'ui', 'Views.md'),
         '# Views\n'
     );
 
@@ -381,7 +380,7 @@ function generateSystem(systemName, displayName, description, entities, seedingI
     for (const entity of entities) {
         const classContent = generateClassFile(entity, seedingInstructions[entity.name]);
         fs.writeFileSync(
-            path.join(systemDir, 'docs', 'requirements', 'classes', `${entity.name}.md`),
+            path.join(systemDir, 'docs', 'classes', `${entity.name}.md`),
             classContent
         );
 
@@ -395,7 +394,7 @@ function generateSystem(systemName, displayName, description, entities, seedingI
     // Generate DataModel.md (with areas and descriptions)
     const dataModelContent = generateDataModel(entities, displayName, areas, descriptions);
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'requirements', 'DataModel.md'),
+        path.join(systemDir, 'docs', 'DataModel.md'),
         dataModelContent
     );
 
@@ -420,10 +419,10 @@ function generateSystem(systemName, displayName, description, entities, seedingI
         files: [
             'config.json',
             'docs/index.md',
-            'docs/requirements/DataModel.md',
-            'docs/requirements/ui/Crud.md',
-            'docs/requirements/ui/Views.md',
-            ...entities.map(e => `docs/requirements/classes/${e.name}.md`),
+            'docs/DataModel.md',
+            'docs/ui/Crud.md',
+            'docs/ui/Views.md',
+            ...entities.map(e => `docs/classes/${e.name}.md`),
             ...entities.map(e => `data/seed/${e.name}.json`),
             'help/index.md'
         ]
@@ -517,7 +516,7 @@ function generateExample(attr) {
  */
 function generateDataModel(entities, displayName, areas = {}, descriptions = {}) {
     let content = `# Data Model\n\n`;
-    content += `![Data Model Diagram](/docs-assets/requirements/DataModel-diagram.svg)\n\n`;
+    content += `![Data Model Diagram](/docs-assets/DataModel-diagram.svg)\n\n`;
     content += `## Entity Descriptions\n\n`;
     content += `Entity definitions are stored in separate files under [classes/](classes/).\n\n`;
 
@@ -608,7 +607,7 @@ function generateDataModel(entities, displayName, areas = {}, descriptions = {})
     }
 
     content += `## Class Diagram\n\n`;
-    content += `![Data Model Diagram (Detailed)](/docs-assets/requirements/DataModel-diagram-detailed.svg)\n\n`;
+    content += `![Data Model Diagram (Detailed)](/docs-assets/DataModel-diagram-detailed.svg)\n\n`;
     content += `<a href="/layout-editor?doc=DataModel" target="_blank"><button type="button">Edit Layout</button></a>\n\n`;
     content += `---\n\n`;
     content += `*Model generated with [Model Builder](/#model-builder). See [Design Brief](../design.md) for original requirements.*\n`;
@@ -636,7 +635,7 @@ function generateDocsIndex(systemName, displayName, description, entities, port)
     content += `## Quick Links\n\n`;
     content += `| Link | Description |\n`;
     content += `|------|-------------|\n`;
-    content += `| **[Data Model →](requirements/DataModel.md)** | Entity definitions |\n`;
+    content += `| **[Data Model →](DataModel.md)** | Entity definitions |\n`;
     content += `| **[RAP Platform Docs →](/rap)** | How the RAP engine works |\n`;
     content += `| **[User Guide →](/help)** | How to use the application |\n`;
     content += `\n---\n\n`;
@@ -710,9 +709,8 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
         path.join(systemDir, 'data'),
         path.join(systemDir, 'data', 'seed'),
         path.join(systemDir, 'docs'),
-        path.join(systemDir, 'docs', 'requirements'),
-        path.join(systemDir, 'docs', 'requirements', 'classes'),
-        path.join(systemDir, 'docs', 'requirements', 'ui'),
+        path.join(systemDir, 'docs', 'classes'),
+        path.join(systemDir, 'docs', 'ui'),
         path.join(systemDir, 'help'),
         path.join(systemDir, 'icons')
     ];
@@ -737,11 +735,11 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
 
     // Generate empty Crud.md and Views.md
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'requirements', 'ui', 'Crud.md'),
+        path.join(systemDir, 'docs', 'ui', 'Crud.md'),
         '# CRUD\n'
     );
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'requirements', 'ui', 'Views.md'),
+        path.join(systemDir, 'docs', 'ui', 'Views.md'),
         '# Views\n'
     );
 
@@ -800,7 +798,7 @@ function loadSystemState(systemName) {
     }
 
     // List existing entities
-    const classesDir = path.join(systemDir, 'docs', 'requirements', 'classes');
+    const classesDir = path.join(systemDir, 'docs', 'classes');
     let existingEntities = [];
     if (fs.existsSync(classesDir)) {
         existingEntities = fs.readdirSync(classesDir)
@@ -835,7 +833,7 @@ function importEntities(systemName, entities, seedingInstructions, mode, areas =
         throw new Error(`System '${systemName}' does not exist`);
     }
 
-    const classesDir = path.join(systemDir, 'docs', 'requirements', 'classes');
+    const classesDir = path.join(systemDir, 'docs', 'classes');
     const seedDir = path.join(systemDir, 'data', 'seed');
 
     // Ensure directories exist
@@ -897,7 +895,7 @@ function importEntities(systemName, entities, seedingInstructions, mode, areas =
         .map(f => f.replace('.md', ''));
 
     // Update Crud.md with entity list
-    const uiDir = path.join(systemDir, 'docs', 'requirements', 'ui');
+    const uiDir = path.join(systemDir, 'docs', 'ui');
     fs.mkdirSync(uiDir, { recursive: true });
     const crudContent = generateCrudMd(finalEntities.map(name => ({ name })));
     fs.writeFileSync(path.join(uiDir, 'Crud.md'), crudContent);
@@ -917,7 +915,7 @@ function importEntities(systemName, entities, seedingInstructions, mode, areas =
     const displayName = config.pwa?.name || systemName;
     const dataModelContent = generateDataModel(allEntities, displayName, areas, descriptions);
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'requirements', 'DataModel.md'),
+        path.join(systemDir, 'docs', 'DataModel.md'),
         dataModelContent
     );
 

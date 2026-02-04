@@ -18,17 +18,17 @@ NEW_TABLE = <new_name>           # New table name (snake_case)
 Before renaming, search for all references:
 
 ```bash
-grep -r "OLD_NAME" app/systems/<system>/docs/requirements/
+grep -r "OLD_NAME" app/systems/<system>/docs/
 grep -r "OLD_NAME" app/systems/<system>/data/seed/
 grep -r "OLD_NAME" app/server/
 grep -r "OLD_NAME" app/systems/<system>/config.json
 ```
 
 **Typical locations:**
-- `app/systems/<system>/docs/requirements/classes/OLD_NAME.md` - Entity definition
-- `app/systems/<system>/docs/requirements/DataModel.md` - List and links
-- `app/systems/<system>/docs/requirements/DataModel-layout.json` - Diagram position
-- `app/systems/<system>/docs/requirements/classes/*.md` - Seed context in other entities
+- `app/systems/<system>/docs/classes/OLD_NAME.md` - Entity definition
+- `app/systems/<system>/docs/DataModel.md` - List and links
+- `app/systems/<system>/docs/DataModel-layout.json` - Diagram position
+- `app/systems/<system>/docs/classes/*.md` - Seed context in other entities
 - `app/systems/<system>/data/seed/OLD_NAME.json` - Generated seed data
 - `app/systems/<system>/config.json` - enabledEntities list
 
@@ -40,7 +40,7 @@ grep -r "OLD_NAME" app/systems/<system>/config.json
 
 ```bash
 # Entity Markdown
-mv app/systems/<system>/docs/requirements/classes/OLD_NAME.md app/systems/<system>/docs/requirements/classes/NEW_NAME.md
+mv app/systems/<system>/docs/classes/OLD_NAME.md app/systems/<system>/docs/classes/NEW_NAME.md
 
 # Seed data (if exists)
 mv app/systems/<system>/data/seed/OLD_NAME.json app/systems/<system>/data/seed/NEW_NAME.json

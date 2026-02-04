@@ -526,7 +526,7 @@ This approach keeps documentation and diagrams in sync – change the Markdown, 
 ```
 your-system/
 ├── app/
-│   ├── docs/requirements/
+│   ├── docs/
 │   │   ├── DataModel.md          # Visual data model with areas
 │   │   ├── Types.md              # Global type definitions
 │   │   └── classes/              # Entity Markdown files
@@ -642,7 +642,7 @@ Use `app/config_sample.json` as template for new systems.
 
 ### UI Configuration (Markdown)
 
-Entity visibility and views are defined in `docs/requirements/ui/`:
+Entity visibility and views are defined in `docs/ui/`:
 
 **Crud.md** — Which entities appear in the UI:
 ```markdown

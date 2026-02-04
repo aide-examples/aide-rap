@@ -19,7 +19,7 @@ This system contains 2 entities:
 
 | Link | Description |
 |------|-------------|
-| **[Data Model →](requirements/DataModel.md)** | Entity definitions |
+| **[Data Model →](DataModel.md)** | Entity definitions |
 | **[RAP Platform Docs →](/rap)** | How the RAP engine works |
 | **[User Guide →](/help)** | How to use the application |
 

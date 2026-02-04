@@ -9,7 +9,7 @@ Reference for the XLSX import pipeline — how external spreadsheet data flows t
 The import system converts external XLSX files into seed-compatible JSON using declarative mapping rules defined in Markdown files.
 
 ```
-extern/FDB.xlsx  →  imports/Aircraft.md  →  import/Aircraft.json  →  Database
+extern/FDB.xlsx  →  docs/imports/Aircraft.md  →  import/Aircraft.json  →  Database
     (XLSX)            (Mapping Rules)         (JSON Seed)           (SQLite)
 ```
 
@@ -19,7 +19,7 @@ This separates data acquisition (XLSX from external systems) from data transform
 
 ## Import Definition Files
 
-Each entity can have an import definition in `imports/{Entity}.md`:
+Each entity can have an import definition in `docs/imports/{Entity}.md`:
 
 ```markdown
 # Aircraft Import
@@ -396,8 +396,11 @@ The log panel is resizable via drag handle.
 
 ```
 app/systems/<system>/
-├── imports/               ← Import definition files
-│   └── Aircraft.md
+├── docs/
+│   ├── imports/           ← Import definition files
+│   │   └── Aircraft.md
+│   ├── classes/           ← Entity class definitions
+│   └── ui/                ← UI specifications
 ├── data/
 │   ├── extern/            ← External XLSX files (gitignored)
 │   │   └── FDB 2025-12-31.xlsx
@@ -430,7 +433,7 @@ app/systems/<system>/
 | `app/server/utils/ImportManager.js` | Core: parse definitions, read XLSX, apply mapping, filter, write JSON |
 | `app/server/routers/import.router.js` | REST API for import operations |
 | `app/static/rap/components/seed-import-dialog.js` | UI: unified import dialog with tabs |
-| `app/systems/*/imports/*.md` | Import definition files |
+| `app/systems/*/docs/imports/*.md` | Import definition files |
 | `app/systems/*/data/extern/*.xlsx` | Source XLSX files |
 | `app/systems/*/data/import/*.json` | Generated import JSON files |
 

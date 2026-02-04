@@ -11,7 +11,7 @@ let CLASSES_DIR = null;
 
 /**
  * Initialize instruction-parser with a specific docs directory
- * @param {string} docsDir - Path to the docs/requirements directory
+ * @param {string} docsDir - Path to the docs directory (contains classes/, ui/, imports/)
  */
 function init(docsDir) {
   CLASSES_DIR = path.join(docsDir, 'classes');

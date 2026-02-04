@@ -29,7 +29,7 @@ Attribute order is used in multiple places:
 
 ## Step 1: Reorder Markdown Table
 
-In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, arrange the rows of the attribute table in the desired order.
+In `app/systems/<system>/docs/classes/ENTITY_NAME.md`, arrange the rows of the attribute table in the desired order.
 
 **Example before:**
 ```markdown
@@ -94,7 +94,7 @@ Computed fields (e.g., `[COMPUTED:...]`) can be at any position - they are not s
 ## Example: EngineMount (aircraft before engine)
 
 **Affected file:**
-`app/systems/<system>/docs/requirements/classes/EngineMount.md` - Swap table rows
+`app/systems/<system>/docs/classes/EngineMount.md` - Swap table rows
 
 **Change:** `engine, aircraft, position, ...` -> `aircraft, engine, position, ...`
 

@@ -14,7 +14,7 @@ AREA        = <AreaName>         # Area in DataModel.md (e.g., "Engine Managemen
 
 ## Step 1: Create Entity Markdown File
 
-Create `app/systems/SYSTEM/docs/requirements/classes/ENTITY_NAME.md`:
+Create `app/systems/SYSTEM/docs/classes/ENTITY_NAME.md`:
 
 ```markdown
 # ENTITY_NAME
@@ -60,7 +60,7 @@ Instructions for generating seed data.
 
 ## Step 2: Add to DataModel.md
 
-In `app/systems/SYSTEM/docs/requirements/DataModel.md`, add the entity to the appropriate area table:
+In `app/systems/SYSTEM/docs/DataModel.md`, add the entity to the appropriate area table:
 
 ```markdown
 ### AREA
@@ -77,7 +77,7 @@ In `app/systems/SYSTEM/docs/requirements/DataModel.md`, add the entity to the ap
 
 ## Step 3: Add to Crud.md
 
-In `app/systems/SYSTEM/docs/requirements/ui/Crud.md`, add the entity to the appropriate section:
+In `app/systems/SYSTEM/docs/ui/Crud.md`, add the entity to the appropriate section:
 
 ```markdown
 ## AREA
@@ -92,7 +92,7 @@ In `app/systems/SYSTEM/docs/requirements/ui/Crud.md`, add the entity to the appr
 
 ## Step 4: Remove from Types.md (if converting enum)
 
-If converting an existing enum type to an entity, remove the enum definition from `app/systems/SYSTEM/docs/requirements/Types.md`.
+If converting an existing enum type to an entity, remove the enum definition from `app/systems/SYSTEM/docs/Types.md`.
 
 The type name in other entities remains the same — it will now be interpreted as a foreign key instead of an enum.
 
@@ -146,7 +146,7 @@ Or create manually: `app/systems/SYSTEM/data/seed/ENTITY_NAME.json`
 ## Example: Converting EngineStandType enum to entity
 
 **Step 1 - Create entity file:**
-`app/systems/irma/docs/requirements/classes/EngineStandType.md`
+`app/systems/irma/docs/classes/EngineStandType.md`
 
 ```markdown
 # EngineStandType

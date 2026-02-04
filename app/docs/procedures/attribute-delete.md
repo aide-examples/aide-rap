@@ -14,7 +14,7 @@ TABLE_NAME  = <table_name>       # Table name (snake_case)
 
 ## Step 1: Remove Attribute from Markdown Table
 
-In `app/systems/<system>/docs/requirements/classes/ENTITY_NAME.md`, delete the row with the attribute:
+In `app/systems/<system>/docs/classes/ENTITY_NAME.md`, delete the row with the attribute:
 
 ```markdown
 | Attribute | Type | Description | Example |

@@ -2,7 +2,7 @@
  * ImportManager - Manages XLSX imports based on MD definitions
  *
  * Workflow:
- * 1. Parse import definition from imports/*.md
+ * 1. Parse import definition from docs/imports/*.md
  * 2. Read XLSX from data/extern/
  * 3. Apply column mapping
  * 4. Apply SQL-like filter
@@ -21,7 +21,7 @@ class ImportManager {
   constructor(systemDir, logger = null) {
     this.systemDir = systemDir;
     this.logger = logger || console;
-    this.importsDir = path.join(systemDir, 'imports');
+    this.importsDir = path.join(systemDir, 'docs', 'imports');
     this.externDir = path.join(systemDir, 'data', 'extern');
     this.importDir = path.join(systemDir, 'data', 'import');
 
@@ -84,7 +84,7 @@ class ImportManager {
     }
 
     const content = fs.readFileSync(mdPath, 'utf-8');
-    return { content, path: `imports/${entityName}.md` };
+    return { content, path: `docs/imports/${entityName}.md` };
   }
 
   /**
@@ -98,7 +98,7 @@ class ImportManager {
 
     try {
       fs.writeFileSync(mdPath, content, 'utf-8');
-      return { success: true, path: `imports/${entityName}.md` };
+      return { success: true, path: `docs/imports/${entityName}.md` };
     } catch (e) {
       this.logger.error('Failed to save import definition:', { error: e.message });
       return { error: e.message };
