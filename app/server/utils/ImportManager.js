@@ -318,8 +318,10 @@ class ImportManager {
     // Simple transforms
     switch (transform) {
       case 'number':
-        // Handle German number format (comma as decimal separator)
-        const num = parseFloat(str.replace(',', '.'));
+        // Handle German number format: 1.234,56 → 1234.56
+        // Remove thousand separators (dots) and replace decimal comma with dot
+        const germanNum = str.replace(/\./g, '').replace(',', '.');
+        const num = parseFloat(germanNum);
         return isNaN(num) ? value : num;
 
       case 'trim':
@@ -421,6 +423,12 @@ class ImportManager {
       return this.parseConcatExpression(concatMatch[1]);
     }
 
+    // calc(...) - arithmetic expression with column references
+    const calcMatch = expr.match(/^calc\((.+)\)$/i);
+    if (calcMatch) {
+      return this.parseCalcExpression(calcMatch[1]);
+    }
+
     // Otherwise: XLSX column name
     return { type: 'column', name: expr };
   }
@@ -507,6 +515,73 @@ class ImportManager {
   }
 
   /**
+   * Parse calc(...) expression for arithmetic operations
+   * Supports: calc(Col1 * Col2), calc(Price / 100), calc(( A + B ) * C)
+   * - Column names may contain spaces and hyphens (e.g., "Faktor Von-Währung")
+   * - Operators must be surrounded by spaces: ` + `, ` - `, ` * `, ` / `
+   * - Parentheses must have space on inner side: `( ` and ` )`
+   * - Number literals
+   * @param {string} expr - The expression inside calc(...)
+   * @returns {Object} - { type: 'calc', tokens: array, columns: string[] }
+   */
+  parseCalcExpression(expr) {
+    expr = expr.trim();
+    const columns = [];
+    const tokens = [];
+
+    // Replace operators (with surrounding spaces) with unique markers
+    // This preserves column names with spaces like "Faktor Von-Währung"
+    const MARKERS = {
+      ' + ': '\x00ADD\x00',
+      ' - ': '\x00SUB\x00',
+      ' * ': '\x00MUL\x00',
+      ' / ': '\x00DIV\x00',
+      '( ': '\x00LPAR\x00',
+      ' )': '\x00RPAR\x00'
+    };
+
+    let marked = expr;
+    for (const [op, marker] of Object.entries(MARKERS)) {
+      marked = marked.split(op).join(marker);
+    }
+
+    // Split by markers
+    const parts = marked.split(/\x00/);
+
+    for (const part of parts) {
+      if (!part) continue;
+
+      // Check for operator markers
+      if (part === 'ADD') {
+        tokens.push({ type: 'operator', value: '+' });
+      } else if (part === 'SUB') {
+        tokens.push({ type: 'operator', value: '-' });
+      } else if (part === 'MUL') {
+        tokens.push({ type: 'operator', value: '*' });
+      } else if (part === 'DIV') {
+        tokens.push({ type: 'operator', value: '/' });
+      } else if (part === 'LPAR') {
+        tokens.push({ type: 'operator', value: '(' });
+      } else if (part === 'RPAR') {
+        tokens.push({ type: 'operator', value: ')' });
+      } else {
+        // It's an operand (number or column name)
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+
+        if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+          tokens.push({ type: 'operand', value: trimmed, isNumber: true });
+        } else {
+          tokens.push({ type: 'operand', value: trimmed, isColumn: true });
+          columns.push(trimmed);
+        }
+      }
+    }
+
+    return { type: 'calc', tokens, columns };
+  }
+
+  /**
    * Resolve a source expression to a value for a given row
    * @param {Object} sourceExpr - Parsed source expression from parseSourceExpression()
    * @param {Object} row - The current XLSX row data
@@ -552,6 +627,41 @@ class ImportManager {
           return '';
         });
         return values.join('');
+      }
+
+      case 'calc': {
+        // Build expression string by replacing column references with values
+        let exprParts = [];
+        for (const token of sourceExpr.tokens) {
+          if (token.type === 'operator') {
+            exprParts.push(token.value);
+          } else if (token.isNumber) {
+            exprParts.push(token.value);
+          } else if (token.isColumn) {
+            const val = row[token.value];
+            if (val === null || val === undefined) {
+              // If any column is null, result is null
+              return null;
+            }
+            // Parse number (handle German format with comma)
+            const numVal = typeof val === 'number' ? val : parseFloat(String(val).replace(',', '.'));
+            if (isNaN(numVal)) {
+              this.logger.warn(`calc: Non-numeric value in column "${token.value}": ${val}`);
+              return null;
+            }
+            exprParts.push(numVal);
+          }
+        }
+
+        // Evaluate the expression
+        try {
+          // eslint-disable-next-line no-new-func
+          const result = new Function(`return ${exprParts.join(' ')};`)();
+          return result;
+        } catch (e) {
+          this.logger.warn(`calc: Expression error: ${exprParts.join(' ')}`, { error: e.message });
+          return null;
+        }
       }
 
       default:

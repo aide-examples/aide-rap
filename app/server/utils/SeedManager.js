@@ -323,6 +323,30 @@ function buildLabelLookupFromSeed(entityName) {
 }
 
 /**
+ * Build a lookup map from records being imported (for self-referential FKs).
+ * Allows earlier records in the import to be referenced by later records.
+ * E.g., EngineType "CFM56-5B" can reference "CFM56" if "CFM56" appears earlier.
+ *
+ * @param {object} entity - Entity schema
+ * @param {array} records - Records being imported
+ * @returns {object} - Lookup map: label -> row index (1-based, becomes id after insert)
+ */
+function buildLookupFromImportRecords(entity, records) {
+  const labelCol = entity.columns.find(c => c.ui?.label);
+  const label2Col = entity.columns.find(c => c.ui?.label2);
+
+  if (!labelCol && !label2Col) return {};
+
+  const rows = records.map((r, idx) => ({
+    id: idx + 1,  // Row index becomes id after insert
+    ...(labelCol ? { [labelCol.name]: r[labelCol.name] ?? null } : {}),
+    ...(label2Col ? { [label2Col.name]: r[label2Col.name] ?? null } : {})
+  }));
+
+  return buildLookupFromRows(rows, labelCol, label2Col);
+}
+
+/**
  * Resolve conceptual FK references in a record.
  * Converts { "manufacturer": "Airbus" } to { "manufacturer_id": 1 }
  *
@@ -343,7 +367,7 @@ function resolveConceptualFKs(entityName, record, lookups) {
   for (const fk of entity.foreignKeys) {
     const conceptualName = fk.displayName;  // e.g., "manufacturer"
     const technicalName = fk.column;        // e.g., "manufacturer_id"
-    const targetEntity = fk.references.entity; // e.g., "AircraftManufacturer"
+    const targetEntity = fk.references?.entity || entityName; // Fall back to self for self-refs
 
     // Check if record uses conceptual name (e.g., "manufacturer": "Airbus")
     if (conceptualName && conceptualName in record && typeof record[conceptualName] === 'string') {
@@ -473,8 +497,8 @@ function getStatus() {
     const missing = [];
 
     for (const fk of entity.foreignKeys) {
-      const target = fk.references.entity;
-      if (target === entity.className) continue; // Skip self-references
+      const target = fk.references?.entity;
+      if (!target || target === entity.className) continue; // Skip self-references and broken FKs
       if (!deps.includes(target)) deps.push(target);
 
       const targetStatus = statusMap[target];
@@ -594,16 +618,22 @@ function validateImport(entityName, records) {
   // Build lookups for FK validation (with seed file fallback)
   const lookups = {};
   for (const fk of entity.foreignKeys) {
-    if (!lookups[fk.references.entity]) {
-      const dbLookup = buildLabelLookup(fk.references.entity);
-      if (Object.keys(dbLookup).length > 0) {
-        lookups[fk.references.entity] = dbLookup;
+    const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
+    if (!lookups[targetEntity]) {
+      // Self-referential FK: build lookup from records being validated
+      if (targetEntity === entityName) {
+        lookups[entityName] = buildLookupFromImportRecords(entity, records);
       } else {
-        // DB table empty — fall back to seed file
-        const { lookup: seedLookup, found } = buildLabelLookupFromSeed(fk.references.entity);
-        lookups[fk.references.entity] = seedLookup;
-        if (found) {
-          seedFallbacks.push(fk.references.entity);
+        const dbLookup = buildLabelLookup(targetEntity);
+        if (Object.keys(dbLookup).length > 0) {
+          lookups[targetEntity] = dbLookup;
+        } else {
+          // DB table empty — fall back to seed file
+          const { lookup: seedLookup, found } = buildLabelLookupFromSeed(targetEntity);
+          lookups[targetEntity] = seedLookup;
+          if (found) {
+            seedFallbacks.push(targetEntity);
+          }
         }
       }
     }
@@ -631,7 +661,7 @@ function validateImport(entityName, records) {
     for (const fk of entity.foreignKeys) {
       const conceptualName = fk.displayName;
       const technicalName = fk.column;
-      const targetEntity = fk.references.entity;
+      const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
 
       // Check conceptual name (e.g., "manufacturer": "Airbus")
       if (conceptualName && record[conceptualName]) {
@@ -848,8 +878,9 @@ function countSeedConflicts(entityName, sourceDir = 'seed') {
   // Build FK lookups for resolving conceptual names
   const lookups = {};
   for (const fk of entity.foreignKeys) {
-    if (!lookups[fk.references.entity]) {
-      lookups[fk.references.entity] = buildLabelLookup(fk.references.entity);
+    const targetEntity = fk.references?.entity || entityName;  // Fall back to self
+    if (!lookups[targetEntity]) {
+      lookups[targetEntity] = buildLabelLookup(targetEntity);
     }
   }
 
@@ -914,13 +945,19 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   if (!lookups) {
     lookups = {};
     for (const fk of entity.foreignKeys) {
-      if (!lookups[fk.references.entity]) {
-        const dbLookup = buildLabelLookup(fk.references.entity);
-        if (Object.keys(dbLookup).length > 0) {
-          lookups[fk.references.entity] = dbLookup;
+      const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
+      if (!lookups[targetEntity]) {
+        // Self-referential FK: build lookup from records being imported
+        if (targetEntity === entityName) {
+          lookups[entityName] = buildLookupFromImportRecords(entity, records);
         } else {
-          const { lookup: seedLookup } = buildLabelLookupFromSeed(fk.references.entity);
-          lookups[fk.references.entity] = seedLookup;
+          const dbLookup = buildLabelLookup(targetEntity);
+          if (Object.keys(dbLookup).length > 0) {
+            lookups[targetEntity] = dbLookup;
+          } else {
+            const { lookup: seedLookup } = buildLabelLookupFromSeed(targetEntity);
+            lookups[targetEntity] = seedLookup;
+          }
         }
       }
     }
@@ -933,6 +970,13 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     const validation = validateImport(entityName, records);
     invalidRows = new Set(validation.invalidRows.map(r => r - 1)); // Convert to 0-based
     validationWarnings = validation.warnings || [];
+  }
+
+  // Check for self-referential FKs - if present, disable FK constraints during import
+  // This allows records to reference other records in the same batch regardless of order
+  const hasSelfRef = entity.foreignKeys.some(fk => (fk.references?.entity || entityName) === entityName);
+  if (hasSelfRef) {
+    db.pragma('foreign_keys = OFF');
   }
 
   // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
@@ -967,6 +1011,11 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   const errors = [];
   const mediaErrors = [];
   const fkErrorMap = new Map();  // key: "field|value|targetEntity" -> { field, value, targetEntity, count }
+
+  // Track duplicates within the import batch (same LABEL value appearing multiple times)
+  const labelCol = entity.columns.find(c => c.ui?.label);
+  const seenLabels = new Map();  // label value -> first row number (1-based)
+  const duplicates = [];  // { value, firstRow, duplicateRow }
 
   // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
   const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
@@ -1010,6 +1059,22 @@ async function loadEntity(entityName, lookups = null, options = {}) {
           targetEntity: fkWarn.targetEntity,
           count: 1
         });
+      }
+    }
+
+    // Track duplicates within import batch (same LABEL value appearing multiple times)
+    if (labelCol) {
+      const labelValue = resolved[labelCol.name];
+      if (labelValue != null) {
+        if (seenLabels.has(labelValue)) {
+          duplicates.push({
+            value: labelValue,
+            firstRow: seenLabels.get(labelValue),
+            duplicateRow: i + 1
+          });
+        } else {
+          seenLabels.set(labelValue, i + 1);
+        }
       }
     }
 
@@ -1111,9 +1176,24 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     result.fkErrorsTotal = fkErrors.reduce((sum, e) => sum + e.count, 0);
   }
 
+  // Add duplicate warnings (same LABEL value appearing multiple times in import)
+  if (duplicates.length > 0) {
+    result.duplicates = duplicates.map(d => ({
+      value: d.value,
+      firstRow: d.firstRow,
+      duplicateRow: d.duplicateRow,
+      message: `"${d.value}" appears in row ${d.firstRow} and ${d.duplicateRow} (row ${d.duplicateRow} overwrites)`
+    }));
+  }
+
   // Add media errors if any occurred
   if (mediaErrors.length > 0) {
     result.mediaErrors = mediaErrors;
+  }
+
+  // Re-enable FK constraints if we disabled them for self-refs
+  if (hasSelfRef) {
+    db.pragma('foreign_keys = ON');
   }
 
   // Emit after event (MediaService listens to update media refs)

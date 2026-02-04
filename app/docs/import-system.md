@@ -66,6 +66,7 @@ The **Source** column in the mapping table supports several expression types:
 | Random Choice | `random("a","b")` | `random("A","B","C")` | Random selection from strings |
 | Random Enum | `random(EnumType)` | `random(CurrencyCode)` | Random internal value from enum type |
 | Concat | `concat(a, b, ...)` | `concat(First, " ", Last)` | Combine columns with separators |
+| Calc | `calc(expr)` | `calc(Price * Factor)` | Arithmetic expression with columns |
 
 ### Examples
 
@@ -79,6 +80,8 @@ The **Source** column in the mapping table supports several expression types:
 | random(OperationalStatus)     | status              |                 |
 | concat(Code, "-", Year)       | reference           |                 |
 | concat(First, " ", Last)      | full_name           |                 |
+| calc(Price * Factor)          | adjusted_price      |                 |
+| calc(Amount / 100)            | amount_cents        |                 |
 ```
 
 ### Concat Function
@@ -88,6 +91,26 @@ The **Source** column in the mapping table supports several expression types:
 - **String literals** (with quotes): Fixed separator or prefix/suffix
 
 NULL values in columns are converted to empty strings.
+
+### Calc Function
+
+`calc(expression)` performs arithmetic operations on numeric columns:
+- **Column names**: Reference XLSX columns (may contain spaces and hyphens)
+- **Operators**: `+`, `-`, `*`, `/` — **must be surrounded by spaces**
+- **Parentheses**: For grouping `( A + B ) * C`
+- **Number literals**: Fixed values like `100` or `0.5`
+
+**Important:** Operators are only recognized when surrounded by spaces. This allows column names with hyphens like `Faktor Von-Währung` to work correctly.
+
+If any referenced column is NULL or non-numeric, the result is NULL.
+
+```markdown
+| Source                                     | Target  |
+|--------------------------------------------|---------|
+| calc(Umrechnungskurs * Faktor Von-Währung) | rate    |
+| calc(Price / 100)                          | cents   |
+| calc((Base + Tax) * Quantity)              | total   |
+```
 
 ### Enum Resolution
 

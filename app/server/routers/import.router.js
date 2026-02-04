@@ -196,6 +196,18 @@ module.exports = function(cfg) {
               }
             }
           }
+        } else if (sourceExpr.type === 'calc') {
+          // Validate each column reference in calc expression
+          for (const colName of sourceExpr.columns || []) {
+            if (!sourceColumnSet.has(colName)) {
+              errors.source.push({
+                column: colName,
+                message: `Source column "${colName}" not found in XLSX (in calc)`
+              });
+            } else {
+              usedXlsxColumns.add(colName);
+            }
+          }
         }
         // Literals and randomNumber/randomChoice don't need validation
       }

@@ -925,7 +925,8 @@ function parseAllUserViews(viewsConfig, schema) {
       prefilter: entry.prefilter || null,
       requiredFilter: entry.requiredFilter || null,
       defaultSort: defaultSort,
-      chart: entry.chart || null
+      chart: entry.chart || null,
+      filter: entry.filter || null  // SQL WHERE clause for view-level filtering
     };
 
     // Deduplicate joins by alias
@@ -1184,6 +1185,14 @@ function generateUserViewSQL(parsedView) {
 
   if (joinClauses.length > 0) {
     sql.push(joinClauses.join('\n'));
+  }
+
+  // Add WHERE clause if filter is specified
+  if (parsedView.filter) {
+    // Replace unqualified column names with b. prefix for base table columns
+    // But preserve already qualified names (containing .)
+    let whereClause = parsedView.filter;
+    sql.push(`WHERE ${whereClause}`);
   }
 
   return sql.join('\n');

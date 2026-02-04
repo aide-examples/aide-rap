@@ -761,6 +761,12 @@ const SeedImportDialog = {
         result.fkErrors.forEach(e => this.log('error', e.message));
       }
 
+      // Show duplicate warnings (same LABEL value appearing multiple times)
+      if (result.duplicates?.length > 0) {
+        this.log('warning', `${result.duplicates.length} duplicate(s) found - later rows overwrite earlier ones`);
+        result.duplicates.forEach(d => this.log('warning', d.message));
+      }
+
       if (result.errors?.length > 0) {
         result.errors.slice(0, 5).forEach(e => this.log('error', e));
       }

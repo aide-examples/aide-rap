@@ -2631,10 +2631,10 @@
    ============================================================================= */
 
 .seed-import-modal {
-    width: 90%;
-    max-width: 800px;
-    height: 80vh;
-    max-height: 600px;
+    width: 95%;
+    max-width: 1400px;
+    height: 92vh;
+    max-height: 92vh;
     display: flex;
     flex-direction: column;
 }
@@ -3055,10 +3055,10 @@
    ============================================================================= */
 
 .unified-import {
-    width: 90%;
-    max-width: 900px;
-    height: 85vh;
-    max-height: 700px;
+    width: 95%;
+    max-width: 1400px;
+    height: 92vh;
+    max-height: 92vh;
 }
 
 .unified-import .modal-body {
@@ -3565,9 +3565,10 @@
    ============================================================================= */
 
 .seed-generator-dialog {
-    width: 90%;
-    max-width: 800px;
-    max-height: 80vh;
+    width: 95%;
+    max-width: 1400px;
+    height: 92vh;
+    max-height: 92vh;
     display: flex;
     flex-direction: column;
 }

@@ -41,6 +41,7 @@ Views are defined in `config.json` under the `"views"` key, sibling to `"crud"`:
 | `base` | Yes | Base entity (PascalCase). Determines the SQL base table, area color, and row-click target |
 | `columns` | Yes | Array of column definitions (see below) |
 | `sort` | No | Default sort column and order (see [Default Sorting](#default-sorting)) |
+| `filter` | No | SQL WHERE clause for view-level filtering (see [View Filter](#view-filter)) |
 | `requiredFilter` | No | Fields requiring user filter before loading (always shows dialog) |
 | `prefilter` | No | Fields for optional prefilter (dialog shown when dataset is large) |
 | `calculator` | No | Client-side JavaScript for row styling |
@@ -428,6 +429,51 @@ Shows a filter dialog only when the dataset exceeds the pagination threshold:
     "shop.name AS Shop",
     "workscope.designation AS Workscope"
   ]
+}
+```
+
+---
+
+## View Filter
+
+Views can specify a `filter` property containing a SQL WHERE clause that filters rows at the database level. Unlike `requiredFilter` and `prefilter` (which prompt the user), `filter` is applied automatically and permanently.
+
+### Syntax
+
+```json
+{
+  "name": "Engine Subtypes",
+  "base": "EngineType",
+  "filter": "b.super_type_id IS NOT NULL",
+  "columns": [
+    "designation AS Type",
+    "super_type.designation AS Parent Type"
+  ]
+}
+```
+
+### Use Cases
+
+- **Exclude NULL relationships**: `"filter": "b.super_type_id IS NOT NULL"`
+- **Status filtering**: `"filter": "b.status = 'Active'"`
+- **Combined conditions**: `"filter": "b.status = 'Active' AND b.deleted_at IS NULL"`
+
+### Column References
+
+The filter operates on the base table (aliased as `b`). **Always use the `b.` prefix** for base table columns to avoid ambiguity when JOINs are present:
+
+| Entity Column | Filter Syntax |
+|---------------|---------------|
+| `super_type` (FK) | `b.super_type_id IS NOT NULL` |
+| `status` (string) | `b.status = 'Active'` |
+| `count` (number) | `b.count > 0` |
+
+For joined columns, use the join alias pattern `j_{path}`:
+
+```json
+{
+  "filter": "j_type.thrust > 20000",
+  "columns": ["type.designation AS Type", "type.thrust AS Thrust"]
 }
 ```
 
