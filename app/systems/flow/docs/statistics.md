@@ -2,16 +2,16 @@
 
 Lines of code for the **flow** system.
 
-*Generated: 2026-02-04 20:30*
+*Generated: 2026-02-04 21:05*
 
 ## Documentation
 
 | Category | LOC |
 |----------|----:|
 | Entity Classes (classes/*.md) | 70 |
-| Other Docs (requirements/*.md) | 175 |
+| Other Docs (requirements/*.md) | 82 |
 | Help | 34 |
-| **Subtotal** | **279** |
+| **Subtotal** | **186** |
 
 ## Configuration
 
@@ -26,4 +26,4 @@ Lines of code for the **flow** system.
 
 | Category | LOC |
 |----------|----:|
-| **System Total** | **350** |
+| **System Total** | **257** |

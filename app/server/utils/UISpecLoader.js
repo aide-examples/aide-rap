@@ -1,7 +1,7 @@
 /**
  * UISpecLoader — Read CRUD and Views configuration from Markdown files.
  *
- * Looks for `requirements/ui/Crud.md` and `requirements/ui/Views.md`.
+ * Looks for `docs/Crud.md` and `docs/views/{Area}/{ViewName}.md`.
  * Returns the same data structures as the old config.json format.
  *
  * Crud.md format:
@@ -9,10 +9,8 @@
  *   ## Section Name        → section separator
  *   - EntityName           → entity entry
  *
- * Views.md format:
- *   # Views
- *   ## Section Name        → section separator
- *   ### View Name          → view name
+ * View file format (one file per view in docs/views/{Area}/{ViewName}.md):
+ *   # View Name            → view name (or inferred from filename)
  *   ```json                → view definition (base, columns)
  *   { "base": "...", "columns": [...] }
  *   ```
@@ -20,6 +18,8 @@
  *   schema.columns.push({ key: 'x', label: 'X', type: 'number' });
  *   for (const row of data) { row.x = ...; }
  *   ```
+ *
+ * Area = subdirectory name (used as section separator)
  */
 
 const fs = require('fs');
@@ -42,7 +42,7 @@ const SEPARATOR_PREFIX = '-------------------- ';
  * @returns {{entities: string[], prefilters: Object, requiredFilters: Object, tableOptions: Object}|null}
  */
 function loadCrudConfig(requirementsDir) {
-  const mdPath = path.join(requirementsDir, 'ui', 'Crud.md');
+  const mdPath = path.join(requirementsDir, 'Crud.md');
   if (!fs.existsSync(mdPath)) return null;
 
   let content = fs.readFileSync(mdPath, 'utf-8');
@@ -123,81 +123,106 @@ function loadCrudConfig(requirementsDir) {
 }
 
 /**
- * Load view definitions from Views.md.
- * @param {string} requirementsDir - Path to requirements/ directory
- * @returns {Array|null} Array of view objects and separator strings, or null if not found
+ * Parse a single view file.
+ * @param {string} content - File content
+ * @param {string} filename - Filename (used as fallback for view name)
+ * @returns {Object|null} View definition object or null if invalid
  */
-function loadViewsConfig(requirementsDir) {
-  const mdPath = path.join(requirementsDir, 'ui', 'Views.md');
-  if (!fs.existsSync(mdPath)) return null;
-
-  let content = fs.readFileSync(mdPath, 'utf-8');
-
-  // Remove HTML comments before parsing (they may contain example entries)
+function parseViewFile(content, filename) {
+  // Remove HTML comments before parsing
   content = content.replace(/<!--[\s\S]*?-->/g, '');
 
   const lines = content.split('\n');
-  const result = [];
-  let currentViewName = null;
-  let lastViewObj = null;
+  let name = null;
+  let jsonBlock = null;
+  let jsBlock = null;
+  let inJson = false;
+  let inJs = false;
+  let blockContent = [];
 
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
+  for (const line of lines) {
+    const trimmed = line.trim();
 
-    // H2 = section separator
-    if (trimmed.startsWith('## ')) {
-      result.push(SEPARATOR_PREFIX + trimmed.substring(3).trim());
-      currentViewName = null;
-      lastViewObj = null;
-      continue;
-    }
-
-    // H3 = view name
-    if (trimmed.startsWith('### ')) {
-      currentViewName = trimmed.substring(4).trim();
-      lastViewObj = null;
-      continue;
-    }
-
-    // JSON code block = view definition
-    if (trimmed === '```json' && currentViewName) {
-      const jsonLines = [];
-      i++;
-      while (i < lines.length && lines[i].trim() !== '```') {
-        jsonLines.push(lines[i]);
-        i++;
+    // H1 = View Name
+    if (trimmed.startsWith('# ') && !name) {
+      name = trimmed.substring(2).trim();
+    } else if (trimmed === '```json') {
+      inJson = true;
+      blockContent = [];
+    } else if (trimmed === '```js') {
+      inJs = true;
+      blockContent = [];
+    } else if (trimmed === '```') {
+      if (inJson) {
+        jsonBlock = blockContent.join('\n');
+        inJson = false;
+      } else if (inJs) {
+        jsBlock = blockContent.join('\n');
+        inJs = false;
       }
-
-      try {
-        const viewDef = JSON.parse(jsonLines.join('\n'));
-        viewDef.name = currentViewName;
-        result.push(viewDef);
-        lastViewObj = viewDef;
-      } catch (e) {
-        console.error(`Failed to parse view "${currentViewName}" in ${mdPath}: ${e.message}`);
-      }
-
-      currentViewName = null;
-      continue;
-    }
-
-    // JS code block = calculator (attaches to preceding view)
-    if (trimmed === '```js' && lastViewObj) {
-      const jsLines = [];
-      i++;
-      while (i < lines.length && lines[i].trim() !== '```') {
-        jsLines.push(lines[i]);
-        i++;
-      }
-      const jsCode = jsLines.join('\n').trim();
-      if (jsCode) {
-        lastViewObj.calculator = jsCode;
-      }
-      lastViewObj = null;
+    } else if (inJson || inJs) {
+      blockContent.push(line);
     }
   }
 
-  return result;
+  if (!jsonBlock) return null;
+
+  try {
+    const viewDef = JSON.parse(jsonBlock);
+    viewDef.name = name || filename.replace('.md', '');
+    if (jsBlock && jsBlock.trim()) {
+      viewDef.calculator = jsBlock.trim();
+    }
+    return viewDef;
+  } catch (e) {
+    console.error(`Failed to parse view ${filename}: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Load view definitions from docs/views/{Area}/{ViewName}.md files.
+ * @param {string} requirementsDir - Path to docs/ directory
+ * @returns {Array|null} Array of view objects and separator strings, or null if not found
+ */
+function loadViewsConfig(requirementsDir) {
+  const viewsDir = path.join(requirementsDir, 'views');
+
+  if (!fs.existsSync(viewsDir)) {
+    return null;
+  }
+
+  const result = [];
+
+  // Scan area subdirectories (sorted alphabetically)
+  const areas = fs.readdirSync(viewsDir)
+    .filter(f => {
+      const fullPath = path.join(viewsDir, f);
+      return fs.statSync(fullPath).isDirectory();
+    })
+    .sort();
+
+  for (const area of areas) {
+    const areaDir = path.join(viewsDir, area);
+    const viewFiles = fs.readdirSync(areaDir)
+      .filter(f => f.endsWith('.md'))
+      .sort();
+
+    if (viewFiles.length === 0) continue;
+
+    // Section separator for this area
+    result.push(SEPARATOR_PREFIX + area);
+
+    for (const file of viewFiles) {
+      const content = fs.readFileSync(path.join(areaDir, file), 'utf-8');
+      const viewDef = parseViewFile(content, file);
+      if (viewDef) {
+        result.push(viewDef);
+      }
+    }
+  }
+
+  return result.length > 0 ? result : null;
 }
 
 module.exports = { loadCrudConfig, loadViewsConfig };

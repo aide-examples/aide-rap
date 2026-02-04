@@ -400,7 +400,8 @@ app/systems/<system>/
 │   ├── imports/           ← Import definition files
 │   │   └── Aircraft.md
 │   ├── classes/           ← Entity class definitions
-│   └── ui/                ← UI specifications
+│   ├── views/             ← View definitions (one file per view)
+│   └── Crud.md            ← Entity visibility configuration
 ├── data/
 │   ├── extern/            ← External XLSX files (gitignored)
 │   │   └── FDB 2025-12-31.xlsx

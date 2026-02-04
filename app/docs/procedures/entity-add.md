@@ -77,7 +77,7 @@ In `app/systems/SYSTEM/docs/DataModel.md`, add the entity to the appropriate are
 
 ## Step 3: Add to Crud.md
 
-In `app/systems/SYSTEM/docs/ui/Crud.md`, add the entity to the appropriate section:
+In `app/systems/SYSTEM/docs/Crud.md`, add the entity to the appropriate section:
 
 ```markdown
 ## AREA

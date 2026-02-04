@@ -642,7 +642,7 @@ Use `app/config_sample.json` as template for new systems.
 
 ### UI Configuration (Markdown)
 
-Entity visibility and views are defined in `docs/ui/`:
+Entity visibility and views are defined in `docs/`:
 
 **Crud.md** — Which entities appear in the UI:
 ```markdown
@@ -657,16 +657,23 @@ Entity visibility and views are defined in `docs/ui/`:
 - Operator
 ```
 
-**Views.md** — Cross-entity join views:
-```markdown
-# Views
-
-## Engine Management
-
-### Engine Status
+**views/{Area}/{ViewName}.md** — Cross-entity join views (one file per view):
 ```
+docs/views/
+├── Engine Management/
+│   ├── Engine Status.md
+│   └── Engine Overview.md
+└── Finance/
+    └── Exchange Rates.md
+```
+
+Each view file contains a JSON block with the view definition:
+```markdown
+# Engine Status
+
 ```json
 { "base": "EngineAllocation", "columns": ["engine.serial_number AS ESN", "aircraft.registration"] }
+```
 ```
 
 See [Views Configuration](procedures/views-config.md) for the full syntax.

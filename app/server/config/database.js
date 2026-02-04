@@ -719,7 +719,7 @@ function reloadUserViews() {
   if (mdViews) {
     storedViewsConfig = mdViews;
     createUserViews(storedViewsConfig);
-    logger.info('User views reloaded from Views.md');
+    logger.info('User views reloaded from views/');
     eventBus.emit('views:reload:after', schema.userViews);
   }
 
@@ -727,7 +727,7 @@ function reloadUserViews() {
 }
 
 /**
- * Watch Views.md for changes and auto-reload
+ * Watch views directory for changes and auto-reload
  * Uses debounce to avoid multiple reloads on rapid saves
  */
 let viewsWatcher = null;
@@ -737,10 +737,10 @@ function watchViewsFile() {
   if (!storedDataModelPath) return;
 
   const requirementsDir = path.dirname(storedDataModelPath);
-  const viewsPath = path.join(requirementsDir, 'ui', 'Views.md');
+  const viewsDir = path.join(requirementsDir, 'views');
 
-  if (!fs.existsSync(viewsPath)) {
-    logger.debug('Views.md not found, skipping file watch');
+  if (!fs.existsSync(viewsDir)) {
+    logger.debug('views/ directory not found, skipping file watch');
     return;
   }
 
@@ -749,23 +749,25 @@ function watchViewsFile() {
     viewsWatcher.close();
   }
 
-  viewsWatcher = fs.watch(viewsPath, (eventType) => {
-    if (eventType === 'change') {
-      // Debounce: wait 500ms before reloading (IDEs often save multiple times)
-      if (viewsReloadTimeout) {
-        clearTimeout(viewsReloadTimeout);
-      }
-      viewsReloadTimeout = setTimeout(() => {
-        try {
-          reloadUserViews();
-        } catch (err) {
-          logger.error('Failed to reload views on file change', { error: err.message });
-        }
-      }, 500);
+  // Watch views directory recursively (includes all Area subdirectories)
+  viewsWatcher = fs.watch(viewsDir, { persistent: false, recursive: true }, (eventType, filename) => {
+    // Only react to .md file changes
+    if (!filename || !filename.endsWith('.md')) return;
+
+    // Debounce: wait 500ms before reloading (IDEs often save multiple times)
+    if (viewsReloadTimeout) {
+      clearTimeout(viewsReloadTimeout);
     }
+    viewsReloadTimeout = setTimeout(() => {
+      try {
+        reloadUserViews();
+      } catch (err) {
+        logger.error('Failed to reload views on file change', { error: err.message });
+      }
+    }, 500);
   });
 
-  logger.info('Watching Views.md for changes');
+  logger.info('Watching views/ directory for changes');
 }
 
 function unwatchViewsFile() {

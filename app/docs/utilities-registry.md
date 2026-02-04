@@ -98,7 +98,7 @@
 | **logger** | server/utils/ | Winston Logging |
 | **instruction-parser** | server/utils/ | Markdown-Sektionen |
 | **mermaid-parser** | server/utils/ | Mermaid ER parsen |
-| **UISpecLoader** | server/utils/ | Crud.md/Views.md laden |
+| **UISpecLoader** | server/utils/ | Crud.md und views/ laden |
 
 ---
 

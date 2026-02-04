@@ -1,6 +1,6 @@
 # User Views
 
-> Cross-entity read-only tables defined in `config.json` via dot-notation path expressions.
+> Cross-entity read-only tables defined via dot-notation path expressions.
 
 ## Overview
 
@@ -10,51 +10,68 @@ Clicking a row in a view jumps to the base entity's edit form in the detail pane
 
 ---
 
-## Configuration
+## Directory Structure
 
-Views are defined in `config.json` under the `"views"` key, sibling to `"crud"`:
+Views are defined as individual Markdown files in `docs/views/`:
+
+```
+docs/views/
+├── Engine Management/          ← Area (dropdown separator)
+│   ├── Engine Status.md        ← View file
+│   ├── Engine Overview.md
+│   └── Stands by Engine Type.md
+├── Finance/
+│   └── Exchange Rates.md
+└── Operations/
+    └── Fleet.md
+```
+
+**Conventions:**
+- **Area = subdirectory name** (becomes dropdown separator)
+- **View name = H1 header** (or filename without `.md`)
+- Areas and views are sorted alphabetically
+
+---
+
+## View File Format
+
+Each view is a Markdown file containing an H1 header (view name), a JSON block (view definition), and optionally a JS block (calculator):
+
+```markdown
+# Engine Status
 
 ```json
 {
-    "crud": { ... },
-    "views": [
-        "-------------------- Fleet Analysis",
-        {
-            "name": "Engine Status",
-            "base": "Engine",
-            "columns": [
-                "serial_number",
-                "total_cycles",
-                "type.designation AS Engine Type",
-                { "path": "type.manufacturer.name", "label": "OEM" }
-            ]
-        }
-    ]
+  "base": "Engine",
+  "columns": [
+    "serial_number",
+    "total_cycles",
+    "type.designation AS Engine Type",
+    { "path": "type.manufacturer.name", "label": "OEM" }
+  ]
 }
 ```
 
-### View Object
+```js
+// Optional: client-side calculator for row styling
+for (const row of data) {
+  row._rowClass = row['Total Cycles'] > 1000 ? 'highlight' : '';
+}
+```
+```
+
+### View Object (JSON block)
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `name` | Yes | Display name shown in the Views dropdown |
 | `base` | Yes | Base entity (PascalCase). Determines the SQL base table, area color, and row-click target |
 | `columns` | Yes | Array of column definitions (see below) |
 | `sort` | No | Default sort column and order (see [Default Sorting](#default-sorting)) |
 | `filter` | No | SQL WHERE clause for view-level filtering (see [View Filter](#view-filter)) |
 | `requiredFilter` | No | Fields requiring user filter before loading (always shows dialog) |
 | `prefilter` | No | Fields for optional prefilter (dialog shown when dataset is large) |
-| `calculator` | No | Client-side JavaScript for row styling |
 
-### Separators
-
-Strings starting with dashes serve as group headers in the dropdown:
-
-```json
-"-------------------- Fleet Analysis"
-```
-
-The dashes are stripped; only the label text is displayed.
+The `name` property is extracted from the H1 header (or filename), so it's not needed in the JSON block.
 
 ---
 
@@ -273,53 +290,67 @@ Subquery aliases use `_br` for the child table and `_br_{field}` for internal jo
 
 ## Complete Example
 
+File structure:
+```
+docs/views/
+├── Fleet Analysis/
+│   ├── Engine Status.md
+│   ├── Aircraft Fleet.md
+│   └── Engine Overview.md
+└── Maintenance/
+    └── Open Shop Orders.md
+```
+
+**Fleet Analysis/Engine Status.md:**
+```markdown
+# Engine Status
+
 ```json
-"views": [
-    "-------------------- Fleet Analysis",
-    {
-        "name": "Engine Status",
-        "base": "Engine",
-        "columns": [
-            "serial_number",
-            "total_cycles OMIT 0",
-            "total_flight_hours",
-            "type.designation AS Engine Type",
-            { "path": "type.manufacturer.name", "label": "OEM" }
-        ]
-    },
-    {
-        "name": "Aircraft Fleet",
-        "base": "Aircraft",
-        "columns": [
-            "registration",
-            "serial_number",
-            "status",
-            "type.designation AS Aircraft Type",
-            { "path": "type.manufacturer.name", "label": "Manufacturer" }
-        ]
-    },
-    {
-        "name": "Engine Overview",
-        "base": "Engine",
-        "columns": [
-            "serial_number AS ESN",
-            "type.designation AS Type",
-            "EngineAllocation<engine(COUNT) AS Allocations",
-            "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
-        ]
-    },
-    "-------------------- Maintenance",
-    {
-        "name": "Open Shop Orders",
-        "base": "ShopOrder",
-        "columns": [
-            "order_number",
-            "status",
-            "engine.serial_number AS Engine S/N",
-            "mro.name AS MRO"
-        ]
-    }
-]
+{
+  "base": "Engine",
+  "columns": [
+    "serial_number",
+    "total_cycles OMIT 0",
+    "total_flight_hours",
+    "type.designation AS Engine Type",
+    { "path": "type.manufacturer.name", "label": "OEM" }
+  ]
+}
+```
+```
+
+**Fleet Analysis/Engine Overview.md:**
+```markdown
+# Engine Overview
+
+```json
+{
+  "base": "Engine",
+  "columns": [
+    "serial_number AS ESN",
+    "type.designation AS Type",
+    "EngineAllocation<engine(COUNT) AS Allocations",
+    "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+  ]
+}
+```
+```
+
+**Maintenance/Open Shop Orders.md:**
+```markdown
+# Open Shop Orders
+
+```json
+{
+  "base": "ShopOrder",
+  "columns": [
+    "order_number",
+    "status",
+    "engine.serial_number AS Engine S/N",
+    "mro.name AS MRO"
+  ]
+}
+```
 ```
 
 ---

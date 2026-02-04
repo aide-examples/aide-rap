@@ -348,7 +348,7 @@ function generateSystem(systemName, displayName, description, entities, seedingI
         path.join(systemDir, 'data', 'seed'),
         path.join(systemDir, 'docs'),
         path.join(systemDir, 'docs', 'classes'),
-        path.join(systemDir, 'docs', 'ui'),
+        path.join(systemDir, 'docs', 'views'),
         path.join(systemDir, 'help')
     ];
 
@@ -366,15 +366,11 @@ function generateSystem(systemName, displayName, description, entities, seedingI
     // Generate Crud.md (entity list for CRUD UI)
     const crudContent = generateCrudMd(entities);
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'ui', 'Crud.md'),
+        path.join(systemDir, 'docs', 'Crud.md'),
         crudContent
     );
 
-    // Generate Views.md (empty, no views initially)
-    fs.writeFileSync(
-        path.join(systemDir, 'docs', 'ui', 'Views.md'),
-        '# Views\n'
-    );
+    // views/ directory created above - user adds view files manually
 
     // Generate entity class files
     for (const entity of entities) {
@@ -420,8 +416,8 @@ function generateSystem(systemName, displayName, description, entities, seedingI
             'config.json',
             'docs/index.md',
             'docs/DataModel.md',
-            'docs/ui/Crud.md',
-            'docs/ui/Views.md',
+            'docs/Crud.md',
+            'docs/views/',
             ...entities.map(e => `docs/classes/${e.name}.md`),
             ...entities.map(e => `data/seed/${e.name}.json`),
             'help/index.md'
@@ -710,7 +706,7 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
         path.join(systemDir, 'data', 'seed'),
         path.join(systemDir, 'docs'),
         path.join(systemDir, 'docs', 'classes'),
-        path.join(systemDir, 'docs', 'ui'),
+        path.join(systemDir, 'docs', 'views'),
         path.join(systemDir, 'help'),
         path.join(systemDir, 'icons')
     ];
@@ -733,14 +729,10 @@ function createMinimalSystem(systemName, displayName, description, themeColor) {
         generateLogoSvg(themeColor)
     );
 
-    // Generate empty Crud.md and Views.md
+    // Generate empty Crud.md (views/ directory created above)
     fs.writeFileSync(
-        path.join(systemDir, 'docs', 'ui', 'Crud.md'),
+        path.join(systemDir, 'docs', 'Crud.md'),
         '# CRUD\n'
-    );
-    fs.writeFileSync(
-        path.join(systemDir, 'docs', 'ui', 'Views.md'),
-        '# Views\n'
     );
 
     return {
@@ -895,16 +887,12 @@ function importEntities(systemName, entities, seedingInstructions, mode, areas =
         .map(f => f.replace('.md', ''));
 
     // Update Crud.md with entity list
-    const uiDir = path.join(systemDir, 'docs', 'ui');
-    fs.mkdirSync(uiDir, { recursive: true });
     const crudContent = generateCrudMd(finalEntities.map(name => ({ name })));
-    fs.writeFileSync(path.join(uiDir, 'Crud.md'), crudContent);
+    fs.writeFileSync(path.join(systemDir, 'docs', 'Crud.md'), crudContent);
 
-    // Ensure Views.md exists
-    const viewsMdPath = path.join(uiDir, 'Views.md');
-    if (!fs.existsSync(viewsMdPath)) {
-        fs.writeFileSync(viewsMdPath, '# Views\n');
-    }
+    // Ensure views/ directory exists
+    const viewsDir = path.join(systemDir, 'docs', 'views');
+    fs.mkdirSync(viewsDir, { recursive: true });
 
     // Load config for metadata
     const configPath = path.join(systemDir, 'config.json');

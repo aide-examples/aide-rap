@@ -54,9 +54,9 @@ Filters are defined inline with the entity list item:
 | `prefilter: field:year` | Show dialog with year dropdown when large |
 | `prefilter: field:month` | Show dialog with year-month dropdown when large |
 
-### View Filters (Views.md)
+### View Filters (views/ files)
 
-Filters are defined in the view JSON:
+Filters are defined in the view file's JSON block:
 
 ```json
 {
@@ -319,7 +319,10 @@ Large detail table where users filter by parent FK:
 
 View filtered by low-cardinality reference:
 
-**Views.md:**
+**views/Metering/Readings by Resource.md:**
+```markdown
+# Readings by Resource
+
 ```json
 {
   "base": "Reading",
@@ -331,6 +334,7 @@ View filtered by low-cardinality reference:
     "reading_at"
   ]
 }
+```
 ```
 
 **Behavior:** Opening "Readings by Resource" view shows dialog with dropdown containing resource types (Strom, Gas, Wasser). User selects one and sees only readings for that resource.
@@ -344,7 +348,10 @@ View or entity filtered by year:
 - Reading (required: reading_at:year)
 ```
 
-**Views.md:**
+**views/Metering/Readings by Year.md:**
+```markdown
+# Readings by Year
+
 ```json
 {
   "base": "Reading",
@@ -355,6 +362,7 @@ View or entity filtered by year:
     "reading_at"
   ]
 }
+```
 ```
 
 **Behavior:** Opening "Reading" shows dialog with dropdown containing years (2025, 2024, 2023...). User selects a year and sees only readings from that year. Years are sorted descending (most recent first).
