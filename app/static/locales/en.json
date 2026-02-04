@@ -216,5 +216,13 @@
     "si_run_import": "Run Import (XLSX → JSON)",
     "si_drop_file": "Drop file or click",
     "si_paste_placeholder": "Paste JSON or CSV data here...",
-    "si_preview_empty": "Paste data, then click \"Parse\""
+    "si_preview_empty": "Paste data, then click \"Parse\"",
+
+    "si_tab_preview": "Preview",
+    "si_preview_source": "Source",
+    "si_preview_showing": "Showing",
+    "si_preview_of": "of",
+    "si_preview_rows": "rows",
+    "si_preview_record": "Record",
+    "si_preview_no_data": "No data in source file"
 }

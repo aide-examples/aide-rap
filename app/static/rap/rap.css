@@ -3278,6 +3278,49 @@
     color: var(--color-danger-hover);
 }
 
+/* Preview Tab (Sample Records) */
+.sample-content {
+    font-size: 0.9rem;
+}
+
+.sample-info {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--table-row-hover);
+    border-radius: 6px;
+}
+
+.sample-records {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sample-record {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.sample-record-header {
+    padding: 8px 12px;
+    background: var(--table-header-bg);
+    font-weight: 500;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sample-json {
+    margin: 0;
+    padding: 12px;
+    background: #fafafa;
+    font-family: monospace;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 /* Rule Tab */
 .rule-toolbar {
     display: flex;

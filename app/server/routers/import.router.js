@@ -133,6 +133,27 @@ module.exports = function(cfg) {
   });
 
   /**
+   * GET /api/import/sample/:entity
+   * Returns first N rows from the XLSX source file as JSON
+   * Query params: count (default: 3)
+   */
+  router.get('/api/import/sample/:entity', (req, res) => {
+    try {
+      const count = parseInt(req.query.count) || 3;
+      const result = importManager.getSourceSample(req.params.entity, count);
+
+      if (result.error) {
+        res.status(400).json(result);
+      } else {
+        res.json(result);
+      }
+    } catch (e) {
+      console.error(`Failed to get sample for ${req.params.entity}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
    * GET /api/import/validate/:entity
    * Validates import rule mapping against source schema and entity schema
    * Returns: { valid, sourceErrors[], targetErrors[] }

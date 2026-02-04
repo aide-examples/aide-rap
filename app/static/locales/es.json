@@ -208,5 +208,13 @@
     "si_run_import": "Ejecutar importación (XLSX → JSON)",
     "si_drop_file": "Suelte archivo o haga clic",
     "si_paste_placeholder": "Pegue datos JSON o CSV aquí...",
-    "si_preview_empty": "Pegue datos, luego haga clic en \"Parse\""
+    "si_preview_empty": "Pegue datos, luego haga clic en \"Parse\"",
+
+    "si_tab_preview": "Vista previa",
+    "si_preview_source": "Origen",
+    "si_preview_showing": "Mostrando",
+    "si_preview_of": "de",
+    "si_preview_rows": "filas",
+    "si_preview_record": "Registro",
+    "si_preview_no_data": "Sin datos en archivo de origen"
 }

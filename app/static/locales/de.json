@@ -216,5 +216,13 @@
     "si_run_import": "Import ausführen (XLSX → JSON)",
     "si_drop_file": "Datei ablegen oder klicken",
     "si_paste_placeholder": "JSON oder CSV-Daten hier einfügen...",
-    "si_preview_empty": "Daten einfügen, dann \"Parse\" klicken"
+    "si_preview_empty": "Daten einfügen, dann \"Parse\" klicken",
+
+    "si_tab_preview": "Vorschau",
+    "si_preview_source": "Quelle",
+    "si_preview_showing": "Zeige",
+    "si_preview_of": "von",
+    "si_preview_rows": "Zeilen",
+    "si_preview_record": "Datensatz",
+    "si_preview_no_data": "Keine Daten in Quelldatei"
 }

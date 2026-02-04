@@ -165,6 +165,58 @@ class ImportManager {
   }
 
   /**
+   * Get sample rows from the XLSX source file
+   * @param {string} entityName - Entity name
+   * @param {number} count - Number of rows to return (default: 3)
+   * @returns {Object} - { records, sourceFile, sheet, error }
+   */
+  getSourceSample(entityName, count = 3) {
+    const definition = this.parseImportDefinition(entityName);
+
+    if (!definition) {
+      return { error: `No import definition found for ${entityName}` };
+    }
+
+    if (!definition.source) {
+      return { error: 'No source file specified in import definition' };
+    }
+
+    const sourcePath = path.join(this.systemDir, 'data', definition.source);
+
+    if (!fs.existsSync(sourcePath)) {
+      return { error: `Source file not found: ${definition.source}` };
+    }
+
+    try {
+      // Read only first few rows for efficiency (header + count data rows)
+      const workbook = XLSX.readFile(sourcePath, { sheetRows: count + 1 });
+
+      let sheetName = definition.sheet;
+      if (!sheetName) {
+        sheetName = workbook.SheetNames[0];
+      }
+
+      const sheet = workbook.Sheets[sheetName];
+      if (!sheet) {
+        return { error: `Sheet '${sheetName}' not found in XLSX` };
+      }
+
+      // Convert sheet to JSON (first row becomes keys)
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+
+      return {
+        records: rows.slice(0, count),
+        sourceFile: definition.source,
+        sheet: sheetName,
+        totalRows: rows.length
+      };
+    } catch (e) {
+      this.logger.error('Failed to read source sample:', { error: e.message });
+      return { error: e.message };
+    }
+  }
+
+  /**
    * Parse import definition from MD file
    * @param {string} entityName - Entity name (without .md extension)
    * @returns {Object|null} - { source, sheet, mapping, transforms, filter }
