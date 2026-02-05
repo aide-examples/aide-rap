@@ -10,6 +10,33 @@ const { parseSeedContext } = require('../utils/instruction-parser');
 const SeedManager = require('../utils/SeedManager');
 
 /**
+ * Shuffle array randomly (Fisher-Yates)
+ */
+function shuffleArray(arr) {
+  const result = [...arr];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/**
+ * Parse [FKLIMIT=n] directive from instruction
+ * @param {string} instruction - Data generator instruction
+ * @returns {{ cleanInstruction: string, fkLimit: number|null }}
+ */
+function parseFkLimit(instruction) {
+  const match = instruction.match(/\[FKLIMIT=(\d+)\]/i);
+  if (match) {
+    const limit = parseInt(match[1], 10);
+    const cleanInstruction = instruction.replace(/\s*\[FKLIMIT=\d+\]/gi, '').trim();
+    return { cleanInstruction, fkLimit: limit };
+  }
+  return { cleanInstruction: instruction, fkLimit: null };
+}
+
+/**
  * Build the prompt for AI-based seed data generation
  * @param {string} entityName - Name of entity to generate
  * @param {Object} schema - Entity schema with columns and types
@@ -19,6 +46,8 @@ const SeedManager = require('../utils/SeedManager');
  * @param {Object} backRefData - Back-reference data (entities that reference this one)
  */
 function buildPrompt(entityName, schema, instruction, existingData, contextData = {}, backRefData = {}) {
+  // Parse [FKLIMIT=n] from instruction
+  const { cleanInstruction, fkLimit } = parseFkLimit(instruction);
   // System columns that should be excluded from AI prompt (auto-managed by database)
   const systemColumns = new Set(['id', 'created_at', 'updated_at', 'deleted_at', 'version']);
 
@@ -48,20 +77,33 @@ function buildPrompt(entityName, schema, instruction, existingData, contextData 
 
   const typeDefinitions = schema.types || {};
 
-  // Build FK reference summary with ALL records
+  // Build FK reference summary (with optional limit)
   const fkSummary = {};
   for (const [refEntity, entityData] of Object.entries(existingData)) {
-    const records = Array.isArray(entityData) ? entityData : entityData.records;
+    let records = Array.isArray(entityData) ? entityData : entityData.records;
     const labelFields = Array.isArray(entityData) ? null : entityData.labelFields;
+    const hasComputedLabel = entityData?.hasComputedLabel || false;
 
     if (records && records.length > 0) {
+      // Apply fkLimit: random selection of N records
+      if (fkLimit && records.length > fkLimit) {
+        records = shuffleArray(records).slice(0, fkLimit);
+      }
+
       fkSummary[refEntity] = records.map(r => {
         let label = null;
-        // labelFields can be object {primary, secondary} or array [field1, field2]
-        const primaryField = labelFields?.primary || (Array.isArray(labelFields) ? labelFields[0] : null);
-        if (primaryField) {
-          label = r[primaryField];
+        // Priority 1: Use computed _label if entity has labelExpression
+        if (hasComputedLabel && r._label) {
+          label = r._label;
         }
+        // Priority 2: Use configured labelFields
+        if (!label) {
+          const primaryField = labelFields?.primary || (Array.isArray(labelFields) ? labelFields[0] : null);
+          if (primaryField) {
+            label = r[primaryField];
+          }
+        }
+        // Priority 3: Fallback to common field names
         if (!label) {
           label = r.name || r.title || r.designation || r.registration || r.serial_number || r.icao_code || `#${r.id}`;
         }
@@ -79,7 +121,7 @@ ${JSON.stringify(columnInfo, null, 2)}
 ${JSON.stringify(typeDefinitions, null, 2)}
 
 ## Instruction
-${instruction}
+${cleanInstruction}
 
 ## Available Foreign Key References
 ${Object.keys(fkSummary).length > 0 ? JSON.stringify(fkSummary, null, 2) : 'None - no referenced entities have seed data yet.'}
@@ -141,12 +183,21 @@ function buildCompletePrompt(entityName, schema, instruction, existingRecords, f
   for (const [refEntity, entityData] of Object.entries(fkData)) {
     const records = Array.isArray(entityData) ? entityData : entityData.records;
     const labelFields = Array.isArray(entityData) ? null : entityData.labelFields;
+    const hasComputedLabel = entityData?.hasComputedLabel || false;
 
     if (records && records.length > 0) {
       fkSummary[refEntity] = records.map(r => {
         let label = null;
-        const primaryField = labelFields?.primary || (Array.isArray(labelFields) ? labelFields[0] : null);
-        if (primaryField) label = r[primaryField];
+        // Priority 1: Use computed _label if entity has labelExpression
+        if (hasComputedLabel && r._label) {
+          label = r._label;
+        }
+        // Priority 2: Use configured labelFields
+        if (!label) {
+          const primaryField = labelFields?.primary || (Array.isArray(labelFields) ? labelFields[0] : null);
+          if (primaryField) label = r[primaryField];
+        }
+        // Priority 3: Fallback to common field names
         if (!label) {
           label = r.name || r.title || r.designation || r.registration || r.serial_number || r.icao_code || `#${r.id}`;
         }
@@ -366,17 +417,25 @@ function loadExistingDataForFKs(entitySchema, getDatabase, fullSchema = null) {
     const refTable = col.foreignKey.table;
     let records = [];
     let labelFields = null;
+    let hasComputedLabel = false;
     let fromSeed = false;
 
     if (fullSchema && fullSchema.entities && fullSchema.entities[refEntity]) {
       labelFields = fullSchema.entities[refEntity].ui?.labelFields;
+      hasComputedLabel = fullSchema.entities[refEntity].ui?.hasComputedLabel || false;
     }
 
-    // Try to load from database first
+    // Try to load from database first - use VIEW to get computed _label
     if (getDatabase) {
       try {
         const db = getDatabase();
-        records = db.prepare(`SELECT * FROM ${refTable}`).all() || [];
+        const viewName = refTable + '_view';
+        // Try view first (has _label for computed labels), fall back to table
+        try {
+          records = db.prepare(`SELECT * FROM ${viewName}`).all() || [];
+        } catch (viewErr) {
+          records = db.prepare(`SELECT * FROM ${refTable}`).all() || [];
+        }
       } catch (e) {
         // Table might not exist yet, ignore
       }
@@ -402,7 +461,8 @@ function loadExistingDataForFKs(entitySchema, getDatabase, fullSchema = null) {
     if (records.length > 0) {
       existingData[refEntity] = {
         records,
-        labelFields
+        labelFields,
+        hasComputedLabel
       };
       if (fromSeed) {
         seedOnlyFKs.push(refEntity);

@@ -1499,20 +1499,23 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
   // Extract entity-level labelFields from column UI annotations
   const labelCol = columns.find(c => c.ui?.label);
   const label2Col = columns.find(c => c.ui?.label2);
+
+  // Store entity-level label expression if defined
+  const entityAnnotations = classDef.entityAnnotations || null;
+  const hasComputedLabel = !!entityAnnotations?.labelExpression;
+
   const entityUI = {
     labelFields: {
       primary: labelCol?.name || null,
       secondary: label2Col?.name || null
-    }
+    },
+    hasComputedLabel
   };
 
   // Add system columns (timestamps + version) after user-defined columns
   for (const sysCol of SYSTEM_COLUMNS) {
     columns.push({ ...sysCol });
   }
-
-  // Store entity-level label expression if defined
-  const entityAnnotations = classDef.entityAnnotations || null;
 
   return {
     className,
