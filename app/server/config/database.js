@@ -49,10 +49,13 @@ function viewExists(viewName) {
 
 /**
  * Create or recreate a view for an entity
+ * @param {Object} entity - Entity definition
+ * @param {Object} schemaOverride - Optional schema override (defaults to module-level schema)
  */
-function createOrReplaceView(entity) {
+function createOrReplaceView(entity, schemaOverride = null) {
   const viewName = entity.tableName + '_view';
-  const viewSQL = generateViewSQL(entity);
+  const effectiveSchema = schemaOverride || schema;
+  const viewSQL = generateViewSQL(entity, effectiveSchema);
 
   if (viewExists(viewName)) {
     db.exec(`DROP VIEW IF EXISTS ${viewName}`);

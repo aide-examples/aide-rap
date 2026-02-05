@@ -22,6 +22,8 @@ Entity definitions are stored in separate files under [classes/](classes/).
 |--------|-------------|
 | [Building](classes/Building.md) | Building location |
 | [ResourceType](classes/ResourceType.md) | Type of resource (water, gas, electricity) |
+| [MeterManufacturer](classes/MeterManufacturer.md) | Meter manufacturer company |
+| [MeterType](classes/MeterType.md) | Meter product type |
 </div>
 
 ## Class Diagram

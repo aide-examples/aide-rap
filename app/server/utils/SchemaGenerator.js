@@ -232,9 +232,9 @@ function splitConcatArgs(argsStr) {
 
 /**
  * Parse a label expression from [LABEL=expr] or [LABEL2=expr]
- * Supports: concat(field1, 'sep', field2) or simple fieldname
+ * Supports: concat(field1, 'sep', field2), field.chain, or simple fieldname
  * @param {string} expr - The expression string
- * @returns {object} - { type: 'concat'|'field', parts?: string[], field?: string }
+ * @returns {object} - Structured expression with typed parts
  */
 function parseLabelExpression(expr) {
   const trimmed = expr.trim();
@@ -242,12 +242,27 @@ function parseLabelExpression(expr) {
   // Match concat(...)
   const concatMatch = trimmed.match(/^concat\((.+)\)$/i);
   if (concatMatch) {
-    const parts = splitConcatArgs(concatMatch[1]);
+    const rawParts = splitConcatArgs(concatMatch[1]);
+    const parts = rawParts.map(p => {
+      // Check if it's a quoted literal
+      if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+        return { type: 'literal', value: p.slice(1, -1) };
+      }
+      // Check for dot notation (FK chain)
+      if (p.includes('.')) {
+        return { type: 'fkChain', path: p };
+      }
+      // Simple field or FK reference - distinguished later based on schema
+      return { type: 'ref', name: p };
+    });
     return { type: 'concat', parts };
   }
 
-  // Simple field reference
-  return { type: 'field', field: trimmed };
+  // Simple field/FK reference
+  if (trimmed.includes('.')) {
+    return { type: 'fkChain', path: trimmed };
+  }
+  return { type: 'ref', name: trimmed };
 }
 
 /**
@@ -277,31 +292,208 @@ function parseEntityLevelAnnotations(headerLines) {
 }
 
 /**
- * Build SQL expression from label expression
- * @param {object} expr - { type: 'concat'|'field', parts?: string[], field?: string }
+ * Build SQL expression from label expression (simple version without FK resolution)
+ * Used for FK label columns where the join already exists
+ * @param {object} expr - Structured label expression
  * @param {string} alias - Table alias (e.g., 'b') or empty string
  * @returns {string} - SQL expression
  */
 function buildLabelSQL(expr, alias) {
   const prefix = alias ? `${alias}.` : '';
 
+  // Handle new structured format
+  if (expr.type === 'ref') {
+    return `${prefix}${expr.name}`;
+  }
+
+  if (expr.type === 'fkChain') {
+    // For simple buildLabelSQL, just use the path as-is (caller must ensure alias is correct)
+    const segments = expr.path.split('.');
+    return `${prefix}${segments[segments.length - 1]}`;
+  }
+
+  if (expr.type === 'literal') {
+    return `'${expr.value}'`;
+  }
+
+  // Legacy format support
   if (expr.type === 'field') {
     return `${prefix}${expr.field}`;
   }
 
   if (expr.type === 'concat') {
     const sqlParts = expr.parts.map(p => {
-      // Check if it's a quoted literal
-      if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
-        return p; // Keep as-is (SQL string literal)
+      // Handle new structured parts
+      if (typeof p === 'object') {
+        if (p.type === 'literal') return `'${p.value}'`;
+        if (p.type === 'ref') return `${prefix}${p.name}`;
+        if (p.type === 'fkChain') {
+          const segs = p.path.split('.');
+          return `${prefix}${segs[segs.length - 1]}`;
+        }
       }
-      // Field reference
+      // Legacy: string parts
+      if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+        return p;
+      }
       return `${prefix}${p}`;
     });
     return `(${sqlParts.join(' || ')})`;
   }
 
   return 'NULL';
+}
+
+/**
+ * Build SQL expression with FK chain resolution
+ * Resolves FK references to their target entity's labels, creating necessary JOINs
+ * @param {object} expr - Structured label expression
+ * @param {string} baseAlias - Base table alias (e.g., 'b')
+ * @param {object} entity - Entity definition (for FK column lookup)
+ * @param {object} schema - Full schema (for target entity resolution)
+ * @param {object} joinCounter - Mutable counter for generating unique join aliases
+ * @returns {{ sql: string, joins: Array<{alias, table, onLeft, onRight}> }}
+ */
+function buildLabelSQLWithJoins(expr, baseAlias, entity, schema, joinCounter = { value: 0 }) {
+
+  /**
+   * Resolve a simple reference (field or FK) to SQL
+   */
+  function resolveRef(refName, currentAlias, currentEntity) {
+    // Check if it's an FK column
+    const fkCol = currentEntity.columns.find(
+      c => c.foreignKey && (c.displayName === refName || c.name === refName || c.name === refName + '_id')
+    );
+
+    if (!fkCol) {
+      // Simple field on current table
+      return { sql: `${currentAlias}.${refName}`, joins: [] };
+    }
+
+    // FK reference - need to join and resolve target's label
+    const targetEntityName = fkCol.foreignKey.entity;
+    const targetEntity = schema.entities[targetEntityName];
+    if (!targetEntity) {
+      console.warn(`[labelExpression] Target entity "${targetEntityName}" not found for FK "${refName}"`);
+      return { sql: `${currentAlias}.${fkCol.name}`, joins: [] };
+    }
+
+    const joinAlias = `lbl${joinCounter.value++}`;
+    const join = {
+      alias: joinAlias,
+      table: targetEntity.tableName,
+      onLeft: `${currentAlias}.${fkCol.name}`,
+      onRight: `${joinAlias}.id`
+    };
+
+    if (targetEntity.labelExpression) {
+      // Recursive: target has computed label - resolve its expression
+      const nested = buildLabelSQLWithJoins(
+        targetEntity.labelExpression, joinAlias, targetEntity, schema, joinCounter
+      );
+      return { sql: nested.sql, joins: [join, ...nested.joins] };
+    } else {
+      // Use target's LABEL column
+      const labelCol = targetEntity.columns.find(c => c.ui?.label);
+      const colName = labelCol?.name || 'id';
+      return { sql: `${joinAlias}.${colName}`, joins: [join] };
+    }
+  }
+
+  /**
+   * Resolve an FK chain (e.g., type.manufacturer.name) to SQL
+   */
+  function resolveFKChain(path, currentAlias, currentEntity) {
+    const segments = path.split('.');
+    let alias = currentAlias;
+    let ent = currentEntity;
+    const chainJoins = [];
+
+    // Walk intermediate FKs (all segments except last)
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i];
+      const fkCol = ent.columns.find(
+        c => c.foreignKey && (c.displayName === seg || c.name === seg || c.name === seg + '_id')
+      );
+
+      if (!fkCol) {
+        console.warn(`[labelExpression] FK "${seg}" not found in ${ent.className}`);
+        return { sql: 'NULL', joins: chainJoins };
+      }
+
+      const targetEntityName = fkCol.foreignKey.entity;
+      const targetEntity = schema.entities[targetEntityName];
+      if (!targetEntity) {
+        console.warn(`[labelExpression] Target entity "${targetEntityName}" not found`);
+        return { sql: 'NULL', joins: chainJoins };
+      }
+
+      const joinAlias = `lbl${joinCounter.value++}`;
+      chainJoins.push({
+        alias: joinAlias,
+        table: targetEntity.tableName,
+        onLeft: `${alias}.${fkCol.name}`,
+        onRight: `${joinAlias}.id`
+      });
+
+      alias = joinAlias;
+      ent = targetEntity;
+    }
+
+    // Terminal segment is a column name on the last entity
+    const terminalCol = segments[segments.length - 1];
+    return { sql: `${alias}.${terminalCol}`, joins: chainJoins };
+  }
+
+  // Handle different expression types
+  if (expr.type === 'ref') {
+    return resolveRef(expr.name, baseAlias, entity);
+  }
+
+  if (expr.type === 'fkChain') {
+    return resolveFKChain(expr.path, baseAlias, entity);
+  }
+
+  if (expr.type === 'literal') {
+    return { sql: `'${expr.value}'`, joins: [] };
+  }
+
+  // Legacy 'field' type
+  if (expr.type === 'field') {
+    return resolveRef(expr.field, baseAlias, entity);
+  }
+
+  if (expr.type === 'concat') {
+    const sqlParts = [];
+    const allJoins = [];
+
+    for (const part of expr.parts) {
+      if (part.type === 'literal') {
+        sqlParts.push(`'${part.value}'`);
+      } else if (part.type === 'ref') {
+        const r = resolveRef(part.name, baseAlias, entity);
+        sqlParts.push(r.sql);
+        allJoins.push(...r.joins);
+      } else if (part.type === 'fkChain') {
+        const r = resolveFKChain(part.path, baseAlias, entity);
+        sqlParts.push(r.sql);
+        allJoins.push(...r.joins);
+      } else if (typeof part === 'string') {
+        // Legacy string parts
+        if ((part.startsWith("'") && part.endsWith("'")) || (part.startsWith('"') && part.endsWith('"'))) {
+          sqlParts.push(part);
+        } else {
+          const r = resolveRef(part, baseAlias, entity);
+          sqlParts.push(r.sql);
+          allJoins.push(...r.joins);
+        }
+      }
+    }
+
+    return { sql: `(${sqlParts.join(' || ')})`, joins: allJoins };
+  }
+
+  return { sql: 'NULL', joins: [] };
 }
 
 /**
@@ -1259,38 +1451,67 @@ function buildDependencyOrder(entities) {
  * @param {Object} entity - Entity schema with foreignKeys and labelFields
  * @returns {string|null} - SQL CREATE VIEW statement or null if no FKs with labels
  */
-function generateViewSQL(entity) {
+function generateViewSQL(entity, schema) {
   const baseTable = entity.tableName;
-  // Use first letter as alias, but ensure uniqueness by appending number if needed
   const baseAlias = 'b';
 
   const selects = [`${baseAlias}.*`];
-  const joins = [];
-  let joinAliasCounter = 0;
+  const joinStatements = [];
+  const joinAliases = new Set(); // Track used aliases to avoid duplicates
+
+  // Helper to add a join if not already present
+  function addJoin(join) {
+    if (!joinAliases.has(join.alias)) {
+      joinAliases.add(join.alias);
+      joinStatements.push(`LEFT JOIN ${join.table} ${join.alias} ON ${join.onLeft} = ${join.onRight}`);
+    }
+  }
+
+  // Shared join counter for all label expressions
+  const joinCounter = { value: 0 };
 
   // Add computed _label if entity has labelExpression
-  if (entity.labelExpression) {
-    const labelSQL = buildLabelSQL(entity.labelExpression, baseAlias);
-    selects.push(`${labelSQL} AS _label`);
+  if (entity.labelExpression && schema) {
+    const result = buildLabelSQLWithJoins(entity.labelExpression, baseAlias, entity, schema, joinCounter);
+    selects.push(`${result.sql} AS _label`);
+    result.joins.forEach(addJoin);
   }
 
   // Add computed _label2 if entity has label2Expression
-  if (entity.label2Expression) {
-    const label2SQL = buildLabelSQL(entity.label2Expression, baseAlias);
-    selects.push(`${label2SQL} AS _label2`);
+  if (entity.label2Expression && schema) {
+    const result = buildLabelSQLWithJoins(entity.label2Expression, baseAlias, entity, schema, joinCounter);
+    selects.push(`${result.sql} AS _label2`);
+    result.joins.forEach(addJoin);
   }
 
+  // Add FK label columns
   for (const fk of entity.foreignKeys) {
     // Skip FKs without labelFields (no primary column AND no expression)
     if (!fk.labelFields?.primary && !fk.labelFields?.expression) continue;
 
-    const joinAlias = `fk${joinAliasCounter++}`;
+    const joinAlias = `fk${joinCounter.value++}`;
     const targetTable = fk.references.table;
+    const targetEntityName = fk.references.entity;
+    const targetEntity = schema?.entities?.[targetEntityName];
     const labelFieldName = fk.displayName + '_label';
 
+    // Add join for this FK
+    const fkJoin = {
+      alias: joinAlias,
+      table: targetTable,
+      onLeft: `${baseAlias}.${fk.column}`,
+      onRight: `${joinAlias}.id`
+    };
+    addJoin(fkJoin);
+
     let labelExpr;
-    if (fk.labelFields.expression) {
-      // Use computed expression from target entity
+    if (fk.labelFields.expression && targetEntity && schema) {
+      // Target has computed label - resolve with FK chain support
+      const result = buildLabelSQLWithJoins(fk.labelFields.expression, joinAlias, targetEntity, schema, joinCounter);
+      labelExpr = result.sql;
+      result.joins.forEach(addJoin);
+    } else if (fk.labelFields.expression) {
+      // Fallback: use simple buildLabelSQL (no FK resolution)
       labelExpr = buildLabelSQL(fk.labelFields.expression, joinAlias);
     } else {
       // Build label expression: primary or "primary (secondary)"
@@ -1301,13 +1522,10 @@ function generateViewSQL(entity) {
     }
 
     selects.push(`${labelExpr} AS ${labelFieldName}`);
-    joins.push(`LEFT JOIN ${targetTable} ${joinAlias} ON ${baseAlias}.${fk.column} = ${joinAlias}.id`);
   }
 
-  // If no FK labels to add, still create view for consistency
-  // This ensures all entities can be queried via {table}_view
-
-  const joinClause = joins.length > 0 ? '\n' + joins.join('\n') : '';
+  // Build final SQL
+  const joinClause = joinStatements.length > 0 ? '\n' + joinStatements.join('\n') : '';
 
   return `CREATE VIEW IF NOT EXISTS ${baseTable}_view AS
 SELECT ${selects.join(',\n       ')}
@@ -1523,5 +1741,6 @@ module.exports = {
   TYPE_MAP,
   // Entity-level label expression utilities
   buildLabelSQL,
+  buildLabelSQLWithJoins,
   parseLabelExpression
 };

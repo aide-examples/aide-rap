@@ -7,3 +7,5 @@
 ## Static Data
 - ResourceType
 - Building
+- MeterManufacturer
+- MeterType
