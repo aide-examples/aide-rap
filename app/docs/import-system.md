@@ -156,14 +156,31 @@ The **Transform** column applies conversions to source values:
 
 | Transform | Description | Example |
 |-----------|-------------|---------|
+| `string` | Force string type | `424114` → `"424114"` |
 | `date:DD.MM.YYYY` | German date format → ISO | `01.06.2020` → `2020-06-01` |
 | `date:MM/DD/YYYY` | US date format → ISO | `06/01/2020` → `2020-06-01` |
 | `date:YYYY-MM-DD` | ISO format (passthrough) | — |
 | `number` | Parse with German decimal (`,` → `.`) | `1.234,56` → `1234.56` |
 | `trim` | Remove whitespace | — |
 | `replace:/pattern/replacement/flags` | Regex replacement | See below |
+| `concat:Column:separator` | Combine with another column | See below |
 
 Excel serial dates (numeric) are automatically converted when a date transform is specified.
+
+### String Transform
+
+The `string` transform forces a value to be stored as a string, preventing numeric interpretation:
+
+```markdown
+| Source | Target | Transform |
+|--------|--------|-----------|
+| ESN    | serial_number | string |
+```
+
+**When to use:**
+- Serial numbers that look numeric but should remain strings (`424114` not `424114.0`)
+- Codes with leading zeros that must be preserved (`00123`)
+- Any field where Excel might interpret the value as a number
 
 ### Regex Replace
 
@@ -185,6 +202,25 @@ Examples:
 - `replace:/^(PW)(\d)/$1 $2/` — "PW4000" → "PW 4000"
 - `replace:/[^A-Z0-9]//g` — Remove non-alphanumeric
 - `replace:/\s+/ /g` — Collapse multiple spaces
+
+### Concat Transform
+
+The `concat:OtherColumn:separator` transform combines the current column value with another source column:
+
+```markdown
+| Source       | Target     | Transform              |
+|--------------|------------|------------------------|
+| Manufacturer | identifier | concat:SerialNumber:-  |
+| SerialNumber |            |                        |
+```
+
+This produces `"Boeing-ABC123"` from `Manufacturer="Boeing"` and `SerialNumber="ABC123"`.
+
+**Syntax:** `concat:ColumnName:separator`
+- **ColumnName**: The other XLSX column to append
+- **separator**: Character(s) between the values (use `-` or `_` or ` `)
+
+**Use case:** Creating composite identifiers for FK resolution when the target entity uses `[LABEL=concat(...)]`.
 
 ---
 
@@ -248,6 +284,15 @@ First: Serial Number
 ```
 
 This is useful for denormalized source data where multiple rows have the same key but you only need one record per key. The first row (in XLSX order) is kept, duplicates are discarded.
+
+**NULL Handling:** Rows where the `First` column is NULL or empty are **not deduplicated** — all such rows are kept. This is by design: if you want to filter out empty values, use a Source Filter:
+
+```markdown
+First: Lessor
+
+## Source Filter
+Lessor: /.+/
+```
 
 ---
 

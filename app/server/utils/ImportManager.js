@@ -370,13 +370,16 @@ class ImportManager {
    * - date:DD.MM.YYYY  → converts German date to ISO (YYYY-MM-DD)
    * - date:MM/DD/YYYY  → converts US date to ISO
    * - number           → parse as number
+   * - string           → force value to string
    * - trim             → trim whitespace
    * - replace:/pattern/replacement/flags → regex replacement
+   * - concat:OtherColumn:separator → concatenate with another column (e.g., concat:Serial:-)
    * @param {any} value - The value to transform
    * @param {string} transform - The transform specification
+   * @param {Object} [row] - The source row (needed for concat transform)
    * @returns {any} - The transformed value
    */
-  applyTransform(value, transform) {
+  applyTransform(value, transform, row = null) {
     if (value === null || value === undefined || value === '') {
       return value;
     }
@@ -408,8 +411,30 @@ class ImportManager {
       return value;
     }
 
+    // Concat transform: concat:OtherColumn:separator
+    // Concatenates current value with another column using separator
+    // Example: concat:Serial:- → "Boeing" + "-" + "ABC123" = "Boeing-ABC123"
+    if (transform.startsWith('concat:')) {
+      const spec = transform.substring(7);
+      const parts = spec.split(':');
+      if (parts.length >= 1 && row) {
+        const otherCol = parts[0];
+        const separator = parts.length >= 2 ? parts[1] : '';
+        const otherValue = row[otherCol];
+        if (otherValue !== null && otherValue !== undefined) {
+          return `${str}${separator}${String(otherValue).trim()}`;
+        }
+      }
+      this.logger.warn(`Invalid concat transform or missing row: ${transform}`);
+      return value;
+    }
+
     // Simple transforms
     switch (transform) {
+      case 'string':
+        // Force value to string (useful for numeric-looking cells like ESN)
+        return str;
+
       case 'number':
         // Handle German number format: 1.234,56 → 1234.56
         // Remove thousand separators (dots) and replace decimal comma with dot
@@ -963,9 +988,9 @@ class ImportManager {
           let value = this.resolveSourceValue(sourceExpr, row);
 
           if (value !== undefined) {
-            // Apply transform if specified
+            // Apply transform if specified (pass row for row-aware transforms like concat)
             if (transform) {
-              value = this.applyTransform(value, transform);
+              value = this.applyTransform(value, transform, row);
             }
             mapped[targetCol] = value;
           }

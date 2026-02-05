@@ -499,6 +499,8 @@ function getExtendedSchemaInfo(entityName) {
     }),
     ui: {
       labelFields: labelFields.length > 0 ? labelFields : null,
+      // Entity-level label expression (computed _label column in view)
+      hasComputedLabel: !!entity.labelExpression,
       readonlyFields,
       hiddenFields: hiddenFields.length > 0 ? hiddenFields : null,
       tableOptions: getTableOptions()[entityName] || null

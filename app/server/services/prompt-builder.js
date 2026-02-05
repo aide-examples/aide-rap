@@ -19,6 +19,9 @@ const SeedManager = require('../utils/SeedManager');
  * @param {Object} backRefData - Back-reference data (entities that reference this one)
  */
 function buildPrompt(entityName, schema, instruction, existingData, contextData = {}, backRefData = {}) {
+  // System columns that should be excluded from AI prompt (auto-managed by database)
+  const systemColumns = new Set(['id', 'created_at', 'updated_at', 'deleted_at', 'version']);
+
   // Filter out computed columns (DAILY, IMMEDIATE, HOURLY, ON_DEMAND annotations)
   // Exception: computed FK columns are kept — they provide relationship context for the AI
   const isComputedColumn = (col) => {
@@ -28,9 +31,9 @@ function buildPrompt(entityName, schema, instruction, existingData, contextData 
     return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
   };
 
-  // Prepare column info with types (excluding computed columns)
+  // Prepare column info with types (excluding computed and system columns)
   const columnInfo = schema.columns
-    .filter(col => !isComputedColumn(col))
+    .filter(col => !isComputedColumn(col) && !systemColumns.has(col.name))
     .map(col => {
       const info = {
         name: col.name,
@@ -112,6 +115,9 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
  * @param {Object} contextData - Seed context data (validation/constraint entities)
  */
 function buildCompletePrompt(entityName, schema, instruction, existingRecords, fkData = {}, contextData = {}) {
+  // System columns that should be excluded from AI prompt (auto-managed by database)
+  const systemColumns = new Set(['id', 'created_at', 'updated_at', 'deleted_at', 'version']);
+
   // Filter out computed columns (same logic as buildPrompt)
   const isComputedColumn = (col) => {
     if (col.foreignKey) return false;
@@ -121,7 +127,7 @@ function buildCompletePrompt(entityName, schema, instruction, existingRecords, f
   };
 
   const columnInfo = schema.columns
-    .filter(col => !isComputedColumn(col))
+    .filter(col => !isComputedColumn(col) && !systemColumns.has(col.name))
     .map(col => {
       const info = { name: col.name, type: col.type, nullable: col.nullable };
       if (col.foreignKey) info.foreignKey = col.foreignKey;
@@ -178,7 +184,7 @@ ${JSON.stringify(existingRecords, null, 2)}
 - Generate realistic, plausible values based on the instruction and other field values
 
 ## Output Format
-Return ONLY a valid JSON array containing ALL records (with their original IDs). No markdown, no explanation.`;
+Return ONLY a valid JSON array containing ALL records (with their original IDs). No markdown, no explanation. Use compact JSON (no pretty-printing).`;
 }
 
 /**

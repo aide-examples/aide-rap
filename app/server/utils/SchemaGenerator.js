@@ -198,6 +198,113 @@ function parseUIAnnotations(description) {
 }
 
 /**
+ * Split concat() arguments respecting quoted strings
+ * e.g., "field1, ' - ', field2" -> ["field1", "' - '", "field2"]
+ */
+function splitConcatArgs(argsStr) {
+  const parts = [];
+  let current = '';
+  let inQuote = false;
+  let quoteChar = null;
+
+  for (let i = 0; i < argsStr.length; i++) {
+    const ch = argsStr[i];
+    if ((ch === '"' || ch === "'") && !inQuote) {
+      inQuote = true;
+      quoteChar = ch;
+      current += ch;
+    } else if (ch === quoteChar && inQuote) {
+      inQuote = false;
+      current += ch;
+      quoteChar = null;
+    } else if (ch === ',' && !inQuote) {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+  return parts;
+}
+
+/**
+ * Parse a label expression from [LABEL=expr] or [LABEL2=expr]
+ * Supports: concat(field1, 'sep', field2) or simple fieldname
+ * @param {string} expr - The expression string
+ * @returns {object} - { type: 'concat'|'field', parts?: string[], field?: string }
+ */
+function parseLabelExpression(expr) {
+  const trimmed = expr.trim();
+
+  // Match concat(...)
+  const concatMatch = trimmed.match(/^concat\((.+)\)$/i);
+  if (concatMatch) {
+    const parts = splitConcatArgs(concatMatch[1]);
+    return { type: 'concat', parts };
+  }
+
+  // Simple field reference
+  return { type: 'field', field: trimmed };
+}
+
+/**
+ * Parse entity-level annotations from content before ## sections
+ * Supports: [LABEL=concat(...)] or [LABEL=fieldname], [LABEL2=...]
+ * @param {string[]} headerLines - Lines between H1 and first ## section
+ * @returns {object} - { labelExpression?, label2Expression? }
+ */
+function parseEntityLevelAnnotations(headerLines) {
+  const annotations = {};
+
+  for (const line of headerLines) {
+    // Match [LABEL=concat(...)] or [LABEL=fieldname]
+    const labelMatch = line.match(/\[LABEL=(.+?)\]/i);
+    if (labelMatch) {
+      annotations.labelExpression = parseLabelExpression(labelMatch[1]);
+    }
+
+    // Match [LABEL2=concat(...)] or [LABEL2=fieldname]
+    const label2Match = line.match(/\[LABEL2=(.+?)\]/i);
+    if (label2Match) {
+      annotations.label2Expression = parseLabelExpression(label2Match[1]);
+    }
+  }
+
+  return Object.keys(annotations).length > 0 ? annotations : null;
+}
+
+/**
+ * Build SQL expression from label expression
+ * @param {object} expr - { type: 'concat'|'field', parts?: string[], field?: string }
+ * @param {string} alias - Table alias (e.g., 'b') or empty string
+ * @returns {string} - SQL expression
+ */
+function buildLabelSQL(expr, alias) {
+  const prefix = alias ? `${alias}.` : '';
+
+  if (expr.type === 'field') {
+    return `${prefix}${expr.field}`;
+  }
+
+  if (expr.type === 'concat') {
+    const sqlParts = expr.parts.map(p => {
+      // Check if it's a quoted literal
+      if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+        return p; // Keep as-is (SQL string literal)
+      }
+      // Field reference
+      return `${prefix}${p}`;
+    });
+    return `(${sqlParts.join(' || ')})`;
+  }
+
+  return 'NULL';
+}
+
+/**
  * Parse media constraints from description
  * Supported:
  *   [SIZE=50MB] or [MAXSIZE=50MB] - file size limit (B, KB, MB, GB)
@@ -449,14 +556,24 @@ function parseEntityFile(fileContent) {
     // Types are automatically registered in TypeRegistry by _parseTypesContent
   }
 
-  // Find description (text before the first ## section or table)
+  // Collect header lines (between H1 and first ## section or table)
+  // These contain description and entity-level annotations like [LABEL=concat(...)]
+  const headerLines = [];
   let i = 1;
   while (i < lines.length && !lines[i].startsWith('|') && !lines[i].startsWith('## ')) {
-    if (lines[i].trim()) {
-      description = lines[i].trim();
+    const line = lines[i].trim();
+    if (line) {
+      headerLines.push(line);
+      // Last non-annotation line is the description
+      if (!line.startsWith('[')) {
+        description = line;
+      }
     }
     i++;
   }
+
+  // Parse entity-level annotations from header lines
+  const entityAnnotations = parseEntityLevelAnnotations(headerLines);
 
   // Find the Attributes table - could be directly after description or after ## Attributes
   let inAttributeSection = false;
@@ -529,7 +646,8 @@ function parseEntityFile(fileContent) {
     description,
     attributes,
     calculations,
-    localTypes
+    localTypes,
+    entityAnnotations
   };
 }
 
@@ -556,7 +674,8 @@ function parseEntityDescriptions(mdContent, mdPath) {
             description: parsed.description,
             attributes: parsed.attributes,
             calculations: parsed.calculations,
-            localTypes: parsed.localTypes
+            localTypes: parsed.localTypes,
+            entityAnnotations: parsed.entityAnnotations
           };
         }
       }
@@ -1016,6 +1135,9 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     columns.push({ ...sysCol });
   }
 
+  // Store entity-level label expression if defined
+  const entityAnnotations = classDef.entityAnnotations || null;
+
   return {
     className,
     tableName,
@@ -1028,7 +1150,10 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     foreignKeys,
     enumFields,
     ui: entityUI,
-    localTypes: classDef.localTypes || {}
+    localTypes: classDef.localTypes || {},
+    // Entity-level label expression (takes precedence over column [LABEL])
+    labelExpression: entityAnnotations?.labelExpression || null,
+    label2Expression: entityAnnotations?.label2Expression || null
   };
 }
 
@@ -1043,14 +1168,23 @@ function enrichFKsWithLabelFields(entities) {
     for (const fk of entity.foreignKeys) {
       const targetEntity = entities[fk.references.entity];
       if (targetEntity) {
-        // Find LABEL and LABEL2 columns in target entity
-        const labelCol = targetEntity.columns.find(c => c.ui?.label);
-        const label2Col = targetEntity.columns.find(c => c.ui?.label2);
+        // Check if target has entity-level labelExpression
+        if (targetEntity.labelExpression) {
+          fk.labelFields = {
+            primary: null,  // No column - computed expression
+            secondary: null,
+            expression: targetEntity.labelExpression  // Store the expression
+          };
+        } else {
+          // Fallback: Find LABEL and LABEL2 columns in target entity
+          const labelCol = targetEntity.columns.find(c => c.ui?.label);
+          const label2Col = targetEntity.columns.find(c => c.ui?.label2);
 
-        fk.labelFields = {
-          primary: labelCol?.name || null,
-          secondary: label2Col?.name || null
-        };
+          fk.labelFields = {
+            primary: labelCol?.name || null,
+            secondary: label2Col?.name || null
+          };
+        }
       }
     }
   }
@@ -1134,19 +1268,37 @@ function generateViewSQL(entity) {
   const joins = [];
   let joinAliasCounter = 0;
 
+  // Add computed _label if entity has labelExpression
+  if (entity.labelExpression) {
+    const labelSQL = buildLabelSQL(entity.labelExpression, baseAlias);
+    selects.push(`${labelSQL} AS _label`);
+  }
+
+  // Add computed _label2 if entity has label2Expression
+  if (entity.label2Expression) {
+    const label2SQL = buildLabelSQL(entity.label2Expression, baseAlias);
+    selects.push(`${label2SQL} AS _label2`);
+  }
+
   for (const fk of entity.foreignKeys) {
-    // Skip FKs without labelFields
-    if (!fk.labelFields?.primary) continue;
+    // Skip FKs without labelFields (no primary column AND no expression)
+    if (!fk.labelFields?.primary && !fk.labelFields?.expression) continue;
 
     const joinAlias = `fk${joinAliasCounter++}`;
     const targetTable = fk.references.table;
     const labelFieldName = fk.displayName + '_label';
 
-    // Build label expression: primary or "primary (secondary)"
-    const { primary, secondary } = fk.labelFields;
-    const labelExpr = secondary
-      ? `${joinAlias}.${primary} || ' (' || ${joinAlias}.${secondary} || ')'`
-      : `${joinAlias}.${primary}`;
+    let labelExpr;
+    if (fk.labelFields.expression) {
+      // Use computed expression from target entity
+      labelExpr = buildLabelSQL(fk.labelFields.expression, joinAlias);
+    } else {
+      // Build label expression: primary or "primary (secondary)"
+      const { primary, secondary } = fk.labelFields;
+      labelExpr = secondary
+        ? `${joinAlias}.${primary} || ' (' || ${joinAlias}.${secondary} || ')'`
+        : `${joinAlias}.${primary}`;
+    }
 
     selects.push(`${labelExpr} AS ${labelFieldName}`);
     joins.push(`LEFT JOIN ${targetTable} ${joinAlias} ON ${baseAlias}.${fk.column} = ${joinAlias}.id`);
@@ -1224,6 +1376,43 @@ function initializeTypeRegistry(mdPath) {
 }
 
 /**
+ * Validate schema and emit warnings for common issues:
+ * - LABEL column without UNIQUE constraint (FK resolution may be ambiguous)
+ * - LABEL on aggregate types (unsupported - will be copied to all sub-fields)
+ */
+function validateSchemaLabelUniqueness(entities) {
+  for (const entity of Object.values(entities)) {
+    // Skip if entity uses computed labelExpression (no column to check)
+    if (entity.labelExpression) continue;
+
+    // Find LABEL column
+    const labelCol = entity.columns.find(c => c.ui?.label);
+    if (!labelCol) continue;
+
+    // Check if LABEL column has UNIQUE constraint or is part of UK
+    const hasUnique = labelCol.unique === true;
+    const isPartOfUK = Object.values(entity.uniqueKeys || {}).some(
+      cols => cols.includes(labelCol.name)
+    );
+
+    if (!hasUnique && !isPartOfUK) {
+      console.warn(
+        `[Schema Warning] ${entity.className}: LABEL column "${labelCol.name}" is not UNIQUE. ` +
+        `FK resolution during import may be ambiguous if duplicate values exist.`
+      );
+    }
+
+    // Check if LABEL is on an aggregate type (unsupported)
+    if (labelCol.aggregateType) {
+      console.warn(
+        `[Schema Warning] ${entity.className}: [LABEL] annotation on aggregate type "${labelCol.aggregateType}" is not meaningful. ` +
+        `Consider using a string field as LABEL instead.`
+      );
+    }
+  }
+}
+
+/**
  * Main: Parse DataModel.md and generate complete schema
  */
 function generateSchema(mdPath, enabledEntities = null) {
@@ -1296,6 +1485,9 @@ function generateSchema(mdPath, enabledEntities = null) {
     }
   }
 
+  // Validate schema and emit warnings for common issues
+  validateSchemaLabelUniqueness(entities);
+
   return {
     areas,
     entities,
@@ -1328,5 +1520,8 @@ module.exports = {
   getTypeInfo,
   getDefaultValue,
   toSnakeCase,
-  TYPE_MAP
+  TYPE_MAP,
+  // Entity-level label expression utilities
+  buildLabelSQL,
+  parseLabelExpression
 };

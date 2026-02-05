@@ -268,6 +268,7 @@ function buildLookupFromRows(rows, labelCol, label2Col) {
  *   This matches the display format used in Views and exports.
  * - Index notation: "#1", "#2", etc. - maps to records by row order (id ascending)
  *   This supports AI-generated seed data that uses "#n" for FK references.
+ * - Entity-level labelExpression: computed _label from view (e.g., concat(mfg, '-', serial))
  */
 function buildLabelLookup(entityName) {
   const { db, schema } = getDbAndSchema();
@@ -275,6 +276,20 @@ function buildLabelLookup(entityName) {
 
   if (!entity) return {};
 
+  // Check if entity has computed labelExpression (from entity-level [LABEL=expr])
+  if (entity.labelExpression) {
+    // Query from view which has the computed _label column
+    const sql = `SELECT id, _label FROM ${entity.tableName}_view ORDER BY id`;
+    try {
+      const rows = db.prepare(sql).all();
+      return buildLookupFromComputedLabel(rows);
+    } catch (e) {
+      // Fallback to column-based lookup if view doesn't exist yet
+      console.warn(`Warning: Could not use _label from view for ${entityName}, falling back to column lookup`);
+    }
+  }
+
+  // Standard column-based lookup
   const labelCol = entity.columns.find(c => c.ui?.label);
   const label2Col = entity.columns.find(c => c.ui?.label2);
 
@@ -289,6 +304,72 @@ function buildLabelLookup(entityName) {
 }
 
 /**
+ * Build lookup map from rows with computed _label column
+ */
+function buildLookupFromComputedLabel(rows) {
+  const lookup = {};
+  let rowIndex = 1;
+
+  for (const row of rows) {
+    const labelVal = row._label;
+    if (labelVal) lookup[labelVal] = row.id;
+    lookup[`#${rowIndex}`] = row.id;
+    rowIndex++;
+  }
+
+  return lookup;
+}
+
+/**
+ * Compute a label value from an expression and a record (in-memory)
+ * Used for seed/import records before they're in the database
+ * @param {object} expr - { type: 'field'|'concat', field?: string, parts?: string[] }
+ * @param {object} record - The record to compute label from
+ * @returns {string|null} - Computed label value
+ */
+function computeLabelFromExpression(expr, record) {
+  if (!expr) return null;
+
+  if (expr.type === 'field') {
+    return record[expr.field] ?? null;
+  }
+
+  if (expr.type === 'concat') {
+    const parts = expr.parts.map(p => {
+      // Check if it's a quoted literal
+      if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+        return p.slice(1, -1); // Remove quotes
+      }
+      // Field reference
+      return record[p] ?? '';
+    });
+    return parts.join('');
+  }
+
+  return null;
+}
+
+/**
+ * Build lookup map from in-memory records using labelExpression
+ * @param {array} records - Records to build lookup from
+ * @param {object} labelExpr - Label expression { type, field/parts }
+ * @returns {object} - Lookup map: label -> id (row index)
+ */
+function buildLookupFromExpressionRecords(records, labelExpr) {
+  const lookup = {};
+  let rowIndex = 1;
+
+  for (const record of records) {
+    const labelVal = computeLabelFromExpression(labelExpr, record);
+    if (labelVal) lookup[labelVal] = rowIndex;
+    lookup[`#${rowIndex}`] = rowIndex;
+    rowIndex++;
+  }
+
+  return lookup;
+}
+
+/**
  * Build a lookup map from a seed JSON file (fallback when DB table is empty).
  * Returns { lookup, found } where found indicates if a seed file was used.
  */
@@ -298,15 +379,21 @@ function buildLabelLookupFromSeed(entityName) {
 
   if (!entity) return { lookup: {}, found: false };
 
-  const labelCol = entity.columns.find(c => c.ui?.label);
-  const label2Col = entity.columns.find(c => c.ui?.label2);
-
   try {
     const seedFile = path.join(getSeedDir(), `${entityName}.json`);
     if (!fs.existsSync(seedFile)) return { lookup: {}, found: false };
 
     const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
     if (!Array.isArray(seedData) || seedData.length === 0) return { lookup: {}, found: false };
+
+    // Check for entity-level labelExpression first
+    if (entity.labelExpression) {
+      return { lookup: buildLookupFromExpressionRecords(seedData, entity.labelExpression), found: true };
+    }
+
+    // Standard column-based lookup
+    const labelCol = entity.columns.find(c => c.ui?.label);
+    const label2Col = entity.columns.find(c => c.ui?.label2);
 
     // Seed files use attribute names (not DB column names with _id suffix).
     // LABEL/LABEL2 columns are always non-FK attributes, so names match.
@@ -332,6 +419,12 @@ function buildLabelLookupFromSeed(entityName) {
  * @returns {object} - Lookup map: label -> row index (1-based, becomes id after insert)
  */
 function buildLookupFromImportRecords(entity, records) {
+  // Check for entity-level labelExpression first
+  if (entity.labelExpression) {
+    return buildLookupFromExpressionRecords(records, entity.labelExpression);
+  }
+
+  // Standard column-based lookup
   const labelCol = entity.columns.find(c => c.ui?.label);
   const label2Col = entity.columns.find(c => c.ui?.label2);
 

@@ -60,6 +60,58 @@ The external value (e.g., "Line", "Open") is automatically mapped to the interna
 | `[READONLY]` | Non-editable field | Displayed but cannot be modified in forms |
 | `[HIDDEN]` | Never displayed | Field exists in DB but not shown in UI |
 
+### Entity-Level Computed LABEL
+
+Instead of marking a column with `[LABEL]`, you can define a **computed label expression** at the entity level. This is useful when the display label should combine multiple fields without creating a redundant database column.
+
+**Syntax** (placed before `## Attributes`):
+
+```markdown
+# Aircraft
+
+[LABEL=concat(manufacturer, ' - ', serial_number)]
+[LABEL2=manufacture_date]
+
+## Attributes
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| serial_number | string | [UK1] | ABC123 |
+| manufacturer | string | [UK1] | Boeing |
+| manufacture_date | date | | 2020-01-15 |
+```
+
+**Supported expressions:**
+
+| Expression | Example | Result |
+|------------|---------|--------|
+| `concat(a, 'sep', b)` | `concat(mfg, ' - ', serial)` | `Boeing - ABC123` |
+| Single field | `serial_number` | `ABC123` |
+
+**How it works:**
+
+1. **SQL View**: A computed `_label` column is added to the entity's view:
+   ```sql
+   CREATE VIEW aircraft_view AS
+   SELECT *, (manufacturer || ' - ' || serial_number) AS _label
+   FROM aircraft;
+   ```
+
+2. **FK Dropdowns**: Use the computed `_label` for display instead of a column value
+
+3. **FK Resolution**: During import/seed, label values are matched against the computed expression
+
+4. **No DB Column**: The label exists only in the view — no redundant storage
+
+**When to use:**
+
+| Scenario | Use |
+|----------|-----|
+| Single column is naturally unique | Column-level `[LABEL]` |
+| Label should combine multiple fields | Entity-level `[LABEL=concat(...)]` |
+| LABEL column would duplicate unique key | Entity-level expression |
+
+**Precedence:** Entity-level `[LABEL=...]` overrides any column-level `[LABEL]` annotation.
+
 ### Visual Styling in Diagrams
 
 | Marker | Diagram Effect |

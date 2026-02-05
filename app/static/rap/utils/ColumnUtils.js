@@ -95,13 +95,24 @@ const ColumnUtils = {
   /**
    * Get display label for a record using schema labelFields
    * @param {Object} record - Data record
-   * @param {Object} schema - Schema with ui.labelFields
+   * @param {Object} schema - Schema with ui.labelFields and ui.hasComputedLabel
    * @returns {Object} - { title: string, subtitle: string|null }
    */
   getRecordLabel(record, schema) {
     let title = `#${record.id}`;
     let subtitle = null;
 
+    // Check for computed _label first (from entity-level labelExpression)
+    if (schema.ui?.hasComputedLabel && record._label) {
+      title = String(record._label);
+      // Check for _label2 if available
+      if (record._label2) {
+        subtitle = String(record._label2);
+      }
+      return { title, subtitle };
+    }
+
+    // Standard column-based label
     const labelFields = schema.ui?.labelFields;
     if (labelFields && labelFields.length > 0) {
       const primaryLabel = record[labelFields[0]];

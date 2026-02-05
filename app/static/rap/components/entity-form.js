@@ -982,12 +982,16 @@ const EntityForm = {
 
         // Get schema to find label field
         const refSchema = await SchemaCache.getExtended(entityName);
+        const hasComputedLabel = refSchema.ui?.hasComputedLabel;
         const labelFields = refSchema.ui?.labelFields || [];
 
         // Build options data
         const options = records.map(rec => {
           let label = `#${rec.id}`;
-          if (labelFields.length > 0 && rec[labelFields[0]]) {
+          // Use computed _label if available (from entity-level labelExpression)
+          if (hasComputedLabel && rec._label) {
+            label = rec._label;
+          } else if (labelFields.length > 0 && rec[labelFields[0]]) {
             label = rec[labelFields[0]];
             if (labelFields.length > 1 && rec[labelFields[1]]) {
               label += ` (${rec[labelFields[1]]})`;

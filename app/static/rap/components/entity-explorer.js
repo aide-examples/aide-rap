@@ -106,19 +106,22 @@ const EntityExplorer = {
 
       const fieldData = { field, type, label: capitalizedLabel, options: [] };
 
+      // For views: always resolve the view column for any filter type
+      if (options.isView && options.viewSchema) {
+        const viewCol = this.findViewColumnForPrefilter(field, options.viewSchema);
+        if (viewCol) {
+          fieldData.viewColumn = viewCol.key; // Store actual column name for filtering
+        }
+      }
+
       // For select, year, or month type, fetch distinct values
       if (type === 'select' || type === 'year' || type === 'month') {
         try {
-          if (options.isView && options.viewName) {
-            // Find the view column that matches this prefilter path
-            // e.g., prefilter "meter.resource_type" → view column "resource" (from "meter.resource_type.name as resource")
-            const viewCol = this.findViewColumnForPrefilter(field, options.viewSchema);
-            if (viewCol) {
-              const result = await ApiClient.getViewDistinctValues(options.viewName, viewCol.key, type);
-              fieldData.options = result.values || [];
-              fieldData.viewColumn = viewCol.key; // Store actual column name for filtering
-            }
-          } else {
+          if (options.isView && options.viewName && fieldData.viewColumn) {
+            // View mode - get distinct values using resolved view column
+            const result = await ApiClient.getViewDistinctValues(options.viewName, fieldData.viewColumn, type);
+            fieldData.options = result.values || [];
+          } else if (!options.isView) {
             // Entity mode - get distinct values from entity (uses field_label column)
             const result = await ApiClient.getDistinctValues(contextName, field, type);
             fieldData.options = result || [];
@@ -156,10 +159,11 @@ const EntityExplorer = {
         `;
       } else {
         // Text input
+        const textColAttr = f.viewColumn ? `data-view-column="${f.viewColumn}"` : '';
         fieldsHtml += `
           <div class="prefilter-field">
             <label>${f.label}</label>
-            <input type="text" data-field="${f.field}" data-type="text" class="prefilter-input"
+            <input type="text" data-field="${f.field}" data-type="text" ${textColAttr} class="prefilter-input"
                    placeholder="${i18n.t('placeholder_text_match')}">
           </div>
         `;
