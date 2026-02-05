@@ -2740,6 +2740,26 @@
     background: var(--table-row-hover);
 }
 
+/* Compact seed table */
+.seed-table.compact th,
+.seed-table.compact td {
+    padding: 5px 10px;
+}
+
+.seed-table.compact .dep-dot {
+    font-size: 20px;
+}
+
+/* Sortable column headers */
+.seed-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.seed-table th.sortable:hover {
+    background: var(--color-gray-200);
+}
+
 /* =============================================================================
    SEED IMPORT DIALOG
    ============================================================================= */

@@ -330,18 +330,44 @@ function buildLookupFromComputedLabel(rows) {
 function computeLabelFromExpression(expr, record) {
   if (!expr) return null;
 
+  // Legacy format: { type: 'field', field: 'name' }
   if (expr.type === 'field') {
     return record[expr.field] ?? null;
   }
 
+  // New format: { type: 'ref', name: 'name' }
+  if (expr.type === 'ref') {
+    return record[expr.name] ?? null;
+  }
+
   if (expr.type === 'concat') {
     const parts = expr.parts.map(p => {
-      // Check if it's a quoted literal
-      if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
-        return p.slice(1, -1); // Remove quotes
+      // New structured format (objects with type property)
+      if (typeof p === 'object' && p !== null) {
+        if (p.type === 'literal') {
+          return p.value;
+        }
+        if (p.type === 'ref') {
+          return record[p.name] ?? '';
+        }
+        if (p.type === 'fkChain') {
+          // For FK chains, just use the first segment (the FK field name)
+          // The record has the conceptual value before FK resolution
+          const firstSegment = p.path.split('.')[0];
+          return record[firstSegment] ?? '';
+        }
+        return '';
       }
-      // Field reference
-      return record[p] ?? '';
+      // Legacy format: plain strings
+      if (typeof p === 'string') {
+        // Check if it's a quoted literal
+        if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+          return p.slice(1, -1); // Remove quotes
+        }
+        // Field reference
+        return record[p] ?? '';
+      }
+      return '';
     });
     return parts.join('');
   }
@@ -896,11 +922,20 @@ function validateImport(entityName, records) {
  * @returns {any} - First unique column value or null
  */
 function getFirstUniqueValue(entity, record) {
+  // First try single-column unique constraints
   const uniqueCols = entity.columns.filter(c => c.unique);
   for (const col of uniqueCols) {
     const value = record[col.name];
     if (value != null) return value;
   }
+
+  // Fall back to composite unique keys (UK1, UK2, etc.)
+  if (entity.uniqueKeys?.length > 0) {
+    const firstUk = entity.uniqueKeys[0];
+    const parts = firstUk.columns.map(colName => record[colName] ?? '').join('-');
+    if (parts && parts !== '-') return parts;
+  }
+
   return null;
 }
 
@@ -1207,8 +1242,16 @@ async function loadEntity(entityName, lookups = null, options = {}) {
           update.run(...values);
           updated++;
 
-          // Track which key was updated (use label or first unique column)
-          const keyValue = labelCol ? resolved[labelCol.name] : getFirstUniqueValue(entity, resolved);
+          // Track which key was updated (use label column, labelExpression, or unique key)
+          // Note: Use 'record' (pre-FK resolution) for labelExpression since it contains readable FK values
+          let keyValue = null;
+          if (labelCol) {
+            keyValue = resolved[labelCol.name];
+          } else if (entity.labelExpression) {
+            keyValue = computeLabelFromExpression(entity.labelExpression, record);
+          } else {
+            keyValue = getFirstUniqueValue(entity, resolved);
+          }
           if (keyValue != null) {
             updatedKeys.set(keyValue, (updatedKeys.get(keyValue) || 0) + 1);
           }

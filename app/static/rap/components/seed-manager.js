@@ -9,6 +9,9 @@ const SeedManager = {
   entities: [],
   contextMenu: null,
   selectedEntity: null,
+  sortColumn: 'name',
+  sortAscending: true,
+  scrollTop: 0,
 
   /**
    * Initialize the seed manager
@@ -218,7 +221,25 @@ const SeedManager = {
   render() {
     if (!this.container || !this.isOpen) return;
 
-    const sorted = [...this.entities].sort((a, b) => a.name.localeCompare(b.name));
+    // Sort entities based on current sort column
+    const sorted = [...this.entities].sort((a, b) => {
+      let valA, valB;
+      switch (this.sortColumn) {
+        case 'seed': valA = a.seedTotal ?? -1; valB = b.seedTotal ?? -1; break;
+        case 'import': valA = a.importTotal ?? -1; valB = b.importTotal ?? -1; break;
+        case 'backup': valA = a.backupTotal ?? -1; valB = b.backupTotal ?? -1; break;
+        case 'rows': valA = a.rowCount ?? -1; valB = b.rowCount ?? -1; break;
+        case 'dep':
+          valA = (a.dependencies?.length > 0 && !a.ready) ? 1 : 0;
+          valB = (b.dependencies?.length > 0 && !b.ready) ? 1 : 0;
+          break;
+        default: valA = a.name.toLowerCase(); valB = b.name.toLowerCase();
+      }
+      if (valA < valB) return this.sortAscending ? -1 : 1;
+      if (valA > valB) return this.sortAscending ? 1 : -1;
+      return 0;
+    });
+
     const rows = sorted.map((e) => {
       const hasSeeds = e.seedTotal !== null && e.seedTotal > 0;
       const hasInvalid = hasSeeds && e.seedValid !== null && e.seedValid < e.seedTotal;
@@ -256,7 +277,7 @@ const SeedManager = {
           : `<span class="source-missing" title="${i18n.t('source_file_missing', { file: e.sourceFile || '?' })}">✗</span>`;
       }
 
-      // Dependency readiness dot
+      // Dependency readiness dot - green for ready or no deps, red for missing
       let depDot = '';
       if (e.dependencies && e.dependencies.length > 0) {
         if (e.ready) {
@@ -264,6 +285,9 @@ const SeedManager = {
         } else {
           depDot = `<span class="dep-dot dep-missing" title="${i18n.t('dep_missing', { deps: e.missingDeps.join(', ') })}">&#9679;</span>`;
         }
+      } else {
+        // No dependencies - show green dot
+        depDot = `<span class="dep-dot dep-ready" title="${i18n.t('dep_none') || 'No dependencies'}">&#9679;</span>`;
       }
 
       return `
@@ -288,16 +312,16 @@ const SeedManager = {
           </div>
           <div class="modal-body">
             <p class="order-hint"><span class="dep-dot dep-ready">&#9679;</span> dependencies satisfied &nbsp; <span class="dep-dot dep-missing">&#9679;</span> missing reference data &nbsp;&mdash;&nbsp; Right-click for actions.</p>
-            <table class="seed-table">
+            <table class="seed-table compact">
               <thead>
                 <tr>
-                  <th></th>
-                  <th>Entity</th>
-                  <th>Seed</th>
-                  <th>Import</th>
+                  <th class="sortable" data-sort="dep">${this.sortColumn === 'dep' ? (this.sortAscending ? '▲' : '▼') : ''}</th>
+                  <th class="sortable" data-sort="name">Entity ${this.sortColumn === 'name' ? (this.sortAscending ? '▲' : '▼') : ''}</th>
+                  <th class="sortable" data-sort="seed">Seed ${this.sortColumn === 'seed' ? (this.sortAscending ? '▲' : '▼') : ''}</th>
+                  <th class="sortable" data-sort="import">Import ${this.sortColumn === 'import' ? (this.sortAscending ? '▲' : '▼') : ''}</th>
                   <th>Source</th>
-                  <th>Backup</th>
-                  <th>DB Rows</th>
+                  <th class="sortable" data-sort="backup">Backup ${this.sortColumn === 'backup' ? (this.sortAscending ? '▲' : '▼') : ''}</th>
+                  <th class="sortable" data-sort="rows">DB Rows ${this.sortColumn === 'rows' ? (this.sortAscending ? '▲' : '▼') : ''}</th>
                 </tr>
               </thead>
               <tbody>
@@ -324,6 +348,14 @@ const SeedManager = {
 
     this.container.classList.add('active');
     this.attachEventHandlers();
+
+    // Restore scroll position
+    requestAnimationFrame(() => {
+      const modalBody = this.container.querySelector('.modal-body');
+      if (modalBody && this.scrollTop > 0) {
+        modalBody.scrollTop = this.scrollTop;
+      }
+    });
   },
 
   /**
@@ -338,11 +370,29 @@ const SeedManager = {
       el.addEventListener('click', () => this.close());
     });
 
+    // Column header sorting
+    this.container.querySelectorAll('.seed-table th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (this.sortColumn === col) {
+          this.sortAscending = !this.sortAscending;
+        } else {
+          this.sortColumn = col;
+          this.sortAscending = true;
+        }
+        this.render();
+      });
+    });
+
     // Context menu on table rows (both left-click and right-click)
     this.container.querySelectorAll('.seed-table tbody tr').forEach(row => {
       const showMenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // Save scroll position before opening context menu / dialog
+        const tableContainer = this.container.querySelector('.modal-body');
+        if (tableContainer) this.scrollTop = tableContainer.scrollTop;
+
         const entityName = row.dataset.entity;
         const hasSeeds = row.dataset.hasSeeds === 'true';
         const hasBackup = row.dataset.hasBackup === 'true';
