@@ -59,6 +59,7 @@ The external value (e.g., "Line", "Open") is automatically mapped to the interna
 | `[LABEL2]` | Secondary display label | Node subtitle, shown in parentheses |
 | `[READONLY]` | Non-editable field | Displayed but cannot be modified in forms |
 | `[HIDDEN]` | Never displayed | Field exists in DB but not shown in UI |
+| `[TRUNCATE=n]` | Truncate display to n characters | Full text shown in tooltip on hover |
 
 ### Entity-Level Computed LABEL
 
@@ -137,6 +138,19 @@ In this example:
 - `internal_code` exists in DB but is never shown in UI
 - `created_at` is displayed but cannot be edited
 
+### Truncating Long Text
+
+For fields that may contain long text (comments, descriptions), use `[TRUNCATE=n]` to limit the display width:
+
+```markdown
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| comment | string [OPTIONAL] | [TRUNCATE=30] | Long text here... |
+| notes | string [OPTIONAL] | User notes [TRUNCATE=50] | |
+```
+
+The full text is always stored in the database. Only the display is truncated, with the complete value shown in a tooltip on hover.
+
 ---
 
 ## Media Field Annotations
@@ -198,7 +212,7 @@ See [Computed References](computed-references.md) for full syntax.
 | Marker Type | Column |
 |-------------|--------|
 | `[OPTIONAL]`, `[DEFAULT=x]` | **Type** column |
-| `[LABEL]`, `[LABEL2]`, `[READONLY]`, `[HIDDEN]` | **Description** column |
+| `[LABEL]`, `[LABEL2]`, `[READONLY]`, `[HIDDEN]`, `[TRUNCATE=n]` | **Description** column |
 | `[UNIQUE]`, `[UK1]`, `[INDEX]`, `[IX1]` | **Description** column |
 | `[SIZE=]`, `[DIMENSION=]`, etc. | **Description** column |
 | `[DAILY=]`, `[IMMEDIATE=]` | **Description** column |
