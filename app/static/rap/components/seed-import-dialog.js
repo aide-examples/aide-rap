@@ -229,6 +229,7 @@ const SeedImportDialog = {
             <div class="import-tab-content" id="tab-rule" style="display: none;">
               <div class="rule-toolbar">
                 <span class="rule-path" id="rule-path"></span>
+                <button class="btn-seed" id="btn-new-mapping">${i18n.t('si_new_mapping')}</button>
                 <button class="btn-seed btn-save-rule" id="btn-save-rule" disabled>Save</button>
               </div>
               <div id="rule-content" class="rule-content">
@@ -405,6 +406,7 @@ const SeedImportDialog = {
     // Rule editor
     const ruleEditor = this.modalElement.querySelector('#rule-editor');
     ruleEditor?.addEventListener('input', () => this.onRuleEditorChange());
+    this.modalElement.querySelector('#btn-new-mapping')?.addEventListener('click', () => this.generateNewMapping());
     this.modalElement.querySelector('#btn-save-rule')?.addEventListener('click', () => this.saveRule());
 
     // Ctrl+Enter in textarea
@@ -633,6 +635,97 @@ const SeedImportDialog = {
 
     saveBtn.textContent = 'Save';
     saveBtn.disabled = !this.ruleModified;
+  },
+
+  /**
+   * Generate a new ## Mapping section with source preview and target columns
+   */
+  async generateNewMapping() {
+    const editor = this.modalElement.querySelector('#rule-editor');
+    if (!editor) return;
+
+    this.log('info', 'Generating new mapping template...');
+
+    try {
+      // Fetch source schema, sample data, and target entity schema in parallel
+      const [schemaRes, sampleRes, entitySchemaRes] = await Promise.all([
+        fetch(`/api/import/schema/${this.entityName}`),
+        fetch(`/api/import/sample/${this.entityName}?count=3`),
+        fetch(`/api/schema`)
+      ]);
+
+      const schemaData = await schemaRes.json();
+      const sampleData = await sampleRes.json();
+      const fullSchema = await entitySchemaRes.json();
+
+      if (schemaData.error) {
+        this.log('error', `Schema: ${schemaData.error}`);
+        return;
+      }
+
+      // Get target entity columns (exclude 'id' and system columns)
+      const entitySchema = fullSchema.entities?.[this.entityName];
+      if (!entitySchema) {
+        this.log('error', `Entity ${this.entityName} not found in schema`);
+        return;
+      }
+
+      const targetColumns = entitySchema.columns
+        .filter(c => c.name !== 'id' && c.name !== 'created_at' && c.name !== 'updated_at')
+        .map(c => {
+          // Use FK displayName if available (e.g., "operator" instead of "operator_id")
+          const fk = entitySchema.foreignKeys?.find(f => f.column === c.name);
+          return fk?.displayName || c.name;
+        });
+
+      // Build source preview lines: "ColumnName | val1 | val2 | val3"
+      const sourceColumns = schemaData.columns || [];
+      const sampleRecords = sampleData.records || [];
+
+      let sourcePreview = '';
+      for (const col of sourceColumns) {
+        const values = sampleRecords.map(r => {
+          const val = r[col];
+          if (val === null || val === undefined) return '';
+          return String(val).substring(0, 40); // Truncate long values
+        });
+        sourcePreview += `${col} | ${values.join(' | ')}\n`;
+      }
+
+      // Calculate column width for Source (make it wide enough for longest source column name)
+      const maxSourceLen = Math.max(...sourceColumns.map(c => c.length), 20);
+      const sourceWidth = ' '.repeat(maxSourceLen);
+
+      // Build mapping table
+      let mappingTable = `| Source${' '.repeat(maxSourceLen - 6)} | Target | Transform |\n`;
+      mappingTable += `|${'-'.repeat(maxSourceLen + 2)}|--------|-----------|`;
+
+      for (const target of targetColumns) {
+        mappingTable += `\n| ${sourceWidth} | ${target} | |`;
+      }
+
+      // Generate the complete mapping section
+      const mappingSection = `## Mapping
+
+${sourcePreview}
+${mappingTable}
+`;
+
+      // Find existing ## Mapping section and replace it, or append
+      const content = editor.value;
+      const mappingRegex = /## Mapping[\s\S]*?(?=\n## |$)/;
+
+      if (mappingRegex.test(content)) {
+        editor.value = content.replace(mappingRegex, mappingSection);
+      } else {
+        editor.value = content + '\n\n' + mappingSection;
+      }
+
+      this.onRuleEditorChange();
+      this.log('success', `Mapping template generated: ${sourceColumns.length} source columns, ${targetColumns.length} target columns`);
+    } catch (err) {
+      this.log('error', `Generate mapping failed: ${err.message}`);
+    }
   },
 
   // ========== RUN TAB ==========

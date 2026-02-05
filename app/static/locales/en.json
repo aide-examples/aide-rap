@@ -224,5 +224,6 @@
     "si_preview_of": "of",
     "si_preview_rows": "rows",
     "si_preview_record": "Record",
-    "si_preview_no_data": "No data in source file"
+    "si_preview_no_data": "No data in source file",
+    "si_new_mapping": "New Mapping"
 }
