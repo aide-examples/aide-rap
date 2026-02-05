@@ -100,6 +100,27 @@ The prompt sent to the AI includes:
 | Referencing Entities | Records from entities that have FK columns pointing here (back-references) |
 | Seed Context | Validation/constraint data from `## Seed Context` section |
 
+### Limiting FK Reference Records
+
+For entities with many records (e.g., 1600+ engines), the FK References section can become very large. Use the `[FKLIMIT=n]` directive in your instruction to limit FK references to a random selection of N records:
+
+```markdown
+## Data Generator
+
+Generate 20 engine usage log entries for the past month.
+Use realistic flight hours and cycles. [FKLIMIT=50]
+```
+
+**Behavior:**
+- The directive is **parsed and removed** before sending to the AI
+- Each FK entity is limited to N **randomly selected** records
+- Reduces prompt size and keeps AI focused on a manageable subset
+- Useful when generating data that only needs to reference a subset of existing records
+
+**Without limit:** All 1600 engines would be included in the prompt, potentially hitting token limits.
+
+**With `[FKLIMIT=50]`:** Only 50 randomly selected engines are shown, making the prompt manageable.
+
 ### Prompt Rules for AI
 
 - Use **label values** for FK fields, not IDs
