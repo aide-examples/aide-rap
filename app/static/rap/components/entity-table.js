@@ -758,16 +758,19 @@ const EntityTable = {
           const labelField = displayName + '_label';
           const preloadedLabel = record[labelField];
 
+          // [NOWRAP] annotation support for FK cells
+          const fkNowrapClass = col.ui?.nowrap ? ' nowrap-cell' : '';
+
           if (preloadedLabel) {
             // Label already available from View - render directly
-            html += `<td class="fk-cell">
+            html += `<td class="fk-cell${fkNowrapClass}">
               <span class="fk-value" data-action="navigate" data-entity="${col.foreignKey.entity}" data-id="${value}">
                 ${DomUtils.escapeHtml(preloadedLabel)}
               </span>
             </td>`;
           } else {
             // Fallback: render with loading placeholder (async load)
-            html += `<td class="fk-cell" data-entity="${col.foreignKey.entity}" data-id="${value}">
+            html += `<td class="fk-cell${fkNowrapClass}" data-entity="${col.foreignKey.entity}" data-id="${value}">
               <span class="fk-loading">#${value}</span>
             </td>`;
           }

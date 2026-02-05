@@ -414,6 +414,7 @@ const EntityTree = {
 
     /**
      * Handle navigation to another entity AND expand the target record
+     * Shows ONLY the single referenced record (filtered by id)
      * @param {string} entityName - Target entity name
      * @param {number} recordId - Target record ID
      * @param {Object} [options] - Options
@@ -434,6 +435,13 @@ const EntityTree = {
         // Switch to the target entity WITHOUT updating breadcrumb
         await EntityExplorer.selectEntityWithoutBreadcrumb(entityName);
 
+        // Apply filter to show ONLY the single referenced record
+        const filter = `id:${recordId}`;
+        if (EntityExplorer.filterInput) {
+            EntityExplorer.filterInput.value = filter;
+        }
+        await EntityExplorer.loadRecords(filter);
+
         const nodeId = `${entityName}-${recordId}`;
         // Add to expanded nodes so it will be expanded when rendered
         this.state.clear();
@@ -452,6 +460,7 @@ const EntityTree = {
                     entity: entityName,
                     recordId: recordId,
                     recordLabel: label.title,
+                    filter: filter,
                     viewMode: 'tree-h',
                     color: color
                 });

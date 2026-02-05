@@ -152,6 +152,10 @@ function findAll(entityName, options = {}) {
     resolveColumn: (colName) => ({ sqlName: colName, jsType: 'string' }),
     // For plain "column:value": validate against entity schema
     validateEntityColumn: (colName) => {
+      // Handle implicit id column (always present but not in entity.columns)
+      if (colName === 'id') {
+        return { sqlName: 'id', jsType: 'number' };
+      }
       const col = entity.columns.find(c => c.name === colName);
       return col ? { sqlName: col.name, jsType: col.jsType } : null;
     },

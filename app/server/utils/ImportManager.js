@@ -583,8 +583,10 @@ class ImportManager {
   /**
    * Parse concat(...) expression arguments
    * Supports: concat(Col1, " ", Col2, "-", Col3)
+   * With inline transforms: concat(Col1>>replace:/a/b/, " ", Col2)
    * - Column names without quotes
    * - String literals with quotes
+   * - >> followed by transform spec applies transform to that column
    * @param {string} args - The arguments inside concat(...)
    * @returns {Object} - { type: 'concat', parts: [...] }
    */
@@ -608,10 +610,10 @@ class ImportManager {
         inQuotes = false;
         quoteChar = null;
       } else if (!inQuotes && ch === ',') {
-        // Separator - flush current if non-empty (column name)
+        // Separator - flush current if non-empty (column name, possibly with transform)
         const trimmed = current.trim();
         if (trimmed) {
-          parts.push({ type: 'column', name: trimmed });
+          parts.push(this.parseColumnWithTransform(trimmed));
         }
         current = '';
       } else if (inQuotes) {
@@ -623,13 +625,31 @@ class ImportManager {
       }
     }
 
-    // Handle remaining content (last column name)
+    // Handle remaining content (last column name, possibly with transform)
     const trimmed = current.trim();
     if (trimmed) {
-      parts.push({ type: 'column', name: trimmed });
+      parts.push(this.parseColumnWithTransform(trimmed));
     }
 
     return { type: 'concat', parts };
+  }
+
+  /**
+   * Parse a column reference that may include an inline transform
+   * Format: "ColumnName" or "ColumnName>>transform"
+   * Example: "Engine Type>>replace:/([A-Z]+)(\d)/$1 $2/"
+   * Note: Using >> instead of | to avoid conflicts with Markdown table syntax
+   * @param {string} spec - Column spec with optional transform
+   * @returns {Object} - { type: 'column', name: string, transform?: string }
+   */
+  parseColumnWithTransform(spec) {
+    const delimIndex = spec.indexOf('>>');
+    if (delimIndex === -1) {
+      return { type: 'column', name: spec };
+    }
+    const name = spec.substring(0, delimIndex).trim();
+    const transform = spec.substring(delimIndex + 2).trim();
+    return { type: 'column', name, transform };
   }
 
   /**
@@ -739,7 +759,13 @@ class ImportManager {
           if (part.type === 'literal') {
             return part.value;
           } else if (part.type === 'column') {
-            const val = row[part.name];
+            let val = row[part.name];
+            if (val === null || val === undefined) return '';
+            val = String(val);
+            // Apply inline transform if specified (e.g., Col|replace:/a/b/)
+            if (part.transform) {
+              val = this.applyTransform(val, part.transform, row);
+            }
             return val === null || val === undefined ? '' : String(val);
           }
           return '';
