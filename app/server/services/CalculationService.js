@@ -181,9 +181,51 @@ function rebuildServerCalculations(entityName) {
   };
 }
 
+/**
+ * Rebuild server calculations where values are NULL (startup safety net)
+ * Only recalculates if there are actually NULL values
+ *
+ * @returns {Object} { entitiesChecked, fieldsProcessed, totalRowsUpdated }
+ */
+function rebuildMissingCalculations() {
+  const schema = getSchema();
+  const db = getDatabase();
+
+  let entitiesChecked = 0;
+  let fieldsProcessed = 0;
+  let totalRowsUpdated = 0;
+
+  for (const entity of schema.orderedEntities) {
+    const serverCalcFields = entity.columns.filter(c => c.serverCalculated);
+    if (serverCalcFields.length === 0) continue;
+
+    entitiesChecked++;
+
+    for (const col of serverCalcFields) {
+      // Check if there are any NULL values
+      const countSQL = `SELECT COUNT(*) as cnt FROM ${entity.tableName} WHERE ${col.name} IS NULL`;
+      const { cnt } = db.prepare(countSQL).get();
+
+      if (cnt > 0) {
+        logger.info(`Found ${cnt} NULL values in ${entity.className}.${col.name}, recalculating...`);
+        const result = runServerCalculation(entity.className, col.name);
+        fieldsProcessed++;
+        totalRowsUpdated += result.rowsUpdated || 0;
+      }
+    }
+  }
+
+  return {
+    entitiesChecked,
+    fieldsProcessed,
+    totalRowsUpdated
+  };
+}
+
 module.exports = {
   getServerCalculatedFields,
   runServerCalculation,
   runOnChangeServerCalculations,
-  rebuildServerCalculations
+  rebuildServerCalculations,
+  rebuildMissingCalculations
 };

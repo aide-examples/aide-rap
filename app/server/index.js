@@ -14,6 +14,7 @@ const AuditRouter = require('./routers/audit.router');
 const mediaRouter = require('./routers/media.router');
 const adminRouter = require('./routers/admin.router');
 const ComputedFieldService = require('./services/ComputedFieldService');
+const CalculationService = require('./services/CalculationService');
 const AuditService = require('./services/AuditService');
 const MediaService = require('./services/MediaService');
 const SeedManager = require('./utils/SeedManager');
@@ -107,6 +108,16 @@ function init(app, config) {
     }
   } catch (err) {
     logger.error('Failed to apply DEFAULT values', { error: err.message });
+  }
+
+  // Rebuild server calculations where values are NULL (safety net)
+  try {
+    const calcResult = CalculationService.rebuildMissingCalculations();
+    if (calcResult.totalRowsUpdated > 0) {
+      logger.info('Server calculations rebuilt at startup', calcResult);
+    }
+  } catch (err) {
+    logger.error('Failed to rebuild server calculations', { error: err.message });
   }
 
   // Run computed field updates (DAILY fields) at startup
