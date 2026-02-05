@@ -22,6 +22,7 @@ This system contains 4 entities:
 | Link | Description |
 |------|-------------|
 | **[Data Model →](DataModel.md)** | Entity definitions |
+| **[Diagram Layout →](../layout-editor)** | Visualize entities and relations |
 | **[RAP Platform Docs →](/rap)** | How the RAP engine works |
 | **[User Guide →](/help)** | How to use the application |
 
