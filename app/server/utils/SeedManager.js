@@ -797,6 +797,21 @@ function validateImport(entityName, records) {
 }
 
 /**
+ * Get the first unique column value from a record (for logging/tracking)
+ * @param {Object} entity - Entity schema
+ * @param {Object} record - Record data
+ * @returns {any} - First unique column value or null
+ */
+function getFirstUniqueValue(entity, record) {
+  const uniqueCols = entity.columns.filter(c => c.unique);
+  for (const col of uniqueCols) {
+    const value = record[col.name];
+    if (value != null) return value;
+  }
+  return null;
+}
+
+/**
  * Find existing record by unique constraint
  * Returns the id if a matching record exists, null otherwise
  */
@@ -1017,6 +1032,9 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   const seenLabels = new Map();  // label value -> first row number (1-based)
   const duplicates = [];  // { value, firstRow, duplicateRow }
 
+  // Track which keys were updated (for reporting)
+  const updatedKeys = new Map();  // key value -> count
+
   // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
   const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
 
@@ -1095,6 +1113,12 @@ async function loadEntity(entityName, lookups = null, options = {}) {
           values.push(existingId); // WHERE id = ?
           update.run(...values);
           updated++;
+
+          // Track which key was updated (use label or first unique column)
+          const keyValue = labelCol ? resolved[labelCol.name] : getFirstUniqueValue(entity, resolved);
+          if (keyValue != null) {
+            updatedKeys.set(keyValue, (updatedKeys.get(keyValue) || 0) + 1);
+          }
         } else {
           const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
           insert.run(...values);
@@ -1184,6 +1208,13 @@ async function loadEntity(entityName, lookups = null, options = {}) {
       duplicateRow: d.duplicateRow,
       message: `"${d.value}" appears in row ${d.firstRow} and ${d.duplicateRow} (row ${d.duplicateRow} overwrites)`
     }));
+  }
+
+  // Add updated keys info (which keys were updated during merge)
+  if (updatedKeys.size > 0) {
+    result.updatedKeys = Array.from(updatedKeys.entries())
+      .sort((a, b) => b[1] - a[1])  // Sort by count descending
+      .map(([key, count]) => ({ key, count }));
   }
 
   // Add media errors if any occurred

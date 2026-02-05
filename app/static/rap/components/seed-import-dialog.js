@@ -247,6 +247,7 @@ const SeedImportDialog = {
                       <button class="btn-seed" id="btn-export-json" disabled>Export JSON</button>
                       <button class="btn-seed" id="btn-export-csv" disabled>Export CSV</button>
                       <button class="btn-seed btn-save" id="btn-load-db">Load into Database</button>
+                      <button class="btn-seed btn-danger" id="btn-clear-db">Clear</button>
                     </div>
                     <div id="load-preview"></div>
                   ` : '<div class="no-definition">No import definition</div>'}
@@ -378,6 +379,7 @@ const SeedImportDialog = {
 
     // Load into DB button
     this.modalElement.querySelector('#btn-load-db')?.addEventListener('click', () => this.loadIntoDb());
+    this.modalElement.querySelector('#btn-clear-db')?.addEventListener('click', () => this.clearEntity());
 
     // Export buttons
     this.modalElement.querySelector('#btn-export-json')?.addEventListener('click', () => this.exportImportJson());
@@ -661,6 +663,9 @@ ${mappingTable}
         if (result.recordsFiltered > 0) {
           details += `Target filtered: ${result.recordsFiltered}<br>`;
         }
+        if (result.recordsLimited > 0) {
+          details += `Limited (test): ${result.recordsLimited}<br>`;
+        }
         details += `Records written: ${result.recordsWritten}<br>`;
         details += `Output: ${result.outputFile}`;
 
@@ -793,7 +798,18 @@ ${mappingTable}
 
       if (result.success) {
         this.log('success', `Loaded: ${result.loaded} records`);
-        if (result.updated) this.log('info', `Updated: ${result.updated} records`);
+        if (result.updated) {
+          this.log('info', `Updated: ${result.updated} records`);
+          // Show which keys were updated (with occurrence count)
+          if (result.updatedKeys?.length > 0) {
+            const keyList = result.updatedKeys
+              .slice(0, 10)  // Limit to first 10
+              .map(k => k.count > 1 ? `${k.key} (${k.count}×)` : k.key)
+              .join(', ');
+            const more = result.updatedKeys.length > 10 ? `, ... +${result.updatedKeys.length - 10} more` : '';
+            this.log('info', `Updated keys: ${keyList}${more}`);
+          }
+        }
         if (result.skipped) this.log('info', `Skipped: ${result.skipped} records`);
 
         // Refresh seed manager
@@ -828,6 +844,45 @@ ${mappingTable}
     if (btn) {
       btn.disabled = false;
       btn.textContent = 'Load into Database';
+    }
+  },
+
+  /**
+   * Clear all records from the entity's database table
+   */
+  async clearEntity() {
+    // Confirm before clearing
+    const confirmed = confirm(`Clear all ${this.entityName} records?\n\nThis will delete all records from the database table.`);
+    if (!confirmed) return;
+
+    const btn = this.modalElement.querySelector('#btn-clear-db');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Clearing...';
+    }
+
+    try {
+      const res = await fetch(`/api/seed/clear/${this.entityName}`, { method: 'POST' });
+      const result = await res.json();
+
+      if (result.success) {
+        this.log('success', `Cleared: ${result.deleted} records deleted`);
+        // Refresh preview
+        this.loadPreview();
+        // Refresh seed manager
+        if (typeof SeedManager !== 'undefined') {
+          SeedManager.refresh();
+        }
+      } else {
+        this.log('error', result.error || 'Clear failed');
+      }
+    } catch (err) {
+      this.log('error', err.message);
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Clear';
     }
   },
 

@@ -234,7 +234,8 @@ class ImportManager {
     const definition = {
       source: null,
       sheet: null,
-      maxRows: null,  // Optional row limit for large files
+      maxRows: null,  // Optional row limit for large files (limits XLSX reading)
+      limit: null,    // Optional output limit for testing (limits final output after filtering)
       first: null,    // Column name for deduplication (keep first occurrence)
       mapping: [],    // Array of { source, target, transform } - allows same source multiple times
       sourceFilter: [],  // Array of { column, regex } - pre-mapping filter on XLSX columns
@@ -242,6 +243,7 @@ class ImportManager {
     };
 
     let inMapping = false;
+    let mappingTableStarted = false;  // Only parse rows after "| Source |..." header
     let inFilter = false;
     let inSourceFilter = false;
     let filterLines = [];
@@ -270,6 +272,15 @@ class ImportManager {
         continue;
       }
 
+      // Parse Limit: directive (optional output limit for testing)
+      if (trimmed.startsWith('Limit:')) {
+        const val = parseInt(trimmed.substring(6).trim(), 10);
+        if (!isNaN(val) && val > 0) {
+          definition.limit = val;
+        }
+        continue;
+      }
+
       // Parse First: directive (deduplication - keep first occurrence per value)
       if (trimmed.startsWith('First:')) {
         definition.first = trimmed.substring(6).trim();
@@ -279,6 +290,7 @@ class ImportManager {
       // Detect section headers
       if (trimmed.startsWith('## Mapping')) {
         inMapping = true;
+        mappingTableStarted = false;  // Reset - wait for "| Source |" header
         inFilter = false;
         continue;
       }
@@ -305,14 +317,22 @@ class ImportManager {
       }
 
       // Parse mapping table rows (Source | Target | Transform)
+      // Only start parsing after seeing "| Source | Target |" header row
       if (inMapping && trimmed.startsWith('|') && !trimmed.includes('---')) {
         const cells = trimmed.split('|').map(c => c.trim()).filter(c => c);
         if (cells.length >= 2) {
           const source = cells[0];
           const target = cells[1];
           const transform = cells[2] || null;
-          // Skip header row
-          if (source.toLowerCase() !== 'source' && target.toLowerCase() !== 'target') {
+
+          // Check for header row "| Source | Target |..."
+          if (source.toLowerCase() === 'source' && target.toLowerCase() === 'target') {
+            mappingTableStarted = true;
+            continue;
+          }
+
+          // Only parse data rows after header has been seen
+          if (mappingTableStarted) {
             definition.mapping.push({ source, target, transform });
           }
         }
@@ -351,6 +371,7 @@ class ImportManager {
    * - date:MM/DD/YYYY  → converts US date to ISO
    * - number           → parse as number
    * - trim             → trim whitespace
+   * - replace:/pattern/replacement/flags → regex replacement
    * @param {any} value - The value to transform
    * @param {string} transform - The transform specification
    * @returns {any} - The transformed value
@@ -366,6 +387,25 @@ class ImportManager {
     if (transform.startsWith('date:')) {
       const format = transform.substring(5);
       return this.parseDate(str, format);
+    }
+
+    // Regex replace: replace:/pattern/replacement/flags
+    if (transform.startsWith('replace:')) {
+      const spec = transform.substring(8);
+      // Parse /pattern/replacement/flags format
+      const match = spec.match(/^\/(.+?)\/(.*)\/([gimsuy]*)$/);
+      if (match) {
+        const [, pattern, replacement, flags] = match;
+        try {
+          const regex = new RegExp(pattern, flags || 'g');
+          return str.replace(regex, replacement);
+        } catch (e) {
+          this.logger.warn(`Invalid regex in replace transform: ${e.message}`);
+          return value;
+        }
+      }
+      this.logger.warn(`Invalid replace transform syntax: ${spec}`);
+      return value;
     }
 
     // Simple transforms
@@ -935,7 +975,7 @@ class ImportManager {
 
       // Apply filter
       const filterFn = this.parseFilter(definition.filter);
-      const filteredData = mappedData.filter(row => {
+      let filteredData = mappedData.filter(row => {
         try {
           return filterFn(row);
         } catch (e) {
@@ -945,6 +985,15 @@ class ImportManager {
       });
 
       const recordsFiltered = recordsRead - filteredData.length;
+
+      // Apply Limit: (for testing - limit output after all filtering)
+      let recordsLimited = 0;
+      if (definition.limit && filteredData.length > definition.limit) {
+        recordsLimited = filteredData.length - definition.limit;
+        filteredData = filteredData.slice(0, definition.limit);
+        this.logger.debug('Limit applied:', { limit: definition.limit, recordsLimited, remaining: filteredData.length });
+      }
+
       const recordsWritten = filteredData.length;
 
       // Write JSON to import directory
@@ -957,6 +1006,7 @@ class ImportManager {
         recordsSourceFiltered,
         recordsDeduplicated,
         recordsFiltered,
+        recordsLimited,
         recordsWritten,
         outputFile: `import/${entityName}.json`
       };

@@ -27,6 +27,7 @@ Each entity can have an import definition in `docs/imports/{Entity}.md`:
 Source: extern/FDB 2025-12-31.xlsx
 Sheet: Tabelle1
 MaxRows: 100000
+Limit: 50
 
 ## Mapping
 
@@ -48,8 +49,13 @@ WHERE status IN ('Asset Fleet', 'Fixed Deliveries', 'Out Plan')
 |-----------|----------|-------------|
 | `Source:` | Yes | Path to XLSX file relative to `data/` |
 | `Sheet:` | No | Sheet name (default: first sheet) |
-| `MaxRows:` | No | Row limit for large files (default: 100000) |
+| `MaxRows:` | No | Row limit for XLSX reading (default: 100000) |
+| `Limit:` | No | Output limit after all filtering (for testing) |
 | `First:` | No | Deduplicate rows by this source column (keep first occurrence) |
+
+**MaxRows vs Limit:**
+- `MaxRows` limits how many rows are read from the XLSX file (performance optimization for very large files)
+- `Limit` limits how many records are written to the output JSON (for testing with a small subset)
 
 ---
 
@@ -155,8 +161,30 @@ The **Transform** column applies conversions to source values:
 | `date:YYYY-MM-DD` | ISO format (passthrough) | — |
 | `number` | Parse with German decimal (`,` → `.`) | `1.234,56` → `1234.56` |
 | `trim` | Remove whitespace | — |
+| `replace:/pattern/replacement/flags` | Regex replacement | See below |
 
 Excel serial dates (numeric) are automatically converted when a date transform is specified.
+
+### Regex Replace
+
+The `replace:/pattern/replacement/flags` transform applies a JavaScript regex replacement:
+
+```markdown
+| Source      | Target      | Transform                      |
+|-------------|-------------|--------------------------------|
+| Engine Type | engine_type | replace:/^(PW)(\d)/$1 $2/      |
+| Code        | code        | replace:/[^A-Z0-9]//g          |
+| Name        | name        | replace:/\s+/ /g               |
+```
+
+- **pattern**: JavaScript regex pattern
+- **replacement**: Replacement string (supports `$1`, `$2` for capture groups)
+- **flags**: Optional flags (`g` = global, `i` = case-insensitive, etc.)
+
+Examples:
+- `replace:/^(PW)(\d)/$1 $2/` — "PW4000" → "PW 4000"
+- `replace:/[^A-Z0-9]//g` — Remove non-alphanumeric
+- `replace:/\s+/ /g` — Collapse multiple spaces
 
 ---
 
@@ -176,10 +204,12 @@ Registration: /^D-/
 Each line specifies a column and regex pattern:
 ```
 ColumnName: /pattern/flags
+ColumnName: !/pattern/flags   (negated)
 ```
 
 - **ColumnName**: Exact XLSX column name
 - **/pattern/**: JavaScript regex pattern
+- **!/pattern/**: Negated pattern (rows that do NOT match)
 - **flags**: Optional regex flags (g, i, m, s, u, y)
 
 Multiple filters are **AND-ed** together (all must match).
@@ -192,7 +222,10 @@ Multiple filters are **AND-ed** together (all must match).
 Status: /Active/i
 Country Code: /^(DE|AT|CH)$/
 Serial Number: /^\d{5,}$/
+Exclude Flag: !/^(TEST|DEMO)/i
 ```
+
+The negation syntax `!/regex/` is useful for excluding rows that match a pattern (e.g., test data, obsolete records).
 
 ### Use Cases
 
