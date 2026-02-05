@@ -274,6 +274,9 @@ const EntityTable = {
               // Render as clickable link to tree view
               const escaped = DomUtils.escapeHtml(String(value));
               displayValue = `<a href="#" class="fk-link" data-entity="${col.fkEntity}" data-id="${fkId}">${escaped}</a>`;
+            } else if (col.truncate) {
+              // Apply truncation from entity column [TRUNCATE=n] annotation
+              displayValue = DomUtils.truncateWithTooltip(String(value), col.truncate);
             } else {
               displayValue = DomUtils.escapeHtml(String(value));
             }

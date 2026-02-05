@@ -192,7 +192,8 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
       selectExpr: `b.${col.name}`,
       label: titleCase(col.displayName || col.name),
       jsType: col.jsType || 'string',
-      entityName: baseEntityName
+      entityName: baseEntityName,
+      truncate: col.ui?.truncate || null  // Inherit [TRUNCATE=n] from entity column
     };
   }
 
@@ -1065,7 +1066,8 @@ function parseAllUserViews(viewsConfig, schema) {
           sqlAlias: label,
           omit,
           areaColor: colAreaColor,
-          entityName: resolved.entityName  // Entity this column belongs to (for diagrams)
+          entityName: resolved.entityName,  // Entity this column belongs to (for diagrams)
+          truncate: resolved.truncate || null  // Inherit [TRUNCATE=n] from entity column
         };
 
         // Add FK link info for navigation (FK paths only)
