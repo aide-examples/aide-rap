@@ -287,7 +287,9 @@ const BreadcrumbNav = {
         // Navigate to entity with filter
         await EntityExplorer.selectEntityWithoutBreadcrumb(crumb.entity);
         if (crumb.filter) {
-          EntityExplorer.filterInput.value = crumb.filter;
+          if (EntityExplorer.filterInput) {
+            EntityExplorer.filterInput.value = crumb.filter;
+          }
           await EntityExplorer.loadRecords(crumb.filter);
         }
         // Restore view mode

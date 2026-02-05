@@ -176,7 +176,7 @@ function parseConstraints(description) {
 
 /**
  * Parse UI annotations from description
- * Supported: [LABEL], [LABEL2], [READONLY], [HIDDEN]
+ * Supported: [LABEL], [LABEL2], [READONLY], [HIDDEN], [TRUNCATE=n]
  */
 function parseUIAnnotations(description) {
   const ui = {};
@@ -192,6 +192,11 @@ function parseUIAnnotations(description) {
   }
   if (/\[HIDDEN\]/i.test(description)) {
     ui.hidden = true;
+  }
+  // Parse [TRUNCATE=n] - truncate display to n characters with tooltip
+  const truncateMatch = description.match(/\[TRUNCATE=(\d+)\]/i);
+  if (truncateMatch) {
+    ui.truncate = parseInt(truncateMatch[1], 10);
   }
 
   return Object.keys(ui).length > 0 ? ui : null;

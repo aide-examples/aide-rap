@@ -73,6 +73,22 @@ const DomUtils = {
   },
 
   /**
+   * Truncate text and return HTML with tooltip showing full text
+   * @param {string} text - The text to potentially truncate
+   * @param {number} maxLength - Maximum characters before truncation
+   * @returns {string} - HTML string with escaped text (truncated with tooltip if needed)
+   */
+  truncateWithTooltip(text, maxLength) {
+    if (text === null || text === undefined) return '';
+    const str = String(text);
+    if (str.length <= maxLength) {
+      return DomUtils.escapeHtml(str);
+    }
+    const truncated = str.substring(0, maxLength) + '…';
+    return `<span title="${DomUtils.escapeHtml(str)}">${DomUtils.escapeHtml(truncated)}</span>`;
+  },
+
+  /**
    * Split CamelCase into separate words: "TotalCycles" → "Total Cycles"
    */
   splitCamelCase(str) {

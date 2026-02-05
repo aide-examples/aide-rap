@@ -805,10 +805,14 @@ const EntityTable = {
           html += `<td class="aggregate-cell">${DomUtils.escapeHtml(displayValue)}</td>`;
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
-          const displayValue = value != null
-            ? DomUtils.escapeHtml(ValueFormatter.format(value, col.name, this.schema))
-            : '';
-          html += `<td>${displayValue}</td>`;
+          const formattedValue = value != null ? ValueFormatter.format(value, col.name, this.schema) : '';
+
+          // Check for TRUNCATE annotation - use DomUtils helper
+          if (col.ui?.truncate) {
+            html += `<td>${DomUtils.truncateWithTooltip(formattedValue, col.ui.truncate)}</td>`;
+          } else {
+            html += `<td>${DomUtils.escapeHtml(formattedValue)}</td>`;
+          }
         }
       }
 
@@ -1183,8 +1187,10 @@ const EntityTable = {
     // Switch to the target entity (this will NOT set a new base crumb because we already pushed)
     // We need to call selectEntity without the breadcrumb setting
     await EntityExplorer.selectEntityWithoutBreadcrumb(entityName);
-    // Apply the filter
-    EntityExplorer.filterInput.value = filter;
+    // Apply the filter (store for display/breadcrumb if filterInput exists)
+    if (EntityExplorer.filterInput) {
+      EntityExplorer.filterInput.value = filter;
+    }
     await EntityExplorer.loadRecords(filter);
   },
 
