@@ -323,14 +323,15 @@ class ImportManager {
         filterLines.push(trimmed);
       }
 
-      // Parse Source Filter lines: ColumnName: /regex/
+      // Parse Source Filter lines: ColumnName: /regex/ or ColumnName: !/regex/ (negated)
       if (inSourceFilter && trimmed) {
-        const match = trimmed.match(/^(.+?):\s*\/(.+)\/([gimsuy]*)$/);
+        const match = trimmed.match(/^(.+?):\s*(!)?\/(.+)\/([gimsuy]*)$/);
         if (match) {
           const column = match[1].trim();
-          const pattern = match[2];
-          const flags = match[3] || '';
-          definition.sourceFilter.push({ column, pattern, flags });
+          const negate = !!match[2];  // true if ! prefix
+          const pattern = match[3];
+          const flags = match[4] || '';
+          definition.sourceFilter.push({ column, pattern, flags, negate });
         }
       }
     }
@@ -879,12 +880,13 @@ class ImportManager {
       // Apply source filter (regex-based filter on XLSX columns, before mapping)
       let recordsSourceFiltered = 0;
       if (definition.sourceFilter.length > 0) {
-        const sourceFilterFns = definition.sourceFilter.map(({ column, pattern, flags }) => {
+        const sourceFilterFns = definition.sourceFilter.map(({ column, pattern, flags, negate }) => {
           const regex = new RegExp(pattern, flags);
           return (row) => {
             const value = row[column];
-            if (value === null || value === undefined) return false;
-            return regex.test(String(value));
+            if (value === null || value === undefined) return negate; // null/undefined: false unless negated
+            const matches = regex.test(String(value));
+            return negate ? !matches : matches;
           };
         });
         const beforeCount = rawData.length;
