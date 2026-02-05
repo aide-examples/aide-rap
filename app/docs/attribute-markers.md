@@ -60,6 +60,7 @@ The external value (e.g., "Line", "Open") is automatically mapped to the interna
 | `[READONLY]` | Non-editable field | Displayed but cannot be modified in forms |
 | `[HIDDEN]` | Never displayed | Field exists in DB but not shown in UI |
 | `[TRUNCATE=n]` | Truncate display to n characters | Full text shown in tooltip on hover |
+| `[NOWRAP]` | Prevent text wrapping | Short values stay on single line |
 
 ### Entity-Level Computed LABEL
 
@@ -212,7 +213,7 @@ See [Computed References](computed-references.md) for full syntax.
 | Marker Type | Column |
 |-------------|--------|
 | `[OPTIONAL]`, `[DEFAULT=x]` | **Type** column |
-| `[LABEL]`, `[LABEL2]`, `[READONLY]`, `[HIDDEN]`, `[TRUNCATE=n]` | **Description** column |
+| `[LABEL]`, `[LABEL2]`, `[READONLY]`, `[HIDDEN]`, `[TRUNCATE=n]`, `[NOWRAP]` | **Description** column |
 | `[UNIQUE]`, `[UK1]`, `[INDEX]`, `[IX1]` | **Description** column |
 | `[SIZE=]`, `[DIMENSION=]`, etc. | **Description** column |
 | `[DAILY=]`, `[IMMEDIATE=]` | **Description** column |

@@ -193,7 +193,8 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
       label: titleCase(col.displayName || col.name),
       jsType: col.jsType || 'string',
       entityName: baseEntityName,
-      truncate: col.ui?.truncate || null  // Inherit [TRUNCATE=n] from entity column
+      truncate: col.ui?.truncate || null,  // Inherit [TRUNCATE=n] from entity column
+      nowrap: col.ui?.nowrap || null       // Inherit [NOWRAP] from entity column
     };
   }
 
@@ -1067,7 +1068,8 @@ function parseAllUserViews(viewsConfig, schema) {
           omit,
           areaColor: colAreaColor,
           entityName: resolved.entityName,  // Entity this column belongs to (for diagrams)
-          truncate: resolved.truncate || null  // Inherit [TRUNCATE=n] from entity column
+          truncate: resolved.truncate || null,  // Inherit [TRUNCATE=n] from entity column
+          nowrap: resolved.nowrap || null       // Inherit [NOWRAP] from entity column
         };
 
         // Add FK link info for navigation (FK paths only)

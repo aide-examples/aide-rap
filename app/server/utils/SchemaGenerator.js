@@ -198,6 +198,10 @@ function parseUIAnnotations(description) {
   if (truncateMatch) {
     ui.truncate = parseInt(truncateMatch[1], 10);
   }
+  // Parse [NOWRAP] - prevent text wrapping in table cells
+  if (/\[NOWRAP\]/i.test(description)) {
+    ui.nowrap = true;
+  }
 
   return Object.keys(ui).length > 0 ? ui : null;
 }

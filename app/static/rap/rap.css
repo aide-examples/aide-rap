@@ -2066,6 +2066,11 @@
     max-width: 320px;
 }
 
+/* [NOWRAP] annotation - prevent text wrapping */
+.entity-table td.nowrap-cell {
+    white-space: nowrap;
+}
+
 .entity-table tbody tr {
     background: #fff;
     cursor: pointer;

@@ -291,7 +291,9 @@ const EntityTable = {
           ? ` style="${Object.entries(cellStyle).map(([k,v]) =>
               `${k.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}:${v}`).join(';')}"`
           : '';
-        html += `<td${styleAttr}>${displayValue}</td>`;
+        // [NOWRAP] annotation - prevent text wrapping
+        const classAttr = col.nowrap ? ' class="nowrap-cell"' : '';
+        html += `<td${classAttr}${styleAttr}>${displayValue}</td>`;
       }
       html += '</tr>';
     }
@@ -809,12 +811,14 @@ const EntityTable = {
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const formattedValue = value != null ? ValueFormatter.format(value, col.name, this.schema) : '';
+          // [NOWRAP] annotation - prevent text wrapping
+          const nowrapClass = col.ui?.nowrap ? ' class="nowrap-cell"' : '';
 
           // Check for TRUNCATE annotation - use DomUtils helper
           if (col.ui?.truncate) {
-            html += `<td>${DomUtils.truncateWithTooltip(formattedValue, col.ui.truncate)}</td>`;
+            html += `<td${nowrapClass}>${DomUtils.truncateWithTooltip(formattedValue, col.ui.truncate)}</td>`;
           } else {
-            html += `<td>${DomUtils.escapeHtml(formattedValue)}</td>`;
+            html += `<td${nowrapClass}>${DomUtils.escapeHtml(formattedValue)}</td>`;
           }
         }
       }
