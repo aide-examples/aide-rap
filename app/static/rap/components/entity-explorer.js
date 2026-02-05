@@ -1717,24 +1717,31 @@ const EntityExplorer = {
    * Execute [CALCULATED] fields defined in entity schema
    * These are client-side computations defined in Entity.md ## Calculations
    */
+  /**
+   * Execute CLIENT [CALCULATED] fields defined in entity schema.
+   * These are display-only computations - values are NOT persisted.
+   * For persistent calculations, use ## Server Calculations in the entity markdown.
+   */
   async executeCalculatedFields() {
     if (!this.currentEntity || this.records.length === 0) return;
 
     try {
       const schema = await SchemaCache.getExtended(this.currentEntity);
-      const calcFields = schema.columns.filter(c => c.calculated);
+      // Prefer clientCalculated, fall back to calculated for backward compat
+      const calcFields = schema.columns.filter(c => c.clientCalculated || c.calculated);
 
       for (const field of calcFields) {
         try {
-          const fn = new Function('data', field.calculated.code);
+          const calcDef = field.clientCalculated || field.calculated;
+          const fn = new Function('data', calcDef.code);
           fn(this.records);
         } catch (e) {
-          console.error(`Calculation error for ${this.currentEntity}.${field.name}:`, e);
+          console.error(`Client calculation error for ${this.currentEntity}.${field.name}:`, e);
           DomUtils.toastError(`Calculation error [${this.currentEntity}.${field.name}]: ${e.message}`);
         }
       }
     } catch (e) {
-      console.error('Failed to execute calculated fields:', e);
+      console.error('Failed to execute client calculated fields:', e);
     }
   },
 

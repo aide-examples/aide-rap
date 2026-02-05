@@ -786,6 +786,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 - [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
 - [Aggregate Types](aggregate-types.md) – `geo`, `address`, and custom composite types
 - [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships
+- [Calculations](calculations.md) – `## Client Calculations` and `## Server Calculations` for derived field values
 - [Seed Data](seed-data.md) – Import, export, and AI-generate test data
 
 ### Procedures

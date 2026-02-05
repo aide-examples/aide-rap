@@ -12,9 +12,9 @@ Meter reading at a specific point in time.
 | reading_at | date | Date of measurement [UK1] | 2024-01-15 |
 | value | int | The numeric value on the meter | 42 |
 | source | string | Manual, Automated, Estimated [DEFAULT=Automated] | Automated |
-| usage | int | Consumption since last reading [CALCULATED] [READONLY] | null |
+| usage | int | Consumption since last reading [CALCULATED] | null |
 
-## Calculations
+## Server Calculations
 
 ### usage
 

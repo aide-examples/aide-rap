@@ -603,9 +603,10 @@ function parseCalculatedAnnotation(description) {
  * Looks for ### fieldName subsections with:
  *   - **Depends on:** field1, field2  (required fields for calculation)
  *   - **Sort:** field1, field2        (required sort order)
+ *   - **Trigger:** ONCHANGE           (optional: run calculation on save, implies READONLY)
  *   - ```js ... ```                   (calculation code)
  *
- * Returns: { fieldName: { code, depends: [...], sort: [...] }, ... }
+ * Returns: { fieldName: { code, depends: [...], sort: [...], trigger: string|null }, ... }
  */
 function parseCalculationsSection(fileContent) {
   const result = {};
@@ -638,7 +639,7 @@ function parseCalculationsSection(fileContent) {
         result[currentField] = currentCalc;
       }
       currentField = trimmed.substring(4).trim();
-      currentCalc = { code: '', depends: [], sort: [] };
+      currentCalc = { code: '', depends: [], sort: [], trigger: null };
       continue;
     }
 
@@ -655,6 +656,13 @@ function parseCalculationsSection(fileContent) {
     const sortMatch = trimmed.match(/^\*\*Sort:\*\*\s*(.+)$/i);
     if (sortMatch) {
       currentCalc.sort = sortMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      continue;
+    }
+
+    // Parse **Trigger:** ONCHANGE (triggers calculation on save)
+    const triggerMatch = trimmed.match(/^\*\*Trigger:\*\*\s*(.+)$/i);
+    if (triggerMatch) {
+      currentCalc.trigger = triggerMatch[1].trim().toUpperCase();
       continue;
     }
 
@@ -676,6 +684,117 @@ function parseCalculationsSection(fileContent) {
   }
 
   return result;
+}
+
+/**
+ * Generic parser for calculation sections with configurable header
+ * Used by parseClientCalculationsSection and parseServerCalculationsSection
+ *
+ * @param {string} fileContent - Markdown content
+ * @param {string} sectionHeader - Section to parse (e.g., '## Client Calculations')
+ * @returns {Object} { fieldName: { code, depends: [...], sort: [...], trigger: string|null }, ... }
+ */
+function parseCalculationsSectionByName(fileContent, sectionHeader) {
+  const result = {};
+  const lines = fileContent.split('\n');
+  let inCalcSection = false;
+  let currentField = null;
+  let currentCalc = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Detect target section
+    if (trimmed === sectionHeader) {
+      inCalcSection = true;
+      continue;
+    }
+
+    // Exit on another ## section
+    if (inCalcSection && trimmed.startsWith('## ') && trimmed !== sectionHeader) {
+      break;
+    }
+
+    if (!inCalcSection) continue;
+
+    // Detect ### fieldName subsection
+    if (trimmed.startsWith('### ')) {
+      if (currentField && currentCalc) {
+        result[currentField] = currentCalc;
+      }
+      currentField = trimmed.substring(4).trim();
+      currentCalc = { code: '', depends: [], sort: [], trigger: null };
+      continue;
+    }
+
+    if (!currentField) continue;
+
+    // Parse **Depends on:** field1, field2
+    const dependsMatch = trimmed.match(/^\*\*Depends on:\*\*\s*(.+)$/i);
+    if (dependsMatch) {
+      currentCalc.depends = dependsMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      continue;
+    }
+
+    // Parse **Sort:** field1, field2
+    const sortMatch = trimmed.match(/^\*\*Sort:\*\*\s*(.+)$/i);
+    if (sortMatch) {
+      currentCalc.sort = sortMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+      continue;
+    }
+
+    // Parse **Trigger:** for custom triggers (mostly for server calculations)
+    const triggerMatch = trimmed.match(/^\*\*Trigger:\*\*\s*(.+)$/i);
+    if (triggerMatch) {
+      currentCalc.trigger = triggerMatch[1].trim().toUpperCase();
+      continue;
+    }
+
+    // Parse ```js code block
+    if (trimmed === '```js') {
+      const jsLines = [];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '```') {
+        jsLines.push(lines[i]);
+        i++;
+      }
+      currentCalc.code = jsLines.join('\n').trim();
+    }
+  }
+
+  // Save last calculation
+  if (currentField && currentCalc) {
+    result[currentField] = currentCalc;
+  }
+
+  return result;
+}
+
+/**
+ * Parse ## Client Calculations section - display-only calculations run in browser
+ * @param {string} fileContent - Markdown content
+ * @returns {Object} { fieldName: { code, depends: [...], sort: [] }, ... }
+ */
+function parseClientCalculationsSection(fileContent) {
+  return parseCalculationsSectionByName(fileContent, '## Client Calculations');
+}
+
+/**
+ * Parse ## Server Calculations section - persistent calculations run on server after save
+ * Default trigger is ONCHANGE (calculated after every create/update)
+ * @param {string} fileContent - Markdown content
+ * @returns {Object} { fieldName: { code, depends: [...], sort: [...], trigger: 'ONCHANGE' }, ... }
+ */
+function parseServerCalculationsSection(fileContent) {
+  const calcs = parseCalculationsSectionByName(fileContent, '## Server Calculations');
+  // Default trigger is ONCHANGE for server calculations
+  for (const def of Object.values(calcs)) {
+    if (!def.trigger) {
+      def.trigger = 'ONCHANGE';
+    }
+  }
+  return calcs;
 }
 
 /**
@@ -830,14 +949,56 @@ function parseEntityFile(fileContent) {
     }
   }
 
-  // Parse ## Calculations section for [CALCULATED] fields
-  const calculations = parseCalculationsSection(fileContent);
+  // Parse calculation sections
+  // New: ## Client Calculations and ## Server Calculations
+  const clientCalculations = parseClientCalculationsSection(fileContent);
+  const serverCalculations = parseServerCalculationsSection(fileContent);
+
+  // Legacy: ## Calculations (deprecated, kept for backward compatibility)
+  const legacyCalculations = parseCalculationsSection(fileContent);
+
+  // Merge legacy calculations with new format:
+  // - Legacy without trigger → client
+  // - Legacy with ONCHANGE trigger → server
+  const mergedClientCalcs = {};
+  const mergedServerCalcs = { ...serverCalculations };
+
+  for (const [name, def] of Object.entries(legacyCalculations)) {
+    if (def.trigger === 'ONCHANGE') {
+      // Legacy with ONCHANGE → server (unless already defined in ## Server Calculations)
+      if (!mergedServerCalcs[name]) {
+        mergedServerCalcs[name] = def;
+      }
+    } else {
+      // Legacy without trigger → client (unless already defined in ## Client Calculations)
+      if (!clientCalculations[name]) {
+        mergedClientCalcs[name] = def;
+      }
+    }
+  }
+
+  // Add explicit client calculations (override legacy)
+  Object.assign(mergedClientCalcs, clientCalculations);
+
+  // Emit deprecation warning if legacy section is used but new sections are not
+  const hasLegacy = Object.keys(legacyCalculations).length > 0;
+  const hasNewSections = Object.keys(clientCalculations).length > 0 ||
+                         Object.keys(serverCalculations).length > 0;
+  if (hasLegacy && !hasNewSections) {
+    console.warn(
+      `[Schema Warning] ${className}: "## Calculations" is deprecated. ` +
+      `Migrate to "## Client Calculations" or "## Server Calculations".`
+    );
+  }
 
   return {
     className,
     description,
     attributes,
-    calculations,
+    clientCalculations: mergedClientCalcs,
+    serverCalculations: mergedServerCalcs,
+    // Legacy: keep 'calculations' for backward compat during transition
+    calculations: legacyCalculations,
     localTypes,
     entityAnnotations
   };
@@ -866,6 +1027,8 @@ function parseEntityDescriptions(mdContent, mdPath) {
             description: parsed.description,
             attributes: parsed.attributes,
             calculations: parsed.calculations,
+            clientCalculations: parsed.clientCalculations,
+            serverCalculations: parsed.serverCalculations,
             localTypes: parsed.localTypes,
             entityAnnotations: parsed.entityAnnotations
           };
@@ -1218,11 +1381,16 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     // Parse computed field annotation (DAILY, IMMEDIATE, etc.)
     const computedRule = parseComputedAnnotation(desc);
 
-    // Parse [CALCULATED] annotation for client-side calculated fields
+    // Parse [CALCULATED] annotation
     const isCalculated = parseCalculatedAnnotation(desc);
-    const calculatedDef = isCalculated && classDef.calculations?.[name]
-      ? classDef.calculations[name]
+
+    // Check for client calculation (display-only, runs in browser)
+    const clientCalcDef = isCalculated && classDef.clientCalculations?.[name]
+      ? classDef.clientCalculations[name]
       : null;
+
+    // Check for server calculation (persistent, runs after save)
+    const serverCalcDef = classDef.serverCalculations?.[name] || null;
 
     // Calculate default value (skip for id and foreign keys)
     let defaultValue = null;
@@ -1270,8 +1438,19 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
       column.computed = computedRule;
     }
 
-    if (calculatedDef) {
-      column.calculated = calculatedDef;
+    // Client calculation (display-only, runs in browser)
+    if (clientCalcDef) {
+      column.clientCalculated = clientCalcDef;
+      // Legacy: keep 'calculated' for backward compat with existing client code
+      column.calculated = clientCalcDef;
+    }
+
+    // Server calculation (persistent, runs after save)
+    if (serverCalcDef) {
+      column.serverCalculated = serverCalcDef;
+      // Server calculations are ALWAYS readonly (auto-computed, not user-editable)
+      if (!column.ui) column.ui = {};
+      column.ui.readonly = true;
     }
 
     // Add media constraints for media type fields

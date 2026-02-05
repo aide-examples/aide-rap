@@ -14,6 +14,7 @@
 const express = require('express');
 const service = require('../services/GenericService');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
+const calculationService = require('../services/CalculationService');
 
 const router = express.Router();
 
@@ -265,6 +266,11 @@ router.post('/:entity', validateEntity, (req, res, next) => {
 
     const created = service.createEntity(entity, data, buildContext(req));
 
+    // Run ONCHANGE calculations (async, don't block response)
+    setImmediate(() => {
+      calculationService.runOnChangeServerCalculations(entity, created);
+    });
+
     // Set ETag for OCC
     if (created.version !== undefined) {
       res.set('ETag', buildETag(entity, created.id, created.version));
@@ -295,6 +301,11 @@ router.put('/:entity/:id', validateEntity, (req, res, next) => {
 
     const updated = service.updateEntity(entity, parseInt(id, 10), data, expectedVersion, buildContext(req));
 
+    // Run ONCHANGE calculations (async, don't block response)
+    setImmediate(() => {
+      calculationService.runOnChangeServerCalculations(entity, updated);
+    });
+
     // Set ETag for OCC
     if (updated.version !== undefined) {
       res.set('ETag', buildETag(entity, updated.id, updated.version));
@@ -313,7 +324,18 @@ router.delete('/:entity/:id', validateEntity, (req, res, next) => {
   try {
     const { entity, id } = req.params;
 
+    // Get record BEFORE delete to extract partition keys for calculation
+    const recordBeforeDelete = service.getEntity(entity, parseInt(id, 10));
+
     const deleted = service.deleteEntity(entity, parseInt(id, 10), buildContext(req));
+
+    // Run ONCHANGE calculations (async, don't block response)
+    // Use the deleted record's data for partition key extraction
+    if (recordBeforeDelete) {
+      setImmediate(() => {
+        calculationService.runOnChangeServerCalculations(entity, recordBeforeDelete);
+      });
+    }
 
     res.json({
       message: `${entity} with ID ${id} deleted`,
