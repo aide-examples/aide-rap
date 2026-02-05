@@ -200,8 +200,6 @@ const SeedImportDialog = {
           </div>
           <div class="modal-body">
             <div class="import-tabs-bar">
-              <button class="import-tab ${disabledClass}" data-tab="schema" ${disabledAttr}>Schema</button>
-              <button class="import-tab ${disabledClass}" data-tab="preview" ${disabledAttr}>${i18n.t('si_tab_preview')}</button>
               <button class="import-tab ${disabledClass}" data-tab="rule" ${disabledAttr}>Rule</button>
               <button class="import-tab ${disabledClass}" data-tab="run" ${disabledAttr}>Run</button>
               <button class="import-tab ${disabledClass}" data-tab="load" ${disabledAttr}>Load</button>
@@ -210,23 +208,7 @@ const SeedImportDialog = {
 
             <div class="import-split-container">
               <div class="import-content-area">
-                <div class="import-tab-content" id="tab-schema" style="display: none;">
-              <div class="tab-content-scroll">
-                <div id="schema-content" class="schema-content">
-                  ${this.hasDefinition ? '<div class="loading">Loading schema...</div>' : '<div class="no-definition">No import definition</div>'}
-                </div>
-              </div>
-            </div>
-
-            <div class="import-tab-content" id="tab-preview" style="display: none;">
-              <div class="tab-content-scroll">
-                <div id="sample-content" class="sample-content">
-                  ${this.hasDefinition ? `<div class="loading">${i18n.t('loading')}</div>` : `<div class="no-definition">${i18n.t('si_no_definition')}</div>`}
-                </div>
-              </div>
-            </div>
-
-            <div class="import-tab-content" id="tab-rule" style="display: none;">
+                <div class="import-tab-content" id="tab-rule" style="display: none;">
               <div class="rule-toolbar">
                 <span class="rule-path" id="rule-path"></span>
                 <button class="btn-seed" id="btn-new-mapping">${i18n.t('si_new_mapping')}</button>
@@ -331,8 +313,6 @@ const SeedImportDialog = {
 
     // Load initial data if definition exists
     if (this.hasDefinition) {
-      this.loadSchema();
-      this.loadSample();
       this.loadRule();
     }
   },
@@ -426,7 +406,7 @@ const SeedImportDialog = {
       tab.classList.toggle('active', tab.dataset.tab === tabName);
     });
 
-    ['schema', 'preview', 'rule', 'run', 'load', 'paste'].forEach(name => {
+    ['rule', 'run', 'load', 'paste'].forEach(name => {
       const el = this.modalElement.querySelector(`#tab-${name}`);
       if (el) el.style.display = name === tabName ? 'flex' : 'none';
     });
@@ -442,80 +422,6 @@ const SeedImportDialog = {
 
     this.modalElement.querySelector('#paste-tab-source').style.display = tabName === 'source' ? 'block' : 'none';
     this.modalElement.querySelector('#paste-tab-preview').style.display = tabName === 'preview' ? 'block' : 'none';
-  },
-
-  // ========== SCHEMA TAB ==========
-
-  async loadSchema() {
-    const contentDiv = this.modalElement.querySelector('#schema-content');
-    try {
-      const res = await fetch(`/api/import/schema/${this.entityName}`);
-      const data = await res.json();
-
-      if (data.error) {
-        contentDiv.innerHTML = `<div class="schema-error">${DomUtils.escapeHtml(data.error)}</div>`;
-        this.log('error', `Schema: ${data.error}`);
-        return;
-      }
-
-      contentDiv.innerHTML = `
-        <div class="schema-info">
-          <strong>Source:</strong> ${DomUtils.escapeHtml(data.sourceFile)}<br>
-          <strong>Sheet:</strong> ${DomUtils.escapeHtml(data.sheet)}
-        </div>
-        <div class="schema-columns">
-          <strong>Columns (${data.columns.length}):</strong>
-          <ul>
-            ${data.columns.map(c => `<li>${DomUtils.escapeHtml(c)}</li>`).join('')}
-          </ul>
-        </div>
-      `;
-      this.log('success', `Schema loaded: ${data.columns.length} columns`);
-    } catch (err) {
-      contentDiv.innerHTML = `<div class="schema-error">Failed to load schema</div>`;
-      this.log('error', `Schema: ${err.message}`);
-    }
-  },
-
-  // ========== PREVIEW TAB ==========
-
-  async loadSample() {
-    const contentDiv = this.modalElement.querySelector('#sample-content');
-    try {
-      const res = await fetch(`/api/import/sample/${this.entityName}?count=3`);
-      const data = await res.json();
-
-      if (data.error) {
-        contentDiv.innerHTML = `<div class="schema-error">${DomUtils.escapeHtml(data.error)}</div>`;
-        this.log('error', `Preview: ${data.error}`);
-        return;
-      }
-
-      if (!data.records || data.records.length === 0) {
-        contentDiv.innerHTML = `<div class="no-definition">${i18n.t('si_preview_no_data')}</div>`;
-        return;
-      }
-
-      // Render sample records as formatted JSON
-      const jsonHtml = data.records.map((record, idx) => `
-        <div class="sample-record">
-          <div class="sample-record-header">${i18n.t('si_preview_record')} ${idx + 1}</div>
-          <pre class="sample-json">${DomUtils.escapeHtml(JSON.stringify(record, null, 2))}</pre>
-        </div>
-      `).join('');
-
-      contentDiv.innerHTML = `
-        <div class="sample-info">
-          <strong>${i18n.t('si_preview_source')}:</strong> ${DomUtils.escapeHtml(data.sourceFile)}<br>
-          <strong>${i18n.t('si_preview_showing')}:</strong> ${data.records.length} ${i18n.t('si_preview_of')} ${data.totalRows || '?'} ${i18n.t('si_preview_rows')}
-        </div>
-        <div class="sample-records">${jsonHtml}</div>
-      `;
-      this.log('info', `Preview: ${data.records.length} sample records loaded`);
-    } catch (err) {
-      contentDiv.innerHTML = `<div class="schema-error">Failed to load sample</div>`;
-      this.log('error', `Preview: ${err.message}`);
-    }
   },
 
   // ========== RULE TAB ==========
@@ -682,6 +588,10 @@ const SeedImportDialog = {
       const sourceColumns = schemaData.columns || [];
       const sampleRecords = sampleData.records || [];
 
+      // Calculate column width for Source (make it wide enough for longest source column name)
+      const maxSourceLen = Math.max(...sourceColumns.map(c => c.length), 20);
+      const sourceWidth = ' '.repeat(maxSourceLen);
+
       let sourcePreview = '';
       for (const col of sourceColumns) {
         const values = sampleRecords.map(r => {
@@ -689,12 +599,9 @@ const SeedImportDialog = {
           if (val === null || val === undefined) return '';
           return String(val).substring(0, 40); // Truncate long values
         });
-        sourcePreview += `${col} | ${values.join(' | ')}\n`;
+        const paddedCol = col.padEnd(maxSourceLen);
+        sourcePreview += `${paddedCol} | ${values.join(' | ')}\n`;
       }
-
-      // Calculate column width for Source (make it wide enough for longest source column name)
-      const maxSourceLen = Math.max(...sourceColumns.map(c => c.length), 20);
-      const sourceWidth = ' '.repeat(maxSourceLen);
 
       // Build mapping table
       let mappingTable = `| Source${' '.repeat(maxSourceLen - 6)} | Target | Transform |\n`;
