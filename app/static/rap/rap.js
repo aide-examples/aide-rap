@@ -129,6 +129,15 @@ async function tryUrlLogin() {
                 <option value="entity-only" data-i18n="settings_breadcrumb_entity">Entity only</option>
               </select>
             </div>
+            <div class="settings-divider"></div>
+            <div class="settings-section">
+              <label class="settings-label" data-i18n="settings_theme">Theme:</label>
+              <select id="theme-select" class="settings-select">
+                <option value="light" data-i18n="theme_light">Light</option>
+                <option value="dark" data-i18n="theme_dark">Dark</option>
+                <option value="system" data-i18n="theme_system">System</option>
+              </select>
+            </div>
           </div>
         `;
         headerRight.insertBefore(settingsDropdown, aboutLink);
@@ -194,6 +203,38 @@ async function tryUrlLogin() {
             // Re-render breadcrumbs with new display mode
             if (typeof BreadcrumbNav !== 'undefined') {
               BreadcrumbNav.render();
+            }
+          });
+        }
+
+        // Theme selector
+        const themeSelect = document.getElementById('theme-select');
+        if (themeSelect) {
+          const applyTheme = (mode) => {
+            let effective = mode;
+            if (mode === 'system') {
+              effective = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            if (effective === 'dark') {
+              document.documentElement.dataset.theme = 'dark';
+            } else {
+              delete document.documentElement.dataset.theme;
+            }
+          };
+
+          const savedTheme = localStorage.getItem('rap-settings-theme') || 'light';
+          themeSelect.value = savedTheme;
+          applyTheme(savedTheme);
+
+          themeSelect.addEventListener('change', () => {
+            localStorage.setItem('rap-settings-theme', themeSelect.value);
+            applyTheme(themeSelect.value);
+          });
+
+          // Listen for OS preference changes when in "system" mode
+          matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+            if (themeSelect.value === 'system') {
+              applyTheme('system');
             }
           });
         }

@@ -161,6 +161,11 @@
     "settings_breadcrumb_label": "Solo etiqueta",
     "settings_breadcrumb_entity": "Solo entidad",
 
+    "settings_theme": "Tema:",
+    "theme_light": "Claro",
+    "theme_dark": "Oscuro",
+    "theme_system": "Sistema",
+
     "share_title": "Compartir estado de navegación",
     "share_copy_url": "Copiar URL",
     "share_include_auth": "Incluir auth (acceso invitado)",

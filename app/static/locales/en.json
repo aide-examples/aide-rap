@@ -169,6 +169,11 @@
     "settings_breadcrumb_label": "Label only",
     "settings_breadcrumb_entity": "Entity only",
 
+    "settings_theme": "Theme:",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_system": "System",
+
     "share_title": "Share Navigation State",
     "share_copy_url": "Copy URL",
     "share_include_auth": "Include auth (guest access)",

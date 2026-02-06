@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="app_title">AIDE RAP</title>
+    <script>
+      // Early theme application (before CSS renders) to prevent flash
+      (function() {
+        var t = localStorage.getItem('rap-settings-theme') || 'system';
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (t === 'dark') document.documentElement.dataset.theme = 'dark';
+      })();
+    </script>
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/static/frame/css/base.css">
     <link rel="stylesheet" href="/static/rap/rap.css">

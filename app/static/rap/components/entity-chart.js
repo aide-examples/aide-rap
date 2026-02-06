@@ -44,7 +44,18 @@ const EntityChart = {
     this.container.innerHTML = '<div id="entity-chart" class="entity-chart-canvas"></div>';
     const chartDiv = document.getElementById('entity-chart');
 
+    // Detect dark mode
+    const isDark = document.documentElement.dataset.theme === 'dark';
+
     // Build complete Vega-Lite spec with muted default color scheme
+    const darkConfig = isDark ? {
+      background: 'transparent',
+      axis: { labelColor: '#d1d5db', titleColor: '#e5e7eb', gridColor: '#374151', domainColor: '#4b5563' },
+      legend: { labelColor: '#d1d5db', titleColor: '#e5e7eb' },
+      title: { color: '#e5e7eb' },
+      view: { stroke: '#374151' }
+    } : {};
+
     const spec = {
       $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
       width: 'container',
@@ -54,6 +65,7 @@ const EntityChart = {
       ...schema.chart,
       config: {
         range: { category: { scheme: 'set2' } },
+        ...darkConfig,
         ...(schema.chart?.config || {})
       }
     };
@@ -69,7 +81,7 @@ const EntityChart = {
       const result = await vegaEmbed(chartDiv, spec, {
         actions: false, // Hide export buttons
         renderer: 'svg',
-        theme: 'quartz'
+        theme: isDark ? 'dark' : 'quartz'
       });
 
       this.view = result.view;
