@@ -237,6 +237,8 @@ class ImportManager {
       maxRows: null,  // Optional row limit for large files (limits XLSX reading)
       limit: null,    // Optional output limit for testing (limits final output after filtering)
       first: null,    // Column name for deduplication (keep first occurrence)
+      sort: null,     // Column name for sorting rawData (smart: detects MM.YYYY, numbers)
+      changes: null,  // { group: ['col1','col2'], track: ['col3','col4'] } - consecutive dedup
       mapping: [],    // Array of { source, target, transform } - allows same source multiple times
       sourceEdit: [],    // Array of { column, pattern, replacement, flags } - regex edits on XLSX columns
       sourceFilter: [],  // Array of { column, regex } - pre-mapping filter on XLSX columns
@@ -286,6 +288,25 @@ class ImportManager {
       // Parse First: directive (deduplication - keep first occurrence per value)
       if (trimmed.startsWith('First:')) {
         definition.first = trimmed.substring(6).trim();
+        continue;
+      }
+
+      // Parse Sort: directive (sort rawData by column before dedup)
+      if (trimmed.startsWith('Sort:')) {
+        definition.sort = trimmed.substring(5).trim();
+        continue;
+      }
+
+      // Parse Changes: directive (consecutive dedup - keep only when track columns change per group)
+      // Syntax: Changes: GroupCol1, GroupCol2 | TrackCol1, TrackCol2
+      if (trimmed.startsWith('Changes:')) {
+        const parts = trimmed.substring(8).split('|').map(s => s.trim());
+        if (parts.length === 2) {
+          definition.changes = {
+            group: parts[0].split(',').map(s => s.trim()).filter(Boolean),
+            track: parts[1].split(',').map(s => s.trim()).filter(Boolean)
+          };
+        }
         continue;
       }
 
@@ -496,6 +517,14 @@ class ImportManager {
           month = parts[0].padStart(2, '0');
           day = parts[1].padStart(2, '0');
           year = parts[2];
+        }
+      } else if (format === 'MM.YYYY') {
+        // Month.Year format: 05.1993 → defaults to 1st of month
+        const parts = str.split('.');
+        if (parts.length === 2) {
+          day = '01';
+          month = parts[0].padStart(2, '0');
+          year = parts[1];
         }
       } else if (format === 'YYYY-MM-DD') {
         // Already ISO format
@@ -1032,6 +1061,28 @@ class ImportManager {
         this.logger.debug('Source filter applied:', { recordsSourceFiltered, remaining: rawData.length });
       }
 
+      // Apply Sort: (sort rawData by column before dedup — smart comparator)
+      if (definition.sort) {
+        const sortCol = definition.sort;
+        const mmYYYY = /^(\d{1,2})\.(\d{4})$/;
+        const toSortKey = (val) => {
+          if (val == null) return '';
+          const s = String(val);
+          const m = s.match(mmYYYY);
+          if (m) return `${m[2]}-${m[1].padStart(2, '0')}`; // MM.YYYY → YYYY-MM
+          const n = parseFloat(s);
+          if (!isNaN(n)) return n;
+          return s;
+        };
+        rawData.sort((a, b) => {
+          const ka = toSortKey(a[sortCol]);
+          const kb = toSortKey(b[sortCol]);
+          if (typeof ka === 'number' && typeof kb === 'number') return ka - kb;
+          return String(ka).localeCompare(String(kb));
+        });
+        this.logger.debug('Sort applied:', { column: sortCol, records: rawData.length });
+      }
+
       // Apply First: deduplication (keep first occurrence per unique value)
       let recordsDeduplicated = 0;
       if (definition.first) {
@@ -1047,6 +1098,24 @@ class ImportManager {
         });
         recordsDeduplicated = beforeCount - rawData.length;
         this.logger.debug('First deduplication applied:', { column: definition.first, recordsDeduplicated, remaining: rawData.length });
+      }
+
+      // Apply Changes: consecutive deduplication (keep only rows where track columns change per group)
+      let recordsChangesRemoved = 0;
+      if (definition.changes) {
+        const { group, track } = definition.changes;
+        const lastTrack = new Map(); // groupKey → trackValue
+        const beforeCount = rawData.length;
+        rawData = rawData.filter(row => {
+          const groupKey = group.map(c => String(row[c] ?? '')).join('\0');
+          const trackValue = track.map(c => String(row[c] ?? '')).join('\0');
+          const prev = lastTrack.get(groupKey);
+          lastTrack.set(groupKey, trackValue);
+          if (prev === trackValue) return false; // same as last → remove
+          return true; // first occurrence or changed → keep
+        });
+        recordsChangesRemoved = beforeCount - rawData.length;
+        this.logger.debug('Changes dedup applied:', { group, track, removed: recordsChangesRemoved, remaining: rawData.length });
       }
 
       // Apply mapping with transforms
@@ -1095,6 +1164,7 @@ class ImportManager {
         recordsRead,
         recordsSourceFiltered,
         recordsDeduplicated,
+        recordsChangesRemoved,
         recordsFiltered,
         recordsLimited,
         recordsWritten,

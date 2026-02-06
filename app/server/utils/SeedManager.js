@@ -321,6 +321,56 @@ function buildLookupFromComputedLabel(rows) {
 }
 
 /**
+ * Check if needle segments appear as a subsequence in haystack segments.
+ * Each needle segment must match a haystack segment, in order, but gaps are allowed.
+ */
+function isSubsequence(needle, haystack) {
+  let hi = 0;
+  for (let ni = 0; ni < needle.length; ni++) {
+    while (hi < haystack.length && haystack[hi] !== needle[ni]) hi++;
+    if (hi >= haystack.length) return false;
+    hi++;
+  }
+  return true;
+}
+
+/**
+ * Extract the separator from a concat-type labelExpression.
+ * Returns the separator string if all literal parts are identical, null otherwise.
+ */
+function getLabelSeparator(labelExpr) {
+  if (!labelExpr || labelExpr.type !== 'concat') return null;
+  const literals = labelExpr.parts
+    .filter(p => typeof p === 'object' && p.type === 'literal')
+    .map(p => p.value);
+  if (literals.length === 0) return null;
+  const unique = new Set(literals);
+  return unique.size === 1 ? literals[0] : null;
+}
+
+/**
+ * Fuzzy label matching: find a unique label in lookup where the import value's
+ * segments (split by separator) are a subsequence of the label's segments.
+ * Returns { id, matchedLabel } if exactly one match, null otherwise.
+ */
+function fuzzyLabelMatch(importValue, lookup, separator) {
+  if (!importValue || !separator) return null;
+  const importSegments = importValue.split(separator);
+  if (importSegments.length < 2) return null;
+
+  const candidates = [];
+  for (const [label, id] of Object.entries(lookup)) {
+    if (label.startsWith('#')) continue;
+    const labelSegments = label.split(separator);
+    if (importSegments.length >= labelSegments.length) continue;
+    if (isSubsequence(importSegments, labelSegments)) {
+      candidates.push({ id, matchedLabel: label });
+    }
+  }
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+/**
  * Compute a label value from an expression and a record (in-memory)
  * Used for seed/import records before they're in the database
  * @param {object} expr - { type: 'field'|'concat', field?: string, parts?: string[] }
@@ -478,10 +528,11 @@ function resolveConceptualFKs(entityName, record, lookups) {
   const { schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
 
-  if (!entity) return { resolved: record, fkWarnings: [] };
+  if (!entity) return { resolved: record, fkWarnings: [], fuzzyMatches: [] };
 
   const resolved = { ...record };
   const fkWarnings = [];
+  const fuzzyMatches = [];
 
   for (const fk of entity.foreignKeys) {
     const conceptualName = fk.displayName;  // e.g., "manufacturer"
@@ -499,11 +550,22 @@ function resolveConceptualFKs(entityName, record, lookups) {
         resolved[technicalName] = resolvedId;
         delete resolved[conceptualName];
       } else {
-        console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
-        eventBus.emit('seed:resolve:warning', { entityName, field: conceptualName, value: labelValue, targetEntity });
-        fkWarnings.push({ field: conceptualName, value: labelValue, targetEntity });
-        // Remove the unresolvable field to prevent SQL type errors
-        delete resolved[conceptualName];
+        // Try fuzzy matching for concat-based labels
+        const targetEntitySchema = schema.entities[targetEntity];
+        const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
+        const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+
+        if (fuzzyResult) {
+          resolved[technicalName] = fuzzyResult.id;
+          delete resolved[conceptualName];
+          lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
+          fuzzyMatches.push({ field: conceptualName, value: labelValue, matchedLabel: fuzzyResult.matchedLabel, targetEntity });
+        } else {
+          console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
+          eventBus.emit('seed:resolve:warning', { entityName, field: conceptualName, value: labelValue, targetEntity });
+          fkWarnings.push({ field: conceptualName, value: labelValue, targetEntity });
+          delete resolved[conceptualName];
+        }
       }
     }
     // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
@@ -516,16 +578,26 @@ function resolveConceptualFKs(entityName, record, lookups) {
       if (resolvedId !== undefined) {
         resolved[technicalName] = resolvedId;
       } else {
-        console.warn(`  Warning: Could not resolve ${technicalName}="${labelValue}" for ${entityName}`);
-        eventBus.emit('seed:resolve:warning', { entityName, field: technicalName, value: labelValue, targetEntity });
-        fkWarnings.push({ field: conceptualName || technicalName, value: labelValue, targetEntity });
-        // Set to NULL to prevent SQL type errors (string in INTEGER column)
-        resolved[technicalName] = null;
+        // Try fuzzy matching for concat-based labels
+        const targetEntitySchema = schema.entities[targetEntity];
+        const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
+        const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+
+        if (fuzzyResult) {
+          resolved[technicalName] = fuzzyResult.id;
+          lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
+          fuzzyMatches.push({ field: conceptualName || technicalName, value: labelValue, matchedLabel: fuzzyResult.matchedLabel, targetEntity });
+        } else {
+          console.warn(`  Warning: Could not resolve ${technicalName}="${labelValue}" for ${entityName}`);
+          eventBus.emit('seed:resolve:warning', { entityName, field: technicalName, value: labelValue, targetEntity });
+          fkWarnings.push({ field: conceptualName || technicalName, value: labelValue, targetEntity });
+          resolved[technicalName] = null;
+        }
       }
     }
   }
 
-  return { resolved, fkWarnings };
+  return { resolved, fkWarnings, fuzzyMatches };
 }
 
 /**
@@ -788,14 +860,23 @@ function validateImport(entityName, records) {
         const lookup = lookups[targetEntity] || {};
 
         if (!lookup[labelValue]) {
-          warnings.push({
-            row: i + 1,
-            field: conceptualName,
-            value: labelValue,
-            targetEntity,
-            message: `"${labelValue}" not found in ${targetEntity}`
-          });
-          invalidRows.add(i + 1);
+          // Try fuzzy matching before marking as invalid
+          const targetEntitySchema = schema.entities[targetEntity];
+          const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
+          const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+
+          if (fuzzyResult) {
+            lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
+          } else {
+            warnings.push({
+              row: i + 1,
+              field: conceptualName,
+              value: labelValue,
+              targetEntity,
+              message: `"${labelValue}" not found in ${targetEntity}`
+            });
+            invalidRows.add(i + 1);
+          }
         }
       }
       // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
@@ -804,14 +885,23 @@ function validateImport(entityName, records) {
         const lookup = lookups[targetEntity] || {};
 
         if (!lookup[labelValue]) {
-          warnings.push({
-            row: i + 1,
-            field: technicalName,
-            value: labelValue,
-            targetEntity,
-            message: `"${labelValue}" not found in ${targetEntity}`
-          });
-          invalidRows.add(i + 1);
+          // Try fuzzy matching before marking as invalid
+          const targetEntitySchema = schema.entities[targetEntity];
+          const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
+          const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+
+          if (fuzzyResult) {
+            lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
+          } else {
+            warnings.push({
+              row: i + 1,
+              field: technicalName,
+              value: labelValue,
+              targetEntity,
+              message: `"${labelValue}" not found in ${targetEntity}`
+            });
+            invalidRows.add(i + 1);
+          }
         }
       }
     }
@@ -1154,6 +1244,7 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   const errors = [];
   const mediaErrors = [];
   const fkErrorMap = new Map();  // key: "field|value|targetEntity" -> { field, value, targetEntity, count }
+  const fuzzyMatchMap = new Map();  // key: "field|value|matchedLabel|targetEntity" -> { ..., count }
 
   // Track duplicates within the import batch (same LABEL value appearing multiple times)
   const labelCol = entity.columns.find(c => c.ui?.label);
@@ -1191,7 +1282,7 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     record = flattenAggregates(entityName, record);
 
     // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
-    const { resolved, fkWarnings } = resolveConceptualFKs(entityName, record, lookups);
+    const { resolved, fkWarnings, fuzzyMatches } = resolveConceptualFKs(entityName, record, lookups);
 
     // Collect FK resolution errors - aggregate by unique (field, value, targetEntity)
     for (const fkWarn of fkWarnings) {
@@ -1205,6 +1296,16 @@ async function loadEntity(entityName, lookups = null, options = {}) {
           targetEntity: fkWarn.targetEntity,
           count: 1
         });
+      }
+    }
+
+    // Collect fuzzy matches - aggregate by unique (field, value, matchedLabel, targetEntity)
+    for (const fm of fuzzyMatches) {
+      const key = `${fm.field}|${fm.value}|${fm.matchedLabel}|${fm.targetEntity}`;
+      if (fuzzyMatchMap.has(key)) {
+        fuzzyMatchMap.get(key).count++;
+      } else {
+        fuzzyMatchMap.set(key, { ...fm, count: 1 });
       }
     }
 
@@ -1334,6 +1435,21 @@ async function loadEntity(entityName, lookups = null, options = {}) {
       }));
     result.fkErrors = fkErrors;
     result.fkErrorsTotal = fkErrors.reduce((sum, e) => sum + e.count, 0);
+  }
+
+  // Add fuzzy match info (FK values resolved via segment subsequence matching)
+  if (fuzzyMatchMap.size > 0) {
+    result.fuzzyMatches = Array.from(fuzzyMatchMap.values())
+      .sort((a, b) => b.count - a.count)
+      .map(e => ({
+        field: e.field,
+        value: e.value,
+        matchedLabel: e.matchedLabel,
+        targetEntity: e.targetEntity,
+        count: e.count,
+        message: `"${e.value}" → "${e.matchedLabel}" in ${e.targetEntity} (${e.count} records)`
+      }));
+    result.fuzzyMatchTotal = Array.from(fuzzyMatchMap.values()).reduce((sum, e) => sum + e.count, 0);
   }
 
   // Add duplicate warnings (same LABEL value appearing multiple times in import)

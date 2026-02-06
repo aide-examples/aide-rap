@@ -50,12 +50,12 @@ WHERE status IN ('Asset Fleet', 'Fixed Deliveries', 'Out Plan')
 | `Source:` | Yes | Path to XLSX file relative to `data/` |
 | `Sheet:` | No | Sheet name (default: first sheet) |
 | `MaxRows:` | No | Row limit for XLSX reading (default: 100000) |
-| `Limit:` | No | Output limit after all filtering (for testing) |
+| `Limit:` | No | Row limit applied early (caps XLSX reading for fast testing) |
 | `First:` | No | Deduplicate rows by this source column (keep first occurrence) |
 
 **MaxRows vs Limit:**
 - `MaxRows` limits how many rows are read from the XLSX file (performance optimization for very large files)
-- `Limit` limits how many records are written to the output JSON (for testing with a small subset)
+- `Limit` caps how many rows are read from the XLSX (for fast testing with a small subset)
 
 ---
 
@@ -224,6 +224,45 @@ This produces `"Boeing-ABC123"` from `Manufacturer="Boeing"` and `SerialNumber="
 
 ---
 
+## Source Edit
+
+The `## Source Edit` section applies regex replacements to XLSX source data **before** filtering and mapping. This is useful when source data has inconsistent formatting (varying capitalization, extra spaces, inconsistent naming).
+
+```markdown
+## Source Edit
+
+Engine Type: /TRENT([X0-9])/Trent $1/
+Engine Type: /PW([0-9])/PW $1/
+Aircraft identifier: /^#.*//
+Position: /^OFFWING$/0/
+```
+
+### Syntax
+
+Each line specifies a column and a regex replacement:
+```
+ColumnName: /pattern/replacement/flags
+```
+
+- **ColumnName**: Exact XLSX column name
+- **/pattern/replacement/flags**: JavaScript regex replacement (same syntax as `String.replace()`)
+- Multiple expressions per column are allowed and applied in order
+- Regex objects are pre-compiled once before the row loop for performance
+
+### Pipeline Position
+
+```
+XLSX read → Limit → Source Edit → Source Filter → First → Mapping → Filter
+```
+
+Source Edit runs **before** Source Filter, so filtered rows already contain cleaned data. This ensures filters match consistently regardless of source data variations.
+
+### Extensibility
+
+Lines starting with `/` are regex replacements. Future operations (e.g., `lowercase`, `trim`) would use different syntax without leading `/` and be handled by a separate parser branch.
+
+---
+
 ## Source Filter
 
 The `## Source Filter` section filters XLSX rows **before** mapping, using regex patterns on source columns:
@@ -360,6 +399,8 @@ The import pipeline has distinct stages, each with different validation responsi
 │  ImportManager.runImport()                                              │
 │                                                                         │
 │  ✓ Parse XLSX file                                                      │
+│  ✓ Apply limit (truncate early for testing)                             │
+│  ✓ Apply source edit (regex replacements on XLSX columns)               │
 │  ✓ Apply source filter (regex on XLSX columns, before mapping)          │
 │  ✓ Apply deduplication (First: directive)                               │
 │  ✓ Apply column mapping (with transforms)                               │
@@ -403,6 +444,24 @@ The import pipeline has distinct stages, each with different validation responsi
 │  Output: { loaded, updated, skipped, fkErrors }                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Fuzzy FK Resolution
+
+When an exact label match fails, the system tries **fuzzy matching** for entities with `concat`-based labels. This handles cases where the import provides abbreviated references.
+
+**Example:** Aircraft has `[LABEL=concat(type, '-', msn)]` which resolves to `"A320-214-6947"`, but the import provides `"A320-6947"` (shortened type).
+
+**Algorithm:** The import value and each label are split by the concat separator (e.g., `-`). If the import segments are a **subsequence** of the label segments, it's a match. A match is accepted only if **exactly one** candidate is found (unambiguous).
+
+```
+Import:  "A320-6947"     → ["A320", "6947"]
+Label:   "A320-214-6947" → ["A320", "214", "6947"]
+→ ["A320", "6947"] is a subsequence → Match!
+```
+
+Fuzzy matches are **cached** in the lookup map, so subsequent records with the same value resolve in O(1). The load result includes a `fuzzyMatches` array with all resolved mappings and counts.
+
+---
 
 ### Why FK Validation is Deferred
 

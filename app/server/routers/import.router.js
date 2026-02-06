@@ -287,6 +287,32 @@ module.exports = function(cfg) {
         }
       }
 
+      // Check Sort: column
+      if (definition.sort) {
+        if (!sourceColumnSet.has(definition.sort)) {
+          errors.source.push({
+            column: definition.sort,
+            message: `Sort column "${definition.sort}" not found in XLSX`
+          });
+        } else {
+          usedXlsxColumns.add(definition.sort);
+        }
+      }
+
+      // Check Changes: columns for consecutive dedup
+      if (definition.changes) {
+        for (const col of [...definition.changes.group, ...definition.changes.track]) {
+          if (!sourceColumnSet.has(col)) {
+            errors.source.push({
+              column: col,
+              message: `Changes column "${col}" not found in XLSX`
+            });
+          } else {
+            usedXlsxColumns.add(col);
+          }
+        }
+      }
+
       // Find unused source columns (in XLSX but not used by any column mapping)
       const unusedSourceColumns = sourceColumns.filter(col => !usedXlsxColumns.has(col));
 
