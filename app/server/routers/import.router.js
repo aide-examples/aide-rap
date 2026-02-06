@@ -233,6 +233,27 @@ module.exports = function(cfg) {
         // Literals and randomNumber/randomChoice don't need validation
       }
 
+      // Check source edit columns
+      for (const { column, pattern, flags } of (definition.sourceEdit || [])) {
+        if (!sourceColumnSet.has(column)) {
+          errors.source.push({
+            column,
+            message: `Source edit column "${column}" not found in XLSX`
+          });
+        } else {
+          usedXlsxColumns.add(column);
+        }
+        // Validate regex syntax
+        try {
+          new RegExp(pattern, flags);
+        } catch (e) {
+          errors.source.push({
+            column,
+            message: `Invalid regex in source edit for "${column}": ${e.message}`
+          });
+        }
+      }
+
       // Check source filter columns
       for (const { column, pattern, flags } of (definition.sourceFilter || [])) {
         if (!sourceColumnSet.has(column)) {

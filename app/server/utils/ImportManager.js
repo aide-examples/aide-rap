@@ -238,6 +238,7 @@ class ImportManager {
       limit: null,    // Optional output limit for testing (limits final output after filtering)
       first: null,    // Column name for deduplication (keep first occurrence)
       mapping: [],    // Array of { source, target, transform } - allows same source multiple times
+      sourceEdit: [],    // Array of { column, pattern, replacement, flags } - regex edits on XLSX columns
       sourceFilter: [],  // Array of { column, regex } - pre-mapping filter on XLSX columns
       filter: null
     };
@@ -245,6 +246,7 @@ class ImportManager {
     let inMapping = false;
     let mappingTableStarted = false;  // Only parse rows after "| Source |..." header
     let inFilter = false;
+    let inSourceEdit = false;
     let inSourceFilter = false;
     let filterLines = [];
 
@@ -291,27 +293,32 @@ class ImportManager {
       if (trimmed.startsWith('## Mapping')) {
         inMapping = true;
         mappingTableStarted = false;  // Reset - wait for "| Source |" header
-        inFilter = false;
+        inFilter = false; inSourceEdit = false; inSourceFilter = false;
         continue;
       }
 
-      if (trimmed.startsWith('## Filter')) {
-        inMapping = false;
-        inFilter = true;
-        inSourceFilter = false;
+      if (trimmed.startsWith('## Source Edit')) {
+        inSourceEdit = true;
+        inMapping = false; inFilter = false; inSourceFilter = false;
         continue;
       }
 
       if (trimmed.startsWith('## Source Filter')) {
-        inMapping = false;
-        inFilter = false;
         inSourceFilter = true;
+        inMapping = false; inFilter = false; inSourceEdit = false;
+        continue;
+      }
+
+      if (trimmed.startsWith('## Filter')) {
+        inFilter = true;
+        inMapping = false; inSourceEdit = false; inSourceFilter = false;
         continue;
       }
 
       if (trimmed.startsWith('## ') || trimmed.startsWith('# ')) {
         inMapping = false;
         inFilter = false;
+        inSourceEdit = false;
         inSourceFilter = false;
         continue;
       }
@@ -341,6 +348,19 @@ class ImportManager {
       // Collect filter lines
       if (inFilter && trimmed) {
         filterLines.push(trimmed);
+      }
+
+      // Parse Source Edit lines: ColumnName: /pattern/replacement/flags
+      if (inSourceEdit && trimmed) {
+        const match = trimmed.match(/^(.+?):\s*\/(.+?)\/(.*)\/([gimsuy]*)$/);
+        if (match) {
+          definition.sourceEdit.push({
+            column: match[1].trim(),
+            pattern: match[2],
+            replacement: match[3],
+            flags: match[4] || ''
+          });
+        }
       }
 
       // Parse Source Filter lines: ColumnName: /regex/ or ColumnName: !/regex/ (negated)
@@ -950,7 +970,9 @@ class ImportManager {
       // Read XLSX with row limit to avoid processing empty rows
       // (Excel files sometimes have range extending to max rows due to formatting)
       const maxRows = definition.maxRows || 100000;
-      const workbook = XLSX.readFile(sourcePath, { sheetRows: maxRows });
+      // When Limit is set, also cap XLSX reading (+1 for header row)
+      const effectiveMaxRows = definition.limit ? Math.min(maxRows, definition.limit + 1) : maxRows;
+      const workbook = XLSX.readFile(sourcePath, { sheetRows: effectiveMaxRows });
 
       // Select sheet
       let sheetName = definition.sheet;
@@ -967,6 +989,29 @@ class ImportManager {
       let rawData = XLSX.utils.sheet_to_json(sheet, { defval: null });
       const recordsRead = rawData.length;
       this.logger.debug('XLSX parsed:', { recordsRead });
+
+      // Apply limit early (truncate before any processing to save time)
+      let recordsLimited = 0;
+      if (definition.limit && rawData.length > definition.limit) {
+        recordsLimited = rawData.length - definition.limit;
+        rawData = rawData.slice(0, definition.limit);
+        this.logger.debug('Limit applied early:', { limit: definition.limit, truncated: recordsLimited });
+      }
+
+      // Apply source edit (regex replacements on XLSX columns, before filtering)
+      if (definition.sourceEdit.length > 0) {
+        const compiledEdits = definition.sourceEdit.map(({ column, pattern, replacement, flags }) => ({
+          column, replacement, regex: new RegExp(pattern, flags)
+        }));
+        for (const row of rawData) {
+          for (const { column, replacement, regex } of compiledEdits) {
+            if (row[column] != null) {
+              row[column] = String(row[column]).replace(regex, replacement);
+            }
+          }
+        }
+        this.logger.debug('Source edit applied:', { rules: compiledEdits.length, records: rawData.length });
+      }
 
       // Apply source filter (regex-based filter on XLSX columns, before mapping)
       let recordsSourceFiltered = 0;
@@ -1037,13 +1082,7 @@ class ImportManager {
 
       const recordsFiltered = recordsRead - filteredData.length;
 
-      // Apply Limit: (for testing - limit output after all filtering)
-      let recordsLimited = 0;
-      if (definition.limit && filteredData.length > definition.limit) {
-        recordsLimited = filteredData.length - definition.limit;
-        filteredData = filteredData.slice(0, definition.limit);
-        this.logger.debug('Limit applied:', { limit: definition.limit, recordsLimited, remaining: filteredData.length });
-      }
+      // Limit was already applied early (before source edit)
 
       const recordsWritten = filteredData.length;
 
