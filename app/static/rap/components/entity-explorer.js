@@ -409,11 +409,20 @@ const EntityExplorer = {
         await this.executeCalculatedFields();
       }
 
-      // Re-render table with all records
+      // Re-render table with all records (preserve column filters)
+      const savedFilters = { ...EntityTable.columnFilters };
       if (this.currentView) {
         await EntityTable.loadView(this.currentView.name, this.currentViewSchema, this.records);
       } else {
         await EntityTable.loadEntity(this.currentEntity, this.records);
+      }
+      if (Object.keys(savedFilters).length > 0) {
+        EntityTable.columnFilters = savedFilters;
+        if (this.currentView) {
+          EntityTable.renderView();
+        } else {
+          EntityTable.render();
+        }
       }
 
       this.updateRecordStatus();
@@ -1186,7 +1195,11 @@ const EntityExplorer = {
     // Re-apply column filters to EntityTable after reload and re-render to show them
     if (this.activeColumnFilters) {
       EntityTable.columnFilters = { ...this.activeColumnFilters };
-      EntityTable.render();
+      if (this.currentView) {
+        EntityTable.renderView();
+      } else {
+        EntityTable.render();
+      }
     }
   },
 
@@ -1291,7 +1304,7 @@ const EntityExplorer = {
     } else {
       this.renderCurrentView();
     }
-    this.updateRecordStatus();
+    // Note: renderCurrentView() already updates record status with correct filtered count
   },
 
   updateViewToggle() {
