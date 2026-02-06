@@ -185,7 +185,8 @@
     "loading": "Laden...",
 
     "prefilter_title": "%{name} filtern",
-    "prefilter_select_hint": "Werte zum Filtern auswählen",
+    "prefilter_select_hint": "Auswählen oder eingeben zum Filtern",
+    "prefilter_select_or_type": "Auswählen oder eingeben...",
     "prefilter_text_hint": "Text zum Filtern eingeben (vergleicht mit Label-Feld)",
     "prefilter_load_all": "Alle laden",
     "prefilter_apply": "Filter anwenden",

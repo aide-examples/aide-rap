@@ -185,7 +185,8 @@
     "loading": "Loading...",
 
     "prefilter_title": "Filter %{name}",
-    "prefilter_select_hint": "Select values to filter by",
+    "prefilter_select_hint": "Select or type to filter",
+    "prefilter_select_or_type": "Select or type...",
     "prefilter_text_hint": "Enter text to filter by (matches label field)",
     "prefilter_load_all": "Load All",
     "prefilter_apply": "Apply Filter",

@@ -177,7 +177,8 @@
     "loading": "Cargando...",
 
     "prefilter_title": "Filtrar %{name}",
-    "prefilter_select_hint": "Seleccione valores para filtrar",
+    "prefilter_select_hint": "Seleccione o escriba para filtrar",
+    "prefilter_select_or_type": "Seleccionar o escribir...",
     "prefilter_text_hint": "Ingrese texto para filtrar (coincide con campo de etiqueta)",
     "prefilter_load_all": "Cargar todo",
     "prefilter_apply": "Aplicar filtro",

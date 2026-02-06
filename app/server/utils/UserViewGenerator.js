@@ -6,7 +6,7 @@
  */
 
 const logger = require('./logger');
-const { toSnakeCase } = require('./SchemaGenerator');
+const { toSnakeCase, buildLabelSQLWithJoins } = require('./SchemaGenerator');
 
 /**
  * Convert view name to SQL-safe view name
@@ -154,6 +154,54 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
       const labelCol = targetEntity.columns.find(c => c.ui?.label) ||
                        targetEntity.columns.find(c => c.name === 'name' || c.name === 'designation' || c.name === 'title');
 
+      // Build join to target entity
+      const alias = 'j_' + (col.displayName || colName);
+      const join = {
+        alias,
+        table: targetEntity.tableName,
+        onLeft: `b.${col.name}`,
+        onRight: `${alias}.id`
+      };
+
+      // Entity with labelExpression: build computed label SQL
+      if (targetEntity.labelExpression) {
+        const joinCounter = { value: 0 };
+        const result = buildLabelSQLWithJoins(
+          targetEntity.labelExpression, alias, targetEntity, schema, joinCounter
+        );
+
+        // Make label join aliases unique by prefixing with parent alias
+        const prefix = alias + '_';
+        const renames = result.joins.map(j => ({ old: j.alias, new: prefix + j.alias }));
+
+        let selectExpr = result.sql;
+        for (const r of renames) {
+          selectExpr = selectExpr.replaceAll(r.old + '.', r.new + '.');
+        }
+
+        const extraJoins = result.joins.map(j => {
+          let onLeft = j.onLeft;
+          let onRight = j.onRight;
+          for (const r of renames) {
+            onLeft = onLeft.replaceAll(r.old + '.', r.new + '.');
+            onRight = onRight.replaceAll(r.old + '.', r.new + '.');
+          }
+          return { ...j, alias: prefix + j.alias, onLeft, onRight };
+        });
+
+        return {
+          joins: [join, ...extraJoins],
+          selectExpr,
+          label: titleCase(col.displayName || col.name),
+          jsType: 'string',
+          entityName: targetEntityName,
+          fkInfo: {
+            fkEntity: targetEntityName,
+            fkIdExpr: `b.${col.name}`
+          }
+        };
+      }
+
       if (!labelCol) {
         // Fallback: just return the FK id (no join)
         return {
@@ -164,15 +212,6 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
           entityName: baseEntityName
         };
       }
-
-      // Build join to get the label
-      const alias = 'j_' + (col.displayName || colName);
-      const join = {
-        alias,
-        table: targetEntity.tableName,
-        onLeft: `b.${col.name}`,
-        onRight: `${alias}.id`
-      };
 
       return {
         joins: [join],
@@ -239,6 +278,47 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
 
   // Terminal segment: column on the last joined entity
   const terminalCol = segments[segments.length - 1];
+  const lastAlias = 'j_' + pathParts.join('_');
+
+  // Handle _label: computed label expression (e.g., aircraft._label → concat(type, '-', msn))
+  if (terminalCol === '_label' && currentEntity.labelExpression) {
+    const joinCounter = { value: 0 };
+    const result = buildLabelSQLWithJoins(
+      currentEntity.labelExpression, lastAlias, currentEntity, schema, joinCounter
+    );
+
+    // Make label join aliases unique by prefixing with parent alias
+    const prefix = lastAlias + '_';
+    const renames = result.joins.map(j => ({ old: j.alias, new: prefix + j.alias }));
+
+    let selectExpr = result.sql;
+    for (const r of renames) {
+      selectExpr = selectExpr.replaceAll(r.old + '.', r.new + '.');
+    }
+
+    const extraJoins = result.joins.map(j => {
+      let onLeft = j.onLeft;
+      let onRight = j.onRight;
+      for (const r of renames) {
+        onLeft = onLeft.replaceAll(r.old + '.', r.new + '.');
+        onRight = onRight.replaceAll(r.old + '.', r.new + '.');
+      }
+      return { ...j, alias: prefix + j.alias, onLeft, onRight };
+    });
+
+    return {
+      joins: [...joins, ...extraJoins],
+      selectExpr,
+      label: titleCase(currentEntity.className),
+      jsType: 'string',
+      entityName: currentEntity.className,
+      fkInfo: {
+        fkEntity: currentEntity.className,
+        fkIdExpr: `${lastAlias}.id`
+      }
+    };
+  }
+
   const col = currentEntity.columns.find(
     c => c.name === terminalCol || c.displayName === terminalCol
   );
@@ -261,8 +341,6 @@ function resolveColumnPath(dotPath, baseEntityName, schema) {
       `(path: "${dotPath}", base: "${baseEntityName}")`
     );
   }
-
-  const lastAlias = 'j_' + pathParts.join('_');
 
   // Build FK link info for navigation
   // fkEntity: target entity name for the link

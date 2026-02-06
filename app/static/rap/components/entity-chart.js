@@ -44,14 +44,18 @@ const EntityChart = {
     this.container.innerHTML = '<div id="entity-chart" class="entity-chart-canvas"></div>';
     const chartDiv = document.getElementById('entity-chart');
 
-    // Build complete Vega-Lite spec
+    // Build complete Vega-Lite spec with muted default color scheme
     const spec = {
       $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
       width: 'container',
       height: 400,
       padding: { left: 40, right: 20, top: 20, bottom: 40 },
       data: { values: this.prepareData(schema, records) },
-      ...schema.chart
+      ...schema.chart,
+      config: {
+        range: { category: { scheme: 'set2' } },
+        ...(schema.chart?.config || {})
+      }
     };
 
     try {

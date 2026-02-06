@@ -145,16 +145,18 @@ const EntityExplorer = {
     let fieldsHtml = '<div class="prefilter-fields">';
     for (const f of parsedFields) {
       if ((f.type === 'select' || f.type === 'year' || f.type === 'month') && f.options.length > 0) {
-        // Dropdown for select, year, or month
+        // Combobox: text input with datalist suggestions
         const colAttr = f.viewColumn ? `data-view-column="${f.viewColumn}"` : (f.entityColumn ? `data-entity-column="${f.entityColumn}"` : '');
         const typeLabel = f.type === 'year' ? ' (Year)' : (f.type === 'month' ? ' (Month)' : '');
+        const listId = `prefilter-list-${f.field.replace(/\./g, '-')}`;
         fieldsHtml += `
           <div class="prefilter-field">
             <label>${f.label}${typeLabel}</label>
-            <select data-field="${f.field}" data-type="${f.type}" ${colAttr} class="prefilter-select">
-              <option value="">-- All --</option>
-              ${f.options.map(v => `<option value="${DomUtils.escapeHtml(String(v))}">${DomUtils.escapeHtml(String(v))}</option>`).join('')}
-            </select>
+            <input type="text" list="${listId}" data-field="${f.field}" data-type="${f.type}" ${colAttr}
+                   class="prefilter-select" placeholder="${i18n.t('prefilter_select_or_type')}">
+            <datalist id="${listId}">
+              ${f.options.map(v => `<option value="${DomUtils.escapeHtml(String(v))}">`).join('')}
+            </datalist>
           </div>
         `;
       } else {
@@ -215,9 +217,17 @@ const EntityExplorer = {
         for (const input of inputs) {
           const value = input.value.trim();
           if (value) {
+            let type = input.dataset.type;
+            // Combobox: if value doesn't match any datalist option, use LIKE filter
+            if (input.list && type === 'select') {
+              const options = Array.from(input.list.options).map(o => o.value);
+              if (!options.includes(value)) {
+                type = 'text'; // LIKE match for free-text input
+              }
+            }
             filters[input.dataset.field] = {
               value,
-              type: input.dataset.type,
+              type,
               viewColumn: input.dataset.viewColumn || null,
               entityColumn: input.dataset.entityColumn || null
             };
