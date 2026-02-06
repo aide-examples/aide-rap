@@ -326,6 +326,17 @@ const EntityTree = {
             });
         });
 
+        // Navigate to all back-reference records in table view (arrow icon)
+        this.container.querySelectorAll('[data-action="navigate-backref"]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const entity = el.dataset.entity;
+                const column = el.dataset.column;
+                const parentId = el.dataset.parentId;
+                this.onNavigateBackRef(entity, column, parentId);
+            });
+        });
+
         // Click on FK entity type link (e.g., "(AircraftType)")
         this.container.querySelectorAll('[data-action="navigate-entity"]').forEach(el => {
             el.addEventListener('click', (e) => {
@@ -478,6 +489,24 @@ const EntityTree = {
             this.records = EntityExplorer.records;
             this.render();
         }
+    },
+
+    /**
+     * Navigate to back-reference entity filtered by FK column (shows all records in table view)
+     */
+    async onNavigateBackRef(entity, column, parentId) {
+        // Switch to the back-reference entity and filter by the FK column
+        await EntityExplorer.selectEntityWithoutBreadcrumb(entity);
+
+        const filter = `${column}:${parentId}`;
+        if (EntityExplorer.filterInput) {
+            EntityExplorer.filterInput.value = filter;
+        }
+
+        // Switch to table view to show all matching records
+        EntityExplorer.viewMode = 'table';
+        await EntityExplorer.loadRecords(filter);
+        EntityExplorer.updateViewToggle();
     },
 
     /**

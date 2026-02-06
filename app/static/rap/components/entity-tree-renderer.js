@@ -311,6 +311,11 @@ const TreeRenderer = {
             const isLimited = count > limit;
             const displayCount = isLimited ? `${limit} of ${count}` : `${count}`;
 
+            // Show navigate arrow when there are more records than the preview limit
+            const navigateArrow = isLimited
+                ? ` <span class="backref-navigate" data-action="navigate-backref" data-entity="${ref.entity}" data-column="${ref.column}" data-parent-entity="${entityName}" data-parent-id="${recordId}" title="Show all ${count} records in table view">&#10140;</span>`
+                : '';
+
             html += `
             <div class="tree-backref-node ${isExpanded ? 'expanded' : ''}"
                  data-node-id="${nodeId}"
@@ -321,12 +326,12 @@ const TreeRenderer = {
                  data-total-count="${count}">
               <div class="tree-backref-header" data-action="toggle-backref" style="background-color: ${areaColor};">
                 <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
-                <span class="backref-label">${ref.entity} [${displayCount}]</span>
+                <span class="backref-label">${ref.entity} [${displayCount}]</span>${navigateArrow}
               </div>
           `;
 
             if (isExpanded) {
-                html += await this.renderExpandedBackReferences(entityName, recordId, ref.entity, visitedPath, context);
+                html += await this.renderExpandedBackReferences(entityName, recordId, ref.entity, ref.column, visitedPath, context);
             }
 
             html += '</div>';
@@ -340,7 +345,7 @@ const TreeRenderer = {
      * @param {Set} visitedPath - Set of visited entity-id pairs (for future use)
      * @param {Object} context - Render context with state and settings
      */
-    async renderExpandedBackReferences(entityName, recordId, refEntity, visitedPath, context) {
+    async renderExpandedBackReferences(entityName, recordId, refEntity, refColumn, visitedPath, context) {
         try {
             const references = await ApiClient.getBackReferences(entityName, recordId);
             const refData = references[refEntity];
@@ -434,9 +439,9 @@ const TreeRenderer = {
                 }
             }
 
-            // Add "more..." indicator if limited
+            // Add clickable "more..." link if limited (navigates to full table view)
             const moreIndicator = isLimited
-                ? `<div class="backref-more-indicator">${totalCount - limit} more...</div>`
+                ? `<div class="backref-more-indicator"><span class="backref-more-link" data-action="navigate-backref" data-entity="${refEntity}" data-column="${refColumn}" data-parent-entity="${entityName}" data-parent-id="${recordId}">${totalCount - limit} more... &#10140;</span></div>`
                 : '';
 
             return `
