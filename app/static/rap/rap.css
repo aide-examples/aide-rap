@@ -2585,6 +2585,10 @@
     cursor: default;
 }
 
+.dep-dot.dep-none {
+    color: var(--color-success);
+}
+
 .dep-dot.dep-ready {
     color: var(--color-primary);
 }

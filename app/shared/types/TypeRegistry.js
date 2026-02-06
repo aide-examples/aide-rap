@@ -128,11 +128,12 @@ class TypeRegistry {
         kind: 'aggregate',
         fields: [
           { name: 'phone', type: 'string', sqlType: 'TEXT', required: false },
-          { name: 'email', type: 'string', sqlType: 'TEXT', required: false },
-          { name: 'fax', type: 'string', sqlType: 'TEXT', required: false }
+          { name: 'email', type: 'mail', sqlType: 'TEXT', required: false },
+          { name: 'fax', type: 'string', sqlType: 'TEXT', required: false },
+          { name: 'homepage', type: 'url', sqlType: 'TEXT', required: false }
         ],
         canonical: '{email} ({phone})',
-        description: 'Contact information with phone, email and fax'
+        description: 'Contact information with phone, email, fax and homepage'
       }
     };
   }

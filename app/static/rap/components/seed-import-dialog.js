@@ -579,7 +579,7 @@ const SeedImportDialog = {
       }
 
       const targetColumns = entitySchema.columns
-        .filter(c => c.name !== 'id' && c.name !== 'created_at' && c.name !== 'updated_at')
+        .filter(c => c.name !== 'id' && !ColumnUtils.SYSTEM_COLUMNS.includes(c.name))
         .map(c => {
           // Use FK displayName if available (e.g., "operator" instead of "operator_id")
           const fk = entitySchema.foreignKeys?.find(f => f.column === c.name);

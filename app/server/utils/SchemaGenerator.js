@@ -1305,7 +1305,7 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
           sqlType,
           jsType: field.type,
           required: false,  // Aggregate sub-fields are optional by default
-          customType: null,
+          customType: (['url', 'mail', 'media'].includes(field.type)) ? field.type : null,
           defaultValue: null,
           description: `${name}: ${field.name}`,
           aggregateType: cleanType,       // Mark as part of an aggregate

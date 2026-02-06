@@ -365,6 +365,12 @@ const ValueFormatter = {
       return `<a href="${escaped}" target="_blank" rel="noopener" class="url-link">${escaped}</a>`;
     }
 
+    // Mail: clickable mailto link
+    if (col.customType === 'mail' && value) {
+      const escaped = DomUtils.escapeHtml(String(value));
+      return `<a href="mailto:${escaped}" class="mail-link">${escaped}</a>`;
+    }
+
     // JSON: formatted preview
     if (col.customType === 'json' && value) {
       const jsonStr = typeof value === 'object' ? JSON.stringify(value) : String(value);

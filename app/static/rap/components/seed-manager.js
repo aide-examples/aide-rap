@@ -277,7 +277,10 @@ const SeedManager = {
           : `<span class="source-missing" title="${i18n.t('source_file_missing', { file: e.sourceFile || '?' })}">✗</span>`;
       }
 
-      // Dependency readiness dot - green for ready or no deps, red for missing
+      // Dependency readiness dot:
+      // - green (dep-none): no dependencies at all
+      // - blue (dep-ready): has dependencies, all satisfied
+      // - red (dep-missing): has dependencies, some missing
       let depDot = '';
       if (e.dependencies && e.dependencies.length > 0) {
         if (e.ready) {
@@ -286,8 +289,7 @@ const SeedManager = {
           depDot = `<span class="dep-dot dep-missing" title="${i18n.t('dep_missing', { deps: e.missingDeps.join(', ') })}">&#9679;</span>`;
         }
       } else {
-        // No dependencies - show green dot
-        depDot = `<span class="dep-dot dep-ready" title="${i18n.t('dep_none') || 'No dependencies'}">&#9679;</span>`;
+        depDot = `<span class="dep-dot dep-none" title="${i18n.t('dep_none') || 'No dependencies'}">&#9679;</span>`;
       }
 
       return `
@@ -311,7 +313,7 @@ const SeedManager = {
             <button class="modal-close" data-action="close">&times;</button>
           </div>
           <div class="modal-body">
-            <p class="order-hint"><span class="dep-dot dep-ready">&#9679;</span> dependencies satisfied &nbsp; <span class="dep-dot dep-missing">&#9679;</span> missing reference data &nbsp;&mdash;&nbsp; Right-click for actions.</p>
+            <p class="order-hint"><span class="dep-dot dep-none">&#9679;</span> no dependencies &nbsp; <span class="dep-dot dep-ready">&#9679;</span> dependencies satisfied &nbsp; <span class="dep-dot dep-missing">&#9679;</span> missing reference data &nbsp;&mdash;&nbsp; Right-click for actions.</p>
             <table class="seed-table compact">
               <thead>
                 <tr>

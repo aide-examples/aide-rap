@@ -259,11 +259,40 @@ const EntityTable = {
               const lat = subValues[0] ?? '';
               const lng = subValues[1] ?? '';
               displayValue = lat !== '' || lng !== '' ? `${lat}, ${lng}` : '';
+              displayValue = DomUtils.escapeHtml(displayValue);
+            } else if (col.aggregateType === 'contact') {
+              // Contact: stacked lines - phone, email (mailto), homepage (link), fax hidden
+              const lines = [];
+              const fields = {};
+              for (let i = 0; i < col.subColumns.length; i++) {
+                const val = subValues[i];
+                if (val == null) continue;
+                const fieldName = col.subColumns[i].replace(/^.*_/, '');
+                fields[fieldName] = DomUtils.escapeHtml(String(val));
+              }
+              if (fields.phone) lines.push(fields.phone);
+              if (fields.email) lines.push(`<a href="mailto:${fields.email}" class="mail-link">${fields.email}</a>`);
+              if (fields.homepage) lines.push(`<a href="${fields.homepage}" target="_blank" rel="noopener" class="url-link">${fields.homepage}</a>`);
+              displayValue = lines.join('<br>');
+            } else if (col.aggregateType === 'address') {
+              // Address: street on line 1, zip+city+country on line 2, no geo coords
+              const fields = {};
+              for (let i = 0; i < col.subColumns.length; i++) {
+                const val = subValues[i];
+                if (val == null) continue;
+                const fieldName = col.subColumns[i].replace(/^.*_/, '');
+                fields[fieldName] = DomUtils.escapeHtml(String(val));
+              }
+              const lines = [];
+              if (fields.street) lines.push(fields.street);
+              const line2 = [fields.zip, fields.city, fields.country].filter(Boolean).join(' ');
+              if (line2) lines.push(line2);
+              displayValue = lines.join('<br>');
             } else {
               // Generic: join with ", "
               displayValue = subValues.filter(v => v != null).join(', ');
+              displayValue = DomUtils.escapeHtml(displayValue);
             }
-            displayValue = DomUtils.escapeHtml(displayValue);
           }
         } else {
           const value = record[col.key];
@@ -802,12 +831,42 @@ const EntityTable = {
               const lat = subValues[0] ?? '';
               const lng = subValues[1] ?? '';
               displayValue = lat !== '' || lng !== '' ? `${lat}, ${lng}` : '';
+              displayValue = DomUtils.escapeHtml(displayValue);
+            } else if (col.aggregateType === 'contact') {
+              // Contact: stacked lines - phone, email (mailto), homepage (link), fax hidden
+              const lines = [];
+              const fields = {};
+              for (let i = 0; i < col.subColumns.length; i++) {
+                const val = subValues[i];
+                if (val == null) continue;
+                const fieldName = col.subColumns[i].replace(/^.*_/, '');
+                fields[fieldName] = DomUtils.escapeHtml(String(val));
+              }
+              if (fields.phone) lines.push(fields.phone);
+              if (fields.email) lines.push(`<a href="mailto:${fields.email}" class="mail-link">${fields.email}</a>`);
+              if (fields.homepage) lines.push(`<a href="${fields.homepage}" target="_blank" rel="noopener" class="url-link">${fields.homepage}</a>`);
+              displayValue = lines.join('<br>');
+            } else if (col.aggregateType === 'address') {
+              // Address: street on line 1, zip+city+country on line 2, no geo coords
+              const fields = {};
+              for (let i = 0; i < col.subColumns.length; i++) {
+                const val = subValues[i];
+                if (val == null) continue;
+                const fieldName = col.subColumns[i].replace(/^.*_/, '');
+                fields[fieldName] = DomUtils.escapeHtml(String(val));
+              }
+              const lines = [];
+              if (fields.street) lines.push(fields.street);
+              const line2 = [fields.zip, fields.city, fields.country].filter(Boolean).join(' ');
+              if (line2) lines.push(line2);
+              displayValue = lines.join('<br>');
             } else {
               // Generic: join with ", "
               displayValue = subValues.filter(v => v != null).join(', ');
+              displayValue = DomUtils.escapeHtml(displayValue);
             }
           }
-          html += `<td class="aggregate-cell">${DomUtils.escapeHtml(displayValue)}</td>`;
+          html += `<td class="aggregate-cell">${displayValue}</td>`;
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const formattedValue = value != null ? ValueFormatter.format(value, col.name, this.schema) : '';
