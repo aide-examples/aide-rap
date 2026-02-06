@@ -1018,7 +1018,7 @@ const EntityExplorer = {
         }
       }
 
-      // Set pagination state on EntityTable for server-side filtering (views)
+      // Set pagination state on EntityTable for server-side filtering/sorting (views)
       // Callback remains if serverFilterEnabled (initial dataset was large) - changing filters may expand results
       const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
       EntityTable.setPaginationState({
@@ -1026,6 +1026,9 @@ const EntityExplorer = {
         filterDebounceMs: config.filterDebounceMs,
         onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
+        } : null,
+        onServerSortRequest: !allRecordsLoaded ? (sortColumn, sortDirection) => {
+          this.reloadWithSort(sortColumn, sortDirection);
         } : null
       });
 
@@ -1105,7 +1108,7 @@ const EntityExplorer = {
       this.records = result.data || [];
       this.hasMore = needsPagination && this.records.length < this.totalRecords;
 
-      // Set pagination state on EntityTable for server-side filtering
+      // Set pagination state on EntityTable for server-side filtering/sorting
       // Callback remains if serverFilterEnabled (initial dataset was large) - changing filters may expand results
       const allRecordsLoaded = !needsPagination || this.records.length >= this.totalRecords;
       EntityTable.setPaginationState({
@@ -1113,6 +1116,9 @@ const EntityExplorer = {
         filterDebounceMs: config.filterDebounceMs,
         onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
+        } : null,
+        onServerSortRequest: !allRecordsLoaded ? (sortColumn, sortDirection) => {
+          this.reloadWithSort(sortColumn, sortDirection);
         } : null
       });
 
@@ -1147,6 +1153,22 @@ const EntityExplorer = {
     this.currentSort = sort;
     this.currentOrder = order;
     await this.loadRecords(filter, { sort, order });
+  },
+
+  /**
+   * Reload with new sort order (server-side), preserving current filter
+   */
+  async reloadWithSort(sortColumn, sortDirection) {
+    this.currentSort = sortColumn;
+    this.currentOrder = sortDirection;
+    if (this.currentView) {
+      await this.reloadViewData(this.currentFilter || '');
+    } else {
+      await this.loadRecords(this.currentFilter || '', { sort: sortColumn, order: sortDirection });
+    }
+    // Preserve sort state on EntityTable after reload
+    EntityTable.sortColumn = sortColumn;
+    EntityTable.sortDirection = sortDirection;
   },
 
   /**
@@ -1269,6 +1291,9 @@ const EntityExplorer = {
         filterDebounceMs: config.filterDebounceMs,
         onServerFilterRequest: this.serverFilterEnabled ? (columnFilters) => {
           this.reloadWithColumnFilters(columnFilters);
+        } : null,
+        onServerSortRequest: !allRecordsLoaded ? (sortColumn, sortDirection) => {
+          this.reloadWithSort(sortColumn, sortDirection);
         } : null
       });
 

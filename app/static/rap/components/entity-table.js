@@ -16,9 +16,10 @@ const EntityTable = {
   columnFilters: {}, // { columnName: filterValue }
   showSystem: false, // Show system columns (version, created_at, updated_at)
 
-  // Server-side filter support (for paginated datasets)
+  // Server-side filter/sort support (for paginated datasets)
   allRecordsLoaded: true,       // false when only partial data loaded (pagination)
   onServerFilterRequest: null,  // Callback: (columnFilters) => void
+  onServerSortRequest: null,    // Callback: (sortColumn, sortDirection) => void
   onFilterChange: null,         // Callback: () => void - notifies when client-side filter changes
   filterDebounceTimer: null,    // Timer for debounced server filter
   filterDebounceMs: 2000,       // Debounce delay (configurable via setPaginationConfig)
@@ -94,6 +95,9 @@ const EntityTable = {
       if (state.onServerFilterRequest) {
         this.lastServerFilters = {};
       }
+    }
+    if (state.onServerSortRequest !== undefined) {
+      this.onServerSortRequest = state.onServerSortRequest;
     }
     if (state.filterDebounceMs !== undefined) {
       this.filterDebounceMs = state.filterDebounceMs;
@@ -366,17 +370,10 @@ const EntityTable = {
    * Attach event listeners for view mode (read-only)
    */
   attachViewEventListeners(columns) {
-    // Column header click for sorting
+    // Column header click for sorting (reuses shared onColumnSort logic)
     this.container.querySelectorAll('th.sortable').forEach(th => {
       th.addEventListener('click', () => {
-        const column = th.dataset.column;
-        if (this.sortColumn === column) {
-          this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-        } else {
-          this.sortColumn = column;
-          this.sortDirection = 'asc';
-        }
-        this.renderView();
+        this.onColumnSort(th.dataset.column);
       });
     });
 
@@ -1065,7 +1062,15 @@ const EntityTable = {
       this.sortColumn = column;
       this.sortDirection = 'asc';
     }
-    this.render();
+
+    // Server-side sort when not all records are loaded
+    if (!this.allRecordsLoaded && this.onServerSortRequest) {
+      this.onServerSortRequest(this.sortColumn, this.sortDirection);
+    } else if (this.currentViewConfig) {
+      this.renderView();
+    } else {
+      this.render();
+    }
   },
 
   /**

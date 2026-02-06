@@ -496,10 +496,10 @@ class ImportManager {
       }
 
       this.logger.warn(`Could not parse date: ${str} with format ${format}`);
-      return str;
+      return null;
     } catch (e) {
       this.logger.warn(`Date parse error: ${str}`, { error: e.message });
-      return str;
+      return null;
     }
   }
 
