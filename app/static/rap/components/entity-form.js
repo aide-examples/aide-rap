@@ -4,7 +4,7 @@
  */
 
 // System columns that are always hidden in forms (managed by the system)
-const SYSTEM_COLUMNS_FORM = ['version', 'created_at', 'updated_at'];
+const SYSTEM_COLUMNS_FORM = ['_version', '_created_at', '_updated_at'];
 
 const EntityForm = {
   currentEntity: null,
@@ -1344,7 +1344,7 @@ const EntityForm = {
       let result;
       if (isEdit) {
         // OCC: Pass version from current record
-        const version = this.currentRecord.version;
+        const version = this.currentRecord._version;
         result = await ApiClient.update(this.currentEntity, this.currentRecord.id, data, version);
       } else {
         result = await ApiClient.create(this.currentEntity, data);
@@ -1382,7 +1382,7 @@ const EntityForm = {
       } else if (result.action === 'overwrite') {
         // Retry with new version (force update)
         try {
-          const newVersion = err.details.currentRecord.version;
+          const newVersion = err.details.currentRecord._version;
           const updated = await ApiClient.update(
             this.currentEntity,
             this.currentRecord.id,

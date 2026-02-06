@@ -14,7 +14,7 @@ const EntityTable = {
   sortColumn: null,
   sortDirection: 'asc', // 'asc' or 'desc'
   columnFilters: {}, // { columnName: filterValue }
-  showSystem: false, // Show system columns (version, created_at, updated_at)
+  showSystem: false, // Show system columns (_version, _created_at, _updated_at)
 
   // Server-side filter/sort support (for paginated datasets)
   allRecordsLoaded: true,       // false when only partial data loaded (pagination)
@@ -66,7 +66,7 @@ const EntityTable = {
       });
     }
 
-    // System columns toggle (version, created_at, updated_at)
+    // System columns toggle (_version, _created_at, _updated_at)
     const systemToggle = document.getElementById('show-system-toggle');
     if (systemToggle) {
       // Restore from sessionStorage
@@ -692,10 +692,15 @@ const EntityTable = {
 
       // Use conceptual name for FKs (type instead of type_id)
       // Split at CamelCase, underscores, and spaces for line breaks in headers
+      // System columns keep their name as-is (short enough, leading _ is meaningful)
+      const isSystem = col.system;
       const rawName = col.foreignKey
         ? (col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name)
         : col.name;
-      const displayName = DomUtils.splitCamelCase(rawName).replace(/[_ ]/g, '<br>');
+      const displayName = isSystem
+        ? col.name
+        : DomUtils.splitCamelCase(rawName).replace(/[_ ]/g, '<br>');
+      const systemClass = isSystem ? ' system-col' : '';
 
       // Use area color for FK columns
       const bgStyle = col.foreignKey?.areaColor
@@ -714,7 +719,7 @@ const EntityTable = {
           📎 ${displayName} ▾
         </th>`;
       } else {
-        html += `<th class="sortable${isFK}" data-column="${col.name}"${bgStyle}${titleAttr}>
+        html += `<th class="sortable${isFK}${systemClass}" data-column="${col.name}"${bgStyle}${titleAttr}>
           ${displayName}${sortIcon}
         </th>`;
       }
@@ -870,14 +875,17 @@ const EntityTable = {
         } else {
           // Regular value - use ValueFormatter to convert enum internal->external
           const formattedValue = value != null ? ValueFormatter.format(value, col.name, this.schema) : '';
-          // [NOWRAP] annotation - prevent text wrapping
-          const nowrapClass = col.ui?.nowrap ? ' class="nowrap-cell"' : '';
+          // Build CSS classes: [NOWRAP] annotation + system column styling
+          const classes = [];
+          if (col.ui?.nowrap) classes.push('nowrap-cell');
+          if (col.system) classes.push('system-col');
+          const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
 
           // Check for TRUNCATE annotation - use DomUtils helper
           if (col.ui?.truncate) {
-            html += `<td${nowrapClass}>${DomUtils.truncateWithTooltip(formattedValue, col.ui.truncate)}</td>`;
+            html += `<td${classAttr}>${DomUtils.truncateWithTooltip(formattedValue, col.ui.truncate)}</td>`;
           } else {
-            html += `<td${nowrapClass}>${DomUtils.escapeHtml(formattedValue)}</td>`;
+            html += `<td${classAttr}>${DomUtils.escapeHtml(formattedValue)}</td>`;
           }
         }
       }

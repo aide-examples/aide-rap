@@ -6,11 +6,11 @@
 /**
  * Columns hidden in diagram views (not relevant for data model visualization)
  */
-const DIAGRAM_HIDDEN_COLUMNS = ['id', 'version', 'created_at', 'updated_at'];
+const DIAGRAM_HIDDEN_COLUMNS = ['id', '_version', '_created_at', '_updated_at'];
 
 /**
  * Filter and collapse columns for diagram display.
- * - Removes system columns (id, version, created_at, updated_at)
+ * - Removes system columns (id, _version, _created_at, _updated_at)
  * - Collapses aggregate fields (e.g., address_street, address_city → address)
  *
  * @param {Array} columns - Entity columns from schema

@@ -12,7 +12,7 @@ const DetailPanel = {
   showIdsToggle: null,
   isCollapsed: false,
   showIds: false,
-  showSystem: false, // Show system columns (version, created_at, updated_at)
+  showSystem: false, // Show system columns (_version, _created_at, _updated_at)
   mode: null, // 'view', 'edit', 'create', or null
 
   // Current record state (for re-rendering when toggle changes)
@@ -218,8 +218,9 @@ const DetailPanel = {
         }
       }
 
+      const systemClass = ColumnUtils.SYSTEM_COLUMNS.includes(col.name) ? ' system-col' : '';
       html += `
-        <div class="detail-row">
+        <div class="detail-row${systemClass}">
           <span class="detail-label">${customLabel || col.name}</span>
           <span class="detail-value">${displayValue}</span>
         </div>

@@ -231,7 +231,7 @@ function findById(entityName, id, enrich = true) {
 
 /**
  * Create a new record
- * System columns (created_at, updated_at, version) use SQLite DEFAULTs
+ * System columns (_created_at, _updated_at, _version) use SQLite DEFAULTs
  */
 function create(entityName, data) {
   const entity = ensureValidationRules(entityName);
@@ -279,7 +279,7 @@ function update(entityName, id, data, expectedVersion = null) {
   const existing = findById(entityName, id, false); // Throws if not found
 
   // OCC: Check version if provided
-  if (expectedVersion !== null && existing.version !== expectedVersion) {
+  if (expectedVersion !== null && existing._version !== expectedVersion) {
     // Version mismatch - get enriched record for client to show diff
     const currentRecord = findById(entityName, id, true);
     throw new VersionConflictError(entityName, id, expectedVersion, currentRecord);
@@ -290,19 +290,19 @@ function update(entityName, id, data, expectedVersion = null) {
   convertBooleansForSql(entity, validated);
 
   // Set system columns (update timestamp)
-  validated.updated_at = new Date().toISOString();
+  validated._updated_at = new Date().toISOString();
 
   // Build UPDATE statement (exclude system columns that shouldn't be user-settable)
   const columns = entity.columns
-    .filter(c => c.name !== 'id' && c.name !== 'created_at' && c.name !== 'version' && validated[c.name] !== undefined)
+    .filter(c => c.name !== 'id' && c.name !== '_created_at' && c.name !== '_version' && validated[c.name] !== undefined)
     .map(c => c.name);
 
   const setClause = columns.map(col => `${col} = ?`).join(', ');
   const values = columns.map(col => validated[col]);
 
   // OCC: Atomic version increment with WHERE check
-  const sql = `UPDATE ${entity.tableName} SET ${setClause}, version = version + 1 WHERE id = ? AND version = ?`;
-  values.push(id, existing.version);
+  const sql = `UPDATE ${entity.tableName} SET ${setClause}, _version = _version + 1 WHERE id = ? AND _version = ?`;
+  values.push(id, existing._version);
 
   try {
     const result = db.prepare(sql).run(...values);
@@ -311,10 +311,10 @@ function update(entityName, id, data, expectedVersion = null) {
     if (result.changes === 0) {
       // Concurrent modification happened between our check and update
       const currentRecord = findById(entityName, id, true);
-      throw new VersionConflictError(entityName, id, existing.version, currentRecord);
+      throw new VersionConflictError(entityName, id, existing._version, currentRecord);
     }
 
-    logger.info(`Updated ${entityName}`, { id, newVersion: existing.version + 1 });
+    logger.info(`Updated ${entityName}`, { id, newVersion: existing._version + 1 });
 
     return findById(entityName, id);
   } catch (err) {

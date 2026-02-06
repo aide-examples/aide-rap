@@ -10,7 +10,8 @@
  */
 
 // System columns that are hidden by default (version, timestamps)
-const SYSTEM_COLUMNS = ['version', 'created_at', 'updated_at'];
+// Prefixed with underscore to avoid polluting the user's attribute namespace
+const SYSTEM_COLUMNS = ['_version', '_created_at', '_updated_at'];
 
 const ColumnUtils = {
   // Expose SYSTEM_COLUMNS for components that need it

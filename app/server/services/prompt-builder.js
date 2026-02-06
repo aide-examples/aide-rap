@@ -49,7 +49,7 @@ function buildPrompt(entityName, schema, instruction, existingData, contextData 
   // Parse [FKLIMIT=n] from instruction
   const { cleanInstruction, fkLimit } = parseFkLimit(instruction);
   // System columns that should be excluded from AI prompt (auto-managed by database)
-  const systemColumns = new Set(['id', 'created_at', 'updated_at', 'deleted_at', 'version']);
+  const systemColumns = new Set(['id', '_created_at', '_updated_at', '_version']);
 
   // Filter out computed columns (DAILY, IMMEDIATE, HOURLY, ON_DEMAND annotations)
   // Exception: computed FK columns are kept — they provide relationship context for the AI
@@ -158,7 +158,7 @@ Return ONLY a valid JSON array. No markdown, no explanation. Use compact JSON (n
  */
 function buildCompletePrompt(entityName, schema, instruction, existingRecords, fkData = {}, contextData = {}) {
   // System columns that should be excluded from AI prompt (auto-managed by database)
-  const systemColumns = new Set(['id', 'created_at', 'updated_at', 'deleted_at', 'version']);
+  const systemColumns = new Set(['id', '_created_at', '_updated_at', '_version']);
 
   // Filter out computed columns (same logic as buildPrompt)
   const isComputedColumn = (col) => {

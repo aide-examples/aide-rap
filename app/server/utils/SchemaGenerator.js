@@ -96,13 +96,14 @@ const TYPE_MAP = {
 /**
  * System columns added to ALL entities automatically.
  * These are NOT defined in DataModel.md — they're infrastructure columns.
- * - created_at: Timestamp when record was created
- * - updated_at: Timestamp of last modification
- * - version: OCC version counter (starts at 1, incremented on update)
+ * Prefixed with underscore to avoid polluting the user's attribute namespace.
+ * - _created_at: Timestamp when record was created
+ * - _updated_at: Timestamp of last modification
+ * - _version: OCC version counter (starts at 1, incremented on update)
  */
 const SYSTEM_COLUMNS = [
   {
-    name: 'created_at',
+    name: '_created_at',
     type: 'string',
     sqlType: "TEXT DEFAULT (datetime('now'))",
     jsType: 'string',
@@ -111,7 +112,7 @@ const SYSTEM_COLUMNS = [
     ui: { readonly: true }
   },
   {
-    name: 'updated_at',
+    name: '_updated_at',
     type: 'string',
     sqlType: "TEXT DEFAULT (datetime('now'))",
     jsType: 'string',
@@ -120,7 +121,7 @@ const SYSTEM_COLUMNS = [
     ui: { readonly: true }
   },
   {
-    name: 'version',
+    name: '_version',
     type: 'int',
     sqlType: 'INTEGER DEFAULT 1',
     jsType: 'number',

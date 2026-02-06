@@ -236,8 +236,8 @@ router.get('/:entity/:id', validateEntity, (req, res, next) => {
     const record = service.getEntity(entity, parseInt(id, 10), req.correlationId);
 
     // Set ETag for OCC
-    if (record.version !== undefined) {
-      res.set('ETag', buildETag(entity, record.id, record.version));
+    if (record._version !== undefined) {
+      res.set('ETag', buildETag(entity, record.id, record._version));
     }
 
     res.json(record);
@@ -272,8 +272,8 @@ router.post('/:entity', validateEntity, (req, res, next) => {
     });
 
     // Set ETag for OCC
-    if (created.version !== undefined) {
-      res.set('ETag', buildETag(entity, created.id, created.version));
+    if (created._version !== undefined) {
+      res.set('ETag', buildETag(entity, created.id, created._version));
     }
 
     res.status(201).json(created);
@@ -284,20 +284,20 @@ router.post('/:entity', validateEntity, (req, res, next) => {
 
 /**
  * PUT /api/entities/:entity/:id - Update record
- * Supports OCC via If-Match header or version in body
+ * Supports OCC via If-Match header or _version in body
  */
 router.put('/:entity/:id', validateEntity, (req, res, next) => {
   try {
     const { entity, id } = req.params;
     const data = req.body;
 
-    // Get expected version from If-Match header or body.version
+    // Get expected version from If-Match header or body._version
     const ifMatchVersion = parseIfMatch(req.get('If-Match'));
-    const bodyVersion = data.version !== undefined ? parseInt(data.version, 10) : null;
+    const bodyVersion = data._version !== undefined ? parseInt(data._version, 10) : null;
     const expectedVersion = ifMatchVersion ?? bodyVersion;
 
-    // Remove version from data (it's a system column, not user-settable)
-    delete data.version;
+    // Remove _version from data (it's a system column, not user-settable)
+    delete data._version;
 
     const updated = service.updateEntity(entity, parseInt(id, 10), data, expectedVersion, buildContext(req));
 
@@ -307,8 +307,8 @@ router.put('/:entity/:id', validateEntity, (req, res, next) => {
     });
 
     // Set ETag for OCC
-    if (updated.version !== undefined) {
-      res.set('ETag', buildETag(entity, updated.id, updated.version));
+    if (updated._version !== undefined) {
+      res.set('ETag', buildETag(entity, updated.id, updated._version));
     }
 
     res.json(updated);

@@ -2092,6 +2092,11 @@
     white-space: nowrap;
 }
 
+/* System columns (_version, _created_at, _updated_at) - italic to indicate special status */
+.system-col {
+    font-style: italic;
+}
+
 .entity-table tbody tr {
     background: #fff;
     cursor: pointer;

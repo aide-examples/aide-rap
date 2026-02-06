@@ -75,7 +75,7 @@ function computeSchemaHash(schema) {
   };
 
   // Hash entity structures (columns + constraints)
-  // Exclude system columns (created_at, updated_at, version) from hash
+  // Exclude system columns (_created_at, _updated_at, _version) from hash
   // to prevent unnecessary schema rebuilds when adding system columns
   for (const entity of schema.orderedEntities) {
     data.entities[entity.className] = {
@@ -280,13 +280,21 @@ function dropAllTables(orderedEntities) {
 }
 
 /**
- * Migrate system columns (created_at, updated_at, version) for existing tables.
+ * Migrate system columns (_created_at, _updated_at, _version) for existing tables.
+ * - Migrates old unprefixed columns (created_at, updated_at, version) to new prefixed names
  * - Adds columns if missing
  * - Sets default values for existing records with NULL
  * Called: after initDatabase, after restore, after seed load
  */
 function migrateSystemColumns(orderedEntities) {
   const now = new Date().toISOString();
+
+  // Old-to-new column name mapping for migration from unprefixed to prefixed
+  const oldToNew = {
+    'created_at': { newName: '_created_at', sqlType: 'TEXT' },
+    'updated_at': { newName: '_updated_at', sqlType: 'TEXT' },
+    'version':    { newName: '_version',    sqlType: 'INTEGER DEFAULT 1' }
+  };
 
   for (const entity of orderedEntities) {
     if (!tableExists(entity.tableName)) continue;
@@ -295,27 +303,40 @@ function migrateSystemColumns(orderedEntities) {
     const columns = db.prepare(`PRAGMA table_info(${entity.tableName})`).all();
     const colNames = columns.map(c => c.name);
 
-    // Add missing columns
-    if (!colNames.includes('created_at')) {
-      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN created_at TEXT`);
-      logger.debug(`Added created_at to ${entity.tableName}`);
+    // Migration: copy data from old unprefixed columns to new prefixed columns
+    for (const [oldName, { newName, sqlType }] of Object.entries(oldToNew)) {
+      if (colNames.includes(oldName) && !colNames.includes(newName)) {
+        db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN ${newName} ${sqlType}`);
+        db.exec(`UPDATE ${entity.tableName} SET ${newName} = ${oldName}`);
+        logger.info(`Migrated ${oldName} → ${newName} in ${entity.tableName}`);
+      }
     }
-    if (!colNames.includes('updated_at')) {
-      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN updated_at TEXT`);
-      logger.debug(`Added updated_at to ${entity.tableName}`);
+
+    // Re-check columns after potential migration
+    const columnsAfter = db.prepare(`PRAGMA table_info(${entity.tableName})`).all();
+    const colNamesAfter = columnsAfter.map(c => c.name);
+
+    // Add missing new-style columns
+    if (!colNamesAfter.includes('_created_at')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN _created_at TEXT`);
+      logger.debug(`Added _created_at to ${entity.tableName}`);
     }
-    if (!colNames.includes('version')) {
-      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN version INTEGER DEFAULT 1`);
-      logger.debug(`Added version to ${entity.tableName}`);
+    if (!colNamesAfter.includes('_updated_at')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN _updated_at TEXT`);
+      logger.debug(`Added _updated_at to ${entity.tableName}`);
+    }
+    if (!colNamesAfter.includes('_version')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN _version INTEGER DEFAULT 1`);
+      logger.debug(`Added _version to ${entity.tableName}`);
     }
 
     // Set default values for existing records with NULL
     const result = db.prepare(`
       UPDATE ${entity.tableName}
-      SET created_at = COALESCE(created_at, ?),
-          updated_at = COALESCE(updated_at, ?),
-          version = COALESCE(version, 1)
-      WHERE created_at IS NULL OR updated_at IS NULL OR version IS NULL
+      SET _created_at = COALESCE(_created_at, ?),
+          _updated_at = COALESCE(_updated_at, ?),
+          _version = COALESCE(_version, 1)
+      WHERE _created_at IS NULL OR _updated_at IS NULL OR _version IS NULL
     `).run(now, now);
 
     if (result.changes > 0) {
