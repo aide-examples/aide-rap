@@ -138,35 +138,35 @@ html[data-theme="dark"] {
     --color-danger-hover: #ef4444;
     --color-warning: #fbbf24;
 
-    --color-gray-50: #111827;
-    --color-gray-100: #1f2937;
-    --color-gray-200: #374151;
-    --color-gray-300: #4b5563;
+    --color-gray-50: #1c1c1f;
+    --color-gray-100: #27272a;
+    --color-gray-200: #3f3f46;
+    --color-gray-300: #52525b;
     --color-gray-400: #6b7280;
     --color-gray-500: #9ca3af;
-    --color-gray-550: #94a3b8;
+    --color-gray-550: #9a9aa4;
     --color-gray-600: #d1d5db;
-    --color-gray-650: #cbd5e1;
+    --color-gray-650: #d4d4d8;
     --color-gray-700: #e5e7eb;
     --color-gray-800: #f3f4f6;
     --color-gray-900: #f9fafb;
 
-    --color-slate-200: #334155;
-    --color-slate-300: #475569;
+    --color-slate-200: #3f3f46;
+    --color-slate-300: #52525b;
 
     --color-warning-light: rgba(251, 191, 36, 0.15);
     --color-warning-dark: #fbbf24;
 
-    --border-color: #374151;
-    --border-color-dark: #4b5563;
+    --border-color: #3f3f46;
+    --border-color-dark: #52525b;
 
-    --table-header-bg: #1e293b;
-    --table-row-hover: #111827;
+    --table-header-bg: #232326;
+    --table-row-hover: #1c1c1f;
     --table-row-selected: rgba(96, 165, 250, 0.1);
 
-    --color-bg: #0f172a;
-    --color-bg-subtle: #111827;
-    --color-bg-hover: #1e293b;
+    --color-bg: #18181b;
+    --color-bg-subtle: #1c1c1f;
+    --color-bg-hover: #27272a;
 
     --color-text: #e5e7eb;
     --color-text-secondary: #d1d5db;
@@ -216,6 +216,23 @@ html[data-theme="dark"] {
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
     --shadow-overlay: rgba(0, 0, 0, 0.7);
     --shadow-overlay-strong: rgba(0, 0, 0, 0.6);
+}
+
+/* Dark mode: darken inline area colors via overlay + lighten text */
+html[data-theme="dark"] .entity-selector-group-label,
+html[data-theme="dark"] .view-selector-group-label,
+html[data-theme="dark"] .entity-selector-trigger,
+html[data-theme="dark"] .breadcrumb-item,
+html[data-theme="dark"] .tree-node-header,
+html[data-theme="dark"] .tree-fk-header,
+html[data-theme="dark"] .tree-backref-header,
+html[data-theme="dark"] th[style*="background-color"] {
+    background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5));
+}
+
+html[data-theme="dark"] .entity-selector-group-label,
+html[data-theme="dark"] .view-selector-group-label {
+    color: var(--color-text);
 }
 
 /* Utility: Focus state */
