@@ -5931,37 +5931,90 @@ html[data-theme="dark"] .process-selector-group-label {
     border: 1px solid var(--color-info-border);
 }
 
-/* Step tabs */
+/* Step tabs — outer bar (non-scrolling, holds border + scroll indicators) */
 .process-tabs-bar {
-    display: flex;
-    gap: 2px;
-    border-bottom: 2px solid var(--border-color);
+    position: relative;
+    background: var(--color-gray-300);
+    box-shadow: inset 0 -2px 0 var(--border-color);
     margin-bottom: 16px;
+}
+
+/* Inner scroll container (hidden scrollbar) */
+.process-tabs-scroll {
+    display: flex;
     overflow-x: auto;
+    scrollbar-width: none;
+}
+.process-tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Scroll arrow buttons */
+.process-tabs-arrow {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 28px;
+    border: none;
+    cursor: pointer;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: var(--color-text-secondary);
+    background: var(--color-gray-300);
+    box-shadow: inset 0 -2px 0 var(--border-color);
+}
+.process-tabs-arrow:hover {
+    color: var(--color-text);
+    background: var(--color-gray-400);
+}
+.process-tabs-arrow-left {
+    left: 0;
+    border-right: 1px solid var(--border-color);
+}
+.process-tabs-arrow-right {
+    right: 0;
+    border-left: 1px solid var(--border-color);
+}
+.process-tabs-bar.scroll-left .process-tabs-arrow-left,
+.process-tabs-bar.scroll-right .process-tabs-arrow-right {
+    display: flex;
+}
+.process-tabs-bar.scroll-left .process-tabs-scroll {
+    margin-left: 28px;
+}
+.process-tabs-bar.scroll-right .process-tabs-scroll {
+    margin-right: 28px;
 }
 
 .process-tab {
-    padding: 6px 14px;
-    border: none;
-    background: transparent;
+    padding: 7px 14px 6px;
+    margin: 6px 2px 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 5px 5px 0 0;
+    background: var(--color-gray-100);
     font-size: 0.82rem;
     cursor: pointer;
     white-space: nowrap;
     color: var(--color-text-secondary);
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: color 0.15s, border-color 0.15s;
+    transition: color 0.15s, background 0.15s;
 }
 
 .process-tab:hover {
     color: var(--color-text);
-    background: var(--color-gray-50);
+    background: var(--color-bg);
 }
 
 .process-tab.active {
     color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-    font-weight: 500;
+    background: var(--color-bg);
+    border-color: var(--border-color);
+    margin-bottom: -1px;
+    padding-bottom: 7px;
+    font-weight: 700;
 }
 
 /* Step content (rendered markdown) */

@@ -75,7 +75,11 @@ const ProcessPanel = {
         ${descHtml}
         ${contextHtml}
       </div>
-      <div class="process-tabs-bar">${tabsHtml}</div>
+      <div class="process-tabs-bar">
+        <button class="process-tabs-arrow process-tabs-arrow-left">&#9666;</button>
+        <div class="process-tabs-scroll">${tabsHtml}</div>
+        <button class="process-tabs-arrow process-tabs-arrow-right">&#9656;</button>
+      </div>
       <div class="process-step-content"></div>
     `;
 
@@ -95,6 +99,25 @@ const ProcessPanel = {
     this.container.querySelector('.process-close-btn')?.addEventListener('click', () => {
       if (typeof EntityExplorer !== 'undefined') EntityExplorer.closeProcess();
     });
+
+    // Scroll arrows for tab overflow
+    const scrollEl = this.container.querySelector('.process-tabs-scroll');
+    if (scrollEl) {
+      const updateIndicators = () => {
+        const bar = scrollEl.parentElement;
+        bar.classList.toggle('scroll-left', scrollEl.scrollLeft > 0);
+        bar.classList.toggle('scroll-right', scrollEl.scrollLeft + scrollEl.clientWidth < scrollEl.scrollWidth - 1);
+      };
+      scrollEl.addEventListener('scroll', updateIndicators);
+      requestAnimationFrame(updateIndicators);
+      // Arrow click scrolling
+      this.container.querySelector('.process-tabs-arrow-left')?.addEventListener('click', () => {
+        scrollEl.scrollBy({ left: -120, behavior: 'smooth' });
+      });
+      this.container.querySelector('.process-tabs-arrow-right')?.addEventListener('click', () => {
+        scrollEl.scrollBy({ left: 120, behavior: 'smooth' });
+      });
+    }
 
     this.renderStep();
   },
