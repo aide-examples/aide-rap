@@ -198,10 +198,22 @@
             return areaDef.color || '#FFFFFF';
         }
 
-        // Get visible attributes, reordered with self-references first
+        // Build layout context for position-aware FK attribute ordering
+        function buildLayoutContext() {
+            const positions = (layout && layout.classes) || {};
+            const entityCenterYs = {};
+            for (const [name, pos] of Object.entries(positions)) {
+                const attrCount = (model.classes[name]?.attributes || []).length;
+                const h = HEADER_HEIGHT + attrCount * ATTR_LINE_HEIGHT + BOX_PADDING;
+                entityCenterYs[name] = pos.y + h / 2;
+            }
+            return { positions, entityCenterYs, headerHeight: HEADER_HEIGHT, attrLineHeight: ATTR_LINE_HEIGHT };
+        }
+
+        // Get visible attributes, reordered to minimize FK line crossings
         function getVisibleAttributes(className) {
             const classDef = model.classes[className] || {};
-            return ConnectionCalculator.getVisibleAttributes(classDef.attributes, className);
+            return ConnectionCalculator.getVisibleAttributes(classDef.attributes, className, buildLayoutContext());
         }
 
         // Load available documents
@@ -465,11 +477,12 @@
 
             const positions = layout.classes || {};
             const entityNames = Object.keys(model.classes);
+            const layoutCtx = buildLayoutContext();
 
             // Helper to get box height for a class (always attribute-based)
             function boxHeight(className) {
                 const attrs = ConnectionCalculator.getVisibleAttributes(
-                    (model.classes[className] || {}).attributes, className
+                    (model.classes[className] || {}).attributes, className, layoutCtx
                 );
                 return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
             }
@@ -483,7 +496,7 @@
                 function calcDetailedWidth() {
                     if (!fitToContent) return BOX_WIDTH;
                     const attrs = ConnectionCalculator.getVisibleAttributes(
-                        (model.classes[className] || {}).attributes, className
+                        (model.classes[className] || {}).attributes, className, layoutCtx
                     );
                     let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
                     for (const attr of attrs) {
@@ -581,7 +594,7 @@
             // Render relationships
             for (const className of entityNames) {
                 const attrs = ConnectionCalculator.getVisibleAttributes(
-                    (model.classes[className] || {}).attributes, className
+                    (model.classes[className] || {}).attributes, className, layoutCtx
                 );
                 const fromPos = positions[className] || { x: 50, y: 50 };
 
@@ -651,7 +664,7 @@
 
                 if (detailed) {
                     // Detailed mode: attributes (FK attrs as bold name, others as name: type)
-                    const visibleAttrs = ConnectionCalculator.getVisibleAttributes(classDef.attributes, className);
+                    const visibleAttrs = ConnectionCalculator.getVisibleAttributes(classDef.attributes, className, layoutCtx);
                     const maxTextWidth = w - 10; // 5px padding on each side
                     for (let i = 0; i < visibleAttrs.length; i++) {
                         const attr = visibleAttrs[i];

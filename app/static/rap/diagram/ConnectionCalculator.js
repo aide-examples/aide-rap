@@ -150,21 +150,105 @@
         },
 
         /**
-         * Get visible attributes, sorted with self-references first.
+         * Get visible attributes, reordered to minimize FK line crossings.
+         * When a layout context is provided, FK attributes are placed at slots
+         * closest to the target entity's center Y — producing horizontal lines
+         * where possible and pushing FKs to edges otherwise, leaving the middle
+         * free for incoming connections.
          * Note: System columns and aggregate collapsing are handled server-side
          * in layout-editor.router.js schemaToModel().
+         * @param {Array} attributes
+         * @param {string} className - Current entity name (for self-ref detection)
+         * @param {Object} [context] - Layout context for position-aware ordering:
+         *   { positions, entityCenterYs, headerHeight, attrLineHeight }
          */
-        getVisibleAttributes(attributes, className) {
+        getVisibleAttributes(attributes, className, context) {
             const attrs = attributes || [];
-            return attrs.slice().sort((a, b) => {
-                const aType = (a.type || '').replace(/\s*\[[^\]]+\]/g, '').trim();
-                const bType = (b.type || '').replace(/\s*\[[^\]]+\]/g, '').trim();
-                const aIsSelf = aType === className;
-                const bIsSelf = bType === className;
-                if (aIsSelf && !bIsSelf) return -1;
-                if (!aIsSelf && bIsSelf) return 1;
-                return 0;
-            });
+
+            // Without context: simple sort (self-refs first, rest stable)
+            if (!context || !context.positions) {
+                return attrs.slice().sort((a, b) => {
+                    const aIsSelf = this.extractBaseType(a.type) === className;
+                    const bIsSelf = this.extractBaseType(b.type) === className;
+                    if (aIsSelf && !bIsSelf) return -1;
+                    if (!aIsSelf && bIsSelf) return 1;
+                    return 0;
+                });
+            }
+
+            const { positions, entityCenterYs, headerHeight, attrLineHeight } = context;
+            const sourceY = (positions[className] || { y: 0 }).y;
+
+            // Categorize attributes
+            const selfRefs = [];
+            const fks = [];
+            const nonFKs = [];
+
+            for (const attr of attrs) {
+                const baseType = this.extractBaseType(attr.type);
+                if (baseType === className) {
+                    selfRefs.push(attr);
+                } else if (positions[baseType] && entityCenterYs[baseType] !== undefined) {
+                    // Ideal slot: where this attr's y equals target center y
+                    const idealSlot = (entityCenterYs[baseType] - sourceY - headerHeight) / attrLineHeight - 0.5;
+                    fks.push({ attr, idealSlot });
+                } else {
+                    nonFKs.push(attr);
+                }
+            }
+
+            const totalSlots = attrs.length;
+            const result = new Array(totalSlots);
+
+            // Tier 1: Self-refs at top
+            for (let i = 0; i < selfRefs.length; i++) {
+                result[i] = selfRefs[i];
+            }
+
+            // Available slot indices for FKs and non-FKs
+            const availSlots = [];
+            for (let s = selfRefs.length; s < totalSlots; s++) {
+                availSlots.push(s);
+            }
+
+            // Tier 2: Place FKs at slots closest to target center Y
+            // Sorted by idealSlot to prevent crossings; each FK's search range
+            // is bounded to leave room for remaining FKs
+            fks.sort((a, b) => a.idealSlot - b.idealSlot);
+            const fkIndices = new Set();
+            let startIdx = 0;
+
+            for (let k = 0; k < fks.length; k++) {
+                const maxIdx = availSlots.length - (fks.length - k);
+                const ideal = Math.round(fks[k].idealSlot);
+
+                let bestIdx = startIdx;
+                let bestDist = Math.abs(availSlots[startIdx] - ideal);
+
+                for (let i = startIdx + 1; i <= maxIdx; i++) {
+                    const dist = Math.abs(availSlots[i] - ideal);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestIdx = i;
+                    } else if (dist > bestDist) {
+                        break; // Past optimum (slots are sorted ascending)
+                    }
+                }
+
+                result[availSlots[bestIdx]] = fks[k].attr;
+                fkIndices.add(bestIdx);
+                startIdx = bestIdx + 1;
+            }
+
+            // Tier 3: Non-FKs fill remaining slots in original order
+            let nfIdx = 0;
+            for (let i = 0; i < availSlots.length; i++) {
+                if (!fkIndices.has(i) && nfIdx < nonFKs.length) {
+                    result[availSlots[i]] = nonFKs[nfIdx++];
+                }
+            }
+
+            return result;
         },
 
         /**
