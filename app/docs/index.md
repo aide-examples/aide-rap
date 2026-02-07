@@ -174,294 +174,17 @@ data with "natural keys" resolving them to internal identifiers.
 
 ## User Interface
 
-### Three-View Entity Explorer
+Three-view Entity Explorer (Table, Tree Vertical, Tree Horizontal), breadcrumb navigation with deep linking and QR sharing, cross-entity User Views with dot-notation FK paths, context menus, and export to PDF/DOCX/XLSX/CSV.
 
-Switch seamlessly between viewing modes:
-
-| View | Best For |
-|------|----------|
-| **Table** | Quick scanning, sorting, filtering |
-| **Tree (Vertical)** | Deep relationship exploration |
-| **Tree (Horizontal)** | Compact attribute display |
-
-**Deep Relationship Traversal:** The tree view doesn't stop at one level. Click any foreign key to expand it, then expand *its* foreign keys, and so on – as deep as you want to go:
-
-```
-Aircraft D-AINA
-  └─ type: Airbus A320neo
-       └─ manufacturer: Airbus SE
-            └─ Aircraft [5] ← back-references!
-                 └─ D-AINB
-                      └─ operator: Lufthansa
-                           └─ ...
-```
-
-**Cycle Detection** prevents infinite loops – if you'd circle back to an already-visited record, you'll see a ↻ marker instead of an expand arrow.
-
-**Focused Navigation** keeps the tree manageable – opening a new branch automatically closes sibling branches.
-
-### Breadcrumb Navigation
-
-Navigate through your exploration history with a visual breadcrumb trail:
-
-```
-[Aircraft] › [Aircraft D-ABCD] › [AircraftType Boeing 737]
-     ↑              ↑                      ↑
-  Base crumb    Record crumb         Current position
-```
-
-**How it works:**
-- **Dropdown selection** sets the base crumb (entity or view) and clears the navigation stack
-- **FK link clicks** push new crumbs onto the stack (record navigation)
-- **Back-reference counts** push filtered crumbs (e.g., "5 Flights" → Flights filtered by aircraft)
-- **Crumb clicks** truncate the stack and restore that state
-- **Browser back/forward** buttons navigate through the history
-
-**State Preservation:**
-When navigating back, the system restores:
-- **View mode** (table, tree-v, tree-h, map, chart)
-- **Selected row** – highlights the row you navigated from in table view
-
-**Display Options** (Settings → Breadcrumb display):
-| Option | Display | Tooltip |
-|--------|---------|---------|
-| **Full** | Entity + Label | – |
-| **Label only** | Just the label | Entity type |
-| **Entity only** | Just the entity | Label |
-
-**Deep Linking & Sharing:**
-Right-click any breadcrumb to share the navigation state:
-- **Share Dialog** shows a URL with the current breadcrumb stack encoded as base64 JSON
-- **QR Code** (300×300px) for quick mobile access
-- **Guest Auth Option** – include `?user=guest` for anonymous access
-- **URL Parameter** `?crumbs=...` – open directly to a specific navigation state
-
-Example URL:
-```
-https://myapp.com/rap?user=guest&crumbs=W3sidCI6ImUiLCJlIjoiQWlyY3JhZnQifV0=
-```
-
-**FK Label Resolution:** Instead of showing raw IDs, the system creates database views that join display labels:
-
-```sql
--- Auto-generated view
-CREATE VIEW aircraft_view AS
-SELECT a.*,
-       t.designation AS type_label,
-       o.name AS operator_label
-FROM aircraft a
-LEFT JOIN aircraft_type t ON a.type_id = t.id
-LEFT JOIN operator o ON a.operator_id = o.id
-```
-
-One query returns everything the UI needs – no N+1 problems.
-
-### User Views (Cross-Entity Join Tables)
-
-Define read-only views in `config.json` that join data across entities via FK chains:
-
-```json
-{
-    "name": "Engine Status",
-    "base": "EngineAllocation",
-    "columns": [
-        "engine.serial_number AS ESN",
-        "engine.type.thrust_lbs AS Thrust",
-        "mount_position AS pos OMIT 0"
-    ]
-}
-```
-
-- **Dot-notation paths** follow FK relationships: `engine.type.thrust_lbs` → EngineAllocation → Engine → EngineType
-- **AS alias** for custom column headers
-- **OMIT** suppresses specific values from display (FK columns default to `OMIT null`)
-- Materialized as SQL views (`uv_*`) at startup — no runtime overhead
-- Separate **Views dropdown** (blue) left of the entity selector
-- Full column filtering and sorting, same as entity tables
-- Row click jumps to the base entity's edit form
-
-**Back-Reference Columns** pull data from child entities that point *to* the base entity via FK — implemented as correlated SQL subqueries:
-
-```json
-{
-    "name": "Engine Overview",
-    "base": "Engine",
-    "columns": [
-        "serial_number AS ESN",
-        "type.designation AS Type",
-        "EngineAllocation<engine(COUNT) AS Allocations",
-        "EngineEvent<engine(COUNT) AS Events OMIT 0",
-        "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
-    ]
-}
-```
-
-Syntax: `Entity<fk_field(params).column`
-
-| Part | Description | Example |
-|------|-------------|---------|
-| `Entity` | Child entity with FK to base | `EngineAllocation` |
-| `<fk_field` | FK column pointing to base (without `_id`) | `<engine` |
-| `(params)` | Comma-separated: `COUNT`, `LIST`, `WHERE col=val`, `ORDER BY col`, `LIMIT n` | `(WHERE end_date=null, LIMIT 1)` |
-| `.column` | Target column, supports FK-chain dot-paths | `.aircraft.registration` |
-
-See [Views Configuration](procedures/views-config.md) for the full syntax reference.
-
-### Context Menu
-
-Right-click any record (in table or tree) for quick actions:
-- **New** – Create a new record of this entity type
-- **Details** – Read-only view in side panel
-- **Edit** – Open form for modification
-- **Delete** – With confirmation and FK constraint checking
-- **Export CSV** – Download current table view as CSV (semicolon-separated, UTF-8)
-- **Export PDF** – Download current table view as PDF
-
-### Export (PDF, CSV)
-
-Export the current table view to a professionally formatted PDF:
-
-- **A4 Landscape** layout for maximum column space
-- **Entity color** in title bar and column headers
-- **FK column colors** match their target entity's area color
-- **Dynamic column widths** based on content
-- **Filtered data** – exports only what's currently visible
-- **FK labels** instead of raw IDs
-- **Enum conversion** – shows external values, not internal codes
-- **Automatic page breaks** with header repetition
-- **Page numbers** on each page
-
-**TreeView PDF Export:**
-
-When in Tree View mode, PDF export captures the currently expanded structure:
-- Exports only what's visible (expanded nodes)
-- Uses indentation to show hierarchy depth
-- Includes symbols for relationships: `▸` root, `→` FK, `←` back-reference, `↻` cycle
-- Respects current sort settings (attribute order, reference position)
+See [User Interface](user-interface.md) for details.
 
 ---
 
 ## Admin Tools
 
-### Seed Manager
+Seed Manager for import/export/backup/restore of data, Media Store for file uploads with thumbnails and dimension constraints, AI-powered seed data generation, and schema reinitialization without server restart.
 
-The Admin menu opens a dedicated interface for managing seed data across all entities:
-
-**Entity Overview Table:**
-- Shows all entities in dependency order (load top-to-bottom, clear bottom-to-top)
-- **Seed** – Record count in seed file (or `--` if none); shows `valid / total` when some records have unresolved FKs
-- **Backup** – Record count in backup file (or `--` if none)
-- **DB Rows** – Current record count in database
-
-**Context Menu Actions** (click or right-click on entity row):
-- **Import...** – Open import dialog (paste or drag & drop JSON/CSV)
-- **Export...** – Download seed file as JSON or CSV
-- **Generate...** – Open AI generator dialog
-- **Load...** – Preview seed data, then load into database
-- **Clear** – Delete all records from database
-
-**Import Dialog Features:**
-- **Auto-detect format** – JSON or CSV (semicolon, comma, or tab separated)
-- **Drag & drop** – Drop `.json` or `.csv` files directly
-- **Paste support** – Paste text from clipboard
-- **Preview table** – Shows parsed records before saving
-- **FK validation** – Warns about unresolved foreign key references
-
-**Bulk Operations:**
-- **Backup** – Export all DB data to `data/backup/` as JSON (with FK label resolution)
-- **Restore** – Clear DB and reload from backup files
-- **Load All** – Load all available seed files (merge mode)
-- **Clear All** – Clear all database tables
-- **Reset All** – Clear then reload all seed data
-- **Reinitialize** – Re-read DataModel.md and rebuild database schema without server restart. Two-step confirmation: warns about data loss, then offers backup before proceeding. See [Schema Migration](procedures/schema-migration.md) for details.
-
-### Media Store
-
-Upload and manage files attached to entities. Files are stored in the filesystem with metadata in SQLite.
-
-**Features:**
-- Drag & drop file upload in entity forms
-- Automatic thumbnail generation for images
-- Directory hashing for scalability (256 buckets based on UUID prefix)
-- Manifest files as safety net for database recovery
-- Reference tracking to prevent orphaned files
-
-**Storage Structure:**
-```
-system/data/media/
-  originals/
-    a5/                        # First 2 hex chars of UUID
-      a5f3e2d1-...-....pdf
-      manifest.json            # Safety net: original filenames, metadata
-    b2/
-      ...
-  thumbnails/
-    a5/
-      a5f3e2d1-..._thumb.jpg
-```
-
-**API Endpoints:**
-```
-POST   /api/media              # Upload single file
-POST   /api/media/from-url     # Upload from URL (server fetches)
-POST   /api/media/bulk         # Upload multiple files (max 20)
-GET    /api/media              # List all media (paginated)
-GET    /api/media/:id          # Get metadata
-GET    /api/media/:id/file     # Download/view file
-GET    /api/media/:id/thumbnail # Get thumbnail (images only)
-DELETE /api/media/:id          # Delete (admin, if unreferenced)
-POST   /api/media/cleanup      # Remove orphaned files (admin)
-POST   /api/media/rebuild-index # Rebuild DB from manifests (admin)
-```
-
-**Configuration** (optional in `config.json`):
-```json
-{
-  "media": {
-    "maxFileSize": "50MB",
-    "maxBulkFiles": 20,
-    "allowedTypes": ["image/*", "application/pdf", ".doc", ".docx"]
-  }
-}
-```
-
-**Field-Level Constraints:**
-
-Control individual media fields with annotations:
-
-| Annotation | Description | Example |
-|------------|-------------|---------|
-| `[SIZE=50MB]` | Max file size (B, KB, MB, GB) | `[SIZE=10MB]` |
-| `[DIMENSION=800x600]` | Max image dimensions | `[DIMENSION=1920x1080]` |
-| `[MAXWIDTH=800]` | Max image width only | `[MAXWIDTH=1200]` |
-| `[MAXHEIGHT=600]` | Max image height only | `[MAXHEIGHT=800]` |
-| `[DURATION=5min]` | Max audio/video duration (sec, min, h) | `[DURATION=30sec]` |
-
-Example usage in DataModel.md:
-```markdown
-## Employee
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| photo | media | Profile picture [DIMENSION=400x400] [SIZE=2MB] |
-| contract | media | Employment contract [SIZE=10MB] |
-| intro_video | media | Introduction video [DURATION=2min] |
-```
-
-Images exceeding dimension constraints are automatically scaled down, preserving aspect ratio. Size and duration constraints trigger validation errors if exceeded.
-
-**URL-based Media Seeding:**
-
-Seed files can reference media by URL. The system automatically fetches and stores the files:
-```json
-[
-  {
-    "code": "USD",
-    "name": "US Dollar",
-    "bills": "https://example.com/usd-bills.jpg"
-  }
-]
-```
-
+See [Admin Tools](admin-tools.md) for details.
 
 ## Advanced Features
 
@@ -524,30 +247,43 @@ This approach keeps documentation and diagrams in sync – change the Markdown, 
 ## Architecture
 
 ```
-your-system/
+aide-rap/
 ├── app/
-│   ├── docs/
-│   │   ├── DataModel.md          # Visual data model with areas
-│   │   ├── Types.md              # Global type definitions
-│   │   └── classes/              # Entity Markdown files
-│   │       ├── Aircraft.md
-│   │       ├── Operator.md
-│   │       └── ...
 │   ├── server/
 │   │   ├── routers/              # REST API endpoints
 │   │   ├── services/             # Business logic + LLM integration
 │   │   ├── repositories/         # Data access layer
-│   │   └── utils/                # Schema generation, logging
+│   │   └── utils/                # Schema generation, import, logging
 │   ├── shared/
 │   │   ├── types/                # TypeRegistry, TypeParser
 │   │   └── validation/           # ObjectValidator (isomorphic)
-│   ├── static/<system>/
-│   │   ├── components/           # UI components (ES6 modules)
-│   │   ├── <system>.html         # Main page
-│   │   └── <system>.css          # Styling
-│   └── data/
-│       ├── <system>.sqlite       # Database
-│       └── seed/                 # Seed data (imported or AI-generated)
+│   ├── static/rap/
+│   │   ├── components/           # UI components (JS modules)
+│   │   ├── rap.html              # Main page
+│   │   └── rap.css               # Styling
+│   ├── docs/                     # RAP platform documentation
+│   └── systems/
+│       └── <name>/               # One directory per system
+│           ├── docs/
+│           │   ├── DataModel.md          # Data model with areas
+│           │   ├── Types.md              # Custom type definitions
+│           │   ├── Crud.md               # Entity selector layout
+│           │   ├── Views.md              # View selector layout
+│           │   ├── Processes.md          # Process selector layout
+│           │   ├── classes/              # Entity Markdown files
+│           │   ├── views/                # View definitions (by area)
+│           │   ├── processes/            # Process guides (by area)
+│           │   └── imports/              # XLSX import definitions
+│           ├── data/
+│           │   ├── rap.sqlite            # Database
+│           │   ├── seed/                 # Seed data (JSON)
+│           │   ├── media/                # Uploaded files
+│           │   ├── backup/               # DB backup exports
+│           │   ├── import/               # Imported data (JSON)
+│           │   └── extern/               # Source files (XLSX)
+│           ├── help/                     # Context help pages
+│           ├── icons/                    # System-specific icons
+│           └── config.json               # System configuration
 ├── tools/                        # CLI utilities
 └── aide-frame/                   # Framework (symlink)
 ```
@@ -603,233 +339,9 @@ GET    /api/audit/schema/extended         # Audit schema for UI
 
 ## Configuration
 
-### System Configuration
+System configuration via `config.json` (port, pagination, PWA, layout), role-based authentication with SHA-256 password hashing, and UI layout via Markdown files (`Crud.md`, `Views.md`, `Processes.md`).
 
-Each system has its own `config.json` in `app/systems/<name>/`.
-Use `app/config_sample.json` as template for new systems.
-
-```json
-{
-  "port": 18354,
-  "log_level": "INFO",
-  "titleHtml": "<img src='/icons/logo.png'>My System",
-  "auth": {
-    "enabled": true,
-    "passwords": { "admin": "<sha256-hash>", "user": "" },
-    "sessionSecret": "change-in-production",
-    "sessionTimeout": 86400
-  },
-  "pagination": { "threshold": 100, "pageSize": 100, "filterDebounceMs": 2000 },
-  "tree": { "backRefPreviewLimit": 10 },
-  "pwa": {
-    "enabled": true,
-    "name": "My System",
-    "short_name": "SYS",
-    "theme_color": "#2563eb"
-  },
-  "layout": { "default": "page-fill", "allow_toggle": false },
-  "docsEditable": true,
-  "helpEditable": false
-}
-```
-
-### Pagination Settings
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `threshold` | 500 | Show filter dialog and use pagination when record count exceeds this |
-| `pageSize` | 200 | Number of records per page (infinite scroll) |
-| `filterDebounceMs` | 2000 | Delay before server-side filter query (ms) |
-
-**Server-Side Filtering**: When not all records are loaded (pagination active), column filters trigger a server query after `filterDebounceMs` of inactivity. The status bar shows "X of Y records" to indicate partial loading.
-
-### UI Configuration (Markdown)
-
-Entity visibility and views are defined in `docs/`:
-
-**Crud.md** — Which entities appear in the UI:
-```markdown
-# CRUD
-
-## Engine Management
-- Engine
-- EngineEvent
-
----
-
-## Operations
-- Aircraft
-- Operator
-```
-
-`## Area` groups entities into named sections. A horizontal rule (`---`) inserts a **column break** in the selector dropdown — areas before the first `---` appear in column 1, areas after it in column 2, and so on. Without any `---`, each area becomes its own column (default).
-
-**Views.md** (optional) — Area ordering and column layout for the view selector:
-```markdown
-## Engine Management
----
-## Operations
----
-## Finance
-```
-
-Only `##` headers and `---` separators. Views within each area are still loaded from `docs/views/{Area}/*.md`. Areas not listed in Views.md are appended alphabetically. Without Views.md, areas appear alphabetically with one column per area.
-
-**Processes.md** (optional) — Area ordering and column layout for the process selector:
-```markdown
-## Engine Management
----
-## Operations
-```
-
-Same syntax as Views.md. Processes are loaded from `docs/processes/{Area}/*.md`.
-
-**processes/{Area}/{ProcessName}.md** — Business process guides (one file per process):
-```markdown
-# Engine Shop Visit
-
-Required: Engine:select
-
-This process guides you through handling an engine shop visit.
-
-## Review Engine Usage
-Check the engine's flight hours and cycles.
-- Open the **Engine Usage** view
-- Review total FH and FC since last overhaul
-
-View: Engine Usage
-
-## Create Workscope
-Create a workscope document for the maintenance work.
-
-Entity: Workscope
-```
-
-Each `##` becomes a tab. `View:` and `Entity:` directives become action buttons.
-
-**views/{Area}/{ViewName}.md** — Cross-entity join views (one file per view):
-```
-docs/views/
-├── Engine Management/
-│   ├── Engine Status.md
-│   └── Engine Overview.md
-└── Finance/
-    └── Exchange Rates.md
-```
-
-Each view file contains a JSON block with the view definition:
-```markdown
-# Engine Status
-
-```json
-{ "base": "EngineAllocation", "columns": ["engine.serial_number AS ESN", "aircraft.registration"] }
-```
-```
-
-See [Views Configuration](procedures/views-config.md) for the full syntax.
-
-### Authentication
-
-Enable authentication in `config.json`:
-
-```json
-{
-  "auth": {
-    "enabled": true,
-    "passwords": {
-      "admin": "<sha256-hash>",
-      "user": "",
-      "guest": ""
-    },
-    "sessionSecret": "change-in-production",
-    "sessionTimeout": 86400
-  }
-}
-```
-
-**Generate password hash:**
-```bash
-node app/tools/generate-password-hash.js mypassword
-# Output: 5e884898da28047d1650f25e4ca478eb...
-```
-
-**Roles:**
-- `admin` – Full access, always requires password
-- `user` – Standard access, password optional (empty = no password required)
-- `guest` – Read-only access, password optional
-
-**URL-Login for Bookmarks:**
-```
-http://server/?user=admin&password=mypassword
-http://server/?user=admin&pwh=5e884898da28047d...
-```
-
-Passwords are hashed client-side (SHA-256) before transmission. URL is cleaned after login to prevent credentials in browser history.
-
-**Disable auth:** Start server with `--noauth` flag or set `"enabled": false`.
-
----
-
-# FEATURE BACKLOG
-
-Ideas for future development:
-
-### Export & Import
-- [x] **CSV Export** – Table View context menu "Export CSV"
-- [x] **PDF Export** – Table View context menu "Export PDF"
-- [x] **TreeView PDF Export** – Exports currently expanded tree structure
-- [ ] Detail Panel PDF Export
-
-### Admin / Seed Data Manager
-- [x] **Import Dialog** – Paste or drag & drop JSON/CSV, auto-detect format, FK validation preview
-- [x] **Export Dialog** – Export seed file as JSON or CSV
-- [x] **Load Preview** – Preview seed data before loading into database with conflict detection
-- [x] **AI Generate** – LLM-powered seed data generation from entity descriptions
-- [x] **Seed Context** – `## Seed Context` section for cross-entity validation constraints
-- [x] **Context Menu** – Right-click on entity rows: Import, Export, Generate, Load, Clear
-- [x] **Duplicate Detection** – Business key matching on load (LABEL column fallback)
-- [x] **Load Modes** – Skip conflicts / merge / replace with user choice in preview
-- [x] **FK Label Fallback** – Resolves `engine_id: "GE-900101"` (technical name with label)
-- [x] **Computed FK Support** – READONLY FK columns included in AI prompts and seed loading
-- [x] **Seed File FK Fallback** – Load FK references from seed files when DB table is empty
-
-See [Seed Data Reference](seed-data.md) for technical details.
-
-### User Views
-- [x] **Cross-Entity Views** – Dot-notation FK paths, SQL view materialization, separate dropdown
-- [x] **OMIT Value Suppression** – Per-column `OMIT <value>`, FK default `OMIT null`
-- [x] **Row-Click Navigation** – Jump from view row to base entity edit form
-- [x] **Back-Reference Columns** – Inbound FK subqueries (`Entity<fk(params).column`), COUNT/LIST/scalar, FK-following within subquery
-- [x] **Aggregation** – COUNT and GROUP_CONCAT (LIST) via back-reference columns
-- [x] **Filter Dialogs** – Pre-load filters for large datasets with text input (LIKE), dropdown (exact match), or date extraction (year/month)
-- [ ] **View-Guided Tree** – Render User View columns as hierarchical tree (FK paths become expandable branches, leaves show only view-selected attributes). Usefulness TBD.
-
-See [Views Configuration](procedures/views-config.md) for syntax details.
-See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configuration.
-
-### Business Processes
-- [x] **Process Guide** – Markdown-defined step-by-step process documents with tabbed UI, area-grouped selector, and toggle between process view and data view
-- [x] **Step Navigation** – Non-sequential tabs for each process step with rendered Markdown (images, tables, lists)
-- [x] **Action Buttons** – Steps can reference Views (`View: Name`) or Entities (`Entity: Name`) with one-click navigation
-- [ ] **Process Context** – Required initial object selection, context accumulation across steps
-- [ ] **Breadcrumb Cooperation** – Process learns context from user navigation via breadcrumb entries
-
-### UI Enhancements
-- [x] **Breadcrumb Navigation** – Visual navigation trail with browser back/forward support, state preservation (viewMode, selected row), configurable display
-- [x] **Deep Linking** – Share navigation state via URL parameter + QR code dialog (right-click on breadcrumb)
-- [ ] Keyboard shortcuts (arrow keys, Enter for details)
-- [ ] Column visibility toggle
-- [ ] Drag & Drop column reordering
-- [ ] Saved filter presets
-- [x] **Dark Mode** – Light/Dark/System theme with full coverage (CSS variables, area colors, charts, map)
-- [ ] Accessibility (ARIA labels, high-contrast mode, screen reader support)
-
-### Visualization
-- [x] **Chart View** – Vega-Lite based charts in Views (bar, line, point, arc). Define `chart` property with encoding spec.
-- [x] **Map View** – Leaflet maps for entities/views with geo columns, marker clustering, tooltips
-- [ ] Timeline view for date fields
-
----
+See [Configuration](configuration.md) for the full reference.
 
 # Reference & Procedures
 
@@ -839,6 +351,9 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 
 ### Reference
 
+- [User Interface](user-interface.md) – Entity Explorer, breadcrumbs, views, context menus, export
+- [Configuration](configuration.md) – System config, pagination, authentication, UI layout files
+- [Admin Tools](admin-tools.md) – Seed Manager, Media Store, bulk operations
 - [Scalar Types](scalar-types.md) – `int`, `number`, `string`, `date`, `bool` – built-in attribute types
 - [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
 - [Aggregate Types](aggregate-types.md) – `geo`, `address`, and custom composite types
@@ -856,3 +371,14 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 - [Views Configuration](procedures/views-config.md) – Cross-entity join views with dot-notation FK paths
 - [Filter Dialogs](procedures/filter-dialogs.md) – Pre-load filters for large datasets (required/prefilter, text/dropdown/year/month, AND logic)
 - [Schema Migration](procedures/schema-migration.md) – Reinitialize database schema without server restart
+
+---
+
+# Ideas
+
+- Detail Panel PDF Export
+- Process Context – Required initial object selection, context accumulation across steps
+- Breadcrumb Cooperation – Process learns context from user navigation via breadcrumb entries
+- Keyboard shortcuts (arrow keys, Enter for details)
+- Column visibility toggle
+- Drag & Drop column reordering
