@@ -14,6 +14,7 @@ const ColumnUtils = require('../../static/rap/utils/ColumnUtils');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 const { ForeignKeyConstraintError, UniqueConstraintError } = require('../errors/ConflictError');
 const { parseFilter, buildWhereClause } = require('../utils/FilterParser');
+const { COLUMN_BREAK } = require('../utils/UISpecLoader');
 const logger = require('../utils/logger');
 
 // Shared validator instance
@@ -603,6 +604,10 @@ function getEnabledEntitiesWithAreas() {
   const orderedNames = schema.enabledEntities || Object.keys(schema.entities);
 
   for (const name of orderedNames) {
+    if (name === COLUMN_BREAK) {
+      entities.push({ type: 'column_break' });
+      continue;
+    }
     const entity = schema.entities[name];
     if (!entity) continue;
 

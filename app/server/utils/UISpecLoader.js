@@ -26,6 +26,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SEPARATOR_PREFIX = '-------------------- ';
+const COLUMN_BREAK = '===COLUMN_BREAK===';
 
 /**
  * Load CRUD entity list from Crud.md.
@@ -57,6 +58,12 @@ function loadCrudConfig(requirementsDir) {
 
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
+
+    // Horizontal rule = column break
+    if (/^-{3,}$/.test(trimmed)) {
+      entities.push(COLUMN_BREAK);
+      continue;
+    }
 
     // H2 = section separator
     if (trimmed.startsWith('## ')) {
@@ -181,9 +188,55 @@ function parseViewFile(content, filename) {
 }
 
 /**
+ * Parse a layout markdown file for area ordering and column breaks.
+ * Recognizes `## AreaName` for area ordering and `---` for column breaks.
+ * @param {string} filePath - Path to layout .md file (e.g. Views.md)
+ * @returns {{areas: string[], breaks: Set<number>}|null} areas in order, breaks = indices where column breaks occur
+ */
+function parseLayoutFile(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+
+  let content = fs.readFileSync(filePath, 'utf-8');
+  content = content.replace(/<!--[\s\S]*?-->/g, '');
+
+  const areas = [];
+  const breaks = new Set();
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (/^-{3,}$/.test(trimmed)) {
+      breaks.add(areas.length); // break before next area
+    } else if (trimmed.startsWith('## ')) {
+      areas.push(trimmed.substring(3).trim());
+    }
+  }
+
+  return areas.length > 0 ? { areas, breaks } : null;
+}
+
+/**
+ * Load view files for a single area directory.
+ * @param {string} areaDir - Path to area subdirectory
+ * @returns {Object[]} Array of parsed view definitions
+ */
+function loadAreaViews(areaDir) {
+  const viewFiles = fs.readdirSync(areaDir)
+    .filter(f => f.endsWith('.md'))
+    .sort();
+  const views = [];
+  for (const file of viewFiles) {
+    const content = fs.readFileSync(path.join(areaDir, file), 'utf-8');
+    const viewDef = parseViewFile(content, file);
+    if (viewDef) views.push(viewDef);
+  }
+  return views;
+}
+
+/**
  * Load view definitions from docs/views/{Area}/{ViewName}.md files.
+ * Uses Views.md (if present) for area ordering and column breaks.
  * @param {string} requirementsDir - Path to docs/ directory
- * @returns {Array|null} Array of view objects and separator strings, or null if not found
+ * @returns {Array|null} Array of view objects, separator strings, and COLUMN_BREAK markers
  */
 function loadViewsConfig(requirementsDir) {
   const viewsDir = path.join(requirementsDir, 'views');
@@ -194,35 +247,37 @@ function loadViewsConfig(requirementsDir) {
 
   const result = [];
 
-  // Scan area subdirectories (sorted alphabetically)
-  const areas = fs.readdirSync(viewsDir)
-    .filter(f => {
-      const fullPath = path.join(viewsDir, f);
-      return fs.statSync(fullPath).isDirectory();
-    })
+  // All area directories on disk
+  const diskAreas = fs.readdirSync(viewsDir)
+    .filter(f => fs.statSync(path.join(viewsDir, f)).isDirectory())
     .sort();
 
-  for (const area of areas) {
+  const layout = parseLayoutFile(path.join(requirementsDir, 'Views.md'));
+
+  // Determine area order: layout file or alphabetical fallback
+  const orderedAreas = layout
+    ? [...layout.areas, ...diskAreas.filter(a => !layout.areas.includes(a))]
+    : diskAreas;
+
+  let areaIndex = 0;
+  for (const area of orderedAreas) {
     const areaDir = path.join(viewsDir, area);
-    const viewFiles = fs.readdirSync(areaDir)
-      .filter(f => f.endsWith('.md'))
-      .sort();
+    if (!fs.existsSync(areaDir) || !fs.statSync(areaDir).isDirectory()) continue;
 
-    if (viewFiles.length === 0) continue;
+    const views = loadAreaViews(areaDir);
+    if (views.length === 0) continue;
 
-    // Section separator for this area
-    result.push(SEPARATOR_PREFIX + area);
-
-    for (const file of viewFiles) {
-      const content = fs.readFileSync(path.join(areaDir, file), 'utf-8');
-      const viewDef = parseViewFile(content, file);
-      if (viewDef) {
-        result.push(viewDef);
-      }
+    // Insert column break if layout says so
+    if (layout && layout.breaks.has(areaIndex)) {
+      result.push(COLUMN_BREAK);
     }
+
+    result.push(SEPARATOR_PREFIX + area);
+    result.push(...views);
+    areaIndex++;
   }
 
   return result.length > 0 ? result : null;
 }
 
-module.exports = { loadCrudConfig, loadViewsConfig };
+module.exports = { loadCrudConfig, loadViewsConfig, SEPARATOR_PREFIX, COLUMN_BREAK };

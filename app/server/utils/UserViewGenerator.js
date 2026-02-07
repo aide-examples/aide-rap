@@ -7,6 +7,7 @@
 
 const logger = require('./logger');
 const { toSnakeCase, buildLabelSQLWithJoins } = require('./SchemaGenerator');
+const { COLUMN_BREAK } = require('./UISpecLoader');
 
 /**
  * Convert view name to SQL-safe view name
@@ -945,6 +946,12 @@ function parseAllUserViews(viewsConfig, schema) {
   let currentGroup = null;
 
   for (const entry of viewsConfig) {
+    // Column break marker
+    if (entry === COLUMN_BREAK) {
+      groups.push({ type: 'column_break' });
+      continue;
+    }
+
     // Separator string: "-------------------- Fleet Analysis"
     if (typeof entry === 'string') {
       const label = entry.replace(/^-+\s*/, '').trim();

@@ -69,7 +69,7 @@ router.get('/', (req, res, next) => {
 
     res.json({
       areas,
-      entities: entities.map(e => ({
+      entities: entities.map(e => e.type === 'column_break' ? e : ({
         name: e.name,
         area: e.area,
         areaName: e.areaName,

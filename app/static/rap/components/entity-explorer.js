@@ -581,43 +581,66 @@ const EntityExplorer = {
     this.viewSelector.classList.remove('open');
   },
 
+  /**
+   * Wrap an array of HTML segments into column divs, splitting at column_break markers.
+   * @param {Array<{html: string}|{columnBreak: true}>} segments
+   * @returns {string} HTML with column wrappers
+   */
+  buildColumnsHtml(segments) {
+    let result = '<div class="selector-column">';
+    for (const seg of segments) {
+      if (seg.columnBreak) {
+        result += '</div><div class="selector-column">';
+      } else {
+        result += seg.html;
+      }
+    }
+    result += '</div>';
+    return result;
+  },
+
   async loadEntityTypes() {
     try {
       const { entities, areas } = await ApiClient.getEntityTypes();
 
       // Store entity metadata for readonly/system checks
       this.entityMetadata = {};
-      entities.forEach(e => {
+      entities.filter(e => e.name).forEach(e => {
         this.entityMetadata[e.name] = {
           readonly: e.readonly || false,
           system: e.system || false
         };
       });
 
-      // Group entities by area
-      const grouped = {};
-      entities.forEach(e => {
-        if (!grouped[e.areaName]) {
-          grouped[e.areaName] = { color: e.areaColor, entities: [] };
-        }
-        grouped[e.areaName].entities.push(e);
-      });
+      // Build segments: groups of entities by area, with column breaks
+      const segments = [];
+      let currentGroup = null;
 
-      // Build custom dropdown menu
-      let menuHtml = '';
-      for (const [areaName, group] of Object.entries(grouped)) {
-        menuHtml += `<div class="entity-selector-group">`;
-        menuHtml += `<div class="entity-selector-group-label" style="background-color: ${group.color};">${areaName}</div>`;
-        group.entities.forEach(e => {
-          menuHtml += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">
+      for (const e of entities) {
+        if (e.type === 'column_break') {
+          if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
+          segments.push({ columnBreak: true });
+          currentGroup = null;
+          continue;
+        }
+
+        // New area → start new group
+        if (!currentGroup || currentGroup.areaName !== e.areaName) {
+          if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
+          currentGroup = {
+            areaName: e.areaName,
+            html: `<div class="entity-selector-group"><div class="entity-selector-group-label" style="background-color: ${e.areaColor};">${e.areaName}</div>`
+          };
+        }
+
+        currentGroup.html += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">
             <span class="entity-name">${e.name}</span>
             <span class="entity-count">${e.count || ''}</span>
           </div>`;
-        });
-        menuHtml += `</div>`;
       }
+      if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
 
-      this.selectorMenu.innerHTML = menuHtml;
+      this.selectorMenu.innerHTML = this.buildColumnsHtml(segments);
 
       // Add click handlers for menu items
       this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
@@ -747,26 +770,29 @@ const EntityExplorer = {
       // Show view selector
       this.viewSelector.style.display = '';
 
-      let menuHtml = '';
-      let currentGroup = null;
+      const segments = [];
+      let groupHtml = null;
+
       for (const entry of viewsData.groups) {
-        if (entry.type === 'separator') {
-          if (currentGroup) menuHtml += `</div>`;
-          currentGroup = entry.label;
-          menuHtml += `<div class="view-selector-group">`;
-          menuHtml += `<div class="view-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
+        if (entry.type === 'column_break') {
+          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+          segments.push({ columnBreak: true });
+          groupHtml = null;
+        } else if (entry.type === 'separator') {
+          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+          groupHtml = `<div class="view-selector-group"><div class="view-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
         } else if (entry.type === 'view') {
           const view = viewsData.views.find(v => v.name === entry.name);
           if (view) {
-            menuHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" style="border-left-color: ${view.color};">
+            groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" style="border-left-color: ${view.color};">
               <span class="view-name">${view.name}</span>
             </div>`;
           }
         }
       }
-      if (currentGroup) menuHtml += `</div>`;
+      if (groupHtml) segments.push({ html: groupHtml + '</div>' });
 
-      this.viewSelectorMenu.innerHTML = menuHtml;
+      this.viewSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
 
       // Add click handlers
       this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {

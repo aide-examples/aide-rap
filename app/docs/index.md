@@ -652,10 +652,25 @@ Entity visibility and views are defined in `docs/`:
 - Engine
 - EngineEvent
 
+---
+
 ## Operations
 - Aircraft
 - Operator
 ```
+
+`## Area` groups entities into named sections. A horizontal rule (`---`) inserts a **column break** in the selector dropdown — areas before the first `---` appear in column 1, areas after it in column 2, and so on. Without any `---`, each area becomes its own column (default).
+
+**Views.md** (optional) — Area ordering and column layout for the view selector:
+```markdown
+## Engine Management
+---
+## Operations
+---
+## Finance
+```
+
+Only `##` headers and `---` separators. Views within each area are still loaded from `docs/views/{Area}/*.md`. Areas not listed in Views.md are appended alphabetically. Without Views.md, areas appear alphabetically with one column per area.
 
 **views/{Area}/{ViewName}.md** — Cross-entity join views (one file per view):
 ```

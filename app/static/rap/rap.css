@@ -815,17 +815,22 @@ html[data-theme="dark"] {
     display: flex;
 }
 
+/* Columns (group multiple areas vertically) */
+.selector-column {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--color-gray-200);
+}
+
+.selector-column:last-child {
+    border-right: none;
+}
+
 /* Groups */
 .entity-selector-group,
 .view-selector-group {
     padding: 4px 0;
     min-width: 140px;
-    border-right: 1px solid var(--color-gray-200);
-}
-
-.entity-selector-group:last-child,
-.view-selector-group:last-child {
-    border-right: none;
 }
 
 .entity-selector-group-label,
