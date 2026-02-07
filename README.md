@@ -36,11 +36,12 @@ business process descriptions into complete applications. *No code generation wi
 - SQLite database with constraints and relationships
 - Hashed file storage for media blobs
 - REST API with CRUD, filtering, and validation
-- built-in audit trail for data modification
+- built-in audit tracking of data modifications
 - Modern browser UI with table and tree views
-- Composite views, bar charts, graphs, geo maps
+- Composite views, bar charts, graphs, geo maps, hierarchy trees
 - AI-powered seed data generation
 - configurable import procedures for real world data loading
+- pdf print, export to docx, csv
 - process charts guiding the user
 
 **[Read the Documentation →](app/docs/index.md)**
@@ -50,7 +51,8 @@ business process descriptions into complete applications. *No code generation wi
 Concrete applications built on AIDE RAP. Each system defines its own entities, relationships, and seed data:
 
 - **Book** – A simple publishing system with authors and books (included)
-- **IRMA** – *Intelligent Repair and Maintenance in Aviation* – manages aircraft fleet data, operators, and maintenance records (private repository, requires separate access)
+- **Flow** – Metering flow data for gas, water, electricity
+- **IRMA** - Intelligent Repair and Maintenance in Aviation – (not included, requires separate access)
 
 You can create your own system by adding a folder under `app/systems/`.
 

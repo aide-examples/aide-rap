@@ -34,17 +34,28 @@ const ContextMenu = {
       </div>
       <div class="context-menu-views"></div>
       <div class="context-menu-separator"></div>
-      <div class="context-menu-item" data-action="export-pdf">
-        <span class="context-menu-icon">&#128462;</span>
-        <span data-i18n="ctx_export_pdf">Export PDF</span>
-      </div>
-      <div class="context-menu-item" data-action="export-docx">
-        <span class="context-menu-icon">&#128221;</span>
-        <span data-i18n="ctx_export_docx">Export DOCX</span>
-      </div>
-      <div class="context-menu-item" data-action="export-csv">
-        <span class="context-menu-icon">&#128196;</span>
-        <span data-i18n="ctx_export_csv">Export CSV</span>
+      <div class="context-menu-item context-menu-has-sub">
+        <span class="context-menu-icon">&#128229;</span>
+        <span data-i18n="ctx_export">Export...</span>
+        <span class="context-menu-arrow">&#9656;</span>
+        <div class="context-menu-sub">
+          <div class="context-menu-item" data-action="export-pdf">
+            <span class="context-menu-icon">&#128462;</span>
+            <span data-i18n="ctx_export_pdf">PDF</span>
+          </div>
+          <div class="context-menu-item" data-action="export-docx">
+            <span class="context-menu-icon">&#128221;</span>
+            <span data-i18n="ctx_export_docx">Word</span>
+          </div>
+          <div class="context-menu-item" data-action="export-xlsx">
+            <span class="context-menu-icon">&#128202;</span>
+            <span data-i18n="ctx_export_xlsx">Excel</span>
+          </div>
+          <div class="context-menu-item" data-action="export-csv">
+            <span class="context-menu-icon">&#128196;</span>
+            <span data-i18n="ctx_export_csv">CSV</span>
+          </div>
+        </div>
       </div>
     `;
     document.body.appendChild(menu);
@@ -88,28 +99,45 @@ const ContextMenu = {
     this.menu.style.top = `${y}px`;
     this.menu.classList.add('visible');
 
-    // Check if user has write access (not a guest)
-    const hasWriteAccess = window.currentUser && ['user', 'admin', 'master'].includes(window.currentUser.role);
+    const isViewMode = context.source === 'view';
 
-    // Check if entity is readonly (system entity like AuditTrail)
-    const isReadonly = EntityExplorer.entityMetadata[context.entity]?.readonly === true;
-
-    // Enable/disable write actions based on role and readonly status
-    ['new', 'edit', 'delete'].forEach(action => {
+    // Hide CRUD items and separators in view mode (export-only)
+    ['new', 'details', 'edit', 'delete'].forEach(action => {
       const item = this.menu.querySelector(`[data-action="${action}"]`);
-      if (item) {
-        if (hasWriteAccess && !isReadonly) {
-          item.classList.remove('disabled');
-        } else {
-          item.classList.add('disabled');
-        }
-      }
+      if (item) item.style.display = isViewMode ? 'none' : '';
+    });
+    // Hide separators before CRUD items in view mode
+    this.menu.querySelectorAll(':scope > .context-menu-separator').forEach((sep, i) => {
+      if (i === 0) sep.style.display = isViewMode ? 'none' : '';
     });
 
-    // Populate views section: entity-level views + FK-specific views
+    if (!isViewMode) {
+      // Check if user has write access (not a guest)
+      const hasWriteAccess = window.currentUser && ['user', 'admin', 'master'].includes(window.currentUser.role);
+
+      // Check if entity is readonly (system entity like AuditTrail)
+      const isReadonly = EntityExplorer.entityMetadata[context.entity]?.readonly === true;
+
+      // Enable/disable write actions based on role and readonly status
+      ['new', 'edit', 'delete'].forEach(action => {
+        const item = this.menu.querySelector(`[data-action="${action}"]`);
+        if (item) {
+          if (hasWriteAccess && !isReadonly) {
+            item.classList.remove('disabled');
+          } else {
+            item.classList.add('disabled');
+          }
+        }
+      });
+    }
+
+    // Populate views section: entity-level views + FK-specific views (skip in view mode)
     const viewsContainer = this.menu.querySelector('.context-menu-views');
     viewsContainer.innerHTML = '';
 
+    if (isViewMode) {
+      // Skip views section in view mode
+    } else {
     // Views matching the current entity's requiredFilter
     const entityViews = EntityExplorer.getViewsForEntity(context.entity);
     // Views matching the FK target entity (only when right-clicking on a FK cell)
@@ -148,6 +176,7 @@ const ContextMenu = {
         });
       });
     }
+    } // end !isViewMode
 
     // Adjust if menu goes off-screen
     const rect = this.menu.getBoundingClientRect();
@@ -200,6 +229,8 @@ const ContextMenu = {
       } else {
         EntityTable.exportDocx();
       }
+    } else if (action === 'export-xlsx') {
+      EntityTable.exportXlsx();
     } else if (action === 'export-csv') {
       EntityTable.exportCsv();
     }

@@ -1,6 +1,6 @@
 /**
- * Export Router (PDF, CSV, DOCX)
- * Routes: /api/entities/:entity/export-pdf, export-tree-pdf, export-csv, export-docx
+ * Export Router (PDF, CSV, DOCX, XLSX)
+ * Routes: /api/entities/:entity/export-pdf, export-tree-pdf, export-csv, export-docx, export-xlsx
  * Emits: export:start, export:complete, export:error
  */
 
@@ -11,6 +11,7 @@ const PDFDocument = require('pdfkit');
 
 const PrintService = require('../services/PrintService');
 const CsvService = require('../services/CsvService');
+const XlsxService = require('../services/XlsxService');
 const eventBus = require('../utils/EventBus');
 
 /**
@@ -547,6 +548,36 @@ function createRouter(cfg) {
             console.error('CSV generation error:', error);
             eventBus.emit('export:error', { format, entity, error: error.message });
             res.status(500).json({ error: 'CSV generation failed' });
+        }
+    });
+
+    // Export entity table to XLSX (Excel)
+    router.post('/api/entities/:entity/export-xlsx', (req, res) => {
+        const entity = req.params.entity;
+        const format = 'xlsx';
+
+        try {
+            const { columns, records } = req.body;
+
+            if (!columns || !Array.isArray(columns) || !records || !Array.isArray(records)) {
+                return res.status(400).json({ error: 'columns and records arrays are required' });
+            }
+
+            eventBus.emit('export:start', { format, entity, recordCount: records.length });
+
+            const xlsxService = new XlsxService();
+            const buffer = xlsxService.generateXlsx({ columns, records });
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${entity}.xlsx"`);
+            res.send(buffer);
+
+            eventBus.emit('export:complete', { format, entity, recordCount: records.length, size: buffer.length });
+
+        } catch (error) {
+            console.error('XLSX generation error:', error);
+            eventBus.emit('export:error', { format, entity, error: error.message });
+            res.status(500).json({ error: 'XLSX generation failed' });
         }
     });
 

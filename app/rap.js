@@ -296,6 +296,17 @@ if (enabledEntitiesRaw.length > 0) {
 // 7c. STATIC ROUTES
 // =============================================================================
 
+// Favicon — inline SVG with primary area color
+app.get('/favicon.ico', (req, res) => {
+    const schema = getSchema();
+    const firstArea = Object.values(schema.areas || {})[0];
+    const color = firstArea?.color || '#3b82f6';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="${color}"/><text x="16" y="23" font-size="20" font-weight="700" fill="white" text-anchor="middle" font-family="system-ui,sans-serif">R</text></svg>`;
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(svg);
+});
+
 // System-specific icons (e.g., for custom titleHtml)
 app.use('/icons', require('express').static(path.join(SYSTEM_DIR, 'icons')));
 

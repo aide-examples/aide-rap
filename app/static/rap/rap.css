@@ -4392,6 +4392,42 @@ html[data-theme="dark"] .process-selector-group-label {
     margin: 4px 0;
 }
 
+/* Submenu (Export) */
+.context-menu-has-sub {
+    position: relative;
+}
+
+.context-menu-has-sub > .context-menu-arrow {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+}
+
+.context-menu-sub {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: -1px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-slate-200);
+    border-radius: 6px;
+    box-shadow: var(--shadow-md);
+    min-width: 120px;
+    z-index: 1001;
+}
+
+.context-menu-has-sub:hover > .context-menu-sub {
+    display: block;
+}
+
+.context-menu-sub .context-menu-item:first-child {
+    border-radius: 6px 6px 0 0;
+}
+
+.context-menu-sub .context-menu-item:last-child {
+    border-radius: 0 0 6px 6px;
+}
+
 /* ========================================
    Cycle Detection (Tree View)
    ======================================== */

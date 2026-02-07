@@ -446,6 +446,12 @@ const EntityTable = {
         }
       });
 
+      // Context menu (right-click) — export only
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        ContextMenu.show(e.clientX, e.clientY, { source: 'view' });
+      });
+
       // Cursor indicates clickable
       row.style.cursor = 'pointer';
     });
@@ -1335,14 +1341,53 @@ const EntityTable = {
   },
 
   /**
-   * Export current table view to a server-rendered format (pdf, docx, csv)
+   * Prepare export data for user views (read-only view mode)
+   */
+  prepareViewExportData() {
+    if (!this.currentViewConfig) return null;
+
+    const columns = this.getViewVisibleColumns();
+    const records = this.getViewFilteredRecords(columns);
+    if (records.length === 0) {
+      alert(i18n.t('no_records_to_export'));
+      return null;
+    }
+
+    const exportColumns = columns.map(col => ({
+      key: col.key,
+      label: col.label,
+      color: col.areaColor || null
+    }));
+
+    const formattedRecords = records.map(record => {
+      const formatted = {};
+      for (const col of columns) {
+        const value = record[col.key];
+        formatted[col.key] = value != null ? String(value) : '';
+      }
+      return formatted;
+    });
+
+    const viewName = EntityExplorer.currentView?.name || 'View';
+    return {
+      title: viewName,
+      columns: exportColumns,
+      records: formattedRecords,
+      entityColor: EntityExplorer.currentView?.color || '#1a365d',
+      filters: this.getActiveFilterDescriptions()
+    };
+  },
+
+  /**
+   * Export current table view to a server-rendered format (pdf, docx, csv, xlsx)
    */
   async exportToFormat(format) {
-    const data = this.prepareExportData();
+    const data = this.currentViewConfig ? this.prepareViewExportData() : this.prepareExportData();
     if (!data) return;
 
+    const exportName = this.currentEntity || EntityExplorer.currentView?.name || 'export';
     try {
-      const response = await fetch(`/api/entities/${this.currentEntity}/export-${format}`, {
+      const response = await fetch(`/api/entities/${encodeURIComponent(exportName)}/export-${format}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -1350,7 +1395,7 @@ const EntityTable = {
 
       if (response.ok) {
         const blob = await response.blob();
-        DomUtils.downloadBlob(blob, `${this.currentEntity}.${format}`);
+        DomUtils.downloadBlob(blob, `${exportName}.${format}`);
       } else {
         const error = await response.json();
         alert(i18n.t('export_failed', { message: error.error || 'Unknown error' }));
@@ -1362,5 +1407,6 @@ const EntityTable = {
 
   async exportPdf() { return this.exportToFormat('pdf'); },
   async exportDocx() { return this.exportToFormat('docx'); },
+  async exportXlsx() { return this.exportToFormat('xlsx'); },
   async exportCsv() { return this.exportToFormat('csv'); },
 };
