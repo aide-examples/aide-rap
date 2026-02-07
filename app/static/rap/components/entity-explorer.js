@@ -28,6 +28,16 @@ const EntityExplorer = {
   currentView: null, // null = entity mode, object = view mode { name, base, color }
   entityMetadata: {}, // Map of entity name -> { readonly, system, ... }
   viewsList: [], // All views from API (for context menu matching)
+  // Process selector
+  processSelector: null,
+  processSelectorTrigger: null,
+  processSelectorMenu: null,
+  processToggleBtn: null,
+  processPanelContainer: null,
+  processList: [], // All processes from API
+  activeProcess: null, // Currently loaded process { name, color, ... }
+  processVisible: false, // Is process panel showing?
+  welcomeContainer: null, // Welcome screen container
   records: [],
   selectedId: null,
   viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
@@ -488,11 +498,20 @@ const EntityExplorer = {
     this.mapLabelsToggle = document.getElementById('map-labels-toggle');
     this.mapLabelsCheckbox = document.getElementById('map-show-labels');
 
+    // Process selector
+    this.processSelector = document.getElementById('process-selector');
+    this.processSelectorTrigger = this.processSelector?.querySelector('.process-selector-trigger');
+    this.processSelectorMenu = this.processSelector?.querySelector('.process-selector-menu');
+    this.processToggleBtn = document.getElementById('btn-process-toggle');
+    this.processPanelContainer = document.getElementById('process-panel-container');
+    this.welcomeContainer = document.getElementById('welcome-container');
+
     // Initialize components
     EntityTree.init('entity-tree-container');
     EntityTable.init('entity-table-container');
     EntityChart.init('entity-chart-container');
     HierarchyTree.init('entity-tree-container'); // Reuse tree container
+    ProcessPanel.init();
 
     // Update map when table filters change
     EntityTable.onFilterChange = () => {
@@ -511,9 +530,10 @@ const EntityExplorer = {
     }
     this.updateViewToggle();
 
-    // Load entity types and views
+    // Load entity types, views, and processes
     await this.loadEntityTypes();
     await this.loadViews();
+    await this.loadProcesses();
 
     // Event listeners for entity dropdown
     this.selectorTrigger.addEventListener('click', () => this.toggleDropdown());
@@ -524,10 +544,21 @@ const EntityExplorer = {
       if (!this.viewSelector.contains(e.target)) {
         this.closeViewDropdown();
       }
+      if (this.processSelector && !this.processSelector.contains(e.target)) {
+        this.closeProcessDropdown();
+      }
     });
 
     // Event listeners for view dropdown
     this.viewSelectorTrigger.addEventListener('click', () => this.toggleViewDropdown());
+
+    // Event listeners for process dropdown + toggle
+    if (this.processSelectorTrigger) {
+      this.processSelectorTrigger.addEventListener('click', () => this.toggleProcessDropdown());
+    }
+    if (this.processToggleBtn) {
+      this.processToggleBtn.addEventListener('click', () => this.toggleProcess());
+    }
 
     this.btnViewTable.addEventListener('click', () => this.setViewMode('table'));
     this.btnViewTreeH.addEventListener('click', () => this.setViewMode('tree-h'));
@@ -554,20 +585,36 @@ const EntityExplorer = {
     // Initialize data model diagram component
     DataModelDiagram.init();
 
-    // Open views dropdown on start if views exist, otherwise entity dropdown
-    if (this.viewSelector.style.display !== 'none') {
-      this.toggleViewDropdown();
-    } else {
-      this.openDropdown();
-    }
+    // Show welcome screen on start
+    this.showWelcome();
+  },
+
+  /**
+   * Reposition a dropdown menu so it doesn't overflow the right edge of the viewport.
+   */
+  _clampDropdownToViewport(dropdownEl) {
+    const menu = dropdownEl.querySelector('.entity-selector-menu, .view-selector-menu, .process-selector-menu');
+    if (!menu) return;
+    // Reset any previous adjustment
+    menu.style.left = '';
+    // Wait one frame so the browser has laid out the menu
+    requestAnimationFrame(() => {
+      const rect = menu.getBoundingClientRect();
+      const overflow = rect.right - window.innerWidth + 8; // 8px margin
+      if (overflow > 0) {
+        menu.style.left = `-${overflow}px`;
+      }
+    });
   },
 
   toggleDropdown() {
     this.selector.classList.toggle('open');
+    if (this.selector.classList.contains('open')) this._clampDropdownToViewport(this.selector);
   },
 
   openDropdown() {
     this.selector.classList.add('open');
+    this._clampDropdownToViewport(this.selector);
   },
 
   closeDropdown() {
@@ -576,10 +623,21 @@ const EntityExplorer = {
 
   toggleViewDropdown() {
     this.viewSelector.classList.toggle('open');
+    if (this.viewSelector.classList.contains('open')) this._clampDropdownToViewport(this.viewSelector);
   },
 
   closeViewDropdown() {
     this.viewSelector.classList.remove('open');
+  },
+
+  toggleProcessDropdown() {
+    if (!this.processSelector) return;
+    this.processSelector.classList.toggle('open');
+    if (this.processSelector.classList.contains('open')) this._clampDropdownToViewport(this.processSelector);
+  },
+
+  closeProcessDropdown() {
+    if (this.processSelector) this.processSelector.classList.remove('open');
   },
 
   /**
@@ -1469,11 +1527,19 @@ const EntityExplorer = {
     this.btnViewChart.classList.toggle('active', isChart);
     this.btnViewHierarchy?.classList.toggle('active', isHierarchy);
 
-    // Show/hide containers
-    this.tableContainer.classList.toggle('hidden', this.viewMode !== 'table');
-    this.treeContainer.classList.toggle('hidden', !isTree && !isHierarchy);
-    this.mapContainer.classList.toggle('hidden', !isMap);
-    this.chartContainer.classList.toggle('hidden', !isChart);
+    // Show/hide containers (process panel overrides when visible)
+    const pv = this.processVisible;
+    this.tableContainer.classList.toggle('hidden', pv || this.viewMode !== 'table');
+    this.treeContainer.classList.toggle('hidden', pv || (!isTree && !isHierarchy));
+    this.mapContainer.classList.toggle('hidden', pv || !isMap);
+    this.chartContainer.classList.toggle('hidden', pv || !isChart);
+    if (this.processPanelContainer) {
+      this.processPanelContainer.classList.toggle('hidden', !pv);
+    }
+    // Hide welcome when any content is active
+    if (this.welcomeContainer) {
+      this.welcomeContainer.classList.add('hidden');
+    }
 
     // Update EntityTree attribute layout based on view mode
     // This will re-render the tree if layout changed, preserving expanded nodes
@@ -1903,6 +1969,185 @@ const EntityExplorer = {
       }
     } catch (e) {
       console.error('Failed to execute client calculated fields:', e);
+    }
+  },
+
+  // ─── Welcome screen ────────────────────────────────────────────────────
+
+  showWelcome() {
+    if (!this.welcomeContainer) return;
+    // Hide all data containers so welcome gets full space
+    this.tableContainer.classList.add('hidden');
+    this.treeContainer.classList.add('hidden');
+    this.mapContainer.classList.add('hidden');
+    this.chartContainer.classList.add('hidden');
+    if (this.processPanelContainer) this.processPanelContainer.classList.add('hidden');
+    // Fetch welcome content from API (system-specific)
+    fetch('/api/config/welcome').then(r => r.ok ? r.json() : null).then(data => {
+      if (data && data.html) {
+        this.welcomeContainer.innerHTML = data.html;
+      }
+    }).catch(() => {});
+    this.welcomeContainer.classList.remove('hidden');
+  },
+
+  hideWelcome() {
+    if (this.welcomeContainer) this.welcomeContainer.classList.add('hidden');
+  },
+
+  // ─── Process methods ──────────────────────────────────────────────────
+
+  async loadProcesses() {
+    if (!this.processSelector) return;
+    try {
+      const data = await ApiClient.request('/api/processes');
+      this.processList = data.processes || [];
+      if (this.processList.length === 0) {
+        this.processSelector.style.display = 'none';
+        return;
+      }
+
+      // Show process selector
+      this.processSelector.style.display = '';
+
+      const segments = [];
+      let groupHtml = null;
+
+      for (const entry of data.groups) {
+        if (entry.type === 'column_break') {
+          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+          segments.push({ columnBreak: true });
+          groupHtml = null;
+        } else if (entry.type === 'separator') {
+          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+          groupHtml = `<div class="process-selector-group"><div class="process-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
+        } else if (entry.type === 'process') {
+          const proc = this.processList.find(p => p.name === entry.name);
+          if (proc) {
+            groupHtml += `<div class="process-selector-item" data-value="${proc.name}" data-color="${proc.color}" style="border-left-color: ${proc.color};">
+              <span class="process-name">${proc.name}</span>
+            </div>`;
+          }
+        }
+      }
+      if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+
+      this.processSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
+
+      // Add click handlers
+      this.processSelectorMenu.querySelectorAll('.process-selector-item').forEach(item => {
+        item.addEventListener('click', () => {
+          this.openProcess(item.dataset.value, item.dataset.color);
+        });
+      });
+    } catch (err) {
+      console.warn('Failed to load processes:', err);
+      if (this.processSelector) this.processSelector.style.display = 'none';
+    }
+  },
+
+  async openProcess(name, color) {
+    this.closeProcessDropdown();
+
+    // Update selector UI
+    const textSpan = this.processSelectorTrigger?.querySelector('.process-selector-text');
+    if (textSpan) textSpan.textContent = name;
+    if (this.processSelectorTrigger) this.processSelectorTrigger.style.backgroundColor = color || '';
+
+    // Mark selected in menu
+    this.processSelectorMenu?.querySelectorAll('.process-selector-item').forEach(item => {
+      item.classList.toggle('selected', item.dataset.value === name);
+    });
+
+    // Load full process data
+    try {
+      const processData = await ApiClient.request(`/api/processes/${encodeURIComponent(name)}`);
+      processData.color = color;
+      this.activeProcess = processData;
+
+      // Show toggle button
+      if (this.processToggleBtn) this.processToggleBtn.style.display = '';
+
+      // Show process panel
+      ProcessPanel.show(processData);
+      this.toggleProcess(true);
+    } catch (err) {
+      console.error('Failed to load process:', err);
+      DomUtils.toastError(`Failed to load process: ${name}`);
+    }
+  },
+
+  toggleProcess(show) {
+    if (show === undefined) {
+      show = !this.processVisible;
+    }
+    this.processVisible = show;
+
+    // Toggle button active state
+    if (this.processToggleBtn) {
+      this.processToggleBtn.classList.toggle('active', show);
+    }
+
+    // Show/hide process panel vs data containers
+    if (this.processPanelContainer) {
+      this.processPanelContainer.classList.toggle('hidden', !show);
+    }
+
+    // Hide welcome + all data containers when process is visible
+    if (this.welcomeContainer) this.welcomeContainer.classList.add('hidden');
+    this.tableContainer.classList.toggle('hidden', show || this.viewMode !== 'table');
+    this.treeContainer.classList.toggle('hidden', show || (this.viewMode !== 'tree-h' && this.viewMode !== 'tree-v' && this.viewMode !== 'hierarchy'));
+    this.mapContainer.classList.toggle('hidden', show || this.viewMode !== 'map');
+    this.chartContainer.classList.toggle('hidden', show || this.viewMode !== 'chart');
+  },
+
+  closeProcess() {
+    this.activeProcess = null;
+    this.processVisible = false;
+    ProcessPanel.clear();
+
+    // Hide toggle button and process panel
+    if (this.processToggleBtn) {
+      this.processToggleBtn.style.display = 'none';
+      this.processToggleBtn.classList.remove('active');
+    }
+    if (this.processPanelContainer) {
+      this.processPanelContainer.classList.add('hidden');
+    }
+
+    // Reset selector
+    const textSpan = this.processSelectorTrigger?.querySelector('.process-selector-text');
+    if (textSpan) textSpan.textContent = i18n.t('select_process');
+    if (this.processSelectorTrigger) this.processSelectorTrigger.style.backgroundColor = '';
+    this.processSelectorMenu?.querySelectorAll('.process-selector-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+
+    // Restore data containers
+    this.updateViewToggle();
+  },
+
+  /**
+   * Navigate to a view by name (called from ProcessPanel action buttons)
+   */
+  selectViewByName(viewName, context) {
+    const view = this.viewsList.find(v => v.name === viewName);
+    if (view) {
+      this.selectViewFromDropdown(view.name, view.base, view.color);
+    } else {
+      DomUtils.toastError(`View not found: ${viewName}`);
+    }
+  },
+
+  /**
+   * Navigate to an entity by name (called from ProcessPanel action buttons)
+   */
+  selectEntityByName(entityName) {
+    const item = this.selectorMenu.querySelector(`[data-value="${entityName}"]`);
+    if (item) {
+      this.selectEntityFromDropdown(entityName, item.dataset.color);
+    } else {
+      DomUtils.toastError(`Entity not found: ${entityName}`);
     }
   },
 

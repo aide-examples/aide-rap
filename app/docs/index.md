@@ -586,6 +586,9 @@ GET    /api/views                         # List views with groups/colors
 GET    /api/views/:name                   # Query view data (filter, sort, page)
 GET    /api/views/:name/schema            # View column metadata
 
+GET    /api/processes                     # List processes with groups/colors
+GET    /api/processes/:name               # Get full process (steps, markdown)
+
 GET    /api/audit                         # Audit trail (readonly)
 GET    /api/audit/:id                     # Single audit entry
 GET    /api/audit/schema/extended         # Audit schema for UI
@@ -671,6 +674,38 @@ Entity visibility and views are defined in `docs/`:
 ```
 
 Only `##` headers and `---` separators. Views within each area are still loaded from `docs/views/{Area}/*.md`. Areas not listed in Views.md are appended alphabetically. Without Views.md, areas appear alphabetically with one column per area.
+
+**Processes.md** (optional) — Area ordering and column layout for the process selector:
+```markdown
+## Engine Management
+---
+## Operations
+```
+
+Same syntax as Views.md. Processes are loaded from `docs/processes/{Area}/*.md`.
+
+**processes/{Area}/{ProcessName}.md** — Business process guides (one file per process):
+```markdown
+# Engine Shop Visit
+
+Required: Engine:select
+
+This process guides you through handling an engine shop visit.
+
+## Review Engine Usage
+Check the engine's flight hours and cycles.
+- Open the **Engine Usage** view
+- Review total FH and FC since last overhaul
+
+View: Engine Usage
+
+## Create Workscope
+Create a workscope document for the maintenance work.
+
+Entity: Workscope
+```
+
+Each `##` becomes a tab. `View:` and `Entity:` directives become action buttons.
 
 **views/{Area}/{ViewName}.md** — Cross-entity join views (one file per view):
 ```
@@ -772,6 +807,13 @@ See [Seed Data Reference](seed-data.md) for technical details.
 See [Views Configuration](procedures/views-config.md) for syntax details.
 See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configuration.
 
+### Business Processes
+- [x] **Process Guide** – Markdown-defined step-by-step process documents with tabbed UI, area-grouped selector, and toggle between process view and data view
+- [x] **Step Navigation** – Non-sequential tabs for each process step with rendered Markdown (images, tables, lists)
+- [x] **Action Buttons** – Steps can reference Views (`View: Name`) or Entities (`Entity: Name`) with one-click navigation
+- [ ] **Process Context** – Required initial object selection, context accumulation across steps
+- [ ] **Breadcrumb Cooperation** – Process learns context from user navigation via breadcrumb entries
+
 ### UI Enhancements
 - [x] **Breadcrumb Navigation** – Visual navigation trail with browser back/forward support, state preservation (viewMode, selected row), configurable display
 - [x] **Deep Linking** – Share navigation state via URL parameter + QR code dialog (right-click on breadcrumb)
@@ -779,7 +821,7 @@ See [Filter Dialogs](procedures/filter-dialogs.md) for pre-load filter configura
 - [ ] Column visibility toggle
 - [ ] Drag & Drop column reordering
 - [ ] Saved filter presets
-- [ ] Dark mode
+- [x] **Dark Mode** – Light/Dark/System theme with full coverage (CSS variables, area colors, charts, map)
 - [ ] Accessibility (ARIA labels, high-contrast mode, screen reader support)
 
 ### Visualization

@@ -48,13 +48,16 @@ const EntityChart = {
     const isDark = document.documentElement.dataset.theme === 'dark';
 
     // Build complete Vega-Lite spec with muted default color scheme
-    const darkConfig = isDark ? {
+    const themeConfig = isDark ? {
       background: 'transparent',
-      axis: { labelColor: '#d1d5db', titleColor: '#e5e7eb', gridColor: '#374151', domainColor: '#4b5563' },
-      legend: { labelColor: '#d1d5db', titleColor: '#e5e7eb' },
-      title: { color: '#e5e7eb' },
-      view: { stroke: '#374151' }
-    } : {};
+      axis: { labelColor: '#e5e7eb', titleColor: '#f3f4f6', gridColor: '#3f3f46', domainColor: '#52525b' },
+      legend: { labelColor: '#e5e7eb', titleColor: '#f3f4f6' },
+      title: { color: '#f3f4f6' },
+      view: { stroke: '#3f3f46' }
+    } : {
+      axis: { labelColor: '#333', titleColor: '#111' },
+      legend: { labelColor: '#333', titleColor: '#111' }
+    };
 
     const spec = {
       $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
@@ -65,7 +68,7 @@ const EntityChart = {
       ...schema.chart,
       config: {
         range: { category: { scheme: 'set2' } },
-        ...darkConfig,
+        ...themeConfig,
         ...(schema.chart?.config || {})
       }
     };

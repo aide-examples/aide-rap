@@ -229,6 +229,16 @@ app.get('/api/config/tree', (req, res) => {
     res.json(cfg.tree || { backRefPreviewLimit: 10 });
 });
 
+// Welcome screen content (system-specific)
+app.get('/api/config/welcome', (req, res) => {
+    const welcomePath = path.join(cfg.paths.docs, 'welcome.html');
+    if (fs.existsSync(welcomePath)) {
+        res.json({ html: fs.readFileSync(welcomePath, 'utf-8') });
+    } else {
+        res.json({ html: '' });
+    }
+});
+
 // =============================================================================
 // 7c. BACKEND INITIALIZATION (CRUD API)
 // =============================================================================
@@ -236,6 +246,7 @@ app.get('/api/config/tree', (req, res) => {
 const UISpecLoader = require('./server/utils/UISpecLoader');
 const mdCrud = UISpecLoader.loadCrudConfig(cfg.paths.docs);
 const mdViews = UISpecLoader.loadViewsConfig(cfg.paths.docs);
+const mdProcesses = UISpecLoader.loadProcessesConfig(cfg.paths.docs);
 
 // Extract entities, prefilters, requiredFilters, and tableOptions from CRUD config
 const crudConfig = mdCrud || { entities: [], prefilters: {}, requiredFilters: {}, tableOptions: {} };
@@ -335,6 +346,12 @@ if (authEnabled) {
     app.use('/api/views', authMiddleware, requireRole('guest', 'user', 'admin'));
 }
 app.use(require('./server/routers/UserViewRouter')());
+
+// Process Router (read-only for all authenticated users)
+if (authEnabled) {
+    app.use('/api/processes', authMiddleware, requireRole('guest', 'user', 'admin'));
+}
+app.use(require('./server/routers/ProcessRouter')(mdProcesses));
 
 // Export Router (PDF, CSV) - routes are under /api/entities, protection handled there
 app.use(require('./server/routers/export.router')(cfg));

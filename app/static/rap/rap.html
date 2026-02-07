@@ -32,6 +32,8 @@
     <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
     <!-- Mermaid for ER diagrams -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <!-- Marked for markdown rendering (processes) -->
+    <script src="/static/frame/vendor/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="app-container page-fill">
@@ -109,6 +111,19 @@
                                 <span data-i18n="map_labels">Labels</span>
                             </label>
                         </div>
+                        <div id="process-selector" class="process-selector-dropdown" style="display:none">
+                            <button class="process-selector-trigger">
+                                <span class="process-selector-text" data-i18n="select_process">Select Process...</span>
+                            </button>
+                            <div class="process-selector-menu"></div>
+                        </div>
+                        <button id="btn-process-toggle" class="btn-icon process-toggle-btn" title="Toggle process view" data-i18n-title="tooltip_toggle_process" style="display:none">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+                                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                                <path d="M9 14l2 2 4-4"/>
+                            </svg>
+                        </button>
                         <div id="view-selector" class="view-selector-dropdown" style="display:none">
                             <button class="view-selector-trigger">
                                 <span class="view-selector-text" data-i18n="select_view">Select View...</span>
@@ -152,7 +167,7 @@
                     </div>
 
                     <!-- Entity Tree (tree view) -->
-                    <div id="entity-tree-container" class="entity-list">
+                    <div id="entity-tree-container" class="entity-list hidden">
                     </div>
 
                     <!-- Entity Map (map view) -->
@@ -161,6 +176,14 @@
 
                     <!-- Entity Chart (chart view) -->
                     <div id="entity-chart-container" class="entity-chart hidden">
+                    </div>
+
+                    <!-- Welcome Screen (shown when nothing selected) -->
+                    <div id="welcome-container" class="welcome-screen">
+                    </div>
+
+                    <!-- Process Panel (process view) -->
+                    <div id="process-panel-container" class="process-panel hidden">
                     </div>
                 </section>
 
@@ -238,6 +261,7 @@
     <script src="/static/rap/components/entity-map.js"></script>
     <script src="/static/rap/components/entity-chart.js"></script>
     <script src="/static/rap/components/hierarchy-tree.js"></script>
+    <script src="/static/rap/components/process-panel.js"></script>
     <script src="/static/rap/components/entity-explorer.js"></script>
     <script src="/static/rap/components/data-model-diagram.js"></script>
     <script src="/static/rap/components/breadcrumb-nav.js"></script>

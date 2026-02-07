@@ -1,8 +1,8 @@
 /**
- * UISpecLoader — Read CRUD and Views configuration from Markdown files.
+ * UISpecLoader — Read CRUD, Views, and Processes configuration from Markdown files.
  *
- * Looks for `docs/Crud.md` and `docs/views/{Area}/{ViewName}.md`.
- * Returns the same data structures as the old config.json format.
+ * Looks for `docs/Crud.md`, `docs/views/{Area}/{ViewName}.md`,
+ * and `docs/processes/{Area}/{ProcessName}.md`.
  *
  * Crud.md format:
  *   # CRUD
@@ -18,6 +18,15 @@
  *   schema.columns.push({ key: 'x', label: 'X', type: 'number' });
  *   for (const row of data) { row.x = ...; }
  *   ```
+ *
+ * Process file format (one file per process in docs/processes/{Area}/{ProcessName}.md):
+ *   # Process Name         → process name
+ *   Required: Entity:select → optional initial object selection
+ *   Description text...    → process description (before first ##)
+ *   ## Step Title           → step tab
+ *   Step markdown text...   → step content (rendered with marked)
+ *   View: ViewName          → optional directive → action button
+ *   Entity: EntityName      → optional directive → action button
  *
  * Area = subdirectory name (used as section separator)
  */
@@ -280,4 +289,155 @@ function loadViewsConfig(requirementsDir) {
   return result.length > 0 ? result : null;
 }
 
-module.exports = { loadCrudConfig, loadViewsConfig, SEPARATOR_PREFIX, COLUMN_BREAK };
+/**
+ * Parse a single process file.
+ * Extracts: name (H1), required directive, description (text before first H2),
+ * steps (H2 sections with body text, View/Entity directives).
+ * @param {string} content - File content
+ * @param {string} filename - Filename (used as fallback for process name)
+ * @returns {Object|null} Process definition or null if invalid
+ */
+function parseProcessFile(content, filename) {
+  // Remove HTML comments before parsing
+  content = content.replace(/<!--[\s\S]*?-->/g, '');
+
+  const lines = content.split('\n');
+  let name = null;
+  let required = null;
+  let descriptionLines = [];
+  let steps = [];
+  let currentStep = null;
+  let foundFirstH2 = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // H1 = Process Name
+    if (trimmed.startsWith('# ') && !trimmed.startsWith('## ') && !name) {
+      name = trimmed.substring(2).trim();
+      continue;
+    }
+
+    // Required directive (before first H2)
+    if (!foundFirstH2 && /^Required:\s*(.+)$/i.test(trimmed)) {
+      required = trimmed.match(/^Required:\s*(.+)$/i)[1].trim();
+      continue;
+    }
+
+    // H2 = Step
+    if (trimmed.startsWith('## ')) {
+      foundFirstH2 = true;
+      if (currentStep) steps.push(currentStep);
+      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entity: null };
+      continue;
+    }
+
+    if (!foundFirstH2) {
+      // Before first H2 = description
+      if (name) descriptionLines.push(line);
+    } else if (currentStep) {
+      // Inside a step — check for directives
+      const viewMatch = trimmed.match(/^View:\s*(.+)$/i);
+      const entityMatch = trimmed.match(/^Entity:\s*(.+)$/i);
+      if (viewMatch) {
+        currentStep.view = viewMatch[1].trim();
+      } else if (entityMatch) {
+        currentStep.entity = entityMatch[1].trim();
+      } else {
+        currentStep.bodyLines.push(line);
+      }
+    }
+  }
+
+  // Push last step
+  if (currentStep) steps.push(currentStep);
+
+  if (!name && steps.length === 0) return null;
+
+  // Clean up: trim trailing empty lines from body, join into string
+  const trimBody = (lines) => {
+    while (lines.length > 0 && lines[lines.length - 1].trim() === '') lines.pop();
+    while (lines.length > 0 && lines[0].trim() === '') lines.shift();
+    return lines.join('\n');
+  };
+
+  return {
+    name: name || filename.replace('.md', ''),
+    required,
+    description: trimBody(descriptionLines),
+    steps: steps.map(s => ({
+      title: s.title,
+      body: trimBody(s.bodyLines),
+      view: s.view,
+      entity: s.entity
+    }))
+  };
+}
+
+/**
+ * Load process files for a single area directory.
+ * @param {string} areaDir - Path to area subdirectory
+ * @returns {Object[]} Array of parsed process definitions
+ */
+function loadAreaProcesses(areaDir) {
+  const processFiles = fs.readdirSync(areaDir)
+    .filter(f => f.endsWith('.md'))
+    .sort();
+  const processes = [];
+  for (const file of processFiles) {
+    const content = fs.readFileSync(path.join(areaDir, file), 'utf-8');
+    const processDef = parseProcessFile(content, file);
+    if (processDef) processes.push(processDef);
+  }
+  return processes;
+}
+
+/**
+ * Load process definitions from docs/processes/{Area}/{ProcessName}.md files.
+ * Uses Processes.md (if present) for area ordering and column breaks.
+ * @param {string} requirementsDir - Path to docs/ directory
+ * @returns {Array|null} Array of process objects, separator strings, and COLUMN_BREAK markers
+ */
+function loadProcessesConfig(requirementsDir) {
+  const processesDir = path.join(requirementsDir, 'processes');
+
+  if (!fs.existsSync(processesDir)) {
+    return null;
+  }
+
+  const result = [];
+
+  // All area directories on disk
+  const diskAreas = fs.readdirSync(processesDir)
+    .filter(f => fs.statSync(path.join(processesDir, f)).isDirectory())
+    .sort();
+
+  const layout = parseLayoutFile(path.join(requirementsDir, 'Processes.md'));
+
+  // Determine area order: layout file or alphabetical fallback
+  const orderedAreas = layout
+    ? [...layout.areas, ...diskAreas.filter(a => !layout.areas.includes(a))]
+    : diskAreas;
+
+  let areaIndex = 0;
+  for (const area of orderedAreas) {
+    const areaDir = path.join(processesDir, area);
+    if (!fs.existsSync(areaDir) || !fs.statSync(areaDir).isDirectory()) continue;
+
+    const processes = loadAreaProcesses(areaDir);
+    if (processes.length === 0) continue;
+
+    // Insert column break if layout says so
+    if (layout && layout.breaks.has(areaIndex)) {
+      result.push(COLUMN_BREAK);
+    }
+
+    result.push(SEPARATOR_PREFIX + area);
+    result.push(...processes);
+    areaIndex++;
+  }
+
+  return result.length > 0 ? result : null;
+}
+
+module.exports = { loadCrudConfig, loadViewsConfig, loadProcessesConfig, SEPARATOR_PREFIX, COLUMN_BREAK };

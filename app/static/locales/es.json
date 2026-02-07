@@ -223,5 +223,10 @@
     "si_preview_rows": "filas",
     "si_preview_record": "Registro",
     "si_preview_no_data": "Sin datos en archivo de origen",
-    "si_new_mapping": "Nuevo Mapping"
+    "si_new_mapping": "Nuevo Mapping",
+
+    "select_process": "Seleccionar proceso...",
+    "tooltip_toggle_process": "Alternar vista de proceso",
+    "process_open_view": "Abrir vista: %{name}",
+    "process_open_entity": "Abrir entidad: %{name}"
 }

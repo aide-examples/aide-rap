@@ -231,5 +231,10 @@
     "si_preview_rows": "rows",
     "si_preview_record": "Record",
     "si_preview_no_data": "No data in source file",
-    "si_new_mapping": "New Mapping"
+    "si_new_mapping": "New Mapping",
+
+    "select_process": "Select Process...",
+    "tooltip_toggle_process": "Toggle process view",
+    "process_open_view": "Open View: %{name}",
+    "process_open_entity": "Open Entity: %{name}"
 }

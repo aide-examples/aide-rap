@@ -8,7 +8,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Systems: irma, book, ...                               │  ← Your domain models
+│  Systems: book, metering, ...                           │  ← Your domain models
 │  (Markdown entity definitions under app/systems/)       │
 ├─────────────────────────────────────────────────────────┤
 │  AIDE RAP                                               │  ← This repository
@@ -25,13 +25,23 @@ The [aide-frame](https://github.com/aide-examples/aide-frame) framework provides
 
 ### Layer 2: AIDE RAP (Generator)
 
-The generic RAP engine transforms Markdown-based data models into complete applications. *No code generation wizards*, *no XML schemas* – just describe your entities in Markdown tables and get:
+The generic RAP engine transforms Markdown-based data models, view definitions, import rules and
+business process descriptions into complete applications. *No code generation wizards*, *no XML schemas* 
 
+- Built-in Data Types (address, contact, url, ..)
+– Data Type Definitions (enum, composite, ..) 
+- Configurable Validation Rules (numeric, regexp)
+- Entities, Attributes, References by Type
+- Diagram Editor for data model design
 - SQLite database with constraints and relationships
+- Hashed file storage for media blobs
 - REST API with CRUD, filtering, and validation
+- built-in audit trail for data modification
 - Modern browser UI with table and tree views
+- Composite views, bar charts, graphs, geo maps
 - AI-powered seed data generation
-- Visual diagram editor for data model design
+- configurable import procedures for real world data loading
+- process charts guiding the user
 
 **[Read the Documentation →](app/docs/index.md)**
 

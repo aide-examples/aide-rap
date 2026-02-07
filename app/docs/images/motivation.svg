@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eef4ff"/>
+      <stop offset="100%" stop-color="#dbe8f8"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="220" rx="12" fill="url(#bg2)"/>
+  <!-- Brain icon -->
+  <circle cx="140" cy="100" r="45" fill="none" stroke="#4a7ab5" stroke-width="2.5"/>
+  <path d="M120 85 Q130 70 145 75 Q160 65 165 80 Q175 78 172 92 Q180 100 170 110 Q175 120 163 122 Q158 135 145 128 Q135 138 125 128 Q112 132 112 118 Q100 112 108 102 Q100 90 115 88 Z" fill="#6a9fd8" opacity="0.7"/>
+  <!-- Arrow -->
+  <line x1="200" y1="100" x2="240" y2="100" stroke="#4a7ab5" stroke-width="3" stroke-linecap="round"/>
+  <polygon points="245,100 235,93 235,107" fill="#4a7ab5"/>
+  <!-- Code brackets -->
+  <text x="280" y="90" font-family="monospace" font-size="42" fill="#4a7ab5" font-weight="bold">{</text>
+  <text x="310" y="90" font-family="monospace" font-size="42" fill="#6a9fd8" font-weight="bold">}</text>
+  <text x="275" y="120" font-family="monospace" font-size="11" fill="#4a7ab5">AI + Code</text>
+  <!-- Caption -->
+  <text x="200" y="185" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="14" fill="#3a5a7a" font-weight="600">Understanding AI-Assisted Development</text>
+</svg>

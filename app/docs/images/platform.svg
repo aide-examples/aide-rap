@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" width="400" height="250">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff8ee"/>
+      <stop offset="100%" stop-color="#f5e8d0"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="250" rx="12" fill="url(#bg4)"/>
+  <!-- Excel chaos (left) -->
+  <rect x="30" y="40" width="50" height="40" rx="3" fill="#c4d8a0" stroke="#8aaa60" stroke-width="1" transform="rotate(-5,55,60)"/>
+  <rect x="55" y="50" width="50" height="40" rx="3" fill="#a0c4d8" stroke="#608aaa" stroke-width="1" transform="rotate(3,80,70)"/>
+  <rect x="40" y="65" width="50" height="40" rx="3" fill="#d8c4a0" stroke="#aa8a60" stroke-width="1" transform="rotate(-8,65,85)"/>
+  <text x="70" y="125" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="10" fill="#8a7050">Excel Chaos</text>
+  <!-- Arrow -->
+  <line x1="130" y1="75" x2="175" y2="75" stroke="#b58a4a" stroke-width="2.5" stroke-linecap="round"/>
+  <polygon points="180,75 172,68 172,82" fill="#b58a4a"/>
+  <!-- RAP Platform (center) -->
+  <rect x="190" y="30" width="170" height="110" rx="8" fill="#d4a050" opacity="0.15" stroke="#d4a050" stroke-width="2"/>
+  <text x="275" y="55" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="16" fill="#8a6020" font-weight="700">AIDE-RAP</text>
+  <rect x="205" y="65" width="65" height="25" rx="4" fill="#d4a050" opacity="0.6"/>
+  <text x="237" y="82" text-anchor="middle" font-family="monospace" font-size="9" fill="white">Entities</text>
+  <rect x="280" y="65" width="65" height="25" rx="4" fill="#d4a050" opacity="0.6"/>
+  <text x="312" y="82" text-anchor="middle" font-family="monospace" font-size="9" fill="white">Views</text>
+  <rect x="205" y="98" width="65" height="25" rx="4" fill="#d4a050" opacity="0.6"/>
+  <text x="237" y="115" text-anchor="middle" font-family="monospace" font-size="9" fill="white">Import</text>
+  <rect x="280" y="98" width="65" height="25" rx="4" fill="#d4a050" opacity="0.6"/>
+  <text x="312" y="115" text-anchor="middle" font-family="monospace" font-size="9" fill="white">Export</text>
+  <!-- Target group -->
+  <text x="200" y="175" font-family="Segoe UI, sans-serif" font-size="12" fill="#8a6020" font-weight="600">Target Group:</text>
+  <text x="200" y="195" font-family="Segoe UI, sans-serif" font-size="11" fill="#6a5030">Mid-size teams behind enterprise firewalls</text>
+  <text x="200" y="212" font-family="Segoe UI, sans-serif" font-size="11" fill="#6a5030">with complex data and Excel dependencies</text>
+  <!-- Tagline -->
+  <text x="200" y="240" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="13" fill="#b58a4a" font-weight="600" font-style="italic">Smooth and low-risk transition</text>
+</svg>

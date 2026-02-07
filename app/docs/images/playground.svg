@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220" width="400" height="220">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f0f7ee"/>
+      <stop offset="100%" stop-color="#dcecd6"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="220" rx="12" fill="url(#bg3)"/>
+  <!-- Small app blocks -->
+  <rect x="50" y="50" width="70" height="55" rx="6" fill="#7ab58a" opacity="0.8"/>
+  <text x="85" y="82" text-anchor="middle" font-family="monospace" font-size="10" fill="white">App 1</text>
+  <rect x="135" y="50" width="70" height="55" rx="6" fill="#5a9b6a" opacity="0.8"/>
+  <text x="170" y="82" text-anchor="middle" font-family="monospace" font-size="10" fill="white">App 2</text>
+  <rect x="220" y="50" width="70" height="55" rx="6" fill="#4a8b5a" opacity="0.8"/>
+  <text x="255" y="82" text-anchor="middle" font-family="monospace" font-size="10" fill="white">App 3</text>
+  <rect x="305" y="50" width="70" height="55" rx="6" fill="#3a7b4a" opacity="0.8"/>
+  <text x="340" y="82" text-anchor="middle" font-family="monospace" font-size="10" fill="white">App 4</text>
+  <!-- Arrow down -->
+  <line x1="200" y1="120" x2="200" y2="145" stroke="#4a8b5a" stroke-width="2.5" stroke-linecap="round"/>
+  <polygon points="200,150 194,142 206,142" fill="#4a8b5a"/>
+  <!-- Framework bar -->
+  <rect x="80" y="155" width="240" height="35" rx="6" fill="#3a7b4a" opacity="0.9"/>
+  <text x="200" y="177" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="13" fill="white" font-weight="600">AIDE Framework</text>
+  <!-- Label -->
+  <text x="200" y="210" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="12" fill="#3a6a4a">A Series of Learning Applications</text>
+</svg>

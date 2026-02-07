@@ -231,5 +231,10 @@
     "si_preview_rows": "Zeilen",
     "si_preview_record": "Datensatz",
     "si_preview_no_data": "Keine Daten in Quelldatei",
-    "si_new_mapping": "Neues Mapping"
+    "si_new_mapping": "Neues Mapping",
+
+    "select_process": "Prozess auswählen...",
+    "tooltip_toggle_process": "Prozessansicht umschalten",
+    "process_open_view": "Ansicht öffnen: %{name}",
+    "process_open_entity": "Entität öffnen: %{name}"
 }
