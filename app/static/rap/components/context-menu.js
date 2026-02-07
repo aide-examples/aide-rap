@@ -32,6 +32,7 @@ const ContextMenu = {
         <span class="context-menu-icon">&#128465;</span>
         <span data-i18n="ctx_delete">Delete</span>
       </div>
+      <div class="context-menu-views"></div>
       <div class="context-menu-separator"></div>
       <div class="context-menu-item" data-action="export-pdf">
         <span class="context-menu-icon">&#128462;</span>
@@ -104,6 +105,49 @@ const ContextMenu = {
         }
       }
     });
+
+    // Populate views section: entity-level views + FK-specific views
+    const viewsContainer = this.menu.querySelector('.context-menu-views');
+    viewsContainer.innerHTML = '';
+
+    // Views matching the current entity's requiredFilter
+    const entityViews = EntityExplorer.getViewsForEntity(context.entity);
+    // Views matching the FK target entity (only when right-clicking on a FK cell)
+    const fkViews = context.fkEntity ? EntityExplorer.getViewsForEntity(context.fkEntity) : [];
+
+    const allViews = [
+      ...entityViews.map(v => ({ ...v, filterValue: null })),
+      ...fkViews.map(v => ({ ...v, filterValue: context.fkLabel }))
+    ];
+
+    if (allViews.length > 0) {
+      let html = '<div class="context-menu-separator"></div>';
+      for (const { view, matchType, viewColumn, filterValue } of allViews) {
+        html += `<div class="context-menu-item context-menu-view-item"
+                      data-view-name="${DomUtils.escapeHtml(view.name)}"
+                      data-view-base="${DomUtils.escapeHtml(view.base)}"
+                      data-view-color="${DomUtils.escapeHtml(view.color || '')}"
+                      data-match-type="${matchType}"
+                      ${viewColumn ? `data-view-column="${DomUtils.escapeHtml(viewColumn)}"` : ''}
+                      ${filterValue ? `data-filter-value="${DomUtils.escapeHtml(filterValue)}"` : ''}>
+          <span class="context-menu-icon">&#128202;</span>
+          <span>${DomUtils.escapeHtml(view.name)}</span>
+        </div>`;
+      }
+      viewsContainer.innerHTML = html;
+      viewsContainer.querySelectorAll('.context-menu-view-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          EntityExplorer.openViewForRecord(
+            item.dataset.viewName, item.dataset.viewBase,
+            item.dataset.viewColor, this.currentContext.recordId,
+            item.dataset.matchType, item.dataset.viewColumn,
+            item.dataset.filterValue || null
+          );
+          this.hide();
+        });
+      });
+    }
 
     // Adjust if menu goes off-screen
     const rect = this.menu.getBoundingClientRect();

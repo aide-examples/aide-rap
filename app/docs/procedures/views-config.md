@@ -288,6 +288,53 @@ Subquery aliases use `_br` for the child table and `_br_{field}` for internal jo
 
 ---
 
+## Context Menu Navigation
+
+When right-clicking a record in the CRUD table, the context menu shows **views whose `requiredFilter` references that entity type**. This allows quick navigation from a record to related views.
+
+### How It Works
+
+The system matches views by their `requiredFilter` field types:
+
+1. **Row-level**: Right-clicking anywhere on a row shows views that require an input of the current entity's type
+2. **FK cell**: Right-clicking on a FK cell additionally shows views that require an input of the FK target entity's type
+
+### Example
+
+Given these views:
+
+```json
+// Engine Timeline — requiredFilter references Aircraft
+{
+  "base": "EngineAllocation",
+  "requiredFilter": ["aircraft._label:select"],
+  "columns": ["engine._label AS Engine", "start_date AS Start Date", "aircraft._label AS Aircraft"]
+}
+
+// Operator Fleet — requiredFilter references Operator
+{
+  "base": "Aircraft",
+  "requiredFilter": ["operator._label:select"],
+  "columns": ["registration AS Registration", "operator._label AS Operator"]
+}
+```
+
+In the **Aircraft** CRUD table:
+
+| Action | Shown Views | Why |
+|--------|-------------|-----|
+| Right-click on row | Engine Timeline | requiredFilter targets Aircraft |
+| Right-click on `current_operator` FK cell | Engine Timeline + Operator Fleet | Row match + FK cell match |
+
+### Filter Behavior
+
+- **Row-level views**: The clicked record's label becomes the filter value (e.g., `Aircraft:MSN-001`)
+- **FK cell views**: The FK cell's display text becomes the filter value (e.g., `Operator:Lufthansa`)
+
+The view opens immediately with the filter applied — no prefilter dialog is shown. Breadcrumb navigation is preserved (push, not replace).
+
+---
+
 ## Complete Example
 
 File structure:

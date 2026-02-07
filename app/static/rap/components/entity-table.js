@@ -1101,11 +1101,18 @@ const EntityTable = {
       row.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const id = parseInt(row.dataset.id);
-        ContextMenu.show(e.clientX, e.clientY, {
+        const context = {
           entity: this.currentEntity,
           recordId: id,
           source: 'table'
-        });
+        };
+        // Detect right-click on FK cell → include FK entity and label
+        const fkEl = e.target.closest('.fk-value');
+        if (fkEl) {
+          context.fkEntity = fkEl.dataset.entity;
+          context.fkLabel = fkEl.textContent.trim();
+        }
+        ContextMenu.show(e.clientX, e.clientY, context);
       });
 
       // Double-click: open in horizontal tree view with 2 levels expanded

@@ -27,6 +27,7 @@ const EntityExplorer = {
   currentEntitySchema: null, // Cached entity schema for map rendering
   currentView: null, // null = entity mode, object = view mode { name, base, color }
   entityMetadata: {}, // Map of entity name -> { readonly, system, ... }
+  viewsList: [], // All views from API (for context menu matching)
   records: [],
   selectedId: null,
   viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
@@ -762,6 +763,7 @@ const EntityExplorer = {
   async loadViews() {
     try {
       const viewsData = await ApiClient.getViews();
+      this.viewsList = viewsData.views || [];
       if (!viewsData.views || viewsData.views.length === 0) {
         this.viewSelector.style.display = 'none';
         return;
@@ -842,6 +844,88 @@ const EntityExplorer = {
     this.onViewChange(viewName, baseName, color);
   },
 
+  /**
+   * Get views whose requiredFilter references the given entity.
+   * Returns array of { view, matchType: 'filter', viewColumn } for context menu.
+   */
+  getViewsForEntity(entityName) {
+    if (!entityName || !this.viewsList) return [];
+    const results = [];
+    for (const v of this.viewsList) {
+      if (v.requiredFilterEntities) {
+        const match = v.requiredFilterEntities.find(fe => fe.entity === entityName);
+        if (match) {
+          results.push({ view: v, matchType: 'filter', viewColumn: match.viewColumn });
+        }
+      }
+    }
+    return results;
+  },
+
+  /**
+   * Open a view filtered to a specific record (called from context menu).
+   * @param {string} viewName - View display name
+   * @param {string} baseName - View base entity name
+   * @param {string} color - View color
+   * @param {number} recordId - Record ID
+   * @param {string} matchType - 'filter'
+   * @param {string} [viewColumn] - View column alias for filter match
+   * @param {string} [filterValue] - Explicit filter value (e.g. FK label text)
+   */
+  async openViewForRecord(viewName, baseName, color, recordId, matchType, viewColumn, filterValue) {
+    // Save current selection before navigating
+    if (typeof BreadcrumbNav !== 'undefined') {
+      BreadcrumbNav.updateCurrentSelection(this.selectedId || recordId, this.viewMode);
+    }
+
+    // Build the filter: use explicit filterValue if provided, otherwise derive from record label
+    let recordFilter;
+    if (matchType === 'filter' && viewColumn) {
+      if (filterValue) {
+        recordFilter = `${viewColumn}:${filterValue}`;
+      } else {
+        const record = this.records.find(r => r.id === recordId);
+        const schema = this.currentEntitySchema || await SchemaCache.getExtended(this.currentEntity);
+        const label = ColumnUtils.getRecordLabel(record || { id: recordId }, schema);
+        recordFilter = `${viewColumn}:${label.title}`;
+      }
+    } else {
+      recordFilter = `id:${recordId}`;
+    }
+
+    // Update view selector UI
+    this.viewSelectorValue = viewName;
+    const viewText = this.viewSelectorTrigger.querySelector('.view-selector-text');
+    if (viewText) viewText.textContent = viewName;
+    this.viewSelectorTrigger.style.backgroundColor = color || '';
+
+    this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
+      item.classList.toggle('selected', item.dataset.value === viewName);
+    });
+    this.closeViewDropdown();
+
+    // Deselect entity
+    this.selectorValue = '';
+    const entityText = this.selectorTrigger.querySelector('.entity-selector-text');
+    if (entityText) entityText.textContent = i18n.t('select_entity');
+    this.selectorTrigger.style.backgroundColor = '';
+    this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+
+    // Push breadcrumb (not setBase — preserves history)
+    if (typeof BreadcrumbNav !== 'undefined') {
+      BreadcrumbNav.push({
+        type: 'view',
+        view: { name: viewName, base: baseName, color: color },
+        color: color || '#f5f5f5',
+        filter: recordFilter
+      });
+    }
+
+    await this.onViewChange(viewName, baseName, color, { recordFilter });
+  },
+
   async onEntityChange() {
     const entityName = this.selectorValue;
 
@@ -912,7 +996,7 @@ const EntityExplorer = {
     DetailPanel.clear();
   },
 
-  async onViewChange(viewName, baseName, color) {
+  async onViewChange(viewName, baseName, color, options = {}) {
     this.currentView = { name: viewName, base: baseName, color };
     this.currentEntity = null;
     this.currentEntitySchema = null;
@@ -972,7 +1056,10 @@ const EntityExplorer = {
       const isLargeDataset = this.totalRecords > config.threshold;
 
       let filter = '';
-      if (hasRequired || (hasPrefilter && isLargeDataset)) {
+      if (options.recordFilter) {
+        // Direct record filter (from context menu) — skip prefilter dialog
+        filter = options.recordFilter;
+      } else if (hasRequired || (hasPrefilter && isLargeDataset)) {
         const dialogFields = hasRequired ? this.requiredFilterFields : this.prefilterFields;
         const prefilterResult = await this.showPrefilterDialog(viewName, dialogFields, {
           isView: true,

@@ -32,13 +32,26 @@ module.exports = function() {
       const views = schema.userViews || [];
       const groups = schema.userViewGroups || [];
 
-      res.json({ views: views.map(v => ({
-        name: v.name,
-        base: v.base,
-        color: v.color,
-        group: v.group,
-        columns: v.columns.map(c => c.label)
-      })), groups });
+      res.json({ views: views.map(v => {
+        // Resolve requiredFilter fields to their FK target entities
+        const requiredFilterEntities = [];
+        for (const spec of (v.requiredFilter || [])) {
+          const fieldPath = spec.replace(/:(\w+)$/, ''); // "aircraft._label:select" → "aircraft._label"
+          const fkPrefix = fieldPath.split('.')[0];       // "aircraft"
+          const col = v.columns.find(c => c.fkEntity && c.path && c.path.split('.')[0] === fkPrefix);
+          if (col) {
+            requiredFilterEntities.push({ entity: col.fkEntity, viewColumn: col.sqlAlias });
+          }
+        }
+        return {
+          name: v.name,
+          base: v.base,
+          color: v.color,
+          group: v.group,
+          columns: v.columns.map(c => c.label),
+          ...(requiredFilterEntities.length > 0 ? { requiredFilterEntities } : {})
+        };
+      }), groups });
     } catch (err) {
       logger.error('Failed to list views', { error: err.message });
       res.status(500).json({ error: err.message });
@@ -163,6 +176,7 @@ module.exports = function() {
       const { conditions, params } = parseFilter(filter, {
         // Resolve column by sqlAlias or label
         resolveColumn: (colName) => {
+          if (colName === 'id') return { sqlName: 'id', jsType: 'number' };
           const col = view.columns.find(c => c.sqlAlias === colName || c.label === colName);
           return col ? { sqlName: col.sqlAlias, jsType: col.jsType } : null;
         },

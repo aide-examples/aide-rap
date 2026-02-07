@@ -226,7 +226,9 @@ const BreadcrumbNav = {
           if (entityText) entityText.textContent = i18n.t('select_entity');
           EntityExplorer.selectorTrigger.style.backgroundColor = '';
 
-          await EntityExplorer.onViewChange(crumb.view.name, crumb.view.base, crumb.view.color);
+          const viewOptions = {};
+          if (crumb.filter) viewOptions.recordFilter = crumb.filter;
+          await EntityExplorer.onViewChange(crumb.view.name, crumb.view.base, crumb.view.color, viewOptions);
         }
         // IMPORTANT: Set selectedId BEFORE setViewMode so tree renderer knows which record to expand
         if (crumb.selectedId) {
