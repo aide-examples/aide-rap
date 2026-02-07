@@ -57,7 +57,7 @@
          * @param {number} toWidth - Target box width (optional, defaults to BOX_WIDTH)
          */
         getConnectionPoint(fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed, fromWidth, toWidth) {
-            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT } = DiagramConstants;
+            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT, STUB_LENGTH } = DiagramConstants;
 
             // Use provided widths or fall back to default
             const actualFromWidth = fromWidth || BOX_WIDTH;
@@ -74,14 +74,15 @@
                 ? fromPos.x + actualFromWidth
                 : fromPos.x;
 
-            // Calculate intersection with target box
-            const intersection = this.rayBoxIntersection(
-                fromX, fromY, toCx, toCy,
-                toPos.x, toPos.y, actualToWidth, toHeight
-            );
-
             // Direction: away from source box (right edge = +1, left edge = -1)
             const direction = (fromX === fromPos.x + actualFromWidth) ? 1 : -1;
+
+            // Ray starts from stub end (where the visible line to target begins)
+            const stubX = fromX + direction * STUB_LENGTH;
+            const intersection = this.rayBoxIntersection(
+                stubX, fromY, toCx, toCy,
+                toPos.x, toPos.y, actualToWidth, toHeight
+            );
 
             return { fromX, fromY, toX: intersection.x, toY: intersection.y, direction };
         },
