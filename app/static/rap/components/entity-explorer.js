@@ -1012,6 +1012,7 @@ const EntityExplorer = {
   },
 
   async onEntityChange() {
+    this.dismissContent();
     const entityName = this.selectorValue;
 
     // Restore tree buttons (may have been hidden in view mode), hide map controls initially
@@ -1020,7 +1021,7 @@ const EntityExplorer = {
     this.btnViewMap.style.display = 'none';
     this.mapLabelsToggle.style.display = 'none';
     // If we were in map mode, switch back to default
-    if (this.viewMode === 'map') {
+    if (['map', 'chart'].includes(this.viewMode)) {
       this.viewMode = 'tree-v';
     }
     this.updateViewToggle();
@@ -1082,6 +1083,7 @@ const EntityExplorer = {
   },
 
   async onViewChange(viewName, baseName, color, options = {}) {
+    this.dismissContent();
     this.currentView = { name: viewName, base: baseName, color };
     this.currentEntity = null;
     this.currentEntitySchema = null;
@@ -2003,6 +2005,7 @@ const EntityExplorer = {
 
   showWelcome() {
     if (!this.welcomeContainer) return;
+    this.dismissContent();
     // Hide all data containers so welcome gets full space
     this.tableContainer.classList.add('hidden');
     this.treeContainer.classList.add('hidden');
@@ -2073,8 +2076,21 @@ const EntityExplorer = {
     }
   },
 
+  /**
+   * Dismiss any active content overlay before showing new content.
+   * Called at the start of every content-switching method to ensure
+   * the previous content (process, welcome, etc.) is properly cleaned up.
+   */
+  dismissContent() {
+    if (this.processVisible) {
+      this.toggleProcess(false);
+    }
+    this.hideWelcome();
+  },
+
   async openProcess(name, color) {
     this.closeProcessDropdown();
+    this.dismissContent();
 
     // Update selector UI
     const textSpan = this.processSelectorTrigger?.querySelector('.process-selector-text');

@@ -182,7 +182,9 @@ const ContextMenu = {
     // Available in both entity and view mode (FK cells in views)
     const entityExtQ = context.entity ? EntityExplorer.getExternalQueriesForEntity(context.entity).map(eq => ({ ...eq, fk: false })) : [];
     const fkExtQ = context.fkEntity ? EntityExplorer.getExternalQueriesForEntity(context.fkEntity).map(eq => ({ ...eq, fk: true })) : [];
-    const allExtQueries = [...entityExtQ, ...fkExtQ];
+    // Deduplicate: when FK target has same provider as entity (e.g. self-FK), prefer FK entry
+    const fkProviders = new Set(fkExtQ.map(eq => eq.provider));
+    const allExtQueries = [...entityExtQ.filter(eq => !fkProviders.has(eq.provider)), ...fkExtQ];
     if (allExtQueries.length > 0) {
       let extHtml = '<div class="context-menu-separator"></div>';
       for (const eq of allExtQueries) {
