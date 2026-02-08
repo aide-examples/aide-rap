@@ -166,7 +166,9 @@ const ProcessPanel = {
       } else if (contextKey && contextKey === entityName) {
         entityLabel = `${entityName}: ${this.context[contextKey] || ''}`;
       } else if (contextKey) {
-        entityLabel = `${entityName} (${this.context[contextKey] || contextKey})`;
+        const fkCol = this.context._fkColumns?.[contextKey];
+        const value = this.context[contextKey] || contextKey;
+        entityLabel = fkCol ? `${entityName} (${fkCol}: ${value})` : `${entityName} (${value})`;
       } else {
         entityLabel = `Open Entity: ${entityName}`;
       }

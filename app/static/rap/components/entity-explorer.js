@@ -2263,22 +2263,25 @@ const EntityExplorer = {
     const record = await ApiClient.getById(entityName, recordId);
     const context = {};
     const ids = {};
+    const fkColumns = {};
 
     // Add the selected entity's own label and ID
     context[entityName] = ColumnUtils.getRecordLabel(record, schema).title;
     ids[entityName] = parseInt(recordId);
 
-    // Add FK relationship labels and IDs (e.g. engine_type_id → EngineType: "CF34-10")
+    // Add FK relationship labels, IDs, and column names (e.g. engine_type_id → EngineType: "CF34-10")
     for (const col of schema.columns) {
       if (col.foreignKey) {
         const labelCol = col.name.replace(/_id$/, '') + '_label';
         if (record[labelCol]) {
           context[col.foreignKey.entity] = record[labelCol];
           ids[col.foreignKey.entity] = record[col.name];
+          fkColumns[col.foreignKey.entity] = col.name.replace(/_id$/, '');
         }
       }
     }
     context._ids = ids;
+    context._fkColumns = fkColumns;
     return context;
   },
 
