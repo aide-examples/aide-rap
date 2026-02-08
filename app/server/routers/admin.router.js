@@ -44,6 +44,32 @@ module.exports = function() {
   });
 
   /**
+   * GET /api/admin/external-query/keywords/:provider
+   * Get highlight keywords for a provider
+   */
+  router.get('/api/admin/external-query/keywords/:provider', (req, res) => {
+    try {
+      const keywords = ExternalQueryService.getProviderKeywords(req.params.provider);
+      res.json({ keywords });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/admin/external-query/columns/:provider
+   * Get column definitions for a provider's result display
+   */
+  router.get('/api/admin/external-query/columns/:provider', (req, res) => {
+    try {
+      const columns = ExternalQueryService.getProviderColumns(req.params.provider);
+      res.json({ columns });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
    * GET /api/admin/external-query
    * Query an external API provider (e.g., regulatory databases)
    */

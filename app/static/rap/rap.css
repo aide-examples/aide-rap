@@ -2701,6 +2701,11 @@ html[data-theme="dark"] .process-selector-group-label {
     padding: 0 1px;
     border-radius: 2px;
 }
+
+.ext-query-keyword {
+    color: #1e40af;
+    font-weight: 600;
+}
 .ext-query-search-btn {
     padding: 6px 16px;
     background: var(--color-primary);
@@ -2735,6 +2740,10 @@ html[data-theme="dark"] .process-selector-group-label {
 .ext-query-more-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+.ext-query-muted {
+    color: var(--color-text-secondary);
+    font-style: italic;
 }
 
 /* -----------------------------------------------------------------------------

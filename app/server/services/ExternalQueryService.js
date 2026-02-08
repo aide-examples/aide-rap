@@ -22,6 +22,12 @@ const TIMEOUT_MS = 10000;
  * Build the request URL for a provider, substituting ${term} in param values.
  */
 function buildUrl(provider, searchTerm, page) {
+  // Path-based URL template (e.g. ADS-B: /v2/reg/${term})
+  if (provider.urlTemplate) {
+    return provider.urlTemplate.replace('${term}', encodeURIComponent(searchTerm));
+  }
+
+  // Query-param-based URL building
   const params = new URLSearchParams();
   const pageParam = provider.pagination?.pageParam || 'page';
 
@@ -90,9 +96,10 @@ async function query(providerId, searchTerm, page = 1) {
     throw new Error('External API returned invalid JSON');
   }
 
-  const results = (data.results || []).map(doc => mapResult(doc, provider.resultMapping));
+  const resultsField = provider.resultsField || 'results';
+  const results = (data[resultsField] || []).map(doc => mapResult(doc, provider.resultMapping));
   const pag = provider.pagination || {};
-  const totalCount = data[pag.totalCountField || 'total_count'] || data.count || results.length;
+  const totalCount = pag.totalCountField ? (data[pag.totalCountField] || results.length) : results.length;
   const hasMore = pag.hasMoreField ? !!data[pag.hasMoreField] : false;
 
   logger.debug('External query results', { provider: providerId, count: results.length, totalCount });
@@ -111,4 +118,24 @@ function getProviders() {
   }));
 }
 
-module.exports = { query, getProviders };
+/**
+ * Get highlight keywords for a provider.
+ * @param {string} providerId - Provider key
+ * @returns {string[]} Array of keywords (empty if none configured)
+ */
+function getProviderKeywords(providerId) {
+  const provider = PROVIDERS[providerId];
+  return provider?.highlightKeywords || [];
+}
+
+/**
+ * Get column definitions for a provider's result display.
+ * @param {string} providerId - Provider key
+ * @returns {Object[]|null} Column definitions or null if using default layout
+ */
+function getProviderColumns(providerId) {
+  const provider = PROVIDERS[providerId];
+  return provider?.columns || null;
+}
+
+module.exports = { query, getProviders, getProviderKeywords, getProviderColumns };
