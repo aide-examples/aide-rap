@@ -12,6 +12,13 @@ const ProcessPanel = {
   activeStepIndex: 0,
   context: {},           // { EntityType: "label" } — accumulated context
 
+  /** Simple English plural: Engine→Engines, Process→Processes, Category→Categories */
+  _pluralize(word) {
+    if (/(?:s|x|z|ch|sh)$/i.test(word)) return word + 'es';
+    if (/[^aeiou]y$/i.test(word)) return word.slice(0, -1) + 'ies';
+    return word + 's';
+  },
+
   init() {
     this.container = document.getElementById('process-panel-container');
   },
@@ -168,7 +175,8 @@ const ProcessPanel = {
       } else if (contextKey) {
         const fkCol = this.context._fkColumns?.[contextKey];
         const value = this.context[contextKey] || contextKey;
-        entityLabel = fkCol ? `${entityName} (${fkCol}: ${value})` : `${entityName} (${value})`;
+        const plural = this._pluralize(entityName);
+        entityLabel = fkCol ? `${plural} (${fkCol}: ${value})` : `${plural} (${value})`;
       } else {
         entityLabel = `Open Entity: ${entityName}`;
       }
