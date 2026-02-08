@@ -2106,18 +2106,191 @@ const EntityExplorer = {
     try {
       const processData = await ApiClient.request(`/api/processes/${encodeURIComponent(name)}`);
       processData.color = color;
+
+      // Check for required entity selection
+      let initialContext = null;
+      if (processData.required) {
+        const [entityName] = processData.required.split(':');
+        initialContext = await this.showRequiredEntityDialog(entityName.trim());
+        if (!initialContext) {
+          // User cancelled — abort process opening, reset selector
+          this.resetProcessSelector();
+          return;
+        }
+      }
+
       this.activeProcess = processData;
 
       // Show toggle button
       if (this.processToggleBtn) this.processToggleBtn.style.display = '';
 
-      // Show process panel
-      ProcessPanel.show(processData);
+      // Show process panel (with initial context if required entity was selected)
+      ProcessPanel.show(processData, initialContext);
       this.toggleProcess(true);
     } catch (err) {
       console.error('Failed to load process:', err);
       DomUtils.toastError(`Failed to load process: ${name}`);
     }
+  },
+
+  /**
+   * Show a dialog for the user to select a required entity before opening a process.
+   * @param {string} entityName - Entity type to select from (e.g. "Engine")
+   * @returns {Promise<Object|null>} - Resolved context map or null if cancelled
+   */
+  async showRequiredEntityDialog(entityName) {
+    const dialogId = 'process-required-dialog';
+    let existing = document.getElementById(dialogId);
+    if (existing) existing.remove();
+
+    // Fetch schema and records
+    const schema = await ApiClient.getExtendedSchema(entityName);
+    const result = await ApiClient.getAll(entityName);
+    const records = result.data || [];
+
+    // Build options with labels
+    const options = records.map(rec => {
+      const lbl = ColumnUtils.getRecordLabel(rec, schema);
+      const display = lbl.subtitle ? `${lbl.title} (${lbl.subtitle})` : lbl.title;
+      return { id: rec.id, display };
+    });
+
+    // Create <dialog>
+    const dialog = document.createElement('dialog');
+    dialog.id = dialogId;
+    dialog.className = 'process-required-dialog';
+
+    const THRESHOLD = 20;
+    let selectorHtml;
+    if (options.length > THRESHOLD) {
+      const datalistHtml = options.map(o =>
+        `<option value="${DomUtils.escapeHtml(o.display)}" data-id="${o.id}">`
+      ).join('');
+      selectorHtml = `
+        <input type="text" list="${dialogId}-list" class="process-required-select"
+               placeholder="${i18n.t('process_select_placeholder')}" autocomplete="off">
+        <datalist id="${dialogId}-list">${datalistHtml}</datalist>`;
+    } else {
+      const optsHtml = options.map(o =>
+        `<option value="${o.id}">${DomUtils.escapeHtml(o.display)}</option>`
+      ).join('');
+      selectorHtml = `
+        <select class="process-required-select">
+          <option value="">${i18n.t('process_select_placeholder')}</option>
+          ${optsHtml}
+        </select>`;
+    }
+
+    dialog.innerHTML = `
+      <div class="process-required-header">
+        <h3>${i18n.t('process_select_required', { entity: entityName })}</h3>
+        <button class="process-required-close" title="${i18n.t('cancel')}">&times;</button>
+      </div>
+      <div class="process-required-body">
+        ${selectorHtml}
+      </div>
+      <div class="process-required-actions">
+        <button type="button" class="btn-secondary" data-action="cancel">${i18n.t('cancel')}</button>
+        <button type="button" class="btn-primary" data-action="ok">${i18n.t('ok')}</button>
+      </div>`;
+
+    document.body.appendChild(dialog);
+
+    return new Promise((resolve) => {
+      let resolved = false;
+      const finish = (val) => { if (!resolved) { resolved = true; resolve(val); } };
+
+      dialog.showModal();
+
+      // Focus selector
+      const sel = dialog.querySelector('.process-required-select');
+      if (sel) sel.focus();
+
+      const getSelectedId = () => {
+        if (sel.tagName === 'SELECT') {
+          return sel.value ? parseInt(sel.value, 10) : null;
+        }
+        // Input + datalist: match typed text to options
+        const match = options.find(o => o.display === sel.value.trim());
+        return match ? match.id : null;
+      };
+
+      // OK
+      dialog.querySelector('[data-action="ok"]').addEventListener('click', async () => {
+        const id = getSelectedId();
+        if (!id) return;
+        dialog.close();
+        dialog.remove();
+        finish(await this.resolveProcessContext(entityName, id, schema));
+      });
+
+      // Cancel button
+      dialog.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+        dialog.close();
+        dialog.remove();
+        finish(null);
+      });
+
+      // X button
+      dialog.querySelector('.process-required-close').addEventListener('click', () => {
+        dialog.close();
+        dialog.remove();
+        finish(null);
+      });
+
+      // ESC (native dialog close)
+      dialog.addEventListener('close', () => {
+        dialog.remove();
+        finish(null);
+      });
+
+      // Enter submits
+      sel.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          dialog.querySelector('[data-action="ok"]').click();
+        }
+      });
+    });
+  },
+
+  /**
+   * Resolve process context from a selected record.
+   * Returns entity label + all FK relationship labels.
+   * @param {string} entityName - Selected entity type
+   * @param {number} recordId - Selected record ID
+   * @param {Object} schema - Extended schema
+   * @returns {Object} - Context map { EntityType: "label", ... }
+   */
+  async resolveProcessContext(entityName, recordId, schema) {
+    const record = await ApiClient.getById(entityName, recordId);
+    const context = {};
+
+    // Add the selected entity's own label
+    context[entityName] = ColumnUtils.getRecordLabel(record, schema).title;
+
+    // Add FK relationship labels (e.g. engine_type_id → EngineType: "CF34-10")
+    for (const col of schema.columns) {
+      if (col.foreignKey) {
+        const labelCol = col.name.replace(/_id$/, '') + '_label';
+        if (record[labelCol]) {
+          context[col.foreignKey.entity] = record[labelCol];
+        }
+      }
+    }
+    return context;
+  },
+
+  /**
+   * Reset the process selector dropdown to default state (after cancel).
+   */
+  resetProcessSelector() {
+    const textSpan = this.processSelectorTrigger?.querySelector('.process-selector-text');
+    if (textSpan) textSpan.textContent = i18n.t('select_process');
+    if (this.processSelectorTrigger) this.processSelectorTrigger.style.backgroundColor = '';
+    this.processSelectorMenu?.querySelectorAll('.process-selector-item').forEach(item => {
+      item.classList.remove('selected');
+    });
   },
 
   toggleProcess(show) {

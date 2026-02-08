@@ -238,5 +238,8 @@
     "select_process": "Prozess auswählen...",
     "tooltip_toggle_process": "Prozessansicht umschalten",
     "process_open_view": "Ansicht öffnen: %{name}",
-    "process_open_entity": "Entität öffnen: %{name}"
+    "process_open_entity": "Entität öffnen: %{name}",
+    "process_select_required": "%{entity} auswählen",
+    "process_select_placeholder": "Auswählen...",
+    "ok": "OK"
 }

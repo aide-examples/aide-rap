@@ -230,5 +230,8 @@
     "select_process": "Seleccionar proceso...",
     "tooltip_toggle_process": "Alternar vista de proceso",
     "process_open_view": "Abrir vista: %{name}",
-    "process_open_entity": "Abrir entidad: %{name}"
+    "process_open_entity": "Abrir entidad: %{name}",
+    "process_select_required": "Seleccionar %{entity}",
+    "process_select_placeholder": "Seleccionar...",
+    "ok": "OK"
 }
