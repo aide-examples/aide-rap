@@ -449,9 +449,9 @@ const EntityTable = {
       // Context menu (right-click) — export + external queries on FK cells
       row.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        const ctx = { source: 'view', entity: this.currentViewConfig?.base || null };
-        const fkEl = e.target.closest('.fk-value');
-        if (fkEl) {
+        const ctx = { source: 'view' };
+        const fkEl = e.target.closest('.fk-value, .fk-link');
+        if (fkEl && fkEl.dataset.entity) {
           ctx.fkEntity = fkEl.dataset.entity;
           ctx.fkLabel = fkEl.textContent.trim();
         }
