@@ -2408,6 +2408,16 @@ const EntityExplorer = {
       this.viewMode = 'table';
       this.updateViewToggle();
       await this.loadRecords(filter);
+
+      // Push breadcrumb for filtered navigation
+      if (typeof BreadcrumbNav !== 'undefined') {
+        BreadcrumbNav.push({
+          type: 'filtered',
+          entity: entityName,
+          filter: filter,
+          viewMode: 'table'
+        });
+      }
     }
   },
 

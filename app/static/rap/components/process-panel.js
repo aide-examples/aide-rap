@@ -194,9 +194,14 @@ const ProcessPanel = {
       } else {
         entityLabel = `Open Entity: ${entityName}`;
       }
+      // Get area color from entity selector dropdown
+      const areaColor = typeof EntityExplorer !== 'undefined'
+        ? EntityExplorer.selectorMenu?.querySelector(`[data-value="${entityName}"]`)?.dataset.color || ''
+        : '';
       actionsHtml += `<button class="process-action-btn process-action-entity"
                               data-entity="${DomUtils.escapeHtml(entityName)}"
-                              ${contextKey ? `data-entity-context="${DomUtils.escapeHtml(contextKey)}"` : ''}>
+                              ${contextKey ? `data-entity-context="${DomUtils.escapeHtml(contextKey)}"` : ''}
+                              style="${areaColor ? `border-left: 6px solid ${areaColor}; background: linear-gradient(to right, ${areaColor}4D, transparent)` : ''}">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="0" width="6" height="3"/><rect x="8" y="0" width="6" height="3"/><rect x="0" y="5" width="6" height="3"/><rect x="8" y="5" width="6" height="3"/><rect x="0" y="10" width="6" height="3"/><rect x="8" y="10" width="6" height="3"/></svg>
         ${DomUtils.escapeHtml(entityLabel)}
       </button>`;

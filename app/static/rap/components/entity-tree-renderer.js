@@ -286,7 +286,15 @@ const TreeRenderer = {
     async renderBackReferences(entityName, recordId, backRefs, visitedPath, context) {
         let html = '';
 
-        for (const ref of backRefs) {
+        // Deduplicate by entity name (multiple FKs from same entity → one group)
+        const seen = new Set();
+        const uniqueRefs = backRefs.filter(ref => {
+            if (seen.has(ref.entity)) return false;
+            seen.add(ref.entity);
+            return true;
+        });
+
+        for (const ref of uniqueRefs) {
             const nodeId = `backref-${ref.entity}-to-${entityName}-${recordId}`;
             const isExpanded = context.state.isExpanded(nodeId);
 

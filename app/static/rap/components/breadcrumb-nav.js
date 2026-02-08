@@ -561,7 +561,7 @@ const BreadcrumbNav = {
     if (compact.e) {
       // Fetch entity schema for color
       try {
-        const schema = await ApiClient.getEntitySchema(compact.e);
+        const schema = await ApiClient.getExtendedSchema(compact.e);
         color = schema.areaColor || color;
       } catch (e) {
         // Use default color if schema fetch fails
