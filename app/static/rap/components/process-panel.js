@@ -204,9 +204,8 @@ const ProcessPanel = {
         const searchTerm = contextKey ? (this.context[contextKey] || '') : '';
         // Find matching provider from externalQueries config
         const eqConfig = contextKey ? EntityExplorer.getExternalQueriesForEntity(contextKey) : [];
-        const provider = eqConfig.length > 0 ? eqConfig[0].provider : 'federal-register-ad';
-        if (typeof ExternalQueryDialog !== 'undefined') {
-          ExternalQueryDialog.open(provider, searchTerm, label);
+        if (eqConfig.length > 0 && typeof ExternalQueryDialog !== 'undefined') {
+          ExternalQueryDialog.open(eqConfig[0].provider, searchTerm, label);
         }
       });
     });

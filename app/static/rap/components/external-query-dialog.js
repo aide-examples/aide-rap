@@ -14,7 +14,7 @@ const ExternalQueryDialog = {
 
   /**
    * Open the dialog and run the initial search.
-   * @param {string} provider - Provider ID (e.g., 'federal-register-ad')
+   * @param {string} provider - Provider ID from api_providers.json
    * @param {string} searchTerm - Pre-filled search term
    * @param {string} label - Display label for the dialog title
    */
