@@ -332,6 +332,21 @@ async function tryUrlLogin() {
 
           footerInfo.appendChild(adminSep);
           footerInfo.appendChild(adminEl);
+
+          // SQL Browser link (opens sqlite-viewer in new tab)
+          const sqlSep = document.createElement('span');
+          sqlSep.className = 'status-footer-sep';
+          sqlSep.textContent = '·';
+
+          const sqlEl = document.createElement('a');
+          sqlEl.href = '/sql-browser/?url=/api/admin/db-file';
+          sqlEl.target = '_blank';
+          sqlEl.className = 'status-admin-link';
+          sqlEl.textContent = 'SQL';
+          sqlEl.title = 'SQLite Database Browser';
+
+          footerInfo.appendChild(sqlSep);
+          footerInfo.appendChild(sqlEl);
         }
       }
     }

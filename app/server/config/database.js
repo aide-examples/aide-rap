@@ -823,5 +823,6 @@ module.exports = {
   reinitialize,
   tableExists,
   viewExists,
-  migrateSystemColumns
+  migrateSystemColumns,
+  getDatabasePath: () => storedDbPath
 };

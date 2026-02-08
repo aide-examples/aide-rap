@@ -282,6 +282,11 @@ if (enabledEntitiesRaw.length > 0) {
         });
     }
 
+    // Admin routes (SQL browser, reload-views) - admin only
+    if (authEnabled) {
+        app.use('/api/admin', authMiddleware, requireRole('admin'));
+    }
+
     backend.init(app, {
         appDir: APP_DIR,
         enabledEntities,
@@ -296,6 +301,10 @@ if (enabledEntitiesRaw.length > 0) {
 // =============================================================================
 // 7c. STATIC ROUTES
 // =============================================================================
+
+// SQL Browser — embedded sqlite-viewer (static files, no auth needed for files,
+// the /api/admin/db-file endpoint is protected above)
+app.use('/sql-browser', require('express').static(path.join(APP_DIR, 'static', 'rap', 'sql-browser')));
 
 // Favicon — inline SVG with primary area color
 app.get('/favicon.ico', (req, res) => {
