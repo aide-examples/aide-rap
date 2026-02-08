@@ -2253,28 +2253,32 @@ const EntityExplorer = {
 
   /**
    * Resolve process context from a selected record.
-   * Returns entity label + all FK relationship labels.
+   * Returns entity label + all FK relationship labels, plus _ids map for navigation.
    * @param {string} entityName - Selected entity type
    * @param {number} recordId - Selected record ID
    * @param {Object} schema - Extended schema
-   * @returns {Object} - Context map { EntityType: "label", ... }
+   * @returns {Object} - Context map { EntityType: "label", ..., _ids: { EntityType: id, ... } }
    */
   async resolveProcessContext(entityName, recordId, schema) {
     const record = await ApiClient.getById(entityName, recordId);
     const context = {};
+    const ids = {};
 
-    // Add the selected entity's own label
+    // Add the selected entity's own label and ID
     context[entityName] = ColumnUtils.getRecordLabel(record, schema).title;
+    ids[entityName] = parseInt(recordId);
 
-    // Add FK relationship labels (e.g. engine_type_id → EngineType: "CF34-10")
+    // Add FK relationship labels and IDs (e.g. engine_type_id → EngineType: "CF34-10")
     for (const col of schema.columns) {
       if (col.foreignKey) {
         const labelCol = col.name.replace(/_id$/, '') + '_label';
         if (record[labelCol]) {
           context[col.foreignKey.entity] = record[labelCol];
+          ids[col.foreignKey.entity] = record[col.name];
         }
       }
     }
+    context._ids = ids;
     return context;
   },
 
@@ -2361,6 +2365,40 @@ const EntityExplorer = {
       this.selectEntityFromDropdown(entityName, item.dataset.color);
     } else {
       DomUtils.toastError(`Entity not found: ${entityName}`);
+    }
+  },
+
+  /**
+   * Navigate to a specific record in tree view (called from process context).
+   * @param {string} entityName - Entity type name
+   * @param {number} recordId - Record ID to navigate to
+   */
+  async navigateToEntityRecord(entityName, recordId) {
+    // Ensure tree view mode before navigation
+    if (this.viewMode === 'table') {
+      this.viewMode = 'tree-h';
+    }
+    await EntityTree.onNavigateAndExpand(entityName, recordId, { expandLevels: 1 });
+  },
+
+  /**
+   * Navigate to an entity filtered by FK relationship from process context.
+   * @param {string} entityName - Entity to display
+   * @param {string} fkEntity - FK target entity name (context key)
+   * @param {number} fkId - FK record ID to filter by
+   */
+  async navigateToEntityFiltered(entityName, fkEntity, fkId) {
+    await this.selectEntityWithoutBreadcrumb(entityName);
+
+    // Find FK column that targets fkEntity
+    const schema = await SchemaCache.getExtended(entityName);
+    const fkCol = schema.columns.find(c => c.foreignKey?.entity === fkEntity);
+    if (fkCol && fkId) {
+      const filter = `${fkCol.name}:${fkId}`;
+      if (this.filterInput) this.filterInput.value = filter;
+      this.viewMode = 'table';
+      this.updateViewToggle();
+      await this.loadRecords(filter);
     }
   },
 

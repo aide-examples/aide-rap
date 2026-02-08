@@ -103,7 +103,7 @@ module.exports = function(processesConfig) {
           title: s.title,
           body: s.body,
           view: s.view || null,
-          entity: s.entity || null,
+          entities: s.entities || [],
           call: s.call || null
         }))
       });

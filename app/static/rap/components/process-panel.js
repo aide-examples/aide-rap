@@ -59,10 +59,11 @@ const ProcessPanel = {
       ? `<div class="process-description">${DomUtils.escapeHtml(process.description)}</div>`
       : '';
 
-    // Build context display
-    const contextHtml = Object.keys(this.context).length > 0
-      ? `<div class="process-context">${Object.entries(this.context).map(([k, v]) =>
-          `<span class="process-context-tag">${DomUtils.escapeHtml(k)}: <strong>${DomUtils.escapeHtml(v)}</strong></span>`
+    // Build context display (filter internal keys like _ids)
+    const contextEntries = Object.entries(this.context).filter(([k]) => !k.startsWith('_'));
+    const contextHtml = contextEntries.length > 0
+      ? `<div class="process-context">${contextEntries.map(([k, v]) =>
+          `<span class="process-context-tag">${DomUtils.escapeHtml(k)}: <strong>${DomUtils.escapeHtml(String(v))}</strong></span>`
         ).join(' ')}</div>`
       : '';
 
@@ -151,10 +152,25 @@ const ProcessPanel = {
         Open View: ${DomUtils.escapeHtml(step.view)}
       </button>`;
     }
-    if (step.entity) {
-      actionsHtml += `<button class="process-action-btn process-action-entity" data-entity="${DomUtils.escapeHtml(step.entity)}">
+    for (const entityDef of (step.entities || [])) {
+      // Parse "EntityName(ContextKey)" syntax, e.g. "Engine(EngineType)"
+      const entityMatch = entityDef.match(/^(.+?)\((\w+)\)$/);
+      const entityName = entityMatch ? entityMatch[1].trim() : entityDef;
+      const contextKey = entityMatch ? entityMatch[2] : null;
+      // Build context-aware label
+      let entityLabel;
+      if (contextKey && contextKey === entityName) {
+        entityLabel = `${entityName}: ${this.context[contextKey] || ''}`;
+      } else if (contextKey) {
+        entityLabel = `${entityName} (${this.context[contextKey] || contextKey})`;
+      } else {
+        entityLabel = `Open Entity: ${entityName}`;
+      }
+      actionsHtml += `<button class="process-action-btn process-action-entity"
+                              data-entity="${DomUtils.escapeHtml(entityName)}"
+                              ${contextKey ? `data-entity-context="${DomUtils.escapeHtml(contextKey)}"` : ''}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="0" width="6" height="3"/><rect x="8" y="0" width="6" height="3"/><rect x="0" y="5" width="6" height="3"/><rect x="8" y="5" width="6" height="3"/><rect x="0" y="10" width="6" height="3"/><rect x="8" y="10" width="6" height="3"/></svg>
-        Open Entity: ${DomUtils.escapeHtml(step.entity)}
+        ${DomUtils.escapeHtml(entityLabel)}
       </button>`;
     }
     if (step.call) {
@@ -189,9 +205,21 @@ const ProcessPanel = {
     contentEl.querySelectorAll('.process-action-entity').forEach(btn => {
       btn.addEventListener('click', () => {
         const entityName = btn.dataset.entity;
+        const contextKey = btn.dataset.entityContext;
         if (typeof EntityExplorer !== 'undefined') {
           EntityExplorer.toggleProcess(false); // hide process panel
-          EntityExplorer.selectEntityByName(entityName);
+          if (contextKey && this.context._ids) {
+            const recordId = this.context._ids[contextKey];
+            if (contextKey === entityName) {
+              // Same entity = navigate to specific record in tree view
+              EntityExplorer.navigateToEntityRecord(entityName, recordId);
+            } else {
+              // Different entity = filtered list by FK
+              EntityExplorer.navigateToEntityFiltered(entityName, contextKey, recordId);
+            }
+          } else {
+            EntityExplorer.selectEntityByName(entityName);
+          }
         }
       });
     });
@@ -219,20 +247,21 @@ const ProcessPanel = {
   addContext(entityType, label) {
     if (entityType && label) {
       this.context[entityType] = label;
-      // Re-render context display if visible
+      // Re-render context display if visible (filter internal keys like _ids)
+      const entries = Object.entries(this.context).filter(([k]) => !k.startsWith('_'));
       const contextEl = this.container?.querySelector('.process-context');
       if (contextEl) {
-        contextEl.innerHTML = Object.entries(this.context).map(([k, v]) =>
-          `<span class="process-context-tag">${DomUtils.escapeHtml(k)}: <strong>${DomUtils.escapeHtml(v)}</strong></span>`
+        contextEl.innerHTML = entries.map(([k, v]) =>
+          `<span class="process-context-tag">${DomUtils.escapeHtml(k)}: <strong>${DomUtils.escapeHtml(String(v))}</strong></span>`
         ).join(' ');
-      } else if (Object.keys(this.context).length > 0) {
+      } else if (entries.length > 0) {
         // Add context display if it didn't exist before
         const headerEl = this.container?.querySelector('.process-header');
         if (headerEl) {
           const div = document.createElement('div');
           div.className = 'process-context';
-          div.innerHTML = Object.entries(this.context).map(([k, v]) =>
-            `<span class="process-context-tag">${DomUtils.escapeHtml(k)}: <strong>${DomUtils.escapeHtml(v)}</strong></span>`
+          div.innerHTML = entries.map(([k, v]) =>
+            `<span class="process-context-tag">${DomUtils.escapeHtml(k)}: <strong>${DomUtils.escapeHtml(String(v))}</strong></span>`
           ).join(' ');
           headerEl.appendChild(div);
         }

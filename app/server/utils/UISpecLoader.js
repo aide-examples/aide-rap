@@ -328,7 +328,7 @@ function parseProcessFile(content, filename) {
     if (trimmed.startsWith('## ')) {
       foundFirstH2 = true;
       if (currentStep) steps.push(currentStep);
-      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entity: null, call: null };
+      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entities: [], call: null };
       continue;
     }
 
@@ -343,7 +343,7 @@ function parseProcessFile(content, filename) {
       if (viewMatch) {
         currentStep.view = viewMatch[1].trim();
       } else if (entityMatch) {
-        currentStep.entity = entityMatch[1].trim();
+        currentStep.entities.push(entityMatch[1].trim());
       } else if (callMatch) {
         currentStep.call = callMatch[1].trim();
       } else {
@@ -372,7 +372,7 @@ function parseProcessFile(content, filename) {
       title: s.title,
       body: trimBody(s.bodyLines),
       view: s.view,
-      entity: s.entity,
+      entities: s.entities,
       call: s.call
     }))
   };
