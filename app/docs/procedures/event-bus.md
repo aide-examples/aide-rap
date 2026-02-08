@@ -195,11 +195,11 @@ eventBus.on('entity:create:after', async (entity, record) => {
 
 ```javascript
 eventBus.on('entity:update:before', (entity, id, data) => {
-  if (entity === 'Engine' && data.status === 'scrapped') {
-    // Check if engine has active leases
-    const leases = getActiveLeases(id);
-    if (leases.length > 0) {
-      throw new Error('Cannot scrap engine with active leases');
+  if (entity === 'Project' && data.status === 'cancelled') {
+    // Check if project has active deployments
+    const deployments = getActiveDeployments(id);
+    if (deployments.length > 0) {
+      throw new Error('Cannot cancel project with active deployments');
     }
   }
 });

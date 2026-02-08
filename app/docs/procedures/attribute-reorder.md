@@ -35,18 +35,18 @@ In `app/systems/<system>/docs/classes/ENTITY_NAME.md`, arrange the rows of the a
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| engine | Engine | Reference [LABEL] | 2001 |
-| aircraft | Aircraft | Reference [LABEL2] | 1001 |
-| position | int | Engine position | 1 |
+| project | Project | Reference [LABEL] | 2001 |
+| employee | Employee | Reference [LABEL2] | 1001 |
+| role | string | Deployment role | Lead |
 ```
 
 **Example after:**
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| aircraft | Aircraft | Reference [LABEL2] | 1001 |
-| engine | Engine | Reference [LABEL] | 2001 |
-| position | int | Engine position | 1 |
+| employee | Employee | Reference [LABEL2] | 1001 |
+| project | Project | Reference [LABEL] | 2001 |
+| role | string | Deployment role | Lead |
 ```
 
 ---
@@ -91,11 +91,11 @@ Computed fields (e.g., `[COMPUTED:...]`) can be at any position - they are not s
 
 ---
 
-## Example: EngineMount (aircraft before engine)
+## Example: Deployment (employee before project)
 
 **Affected file:**
-`app/systems/<system>/docs/classes/EngineMount.md` - Swap table rows
+`app/systems/<system>/docs/classes/Deployment.md` - Swap table rows
 
-**Change:** `engine, aircraft, position, ...` -> `aircraft, engine, position, ...`
+**Change:** `project, employee, role, ...` -> `employee, project, role, ...`
 
 **Note:** `DataModel.yaml` is auto-generated from the markdown files - no manual editing needed.

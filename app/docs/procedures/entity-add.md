@@ -6,8 +6,8 @@
 
 ```
 ENTITY_NAME = <EntityName>       # Entity name (PascalCase)
-SYSTEM      = <system>           # System name (e.g., irma)
-AREA        = <AreaName>         # Area in DataModel.md (e.g., "Engine Management")
+SYSTEM      = <system>           # System name (e.g., myproject)
+AREA        = <AreaName>         # Area in DataModel.md (e.g., "Projects")
 ```
 
 ---
@@ -143,45 +143,45 @@ Or create manually: `app/systems/SYSTEM/data/seed/ENTITY_NAME.json`
 
 ---
 
-## Example: Converting EngineStandType enum to entity
+## Example: Converting EquipmentType enum to entity
 
 **Step 1 - Create entity file:**
-`app/systems/irma/docs/classes/EngineStandType.md`
+`app/systems/myproject/docs/classes/EquipmentType.md`
 
 ```markdown
-# EngineStandType
+# EquipmentType
 
-Engine stand type/model specification with manufacturer details.
+Equipment type/model specification with manufacturer details.
 
 ## Attributes
 
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| part_number | string | Part number [LABEL] | PW-1100-STD |
-| name | string | Model name [LABEL2] | PW-1100 Engine Stand |
-| manufacturer | string | Stand manufacturer | Dedienne Aerospace |
-| image | media [OPTIONAL] | Photo of stand type | |
+| part_number | string | Part number [LABEL] | LAP-PRO-15 |
+| name | string | Model name [LABEL2] | Laptop Pro 15" |
+| manufacturer | string | Equipment manufacturer | Dell |
+| image | media [OPTIONAL] | Photo of equipment type | |
 | description | string [OPTIONAL] | Additional details | |
 
 ## Data Generator
 
-Create 3-5 engine stand types from manufacturers like Dedienne Aerospace, MTU.
+Create 3-5 equipment types from manufacturers like Dell, Apple, Lenovo.
 ```
 
-**Step 2 - Add to DataModel.md (Engine Management area):**
+**Step 2 - Add to DataModel.md (Services area):**
 ```markdown
-| EngineStandType | Engine stand type with manufacturer |
+| EquipmentType | Equipment type with manufacturer |
 ```
 
 **Step 3 - Add to Crud.md:**
 ```markdown
-## Engine Management
-- EngineStandType
+## Services
+- EquipmentType
 ```
 
 **Step 4 - Remove enum from Types.md**
 
-**Result:** `EngineStand.type` and `EngineStandBase.stand_type` now reference the new entity instead of the enum.
+**Result:** `Equipment.type` and `EquipmentBase.equipment_type` now reference the new entity instead of the enum.
 
 ---
 

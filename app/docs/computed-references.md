@@ -9,12 +9,12 @@ Algorithmically computed FK relationships that:
 
 ## Motivation
 
-**Example: Aircraft.current_operator_id**
-- Find Registration where `aircraft_id = Aircraft.id` AND `exit_date IS NULL OR exit_date > TODAY`
-- From there: `operator_id` -> Operator
-- There should only be one active Registration
+**Example: Employee.current_department_id**
+- Find Assignment where `employee_id = Employee.id` AND `end_date IS NULL OR end_date > TODAY`
+- From there: `department_id` -> Department
+- There should only be one active Assignment
 
-**Important:** The change is often entered **in advance** (exit_date in the future).
+**Important:** The change is often entered **in advance** (end_date in the future).
 This means: The update must NOT happen when saving, but must be executed **daily**!
 
 ---
@@ -31,7 +31,7 @@ The computed attribute is defined **in the attribute table** with an annotation:
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
 | ... | ... | ... | ... |
-| current_operator_id | int | Reference to Operator [READONLY] [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator] | 5 |
+| current_department_id | int | Reference to Department [READONLY] [DAILY=Assignment[end_date=null OR end_date>TODAY].department] | 5 |
 ```
 
 ### Annotation Syntax
@@ -54,10 +54,10 @@ The computed attribute is defined **in the attribute table** with an annotation:
 ## Rule Syntax
 
 ```
-Registration[exit_date=null OR exit_date>TODAY].operator
-│          │                                  └── FK: operator_id -> Operator
-│          └── Filter: WHERE exit_date IS NULL OR exit_date > CURRENT_DATE
-└── Start Entity: WHERE aircraft_id = self.id (convention)
+Assignment[end_date=null OR end_date>TODAY].department
+│         │                                └── FK: department_id -> Department
+│         └── Filter: WHERE end_date IS NULL OR end_date > CURRENT_DATE
+└── Start Entity: WHERE employee_id = self.id (convention)
 ```
 
 ### Condition Syntax
@@ -75,7 +75,7 @@ Two modes are supported:
 | `[cond1 AND cond2]` | Logical AND |
 | `TODAY` | CURRENT_DATE (evaluated daily) |
 
-**Example:** `[exit_date=null OR exit_date>TODAY]` → finds currently active record
+**Example:** `[end_date=null OR end_date>TODAY]` → finds currently active record
 
 #### 2. Aggregate Function (ORDER BY clause)
 
@@ -86,14 +86,14 @@ Two modes are supported:
 
 **Example:** `[MAX(end_date)]` → finds most recent record (current if end_date=null, else latest ended)
 
-**Implicit NOT NULL filtering:** When the target field is a FK type (e.g., `latest_aircraft: Aircraft`), records where that FK is NULL are automatically excluded.
+**Implicit NOT NULL filtering:** When the target field is a FK type (e.g., `latest_project: Project`), records where that FK is NULL are automatically excluded.
 
 ### Path Navigation
 
 After the filter, a path through FK relationships follows:
-- `.operator` -> navigates via `operator_id` to the Operator entity
+- `.department` -> navigates via `department_id` to the Department entity
 
-The FK column is automatically derived from the entity name (`operator` -> `operator_id`).
+The FK column is automatically derived from the entity name (`department` -> `department_id`).
 
 ---
 
@@ -102,8 +102,8 @@ The FK column is automatically derived from the entity name (`operator` -> `oper
 In addition to the ID, the **display label** of the target record can also be stored:
 
 ```markdown
-| current_operator_id | int | Reference to Operator [READONLY] [DAILY=...] | 5 |
-| current_operator_name | string | Display label [READONLY] [DERIVED=current_operator_id] | Lufthansa |
+| current_department_id | int | Reference to Department [READONLY] [DAILY=...] | 5 |
+| current_department_name | string | Display label [READONLY] [DERIVED=current_department_id] | Marketing |
 ```
 
 `[DERIVED=column]` means: Automatically updated with the ID.
@@ -119,66 +119,66 @@ In addition to the ID, the **display label** of the target record can also be st
 
 | Situation | Behavior |
 |-----------|----------|
-| No match (no active Registration) | `current_operator_id = null` |
-| Multiple matches (data inconsistency!) | `current_operator_id = null` + warning log |
+| No match (no active Assignment) | `current_department_id = null` |
+| Multiple matches (data inconsistency!) | `current_department_id = null` + warning log |
 | Target entity deleted | FK constraint prevents or CASCADE |
 
 ---
 
-## Example: Process for Pre-dated Operator Change
+## Example: Process for Pre-dated Department Transfer
 
 ```
-Scenario: Aircraft D-AIUA changes on 2024-02-01 from Lufthansa to Eurowings
+Scenario: Employee EMP-1042 transfers on 2024-02-01 from Marketing to Engineering
 
-Day 1 (2024-01-15): User enters change
-  └── Registration for Lufthansa: exit_date = '2024-02-01' (future!)
-  └── Registration for Eurowings: entry_date = '2024-02-01'
-  └── Aircraft.current_operator_id remains Lufthansa (exit_date > TODAY)
+Day 1 (2024-01-15): User enters transfer
+  └── Assignment for Marketing: end_date = '2024-02-01' (future!)
+  └── Assignment for Engineering: start_date = '2024-02-01'
+  └── Employee.current_department_id remains Marketing (end_date > TODAY)
 
 Days 2-16: No change
-  └── DAILY job runs, but exit_date > TODAY -> Lufthansa remains
+  └── DAILY job runs, but end_date > TODAY -> Marketing remains
 
 Day 17 (2024-02-01): CRON job at 00:05
-  └── For Aircraft D-AIUA:
-      └── Query: Registration WHERE aircraft_id=1001 AND (exit_date IS NULL OR exit_date > '2024-02-01')
-      └── Result: Eurowings Registration (exit_date=null)
-      └── UPDATE aircraft SET current_operator_id = (Eurowings ID) WHERE id = 1001
+  └── For Employee EMP-1042:
+      └── Query: Assignment WHERE employee_id=1001 AND (end_date IS NULL OR end_date > '2024-02-01')
+      └── Result: Engineering Assignment (end_date=null)
+      └── UPDATE employee SET current_department_id = (Engineering ID) WHERE id = 1001
 
-Result: Aircraft now shows Eurowings as current_operator
+Result: Employee now shows Engineering as current_department
 ```
 
 ---
 
-## Example: Engine.latest_aircraft with MAX()
+## Example: Employee.latest_project with MAX()
 
-**Scenario:** Find the aircraft where an engine was most recently mounted
+**Scenario:** Find the project where an employee was most recently deployed
 
 ```markdown
-| latest_aircraft | Aircraft | [READONLY] [DAILY=EngineAllocation[MAX(end_date)].aircraft] | 1 |
+| latest_project | Project | [READONLY] [DAILY=Deployment[MAX(end_date)].project] | 1 |
 ```
 
 **Generated SQL:**
 ```sql
-UPDATE engine
-SET latest_aircraft_id = (
-    SELECT src.aircraft_id
-    FROM engine_allocation src
-    WHERE src.engine_id = engine.id
-      AND src.aircraft_id IS NOT NULL    -- implicit: target type is Aircraft
+UPDATE employee
+SET latest_project_id = (
+    SELECT src.project_id
+    FROM deployment src
+    WHERE src.employee_id = employee.id
+      AND src.project_id IS NOT NULL    -- implicit: target type is Project
     ORDER BY
       CASE WHEN src.end_date IS NULL THEN 1 ELSE 0 END DESC,  -- NULL = current = highest
       src.end_date DESC                                        -- then by date descending
     LIMIT 1
 )
-WHERE latest_aircraft_id IS NOT (...)
+WHERE latest_project_id IS NOT (...)
 ```
 
 **Logic:**
-1. Find all EngineAllocation records for this engine
-2. Filter: only where aircraft IS NOT NULL (engine was on an aircraft, not in event/storage)
-3. Priority: end_date=NULL first (currently mounted)
-4. Then: highest end_date (most recently dismounted)
-5. If no allocation exists → NULL
+1. Find all Deployment records for this employee
+2. Filter: only where project IS NOT NULL (employee was on a project, not on leave/bench)
+3. Priority: end_date=NULL first (currently deployed)
+4. Then: highest end_date (most recently completed)
+5. If no deployment exists → NULL
 
 ---
 

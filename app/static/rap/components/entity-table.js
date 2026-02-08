@@ -771,7 +771,9 @@ const EntityTable = {
     html += '<tbody>';
     if (sortedRecords.length === 0) {
       const colSpan = columns.length + backRefs.length;
-      html += `<tr><td colspan="${colSpan}" class="empty-table-message">${i18n.t('no_records_found')}</td></tr>`;
+      const readonly = typeof EntityExplorer !== 'undefined' && EntityExplorer.isCurrentEntityReadonly();
+      const newBtn = readonly ? '' : '<br><button class="empty-table-new-btn">+ New</button>';
+      html += `<tr><td colspan="${colSpan}" class="empty-table-message">${i18n.t('no_records_found')}${newBtn}</td></tr>`;
     }
 
     // Get mediaRowHeight from tableOptions (if configured for this entity)
@@ -1098,6 +1100,11 @@ const EntityTable = {
           MediaBrowser.show(entity, field);
         }
       });
+    });
+
+    // "New" button in empty table
+    this.container.querySelector('.empty-table-new-btn')?.addEventListener('click', () => {
+      if (this.currentEntity) DetailPanel.showCreateForm(this.currentEntity);
     });
 
     // Row click for selection

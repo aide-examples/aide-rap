@@ -379,11 +379,63 @@ function parseProcessFile(content, filename) {
 }
 
 /**
+ * Reconstruct a markdown process file from a parsed process object.
+ * Inverse of parseProcessFile() — used for saving edits back to disk.
+ * @param {Object} process - { name, required, description, steps: [{ title, body, view, entities[], call }] }
+ * @returns {string} Markdown content
+ */
+function reconstructProcessFile(process) {
+  const lines = [];
+
+  lines.push(`# ${process.name}`);
+  lines.push('');
+
+  if (process.required) {
+    lines.push(`Required: ${process.required}`);
+    lines.push('');
+  }
+
+  if (process.description) {
+    lines.push(process.description);
+    lines.push('');
+  }
+
+  for (const step of (process.steps || [])) {
+    lines.push(`## ${step.title}`);
+    lines.push('');
+
+    if (step.body) {
+      lines.push(step.body);
+      lines.push('');
+    }
+
+    for (const entity of (step.entities || [])) {
+      lines.push(`Entity: ${entity}`);
+    }
+    if (step.view) {
+      lines.push(`View: ${step.view}`);
+    }
+    if (step.call) {
+      lines.push(`Call: ${step.call}`);
+    }
+
+    // Add blank line after directives (if any were written)
+    const hasDirectives = (step.entities && step.entities.length > 0) || step.view || step.call;
+    if (hasDirectives) {
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
  * Load process files for a single area directory.
  * @param {string} areaDir - Path to area subdirectory
+ * @param {string} areaName - Name of the area (directory name)
  * @returns {Object[]} Array of parsed process definitions
  */
-function loadAreaProcesses(areaDir) {
+function loadAreaProcesses(areaDir, areaName) {
   const processFiles = fs.readdirSync(areaDir)
     .filter(f => f.endsWith('.md'))
     .sort();
@@ -391,7 +443,11 @@ function loadAreaProcesses(areaDir) {
   for (const file of processFiles) {
     const content = fs.readFileSync(path.join(areaDir, file), 'utf-8');
     const processDef = parseProcessFile(content, file);
-    if (processDef) processes.push(processDef);
+    if (processDef) {
+      processDef._sourceFile = path.join('processes', areaName, file);
+      processDef._area = areaName;
+      processes.push(processDef);
+    }
   }
   return processes;
 }
@@ -428,7 +484,7 @@ function loadProcessesConfig(requirementsDir) {
     const areaDir = path.join(processesDir, area);
     if (!fs.existsSync(areaDir) || !fs.statSync(areaDir).isDirectory()) continue;
 
-    const processes = loadAreaProcesses(areaDir);
+    const processes = loadAreaProcesses(areaDir, area);
     if (processes.length === 0) continue;
 
     // Insert column break if layout says so
@@ -444,4 +500,4 @@ function loadProcessesConfig(requirementsDir) {
   return result.length > 0 ? result : null;
 }
 
-module.exports = { loadCrudConfig, loadViewsConfig, loadProcessesConfig, SEPARATOR_PREFIX, COLUMN_BREAK };
+module.exports = { loadCrudConfig, loadViewsConfig, loadProcessesConfig, reconstructProcessFile, parseProcessFile, SEPARATOR_PREFIX, COLUMN_BREAK };

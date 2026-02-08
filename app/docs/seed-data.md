@@ -9,13 +9,13 @@ Reference for the seed data pipeline — how data flows from AI generation throu
 Seed files use **conceptual field names** with **label values** instead of raw IDs:
 
 ```json
-{ "type": "Airbus A320neo", "current_operator": "Lufthansa" }
+{ "department": "Marketing", "manager": "Sarah Chen" }
 ```
 
 The system resolves labels to IDs automatically during load:
 
-1. `type: "Airbus A320neo"` → look up AircraftType by LABEL → `type_id: 3`
-2. `current_operator: "Lufthansa"` → look up Operator by LABEL → `current_operator_id: 1`
+1. `department: "Marketing"` → look up Department by LABEL → `department_id: 3`
+2. `manager: "Sarah Chen"` → look up Manager by LABEL → `manager_id: 1`
 
 ### Lookup Keys
 
@@ -23,17 +23,17 @@ For each FK target entity, a lookup map is built from the database (or seed file
 
 | Key Format | Example | Source |
 |-----------|---------|--------|
-| LABEL value | `Airbus A320neo` | Primary label column (`[LABEL]`) |
+| LABEL value | `Marketing` | Primary label column (`[LABEL]`) |
 | LABEL2 value | `2015-03-12` | Secondary label column (`[LABEL2]`) |
-| Combined | `GE-900101 (2015-03-12)` | `"LABEL (LABEL2)"` format |
+| Combined | `EMP-1042 (2015-03-12)` | `"LABEL (LABEL2)"` format |
 | Index | `#1`, `#2`, ... | Row position (1-based) |
 
 ### Technical Name Fallback
 
-AI models sometimes write `engine_id: "GE-900101"` instead of the instructed `engine: "GE-900101"`. The system handles both:
+AI models sometimes write `project_id: "PRJ-2024-001"` instead of the instructed `project: "PRJ-2024-001"`. The system handles both:
 
-- **Conceptual name** (`engine`): Standard resolution path
-- **Technical name** (`engine_id`) with non-numeric string: Treated as a label, resolved identically
+- **Conceptual name** (`project`): Standard resolution path
+- **Technical name** (`project_id`) with non-numeric string: Treated as a label, resolved identically
 
 This prevents silent data loss where a string label in an INTEGER column would result in NULL.
 
@@ -77,13 +77,13 @@ The **Load tab** in the Generate/Complete dialog shows:
 
 ## Computed FK Columns
 
-Columns annotated with computed expressions like `[DAILY=Registration[...].operator]` are normally excluded from INSERT operations since their values are auto-calculated.
+Columns annotated with computed expressions like `[DAILY=Assignment[...].department]` are normally excluded from INSERT operations since their values are auto-calculated.
 
 **Exception**: Computed columns that are foreign keys are **included** in both:
 - **AI prompt schema** — provides relationship context for data generation
 - **Seed INSERT/UPDATE** — allows initial values from seed data
 
-This means `current_operator: "Lufthansa"` in an Aircraft seed file will be stored as `current_operator_id: 1`, even though the column is `[READONLY]` with a `[DAILY=...]` computation. The daily computation will maintain the value going forward based on Registration data.
+This means `current_department: "Marketing"` in an Employee seed file will be stored as `current_department_id: 1`, even though the column is `[READONLY]` with a `[DAILY=...]` computation. The daily computation will maintain the value going forward based on Assignment data.
 
 ---
 
@@ -102,13 +102,13 @@ The prompt sent to the AI includes:
 
 ### Limiting FK Reference Records
 
-For entities with many records (e.g., 1600+ engines), the FK References section can become very large. Use the `[FKLIMIT=n]` directive in your instruction to limit FK references to a random selection of N records:
+For entities with many records (e.g., 1600+ employees), the FK References section can become very large. Use the `[FKLIMIT=n]` directive in your instruction to limit FK references to a random selection of N records:
 
 ```markdown
 ## Data Generator
 
-Generate 20 engine usage log entries for the past month.
-Use realistic flight hours and cycles. [FKLIMIT=50]
+Generate 20 deployment records for the past month.
+Use realistic project assignments and roles. [FKLIMIT=50]
 ```
 
 **Behavior:**
@@ -117,9 +117,9 @@ Use realistic flight hours and cycles. [FKLIMIT=50]
 - Reduces prompt size and keeps AI focused on a manageable subset
 - Useful when generating data that only needs to reference a subset of existing records
 
-**Without limit:** All 1600 engines would be included in the prompt, potentially hitting token limits.
+**Without limit:** All 1600 employees would be included in the prompt, potentially hitting token limits.
 
-**With `[FKLIMIT=50]`:** Only 50 randomly selected engines are shown, making the prompt manageable.
+**With `[FKLIMIT=50]`:** Only 50 randomly selected employees are shown, making the prompt manageable.
 
 ### Prompt Rules for AI
 
@@ -246,11 +246,11 @@ Entity Markdown          AI Assistant
 ```
 app/systems/<system>/data/
 ├── seed/              ← Hand-crafted or AI-generated seed files
-│   ├── Aircraft.json
-│   └── Engine.json
+│   ├── Employee.json
+│   └── Project.json
 ├── backup/            ← Auto or manual backup of current DB state
-│   ├── Aircraft.json
-│   └── Engine.json
+│   ├── Employee.json
+│   └── Project.json
 └── rap.sqlite         ← SQLite database (gitignored)
 ```
 
@@ -261,10 +261,10 @@ Backup files use the **same JSON format** as seed files — FK values stored as 
 ```json
 [
   {
-    "registration": "D-ABAA",
-    "serial_number": "MSN1501",
-    "type": "Airbus A319-112",
-    "current_operator": "Lufthansa"
+    "emp_code": "EMP-1042",
+    "name": "Sarah Chen",
+    "department": "Marketing",
+    "manager": "James Miller"
   }
 ]
 ```

@@ -122,17 +122,17 @@ conn.close()
 
 ---
 
-## Example: EngineTypePossible -> EngineMountPossible
+## Example: ProjectTypeAllowed -> DeploymentTypeAllowed
 
 **Affected files:**
-1. `classes/EngineTypePossible.md` -> `classes/EngineMountPossible.md`
+1. `classes/ProjectTypeAllowed.md` -> `classes/DeploymentTypeAllowed.md`
 2. `DataModel.md` - Link update
 3. `DataModel-layout.json` - Position key
 4. `config.json` - enabledEntities
-5. `classes/EngineMount.md` - Seed context
-6. `seed/EngineTypePossible.json` -> `seed/EngineMountPossible.json`
+5. `classes/Deployment.md` - Seed context
+6. `seed/ProjectTypeAllowed.json` -> `seed/DeploymentTypeAllowed.json`
 
 **Note:** `DataModel.yaml` is auto-generated - will update on server restart.
 
 **Database:**
-- `engine_type_possible` -> `engine_mount_possible` (30 records)
+- `project_type_allowed` -> `deployment_type_allowed` (30 records)

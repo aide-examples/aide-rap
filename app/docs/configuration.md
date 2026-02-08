@@ -48,24 +48,24 @@ Entity visibility and views are defined in `docs/`:
 ```markdown
 # CRUD
 
-## Engine Management
-- Engine
-- EngineEvent
+## Projects
+- Project
+- Milestone
 
 ---
 
-## Operations
-- Aircraft
-- Operator
+## People
+- Employee
+- Manager
 ```
 
 `## Area` groups entities into named sections. A horizontal rule (`---`) inserts a **column break** in the selector dropdown — areas before the first `---` appear in column 1, areas after it in column 2, and so on. Without any `---`, each area becomes its own column (default).
 
 **Views.md** (optional) — Area ordering and column layout for the view selector:
 ```markdown
-## Engine Management
+## Projects
 ---
-## Operations
+## People
 ---
 ## Finance
 ```
@@ -74,32 +74,32 @@ Only `##` headers and `---` separators. Views within each area are still loaded 
 
 **Processes.md** (optional) — Area ordering and column layout for the process selector:
 ```markdown
-## Engine Management
+## Projects
 ---
-## Operations
+## People
 ```
 
 Same syntax as Views.md. Processes are loaded from `docs/processes/{Area}/*.md`.
 
 **processes/{Area}/{ProcessName}.md** — Business process guides (one file per process):
 ```markdown
-# Engine Shop Visit
+# Employee Onboarding
 
-Required: Engine:select
+Required: Employee:select
 
-This process guides you through handling an engine shop visit.
+This process guides you through onboarding a new employee.
 
-## Review Engine Usage
-Check the engine's flight hours and cycles.
-- Open the **Engine Usage** view
-- Review total FH and FC since last overhaul
+## Review Employee Profile
+Check the employee's details and department assignment.
+- Open the **Staff Overview** view
+- Verify contact information and start date
 
-View: Engine Usage
+View: Staff Overview
 
-## Create Workscope
-Create a workscope document for the maintenance work.
+## Assign Equipment
+Assign required equipment (laptop, phone, access card) to the employee.
 
-Entity: Workscope
+Entity: Equipment
 ```
 
 Each `##` becomes a tab. `View:`, `Entity:`, and `Call:` directives become action buttons.
@@ -116,19 +116,19 @@ The syntax is `Call: Label(ContextKey)` — `Label` is the button text, `Context
 **views/{Area}/{ViewName}.md** — Cross-entity join views (one file per view):
 ```
 docs/views/
-├── Engine Management/
-│   ├── Engine Status.md
-│   └── Engine Overview.md
+├── Projects/
+│   ├── Project Status.md
+│   └── Project Overview.md
 └── Finance/
     └── Exchange Rates.md
 ```
 
 Each view file contains a JSON block with the view definition:
 ```markdown
-# Engine Status
+# Project Status
 
 ```json
-{ "base": "EngineAllocation", "columns": ["engine.serial_number AS ESN", "aircraft.registration"] }
+{ "base": "Deployment", "columns": ["employee.emp_code AS Employee", "project.name AS Project"] }
 ```
 ```
 
@@ -193,11 +193,11 @@ Query external REST APIs at runtime from context menus and process steps. Two co
 - **Context Menu** — Right-click on an entity row or FK cell of a configured type
 - **Process Steps** — `Call: Label(EntityType)` directive in process definitions
 
-**Built-in Providers** (shipped with RAP in `api_providers.json`):
+**Built-in Demo Provider** (shipped with RAP in `api_providers.json`):
 
 | Provider | Source | Description |
 |----------|--------|-------------|
-| `federal-register-ad` | US Federal Register API | FAA Airworthiness Directives (free, no API key) |
+| `federal-register-ad` | US Federal Register API | Searches the US Federal Register (free, no API key). Included as a working demo of the external query feature. |
 
 **API Endpoint:** `GET /api/admin/external-query?provider=...&term=...&page=1` (admin role required)
 

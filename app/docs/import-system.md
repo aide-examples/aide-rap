@@ -9,8 +9,8 @@ Reference for the XLSX import pipeline — how external spreadsheet data flows t
 The import system converts external XLSX files into seed-compatible JSON using declarative mapping rules defined in Markdown files.
 
 ```
-extern/FDB.xlsx  →  docs/imports/Aircraft.md  →  import/Aircraft.json  →  Database
-    (XLSX)            (Mapping Rules)         (JSON Seed)           (SQLite)
+extern/Staff.xlsx  →  docs/imports/Employee.md  →  import/Employee.json  →  Database
+    (XLSX)              (Mapping Rules)           (JSON Seed)             (SQLite)
 ```
 
 This separates data acquisition (XLSX from external systems) from data transformation (mapping) and loading (seed pipeline).
@@ -22,10 +22,10 @@ This separates data acquisition (XLSX from external systems) from data transform
 Each entity can have an import definition in `docs/imports/{Entity}.md`:
 
 ```markdown
-# Aircraft Import
+# Employee Import
 
-Source: extern/FDB 2025-12-31.xlsx
-Sheet: Tabelle1
+Source: extern/Staff Export 2025-12-31.xlsx
+Sheet: Sheet1
 MaxRows: 100000
 Limit: 50
 
@@ -33,14 +33,14 @@ Limit: 50
 
 | Source                | Target              | Transform       |
 |-----------------------|---------------------|-----------------|
-| Machine Serial Number | serial_number       |                 |
-| Registration          | registration        |                 |
-| Aircraft Status       | status              |                 |
-| Manufacturing Date    | manufacture_date    | date:DD.MM.YYYY |
+| Employee Number       | emp_code            | string          |
+| Full Name             | name                |                 |
+| Department            | department          |                 |
+| Hire Date             | hire_date           | date:DD.MM.YYYY |
 
 ## Filter
 
-WHERE status IN ('Asset Fleet', 'Fixed Deliveries', 'Out Plan')
+WHERE status IN ('Active', 'On Leave', 'Probation')
 ```
 
 ### Header Directives
@@ -65,9 +65,9 @@ The **Source** column in the mapping table supports several expression types:
 
 | Type | Syntax | Example | Description |
 |------|--------|---------|-------------|
-| Column | `Name` | `Registration` | Value from XLSX column |
+| Column | `Name` | `Full Name` | Value from XLSX column |
 | Number | `42` | `1000` | Fixed numeric value |
-| String | `"text"` | `"DLH"` | Fixed string value |
+| String | `"text"` | `"Engineering"` | Fixed string value |
 | Random Number | `random(min,max)` | `random(1000,2000)` | Random integer in range |
 | Random Choice | `random("a","b")` | `random("A","B","C")` | Random selection from strings |
 | Random Enum | `random(EnumType)` | `random(CurrencyCode)` | Random internal value from enum type |
@@ -79,11 +79,11 @@ The **Source** column in the mapping table supports several expression types:
 ```markdown
 | Source                        | Target              | Transform       |
 |-------------------------------|---------------------|-----------------|
-| Machine Serial Number         | serial_number       |                 |
-| "DLH"                         | current_operator    |                 |
-| random(1000,5000)             | total_flight_hours  |                 |
-| random("A","B","C")           | maintenance_grade   |                 |
-| random(OperationalStatus)     | status              |                 |
+| Employee Number               | emp_code            | string          |
+| "Engineering"                 | department          |                 |
+| random(1000,5000)             | hours_worked        |                 |
+| random("A","B","C")           | performance_grade   |                 |
+| random(EmpStatus)             | status              |                 |
 | concat(Code, "-", Year)       | reference           |                 |
 | concat(First, " ", Last)      | full_name           |                 |
 | calc(Price * Factor)          | adjusted_price      |                 |
@@ -143,8 +143,8 @@ The **Target** column specifies where to write the value. Two naming conventions
 
 | Convention | Example | Description |
 |------------|---------|-------------|
-| Conceptual | `current_operator` | FK display name (without `_id`) |
-| Technical | `current_operator_id` | Actual DB column name |
+| Conceptual | `department` | FK display name (without `_id`) |
+| Technical | `department_id` | Actual DB column name |
 
 Using **conceptual names** is recommended. The seed pipeline will resolve them to IDs automatically (see [Seed Data: FK Label Resolution](seed-data.md#fk-label-resolution)).
 
@@ -174,7 +174,7 @@ The `string` transform forces a value to be stored as a string, preventing numer
 ```markdown
 | Source | Target | Transform |
 |--------|--------|-----------|
-| ESN    | serial_number | string |
+| Emp Nr | emp_code      | string |
 ```
 
 **When to use:**
@@ -189,7 +189,7 @@ The `replace:/pattern/replacement/flags` transform applies a JavaScript regex re
 ```markdown
 | Source      | Target      | Transform                      |
 |-------------|-------------|--------------------------------|
-| Engine Type | engine_type | replace:/^(PW)(\d)/$1 $2/      |
+| Dept Code   | department  | replace:/^(DEP)(\d)/$1-$2/     |
 | Code        | code        | replace:/[^A-Z0-9]//g          |
 | Name        | name        | replace:/\s+/ /g               |
 ```
@@ -199,7 +199,7 @@ The `replace:/pattern/replacement/flags` transform applies a JavaScript regex re
 - **flags**: Optional flags (`g` = global, `i` = case-insensitive, etc.)
 
 Examples:
-- `replace:/^(PW)(\d)/$1 $2/` — "PW4000" → "PW 4000"
+- `replace:/^(DEP)(\d)/$1-$2/` — "DEP100" → "DEP-100"
 - `replace:/[^A-Z0-9]//g` — Remove non-alphanumeric
 - `replace:/\s+/ /g` — Collapse multiple spaces
 
@@ -214,7 +214,7 @@ The `concat:OtherColumn:separator` transform combines the current column value w
 | SerialNumber |            |                        |
 ```
 
-This produces `"Boeing-ABC123"` from `Manufacturer="Boeing"` and `SerialNumber="ABC123"`.
+This produces `"Acme-PRJ001"` from `Manufacturer="Acme"` and `SerialNumber="PRJ001"`.
 
 **Syntax:** `concat:ColumnName:separator`
 - **ColumnName**: The other XLSX column to append
@@ -231,10 +231,10 @@ The `## Source Edit` section applies regex replacements to XLSX source data **be
 ```markdown
 ## Source Edit
 
-Engine Type: /TRENT([X0-9])/Trent $1/
-Engine Type: /PW([0-9])/PW $1/
-Aircraft identifier: /^#.*//
-Position: /^OFFWING$/0/
+Department Code: /^(DEP)([0-9])/DEP-$2/
+Department Code: /^(HR)([0-9])/HR-$2/
+Employee ID: /^#.*//
+Level: /^UNASSIGNED$/0/
 ```
 
 ### Syntax
@@ -270,8 +270,8 @@ The `## Source Filter` section filters XLSX rows **before** mapping, using regex
 ```markdown
 ## Source Filter
 
-Aircraft Status: /^(Active|In Service)$/
-Registration: /^D-/
+Employee Status: /^(Active|On Leave)$/
+Department: /^(Engineering|Marketing)/
 ```
 
 ### Syntax
@@ -342,8 +342,8 @@ The `## Filter` section supports SQL-like WHERE syntax:
 ```markdown
 ## Filter
 
-WHERE status IN ('Asset Fleet', 'Fixed Deliveries')
-  AND aircraft_type != 'Cargo'
+WHERE status IN ('Active', 'On Leave')
+  AND department != 'Temporary'
 ```
 
 ### Supported Operators
@@ -385,7 +385,7 @@ The import validation checks mapping rules against both source and target schema
 | Required column not mapped | Error |
 | Optional column not mapped | Info |
 
-FK columns (e.g., `current_operator_id`) are considered "covered" when the displayName (e.g., `current_operator`) is mapped.
+FK columns (e.g., `department_id`) are considered "covered" when the displayName (e.g., `department`) is mapped.
 
 ---
 
@@ -433,7 +433,7 @@ The import pipeline has distinct stages, each with different validation responsi
 │    - Collect warnings with row number, field, value, target entity      │
 │                                                                         │
 │  ✓ resolveConceptualFKs() — Convert labels to IDs                       │
-│    - "Lufthansa" → operator_id: 1                                       │
+│    - "Marketing" → department_id: 1                                      │
 │    - Returns unresolved FK warnings                                     │
 │                                                                         │
 │  ✓ INSERT/UPDATE based on load mode                                     │
@@ -449,14 +449,14 @@ The import pipeline has distinct stages, each with different validation responsi
 
 When an exact label match fails, the system tries **fuzzy matching** for entities with `concat`-based labels. This handles cases where the import provides abbreviated references.
 
-**Example:** Aircraft has `[LABEL=concat(type, '-', msn)]` which resolves to `"A320-214-6947"`, but the import provides `"A320-6947"` (shortened type).
+**Example:** Project has `[LABEL=concat(client, '-', code)]` which resolves to `"Acme-Corp-PRJ001"`, but the import provides `"Acme-PRJ001"` (shortened client name).
 
 **Algorithm:** The import value and each label are split by the concat separator (e.g., `-`). If the import segments are a **subsequence** of the label segments, it's a match. A match is accepted only if **exactly one** candidate is found (unambiguous).
 
 ```
-Import:  "A320-6947"     → ["A320", "6947"]
-Label:   "A320-214-6947" → ["A320", "214", "6947"]
-→ ["A320", "6947"] is a subsequence → Match!
+Import:  "Acme-PRJ001"      → ["Acme", "PRJ001"]
+Label:   "Acme-Corp-PRJ001" → ["Acme", "Corp", "PRJ001"]
+→ ["Acme", "PRJ001"] is a subsequence → Match!
 ```
 
 Fuzzy matches are **cached** in the lookup map, so subsequent records with the same value resolve in O(1). The load result includes a `fuzzyMatches` array with all resolved mappings and counts.
@@ -484,8 +484,8 @@ When FK validation fails, the Load result includes:
   loaded: 0,
   skipped: 1899,
   fkErrors: [
-    { row: 1, field: "current_operator", value: "DLH",
-      targetEntity: "Operator", message: "Row 1: \"DLH\" not found in Operator" },
+    { row: 1, field: "department", value: "Mktg",
+      targetEntity: "Department", message: "Row 1: \"Mktg\" not found in Department" },
     // ... up to 10 errors shown
   ],
   fkErrorsTotal: 1899  // Total count if more than 10
@@ -535,15 +535,15 @@ The log panel is resizable via drag handle.
 app/systems/<system>/
 ├── docs/
 │   ├── imports/           ← Import definition files
-│   │   └── Aircraft.md
+│   │   └── Employee.md
 │   ├── classes/           ← Entity class definitions
 │   ├── views/             ← View definitions (one file per view)
 │   └── Crud.md            ← Entity visibility configuration
 ├── data/
 │   ├── extern/            ← External XLSX files (gitignored)
-│   │   └── FDB 2025-12-31.xlsx
+│   │   └── Staff Export 2025-12-31.xlsx
 │   ├── import/            ← Generated JSON from import
-│   │   └── Aircraft.json
+│   │   └── Employee.json
 │   ├── seed/              ← Seed files (may include import output)
 │   └── rap.sqlite
 ```

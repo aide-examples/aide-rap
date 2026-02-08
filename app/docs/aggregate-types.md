@@ -158,21 +158,21 @@ The extended schema API exposes aggregate metadata:
 
 ## Example Entity
 
-**EngineTracker.md:**
+**GpsLog.md:**
 
 ```markdown
-# EngineTracker
+# GpsLog
 
-A tracking device fixed at the cradle of an EngineStand.
+A GPS tracking log entry for an Equipment item.
 
 ## Attributes
 
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
 | serial_number | string | Tracker serial number [LABEL] | TRK-001-2024 |
-| stand | EngineStand | Associated engine stand | |
+| equipment | Equipment | Associated equipment item | |
 | position | geo | GPS coordinates from tracker | 48.1371, 11.5754 |
-| mounted_date | date | When the tracker was placed | 2024-06-15 |
+| recorded_date | date | When the position was recorded | 2024-06-15 |
 | battery_soc | number | Battery state of charge (0-100%) | 95 |
 ```
 
@@ -182,10 +182,10 @@ A tracking device fixed at the cradle of an EngineStand.
 |-----------|------|--------|
 | `id` | INTEGER | (system) |
 | `serial_number` | TEXT | string |
-| `stand_id` | INTEGER | FK to EngineStand |
+| `equipment_id` | INTEGER | FK to Equipment |
 | `position_latitude` | REAL | geo.latitude |
 | `position_longitude` | REAL | geo.longitude |
-| `mounted_date` | TEXT | date |
+| `recorded_date` | TEXT | date |
 | `battery_soc` | REAL | number |
 
 ---

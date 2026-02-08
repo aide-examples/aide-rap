@@ -8,7 +8,7 @@
 
 **Reading the arrows:** Arrows point from a class to its referenced type (read as "is of type" or "references"). The label shows the attribute name on the class where the arrow originates.
 
-**Example:** `AircraftType --manufacturer--> AircraftOEM` means AircraftType has an attribute `manufacturer` referencing AircraftOEM.
+**Example:** `ProjectType --client--> Client` means ProjectType has an attribute `client` referencing Client.
 
 **Source of Truth:** The Markdown file (`DataModel.md`) is the source of truth. Diagrams are generated from it.
 

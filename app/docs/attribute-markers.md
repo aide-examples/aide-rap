@@ -69,33 +69,33 @@ Instead of marking a column with `[LABEL]`, you can define a **computed label ex
 **Syntax** (placed before `## Attributes`):
 
 ```markdown
-# Aircraft
+# Project
 
-[LABEL=concat(manufacturer, ' - ', serial_number)]
-[LABEL2=manufacture_date]
+[LABEL=concat(client, ' - ', project_ref)]
+[LABEL2=start_date]
 
 ## Attributes
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| serial_number | string | [UK1] | ABC123 |
-| manufacturer | string | [UK1] | Boeing |
-| manufacture_date | date | | 2020-01-15 |
+| project_ref | string | [UK1] | PRJ-2024-001 |
+| client | string | [UK1] | Acme Corp |
+| start_date | date | | 2024-01-15 |
 ```
 
 **Supported expressions:**
 
 | Expression | Example | Result |
 |------------|---------|--------|
-| `concat(a, 'sep', b)` | `concat(mfg, ' - ', serial)` | `Boeing - ABC123` |
-| Single field | `serial_number` | `ABC123` |
+| `concat(a, 'sep', b)` | `concat(client, ' - ', ref)` | `Acme Corp - PRJ-2024-001` |
+| Single field | `project_ref` | `PRJ-2024-001` |
 
 **How it works:**
 
 1. **SQL View**: A computed `_label` column is added to the entity's view:
    ```sql
-   CREATE VIEW aircraft_view AS
-   SELECT *, (manufacturer || ' - ' || serial_number) AS _label
-   FROM aircraft;
+   CREATE VIEW project_view AS
+   SELECT *, (client || ' - ' || project_ref) AS _label
+   FROM project;
    ```
 
 2. **FK Dropdowns**: Use the computed `_label` for display instead of a column value
@@ -127,8 +127,8 @@ Instead of marking a column with `[LABEL]`, you can define a **computed label ex
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| name | string | Company name [LABEL] | Airbus |
-| country | string | Country [LABEL2] | France |
+| name | string | Company name [LABEL] | Acme Corp |
+| country | string | Country [LABEL2] | USA |
 | internal_code | string | Internal system code [HIDDEN] | ABC123 |
 | created_at | datetime | Creation timestamp [READONLY] | 2024-01-15 |
 ```
@@ -187,7 +187,7 @@ Computed fields are stored in the database but calculated automatically. They co
 ### Syntax
 
 ```markdown
-| current_operator | Operator | [READONLY] [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator] | 5 |
+| current_department | Department | [READONLY] [DAILY=Assignment[end_date=null OR end_date>TODAY].department] | 5 |
 ```
 
 ### Computation Types
@@ -200,8 +200,8 @@ Computed fields are stored in the database but calculated automatically. They co
 ### Aggregate Functions
 
 ```markdown
-| latest_aircraft | Aircraft | [READONLY] [DAILY=EngineAllocation[MAX(end_date)].aircraft] | 1 |
-| first_event | EngineEvent | [READONLY] [DAILY=EngineEvent[MIN(event_date)]] | 3 |
+| latest_project | Project | [READONLY] [DAILY=Deployment[MAX(end_date)].project] | 1 |
+| first_milestone | Milestone | [READONLY] [DAILY=Milestone[MIN(due_date)]] | 3 |
 ```
 
 See [Computed References](computed-references.md) for full syntax.

@@ -29,7 +29,7 @@ Whole numbers without decimal places. Stored as SQLite INTEGER.
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| total_cycles | int | Engine cycle count | 15000 |
+| hours_worked | int | Total hours worked | 15000 |
 | quantity | int | Item quantity | 42 |
 ```
 
@@ -42,8 +42,8 @@ Numbers with decimal places. Stored as SQLite REAL.
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| total_flight_hours | number | Total flight hours | 12500.5 |
-| thrust | number | Engine thrust in kN | 142.3 |
+| budget | number | Project budget in thousands | 12500.5 |
+| hourly_rate | number | Contractor hourly rate | 142.3 |
 | battery_soc | number | Battery state of charge (0-100) | 95 |
 ```
 
@@ -62,8 +62,8 @@ Variable-length text. Stored as SQLite TEXT.
 ```markdown
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| serial_number | string | Engine serial number | ESN-12345 |
-| name | string | Company name | Lufthansa |
+| project_ref | string | Project reference code | PRJ-2024-001 |
+| name | string | Company name | Acme Corp |
 ```
 
 **UI**: Single-line text input.
@@ -76,7 +76,7 @@ ISO 8601 date format (YYYY-MM-DD). Stored as SQLite TEXT.
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
 | start_date | date | Contract start date | 2024-01-15 |
-| mounted_date | date | Installation date | 2024-06-20 |
+| due_date | date | Task due date | 2024-06-20 |
 ```
 
 **UI**: Date picker.
@@ -137,19 +137,19 @@ Both forms are accepted in entity definitions and behave identically.
 ## Example Entity
 
 ```markdown
-# Engine
+# Project
 
-An aircraft engine with operational data.
+A project with tracking data.
 
 ## Attributes
 
 | Attribute | Type | Description | Example |
 |-----------|------|-------------|---------|
-| serial_number | string | Engine serial number [LABEL] | ESN-12345 |
-| total_cycles | int | Total engine cycles | 15000 |
-| total_flight_hours | number | Total flight hours | 12500.5 |
-| manufacture_date | date | Manufacturing date | 2020-03-15 |
-| is_serviceable | bool | Serviceable status | true |
+| project_ref | string | Project reference [LABEL] | PRJ-2024-001 |
+| team_size | int | Number of team members | 12 |
+| budget | number | Budget in thousands | 12500.5 |
+| start_date | date | Project start date | 2024-03-15 |
+| is_active | bool | Active status | true |
 ```
 
 ---

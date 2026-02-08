@@ -252,6 +252,7 @@ const { getSchema } = require('./server/config/database');
 const mdCrud = UISpecLoader.loadCrudConfig(cfg.paths.docs);
 const mdViews = UISpecLoader.loadViewsConfig(cfg.paths.docs);
 const mdProcesses = UISpecLoader.loadProcessesConfig(cfg.paths.docs);
+const processesDocsDir = cfg.paths.docs;
 
 // Extract entities, prefilters, requiredFilters, and tableOptions from CRUD config
 const crudConfig = mdCrud || { entities: [], prefilters: {}, requiredFilters: {}, tableOptions: {} };
@@ -375,11 +376,16 @@ if (authEnabled) {
 }
 app.use(require('./server/routers/UserViewRouter')());
 
-// Process Router (read-only for all authenticated users)
+// Process Router (GET for all, PUT/POST admin-only)
 if (authEnabled) {
-    app.use('/api/processes', authMiddleware, requireRole('guest', 'user', 'admin'));
+    app.use('/api/processes', authMiddleware, (req, res, next) => {
+        if (req.method === 'GET') {
+            return requireRole('guest', 'user', 'admin')(req, res, next);
+        }
+        return requireRole('admin')(req, res, next);
+    });
 }
-app.use(require('./server/routers/ProcessRouter')(mdProcesses));
+app.use(require('./server/routers/ProcessRouter')(mdProcesses, processesDocsDir));
 
 // Export Router (PDF, CSV) - routes are under /api/entities, protection handled there
 app.use(require('./server/routers/export.router')(cfg));

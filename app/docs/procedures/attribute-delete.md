@@ -107,16 +107,16 @@ Computed fields (e.g., `[DAILY=...]`) don't exist in the database:
 
 ---
 
-## Example: Delete severity_factor from Engine
+## Example: Delete priority_level from Project
 
-**Step 1:** Engine.md - Remove row:
+**Step 1:** Project.md - Remove row:
 ```markdown
-| severity_factor | int [DEFAULT=100] | ... | 90 |  <- delete
+| priority_level | int [DEFAULT=50] | ... | 90 |  <- delete
 ```
 
 **Step 2:** Database:
 ```sql
-ALTER TABLE engine DROP COLUMN severity_factor;
+ALTER TABLE project DROP COLUMN priority_level;
 ```
 
 **Step 3:** Restart server

@@ -41,7 +41,7 @@ const EntityExplorer = {
   welcomeContainer: null, // Welcome screen container
   records: [],
   selectedId: null,
-  viewMode: 'tree-v', // 'table', 'tree-h', or 'tree-v'
+  viewMode: 'table', // 'table', 'tree-h', or 'tree-v'
 
   // Pagination state
   totalRecords: 0,
@@ -616,7 +616,7 @@ const EntityExplorer = {
       this.viewMode = savedViewMode;
     } else if (savedViewMode === 'tree') {
       // Migration from old 2-mode system
-      this.viewMode = 'tree-v';
+      this.viewMode = 'table';
     }
     this.updateViewToggle();
 
@@ -1111,7 +1111,7 @@ const EntityExplorer = {
     this.mapLabelsToggle.style.display = 'none';
     // If we were in map mode, switch back to default
     if (['map', 'chart'].includes(this.viewMode)) {
-      this.viewMode = 'tree-v';
+      this.viewMode = 'table';
     }
     this.updateViewToggle();
 
@@ -1154,7 +1154,7 @@ const EntityExplorer = {
       }
       // If we were in hierarchy mode but entity has no self-ref FK, switch back
       if (this.viewMode === 'hierarchy' && !this.selfRefFK) {
-        this.viewMode = 'tree-v';
+        this.viewMode = 'table';
         this.updateViewToggle();
       }
     } catch (e) {
@@ -1759,7 +1759,9 @@ const EntityExplorer = {
     }
 
     if (this.records.length === 0) {
-      this.list.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+      const readonly = this.isCurrentEntityReadonly();
+      const newBtn = readonly ? '' : '<br><button class="empty-table-new-btn" onclick="DetailPanel.showCreateForm(EntityExplorer.currentEntity)">+ New</button>';
+      this.list.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}${newBtn}</p>`;
       return;
     }
 
@@ -1833,7 +1835,9 @@ const EntityExplorer = {
     }
 
     if (this.records.length === 0) {
-      this.treeContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+      const readonly = this.isCurrentEntityReadonly();
+      const newBtn = readonly ? '' : '<br><button class="empty-table-new-btn" onclick="DetailPanel.showCreateForm(EntityExplorer.currentEntity)">+ New</button>';
+      this.treeContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}${newBtn}</p>`;
       return;
     }
 
@@ -2121,12 +2125,15 @@ const EntityExplorer = {
     try {
       const data = await ApiClient.request('/api/processes');
       this.processList = data.processes || [];
-      if (this.processList.length === 0) {
+      this._processGroups = data.groups || [];
+
+      const isAdmin = window.currentUser && window.currentUser.role === 'admin';
+
+      // Show process selector if there are processes or admin can create new ones
+      if (this.processList.length === 0 && !isAdmin) {
         this.processSelector.style.display = 'none';
         return;
       }
-
-      // Show process selector
       this.processSelector.style.display = '';
 
       const segments = [];
@@ -2151,6 +2158,11 @@ const EntityExplorer = {
       }
       if (groupHtml) segments.push({ html: groupHtml + '</div>' });
 
+      // Admin: add "New Process" button at the end
+      if (isAdmin) {
+        segments.push({ html: '<div class="process-selector-new"><button class="process-selector-new-btn">+ New Process</button></div>' });
+      }
+
       this.processSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
 
       // Add click handlers
@@ -2159,10 +2171,138 @@ const EntityExplorer = {
           this.openProcess(item.dataset.value, item.dataset.color);
         });
       });
+
+      // New process button
+      this.processSelectorMenu.querySelector('.process-selector-new-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showNewProcessDialog();
+      });
     } catch (err) {
       console.warn('Failed to load processes:', err);
       if (this.processSelector) this.processSelector.style.display = 'none';
     }
+  },
+
+  /**
+   * Show dialog to create a new process.
+   */
+  async showNewProcessDialog() {
+    // Close dropdown
+    this.processSelectorMenu?.classList.remove('open');
+    this.processSelector?.classList.remove('open');
+
+    // Fetch available areas
+    let areas = [];
+    try {
+      const data = await ApiClient.request('/api/processes/_areas');
+      areas = data.areas || [];
+    } catch (err) {
+      alert('Failed to load areas: ' + err.message);
+      return;
+    }
+
+    if (areas.length === 0) {
+      alert('No process area directories found. Create a directory in docs/processes/ first.');
+      return;
+    }
+
+    // Build dialog
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-container active';
+    overlay.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-dialog" style="max-width: 400px;">
+          <div class="modal-header">
+            <h3>New Process</h3>
+            <button class="modal-close-btn">&times;</button>
+          </div>
+          <div class="modal-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">Process Name</label>
+              <input type="text" id="new-process-name" placeholder="e.g. Employee Onboarding" style="width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem;">
+            </div>
+            <div>
+              <label style="font-size: 0.8rem; font-weight: 600; color: var(--color-text-secondary); display: block; margin-bottom: 4px;">Area</label>
+              <select id="new-process-area" style="width: 100%; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.9rem;">
+                ${areas.map(a => `<option value="${DomUtils.escapeHtml(a)}">${DomUtils.escapeHtml(a)}</option>`).join('')}
+              </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+              <button class="process-edit-cancel" id="new-process-cancel">Cancel</button>
+              <button class="process-edit-save" id="new-process-create">Create</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const nameInput = overlay.querySelector('#new-process-name');
+    const areaSelect = overlay.querySelector('#new-process-area');
+    const createBtn = overlay.querySelector('#new-process-create');
+    const cancelBtn = overlay.querySelector('#new-process-cancel');
+    const closeBtn = overlay.querySelector('.modal-close-btn');
+
+    const closeDialog = () => overlay.remove();
+
+    cancelBtn.addEventListener('click', closeDialog);
+    closeBtn.addEventListener('click', closeDialog);
+    overlay.querySelector('.modal-overlay').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeDialog();
+    });
+
+    createBtn.addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      const area = areaSelect.value;
+
+      if (!name) {
+        nameInput.focus();
+        return;
+      }
+
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+
+      try {
+        const res = await fetch('/api/processes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, area })
+        });
+        const result = await res.json();
+
+        if (result.error) {
+          alert('Create failed: ' + result.error);
+          createBtn.disabled = false;
+          createBtn.textContent = 'Create';
+          return;
+        }
+
+        closeDialog();
+
+        // Reload process list and open the new process
+        await this.loadProcesses();
+        await this.openProcess(result.name);
+
+        // Enter raw-edit mode for the new process
+        setTimeout(() => {
+          if (typeof ProcessPanel !== 'undefined' && ProcessPanel.currentProcess) {
+            ProcessPanel.enterRawEdit();
+          }
+        }, 100);
+      } catch (err) {
+        alert('Create failed: ' + err.message);
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create';
+      }
+    });
+
+    nameInput.focus();
+
+    // Enter key to create
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') createBtn.click();
+    });
   },
 
   /**

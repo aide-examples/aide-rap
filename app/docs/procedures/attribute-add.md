@@ -36,7 +36,7 @@ In `app/systems/<system>/docs/classes/ENTITY_NAME.md`, add a new row to the attr
 
 **Example with default:**
 ```markdown
-| severity_factor | int | Effect of flight profile on degradation in % [DEFAULT=100] | 90 |
+| priority_level | int | Task priority from 1 (low) to 100 (critical) [DEFAULT=50] | 90 |
 ```
 
 ---
@@ -65,7 +65,7 @@ UPDATE ENTITY_TABLE SET ATTR_NAME = DEFAULT_VALUE WHERE ATTR_NAME IS NULL;
 
 **Example:**
 ```sql
-UPDATE engine SET severity_factor = 100 WHERE severity_factor IS NULL;
+UPDATE project SET priority_level = 50 WHERE priority_level IS NULL;
 ```
 
 ---
@@ -87,13 +87,13 @@ UPDATE engine SET severity_factor = 100 WHERE severity_factor IS NULL;
 If the new attribute is a reference to another entity:
 
 ```markdown
-| operator | Operator | Reference to operator [LABEL2] | 5 |
+| manager | Manager | Reference to manager [LABEL2] | 5 |
 ```
 
 The SchemaGenerator automatically creates:
-- The FK column (`operator_id INTEGER`)
+- The FK column (`manager_id INTEGER`)
 - The foreign key constraint
-- The view with label resolution (`operator_label`)
+- The view with label resolution (`manager_label`)
 
 ### Computed Fields
 
@@ -101,15 +101,15 @@ Computed fields are stored in the database but calculated automatically:
 
 ```markdown
 # Boolean filter: find record matching condition
-| current_operator | Operator | [READONLY] [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator] | 5 |
+| current_department | Department | [READONLY] [DAILY=Assignment[end_date=null OR end_date>TODAY].department] | 5 |
 
 # Aggregate function: find record with MAX/MIN value
-| latest_aircraft | Aircraft | [READONLY] [DAILY=EngineAllocation[MAX(end_date)].aircraft] | 1 |
+| latest_project | Project | [READONLY] [DAILY=Deployment[MAX(end_date)].project] | 1 |
 ```
 
 These require `ALTER TABLE ADD COLUMN` but values are computed by ComputedFieldService.
 
-See [ComputedReferences.md](../systems/irma/docs/ComputedReferences.md) for full syntax.
+See [Computed References](../computed-references.md) for full syntax.
 
 ### Seed Data
 
@@ -119,16 +119,16 @@ If `app/systems/<system>/data/seed/ENTITY_NAME.json` exists and the new attribut
 
 ---
 
-## Example: severity_factor for Engine
+## Example: priority_level for Project
 
-**Change in Engine.md:**
+**Change in Project.md:**
 ```markdown
-| severity_factor | int | Effect of flight profile on degradation in % [DEFAULT=100] | 90 |
+| priority_level | int | Task priority from 1 (low) to 100 (critical) [DEFAULT=50] | 90 |
 ```
 
 **After server restart:**
 ```sql
-UPDATE engine SET severity_factor = 100 WHERE severity_factor IS NULL;
+UPDATE project SET priority_level = 50 WHERE priority_level IS NULL;
 ```
 
 **Note:** `DataModel.yaml` is auto-generated from the markdown files - no manual editing needed.

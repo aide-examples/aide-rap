@@ -8,19 +8,20 @@
 
 ## The Vision
 
-What if you could design your application's data model as naturally as writing documentation? No XML schemas, no code generation wizards, no framework boilerplate. Just describe what you need in plain Markdown, and watch as the system generates:
+What if you could design your application as naturally as writing documentation? No XML schemas, no code generation wizards, no framework boilerplate. Just describe what you need in plain Markdown, and watch as the system generates:
 
 - **SQLite database** with proper constraints and relationships
 - **REST API** with CRUD operations, filtering, and validation
 - **Modern browser UI** with table views, tree navigation, and forms
-- **Seed data** – either imported or AI-generated from your descriptions
-
+- **Views & processes** - define use cases with links to complex views 
+- **Visualize data** by defining graph diagrams and geo maps
+- **connect data sources** using AI-generated seeds or configurable imports
 This is the dream of what CASE tools in the 1990s wanted to be – now actually working.
 
 | What you write | What you get |
 |----------------|--------------|
 | Markdown tables | SQLite with constraints |
-| `type: AircraftType` | Foreign key with label resolution |
+| `department: Department` | Foreign key with label resolution |
 | `[DAILY=rule]` | Computed fields, auto-updated |
 | `## Data Generator` | AI-generated test data |
 
@@ -64,51 +65,51 @@ because there is a set of pre-defined [procedures](/rap#procedures) for it which
 First you define Areas which act as a semantic group of the Entities of your Data Model.
 You assign a color code to each Area which will flow through from your data model diagram into the UI of the running system – entity selector, tree nodes, and table headers all respect the grouping.
 
-Example from IRMA (engine management system):
-- **OEM** (blue) – AircraftOEM, AircraftType, EngineOEM, EngineType
-- **Operations** (green) – CAMO, Airline, Operator, Aircraft, Registration
-- **Engine Management** (orange) – Engine, EngineLease, EngineEvent, EngineAllocation
-- **Maintenance** (purple) – MRO, RepairShop, Workscope
+Example from a project management system:
+- **Organization** (blue) – Company, Department, Client, ProjectType
+- **People** (green) – Division, Team, Manager, Employee, Assignment
+- **Projects** (orange) – Project, Contract, Milestone, Deployment
+- **Services** (purple) – Vendor, Office, TaskTemplate
 
 ## Data Model
 
 Define entities in simple Markdown tables. Foreign keys, types, and constraints are expressed naturally.
 
 ```markdown
-### Aircraft (Example)
+### Employee (Example)
 
-| Attribute     | Type            | Description                    | Example  |
-|---------------|-----------------|--------------------------------|----------|
-| registration  | TailSign [LABEL]| Aircraft registration          | D-AINA   |
-| serial_number | MSN             | Manufacturer serial number     | 7-13     |
-| type          | AircraftType    | Refers to a different entity   | A-320    |
-| status        | AcStatus        | Active, Grounded, or Retired   | Grounded |
+| Attribute     | Type            | Description                    | Example    |
+|---------------|-----------------|--------------------------------|------------|
+| emp_code      | EmpCode [LABEL] | Employee code                  | EMP-1042   |
+| name          | string          | Full name                      | Sarah Chen |
+| department    | Department      | Refers to a different entity   | Marketing  |
+| status        | EmpStatus       | Active, On Leave, or Departed  | Active     |
 ```
 The database will use internal ids to uniquely identify objects and to create
 foreign key relations, but there is no need to define this in the Entity document.
-No `type_id INTEGER REFERENCES aircraft_type(id)` – just write `type: AircraftType` 
+No `department_id INTEGER REFERENCES department(id)` – just write `department: Department`
 and the system handles the rest.
 
 ## Smart Type System
 
 **Pattern Types** – Define validation patterns with regex:
 ```markdown
-| Type     | Pattern           | Example   |
-|----------|-------------------|-----------|
-| TailSign | ^[A-Z]-[A-Z]{4}$  | D-AINA    |
-| MSN      | ^MSN \d+$         | MSN 4711  |
+| Type       | Pattern              | Example      |
+|------------|----------------------|--------------|
+| EmpCode    | ^EMP-\d{4}$          | EMP-1042     |
+| ProjectRef | ^PRJ-\d{4}-\d{3}$    | PRJ-2024-001 |
 ```
 
 **Enum Types** – Map internal values to display labels:
 ```markdown
 
-**AcStatus**
+**EmpStatus**
 
-| Internal | External  | Description           |
-|----------|-----------|----------------------|
-| 1        | Active    | Currently in service |
-| 2        | Grounded  | Temporarily offline  |
-| 3        | Retired   | Permanently removed  |
+| Internal | External  | Description             |
+|----------|-----------|-------------------------|
+| 1        | Active    | Currently employed       |
+| 2        | On Leave  | Temporarily unavailable  |
+| 3        | Departed  | No longer with company   |
 ```
 
 Validation happens identically on frontend (for UX) and backend (for integrity).
@@ -193,10 +194,10 @@ See [Admin Tools](admin-tools.md) for details.
 Express dynamic relationships that depend on time:
 
 ```markdown
-current_operator: Operator [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator]
+current_department: Department [DAILY=Assignment[end_date=null OR end_date>TODAY].department]
 ```
 
-This calculates the current operator by finding the active Registration assignment – recalculated daily to handle future-dated changes.
+This calculates the current department by finding the active Assignment record – recalculated daily to handle future-dated changes.
 
 ### AI-Powered Seed Data Generation
 
@@ -204,11 +205,11 @@ Each entity can include generation instructions:
 
 ```markdown
 ## Data Generator
-Generate 10 realistic German aircraft registrations with various
-operational statuses. Use actual Airbus and Boeing type designations.
+Generate 10 realistic employee records with various departments
+and employment statuses. Use diverse names and realistic job titles.
 ```
 
-The system sends your schema + instructions to an LLM (Gemini or Claude) and receives properly structured JSON. Foreign keys can use display labels (`"operator": "Lufthansa"`) – the system resolves them to IDs automatically.
+The system sends your schema + instructions to an LLM (Gemini or Claude) and receives properly structured JSON. Foreign keys can use display labels (`"department": "Marketing"`) – the system resolves them to IDs automatically.
 
 ### Dual-Layer Validation
 

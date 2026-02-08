@@ -16,14 +16,14 @@ Views are defined as individual Markdown files in `docs/views/`:
 
 ```
 docs/views/
-├── Engine Management/          ← Area (dropdown separator)
-│   ├── Engine Status.md        ← View file
-│   ├── Engine Overview.md
-│   └── Stands by Engine Type.md
+├── Projects/                   ← Area (dropdown separator)
+│   ├── Project Status.md       ← View file
+│   ├── Project Overview.md
+│   └── Equipment by Type.md
 ├── Finance/
 │   └── Exchange Rates.md
-└── Operations/
-    └── Fleet.md
+└── People/
+    └── Staff Overview.md
 ```
 
 **Conventions:**
@@ -38,16 +38,16 @@ docs/views/
 Each view is a Markdown file containing an H1 header (view name), a JSON block (view definition), and optionally a JS block (calculator):
 
 ```markdown
-# Engine Status
+# Project Status
 
 ```json
 {
-  "base": "Engine",
+  "base": "Project",
   "columns": [
-    "serial_number",
-    "total_cycles",
-    "type.designation AS Engine Type",
-    { "path": "type.manufacturer.name", "label": "OEM" }
+    "project_ref",
+    "hours_worked",
+    "type.name AS Project Type",
+    { "path": "type.client.name", "label": "Client" }
   ]
 }
 ```
@@ -55,7 +55,7 @@ Each view is a Markdown file containing an H1 header (view name), a JSON block (
 ```js
 // Optional: client-side calculator for row styling
 for (const row of data) {
-  row._rowClass = row['Total Cycles'] > 1000 ? 'highlight' : '';
+  row._rowClass = row['Hours Worked'] > 1000 ? 'highlight' : '';
 }
 ```
 ```
@@ -82,15 +82,15 @@ Each entry in the `columns` array can be one of three formats:
 ### 1. Simple column (direct attribute)
 
 ```json
-"serial_number"
+"project_ref"
 ```
 
-References a column directly on the base entity. The display label is auto-generated via title-case: `serial_number` → **Serial Number**.
+References a column directly on the base entity. The display label is auto-generated via title-case: `project_ref` → **Project Ref**.
 
 ### 2. Dot-path with AS alias
 
 ```json
-"type.designation AS Engine Type"
+"type.name AS Project Type"
 ```
 
 Follows the FK chain and assigns a custom display label. The `AS` keyword is case-insensitive.
@@ -98,10 +98,10 @@ Follows the FK chain and assigns a custom display label. The `AS` keyword is cas
 ### 3. Object format
 
 ```json
-{ "path": "type.manufacturer.name", "label": "OEM" }
+{ "path": "type.client.name", "label": "Client" }
 ```
 
-Explicit path and label. Equivalent to `"type.manufacturer.name AS OEM"`.
+Explicit path and label. Equivalent to `"type.client.name AS Client"`.
 
 ### OMIT — Value Suppression
 
@@ -110,24 +110,24 @@ The `OMIT` keyword suppresses specific values from display, rendering the cell a
 **String syntax** — append `OMIT <value>` after the column (or after `AS label`):
 
 ```json
-"mount_position AS pos OMIT 0"
-"total_cycles OMIT 0"
+"priority_level AS Priority OMIT 0"
+"hours_worked OMIT 0"
 ```
 
 **Object syntax** — add the `omit` property:
 
 ```json
-{ "path": "total_cycles", "label": "Cycles", "omit": 0 }
+{ "path": "hours_worked", "label": "Hours", "omit": 0 }
 ```
 
 **FK default**: Columns using dot-notation paths (FK joins) automatically get `OMIT null` — missing FK references display as blank instead of showing `null`. This default can be overridden by specifying an explicit `OMIT` value.
 
 | Format | OMIT Behavior |
 |--------|---------------|
-| `"serial_number"` | No suppression |
-| `"serial_number OMIT 0"` | Suppress `0` |
-| `"type.designation AS Type"` | Suppress `null` (FK default) |
-| `"type.designation AS Type OMIT -"` | Suppress `-` (overrides FK default) |
+| `"project_ref"` | No suppression |
+| `"project_ref OMIT 0"` | Suppress `0` |
+| `"type.name AS Type"` | Suppress `null` (FK default) |
+| `"type.name AS Type OMIT -"` | Suppress `-` (overrides FK default) |
 
 ### `.*` — Aggregate Type Expansion
 
@@ -146,8 +146,8 @@ The `.*` suffix expands [aggregate types](../aggregate-types.md) (like `geo`) in
 
 **With back-references:**
 ```json
-"EngineTracker<stand(LIMIT 1).position.*"              // → "Position Latitude", "Position Longitude"
-"EngineTracker<stand(LIMIT 1).position.* AS Tracker"   // → "Tracker Latitude", "Tracker Longitude"
+"GpsLog<equipment(LIMIT 1).position.*"              // → "Position Latitude", "Position Longitude"
+"GpsLog<equipment(LIMIT 1).position.* AS Tracker"   // → "Tracker Latitude", "Tracker Longitude"
 ```
 
 **Object syntax:**
@@ -168,11 +168,11 @@ The `.*` suffix expands [aggregate types](../aggregate-types.md) (like `geo`) in
 Paths are resolved segment by segment against the schema's FK chain:
 
 ```
-type.manufacturer.name    (base: Engine)
-│    │            │
-│    │            └─ Terminal: column "name" on EngineOEM
-│    └─ FK segment: EngineType.manufacturer → EngineOEM
-└─ FK segment: Engine.type → EngineType
+type.client.name    (base: Project)
+│    │       │
+│    │       └─ Terminal: column "name" on Client
+│    └─ FK segment: ProjectType.client → Client
+└─ FK segment: Project.type → ProjectType
 ```
 
 ### Rules
@@ -187,16 +187,16 @@ type.manufacturer.name    (base: Engine)
 The example above produces:
 
 ```sql
-CREATE VIEW IF NOT EXISTS uv_engine_status AS
+CREATE VIEW IF NOT EXISTS uv_project_status AS
 SELECT b.id,
-       b.serial_number AS "Serial Number",
-       b.total_cycles AS "Total Cycles",
-       j_type.designation AS "Engine Type",
-       j_type_manufacturer.name AS "OEM"
-FROM engine b
-LEFT JOIN engine_type j_type ON b.type_id = j_type.id
-LEFT JOIN engine_oem j_type_manufacturer
-  ON j_type.manufacturer_id = j_type_manufacturer.id
+       b.project_ref AS "Project Ref",
+       b.hours_worked AS "Hours Worked",
+       j_type.name AS "Project Type",
+       j_type_client.name AS "Client"
+FROM project b
+LEFT JOIN project_type j_type ON b.type_id = j_type.id
+LEFT JOIN client j_type_client
+  ON j_type.client_id = j_type_client.id
 ```
 
 Join aliases use the pattern `j_{path_segments}` (e.g., `j_type`, `j_type_manufacturer`) for uniqueness and debuggability.
@@ -215,10 +215,10 @@ Entity<fk_field(params).column AS Label
 
 | Part | Description | Example |
 |------|-------------|---------|
-| `Entity` | Child entity that has an FK pointing to the base entity | `EngineAllocation` |
-| `<fk_field` | FK column name (displayName, without `_id`) | `<engine` (= `engine_id`) |
+| `Entity` | Child entity that has an FK pointing to the base entity | `Deployment` |
+| `<fk_field` | FK column name (displayName, without `_id`) | `<employee` (= `employee_id`) |
 | `(params)` | Filter, sort, limit, or aggregation directives | `(WHERE end_date=null, LIMIT 1)` |
-| `.column` | Target column on the child entity (or FK chain from it) | `.mount_position` |
+| `.column` | Target column on the child entity (or FK chain from it) | `.role` |
 
 > ⚠️ **Parentheses required**: The `(params)` part is mandatory, even when empty or only specifying `LIMIT 1`. Omitting parentheses causes the column to be silently ignored.
 >
@@ -242,19 +242,19 @@ Entity<fk_field(params).column AS Label
 The `.column` part supports multi-segment dot-paths, following FK chains from the child entity outward:
 
 ```json
-"EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+"Deployment<employee(WHERE end_date=null, LIMIT 1).project.name AS Current Project"
 ```
 
-This resolves as: find `EngineAllocation` records where `engine_id = base.id` and `end_date IS NULL`, then follow the `aircraft` FK to `Aircraft` and return `registration`. The FK chain within the subquery produces internal LEFT JOINs.
+This resolves as: find `Deployment` records where `employee_id = base.id` and `end_date IS NULL`, then follow the `project` FK to `Project` and return `name`. The FK chain within the subquery produces internal LEFT JOINs.
 
 ### Examples
 
 ```json
-"EngineAllocation<engine(COUNT) AS Allocations"
-"EngineEvent<engine(COUNT) AS Events OMIT 0"
-"EngineAllocation<engine(ORDER BY start_date DESC, LIMIT 1).mount_position AS Last Pos"
-"EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
-"EngineStandMounting<engine(LIST, ORDER BY mounted_date DESC).mounted_date AS Mount History"
+"Deployment<employee(COUNT) AS Deployments"
+"Milestone<project(COUNT) AS Milestones OMIT 0"
+"Deployment<employee(ORDER BY start_date DESC, LIMIT 1).role AS Last Role"
+"Deployment<employee(WHERE end_date=null, LIMIT 1).project.name AS Current Project"
+"Assignment<employee(LIST, ORDER BY start_date DESC).start_date AS Assignment History"
 ```
 
 ### Generated SQL
@@ -263,14 +263,14 @@ Back-reference columns become correlated subqueries in the SELECT clause:
 
 ```sql
 -- COUNT:
-(SELECT COUNT(*) FROM engine_allocation _br
- WHERE _br.engine_id = b.id) AS "Allocations"
+(SELECT COUNT(*) FROM deployment _br
+ WHERE _br.employee_id = b.id) AS "Deployments"
 
 -- Scalar with FK-following:
-(SELECT _br_aircraft.registration FROM engine_allocation _br
- LEFT JOIN aircraft _br_aircraft ON _br.aircraft_id = _br_aircraft.id
- WHERE _br.engine_id = b.id AND _br.end_date IS NULL
- LIMIT 1) AS "Current Aircraft"
+(SELECT _br_project.name FROM deployment _br
+ LEFT JOIN project _br_project ON _br.project_id = _br_project.id
+ WHERE _br.employee_id = b.id AND _br.end_date IS NULL
+ LIMIT 1) AS "Current Project"
 ```
 
 Subquery aliases use `_br` for the child table and `_br_{field}` for internal joins.
@@ -304,32 +304,32 @@ The system matches views by their `requiredFilter` field types:
 Given these views:
 
 ```json
-// Engine Timeline — requiredFilter references Aircraft
+// Deployment Timeline — requiredFilter references Employee
 {
-  "base": "EngineAllocation",
-  "requiredFilter": ["aircraft._label:select"],
-  "columns": ["engine._label AS Engine", "start_date AS Start Date", "aircraft._label AS Aircraft"]
+  "base": "Deployment",
+  "requiredFilter": ["employee._label:select"],
+  "columns": ["project._label AS Project", "start_date AS Start Date", "employee._label AS Employee"]
 }
 
-// Operator Fleet — requiredFilter references Operator
+// Team Roster — requiredFilter references Manager
 {
-  "base": "Aircraft",
-  "requiredFilter": ["operator._label:select"],
-  "columns": ["registration AS Registration", "operator._label AS Operator"]
+  "base": "Employee",
+  "requiredFilter": ["manager._label:select"],
+  "columns": ["emp_code AS Code", "name AS Name", "manager._label AS Manager"]
 }
 ```
 
-In the **Aircraft** CRUD table:
+In the **Employee** CRUD table:
 
 | Action | Shown Views | Why |
 |--------|-------------|-----|
-| Right-click on row | Engine Timeline | requiredFilter targets Aircraft |
-| Right-click on `current_operator` FK cell | Engine Timeline + Operator Fleet | Row match + FK cell match |
+| Right-click on row | Deployment Timeline | requiredFilter targets Employee |
+| Right-click on `manager` FK cell | Deployment Timeline + Team Roster | Row match + FK cell match |
 
 ### Filter Behavior
 
-- **Row-level views**: The clicked record's label becomes the filter value (e.g., `Aircraft:MSN-001`)
-- **FK cell views**: The FK cell's display text becomes the filter value (e.g., `Operator:Lufthansa`)
+- **Row-level views**: The clicked record's label becomes the filter value (e.g., `Employee:EMP-1042`)
+- **FK cell views**: The FK cell's display text becomes the filter value (e.g., `Manager:Sarah Chen`)
 
 The view opens immediately with the filter applied — no prefilter dialog is shown. Breadcrumb navigation is preserved (push, not replace).
 
@@ -340,61 +340,61 @@ The view opens immediately with the filter applied — no prefilter dialog is sh
 File structure:
 ```
 docs/views/
-├── Fleet Analysis/
-│   ├── Engine Status.md
-│   ├── Aircraft Fleet.md
-│   └── Engine Overview.md
-└── Maintenance/
-    └── Open Shop Orders.md
+├── Project Analysis/
+│   ├── Project Status.md
+│   ├── Staff Overview.md
+│   └── Project Overview.md
+└── Services/
+    └── Open Tasks.md
 ```
 
-**Fleet Analysis/Engine Status.md:**
+**Project Analysis/Project Status.md:**
 ```markdown
-# Engine Status
+# Project Status
 
 ```json
 {
-  "base": "Engine",
+  "base": "Project",
   "columns": [
-    "serial_number",
-    "total_cycles OMIT 0",
-    "total_flight_hours",
-    "type.designation AS Engine Type",
-    { "path": "type.manufacturer.name", "label": "OEM" }
+    "project_ref",
+    "hours_worked OMIT 0",
+    "budget",
+    "type.name AS Project Type",
+    { "path": "type.client.name", "label": "Client" }
   ]
 }
 ```
 ```
 
-**Fleet Analysis/Engine Overview.md:**
+**Project Analysis/Project Overview.md:**
 ```markdown
-# Engine Overview
+# Project Overview
 
 ```json
 {
-  "base": "Engine",
+  "base": "Project",
   "columns": [
-    "serial_number AS ESN",
-    "type.designation AS Type",
-    "EngineAllocation<engine(COUNT) AS Allocations",
-    "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+    "project_ref AS Ref",
+    "type.name AS Type",
+    "Deployment<project(COUNT) AS Team Size",
+    "Deployment<project(WHERE end_date=null, LIMIT 1).employee.name AS Lead"
   ]
 }
 ```
 ```
 
-**Maintenance/Open Shop Orders.md:**
+**Services/Open Tasks.md:**
 ```markdown
-# Open Shop Orders
+# Open Tasks
 
 ```json
 {
-  "base": "ShopOrder",
+  "base": "TaskTemplate",
   "columns": [
-    "order_number",
+    "task_number",
     "status",
-    "engine.serial_number AS Engine S/N",
-    "mro.name AS MRO"
+    "project.project_ref AS Project",
+    "vendor.name AS Vendor"
   ]
 }
 ```
@@ -426,9 +426,9 @@ Views can specify a default sort order that is applied when the view is first lo
 **String format:**
 ```json
 {
-  "name": "Engine Status",
-  "base": "Engine",
-  "sort": "serial_number",
+  "name": "Project Status",
+  "base": "Project",
+  "sort": "project_ref",
   "columns": [...]
 }
 ```
@@ -436,7 +436,7 @@ Views can specify a default sort order that is applied when the view is first lo
 **With direction (DESC):**
 ```json
 {
-  "sort": "total_cycles DESC"
+  "sort": "hours_worked DESC"
 }
 ```
 
@@ -465,9 +465,9 @@ Forces a filter dialog before loading data (always shown, regardless of dataset 
 
 ```json
 {
-  "name": "Engine Allocations",
-  "base": "EngineAllocation",
-  "requiredFilter": ["aircraft.registration"],
+  "name": "Employee Deployments",
+  "base": "Deployment",
+  "requiredFilter": ["employee.emp_code"],
   "columns": [...]
 }
 ```
@@ -478,9 +478,9 @@ Shows a filter dialog only when the dataset exceeds the pagination threshold:
 
 ```json
 {
-  "name": "All Events",
-  "base": "EngineEvent",
-  "prefilter": ["engine.serial_number:select", "event_type"],
+  "name": "All Milestones",
+  "base": "Milestone",
+  "prefilter": ["project.project_ref:select", "milestone_type"],
   "columns": [...]
 }
 ```
@@ -496,16 +496,16 @@ Shows a filter dialog only when the dataset exceeds the pagination threshold:
 
 ```json
 {
-  "name": "Shop Visits",
-  "base": "EngineEvent",
-  "requiredFilter": ["shop.name:select"],
-  "prefilter": ["engine.type.designation:select"],
-  "sort": "event_date DESC",
+  "name": "Project Milestones",
+  "base": "Milestone",
+  "requiredFilter": ["vendor.name:select"],
+  "prefilter": ["project.type.name:select"],
+  "sort": "due_date DESC",
   "columns": [
-    "engine.serial_number AS ESN",
-    "event_date",
-    "shop.name AS Shop",
-    "workscope.designation AS Workscope"
+    "project.project_ref AS Project",
+    "due_date",
+    "vendor.name AS Vendor",
+    "task_template.name AS Task"
   ]
 }
 ```
@@ -520,19 +520,19 @@ Views can specify a `filter` property containing a SQL WHERE clause that filters
 
 ```json
 {
-  "name": "Engine Subtypes",
-  "base": "EngineType",
-  "filter": "b.super_type_id IS NOT NULL",
+  "name": "Project Subtypes",
+  "base": "ProjectType",
+  "filter": "b.parent_type_id IS NOT NULL",
   "columns": [
-    "designation AS Type",
-    "super_type.designation AS Parent Type"
+    "name AS Type",
+    "parent_type.name AS Parent Type"
   ]
 }
 ```
 
 ### Use Cases
 
-- **Exclude NULL relationships**: `"filter": "b.super_type_id IS NOT NULL"`
+- **Exclude NULL relationships**: `"filter": "b.parent_type_id IS NOT NULL"`
 - **Status filtering**: `"filter": "b.status = 'Active'"`
 - **Combined conditions**: `"filter": "b.status = 'Active' AND b.deleted_at IS NULL"`
 
@@ -567,17 +567,17 @@ Add a `chart` object containing a Vega-Lite specification (without `$schema`, `w
 
 ```json
 {
-  "name": "Stands by Engine Type",
-  "base": "EngineType",
+  "name": "Equipment by Type",
+  "base": "EquipmentType",
   "columns": [
-    "designation AS Engine Type",
-    "EngineStand<engine_type(COUNT) AS Stands"
+    "name AS Equipment Type",
+    "Equipment<equipment_type(COUNT) AS Count"
   ],
   "chart": {
     "mark": "bar",
     "encoding": {
-      "x": { "field": "Engine Type", "type": "nominal" },
-      "y": { "field": "Stands", "type": "quantitative" }
+      "x": { "field": "Equipment Type", "type": "nominal" },
+      "y": { "field": "Count", "type": "quantitative" }
     }
   }
 }
@@ -598,7 +598,7 @@ You define only the visualization-specific parts:
 |----------|-------------|---------|
 | `mark` | Chart type | `"bar"`, `"line"`, `"point"`, `"arc"` |
 | `encoding` | Data-to-visual mappings | See below |
-| `title` | Chart title (optional) | `"Engine Distribution"` |
+| `title` | Chart title (optional) | `"Equipment Distribution"` |
 
 ### Encoding
 
@@ -607,17 +607,17 @@ The `encoding` object maps data fields to visual channels:
 ```json
 "encoding": {
   "x": {
-    "field": "Engine Type",
+    "field": "Equipment Type",
     "type": "nominal",
     "axis": { "labelAngle": -45 }
   },
   "y": {
-    "field": "Stands",
+    "field": "Count",
     "type": "quantitative",
     "axis": { "tickMinStep": 1, "format": "d" }
   },
   "color": {
-    "field": "Engine Type",
+    "field": "Equipment Type",
     "type": "nominal",
     "legend": null
   }
@@ -639,8 +639,8 @@ Use the **column alias** (the part after `AS`) as the field name in encodings:
 
 ```json
 "columns": [
-  "designation AS Engine Type",        // ← Use "Engine Type" in chart
-  "EngineStand<engine_type(COUNT) AS Stands"  // ← Use "Stands" in chart
+  "name AS Equipment Type",                    // ← Use "Equipment Type" in chart
+  "Equipment<equipment_type(COUNT) AS Count"   // ← Use "Count" in chart
 ]
 ```
 
@@ -658,26 +658,26 @@ Use the **column alias** (the part after `AS`) as the field name in encodings:
 
 ```json
 {
-  "name": "Stands by Engine Type",
-  "base": "EngineType",
+  "name": "Equipment by Type",
+  "base": "EquipmentType",
   "columns": [
-    "designation AS Engine Type",
-    "EngineStand<engine_type(COUNT) AS Stands"
+    "name AS Equipment Type",
+    "Equipment<equipment_type(COUNT) AS Count"
   ],
   "chart": {
     "mark": "bar",
     "encoding": {
       "x": {
-        "field": "Engine Type",
+        "field": "Equipment Type",
         "type": "nominal",
         "axis": { "labelFontSize": 14, "labelColor": "black", "labelAngle": -45 }
       },
       "y": {
-        "field": "Stands",
+        "field": "Count",
         "type": "quantitative",
         "axis": { "tickMinStep": 1, "format": "d", "labelFontSize": 14, "labelColor": "black" }
       },
-      "color": { "field": "Engine Type", "type": "nominal", "legend": null }
+      "color": { "field": "Equipment Type", "type": "nominal", "legend": null }
     }
   }
 }
@@ -708,11 +708,11 @@ For Map View to appear, the view must include columns of type `geo` (which expan
 
 ```json
 {
-  "name": "Stand Tracking",
-  "base": "EngineStand",
+  "name": "Equipment Tracking",
+  "base": "Equipment",
   "columns": [
-    "serial_number AS Stand",
-    "EngineTracker<stand(LIMIT 1).position AS Position"
+    "serial_number AS Equipment",
+    "GpsLog<equipment(LIMIT 1).position AS Position"
   ]
 }
 ```

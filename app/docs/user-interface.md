@@ -13,12 +13,12 @@ Switch seamlessly between viewing modes:
 **Deep Relationship Traversal:** The tree view doesn't stop at one level. Click any foreign key to expand it, then expand *its* foreign keys, and so on – as deep as you want to go:
 
 ```
-Aircraft D-AINA
-  └─ type: Airbus A320neo
-       └─ manufacturer: Airbus SE
-            └─ Aircraft [5] ← back-references!
-                 └─ D-AINB
-                      └─ operator: Lufthansa
+Employee EMP-1042
+  └─ department: Marketing
+       └─ company: Acme Corp
+            └─ Employee [5] ← back-references!
+                 └─ EMP-1043
+                      └─ manager: Sarah Chen
                            └─ ...
 ```
 
@@ -31,7 +31,7 @@ Aircraft D-AINA
 Navigate through your exploration history with a visual breadcrumb trail:
 
 ```
-[Aircraft] › [Aircraft D-ABCD] › [AircraftType Boeing 737]
+[Employee] › [Employee EMP-1042] › [Department Marketing]
      ↑              ↑                      ↑
   Base crumb    Record crumb         Current position
 ```
@@ -39,7 +39,7 @@ Navigate through your exploration history with a visual breadcrumb trail:
 **How it works:**
 - **Dropdown selection** sets the base crumb (entity or view) and clears the navigation stack
 - **FK link clicks** push new crumbs onto the stack (record navigation)
-- **Back-reference counts** push filtered crumbs (e.g., "5 Flights" → Flights filtered by aircraft)
+- **Back-reference counts** push filtered crumbs (e.g., "5 Deployments" → Deployments filtered by employee)
 - **Crumb clicks** truncate the stack and restore that state
 - **Browser back/forward** buttons navigate through the history
 
@@ -71,13 +71,13 @@ https://myapp.com/rap?user=guest&crumbs=W3sidCI6ImUiLCJlIjoiQWlyY3JhZnQifV0=
 
 ```sql
 -- Auto-generated view
-CREATE VIEW aircraft_view AS
+CREATE VIEW employee_view AS
 SELECT a.*,
-       t.designation AS type_label,
-       o.name AS operator_label
-FROM aircraft a
-LEFT JOIN aircraft_type t ON a.type_id = t.id
-LEFT JOIN operator o ON a.operator_id = o.id
+       t.name AS department_label,
+       o.name AS manager_label
+FROM employee a
+LEFT JOIN department t ON a.department_id = t.id
+LEFT JOIN manager o ON a.manager_id = o.id
 ```
 
 One query returns everything the UI needs – no N+1 problems.
@@ -88,17 +88,17 @@ Define read-only views in `config.json` that join data across entities via FK ch
 
 ```json
 {
-    "name": "Engine Status",
-    "base": "EngineAllocation",
+    "name": "Project Status",
+    "base": "Deployment",
     "columns": [
-        "engine.serial_number AS ESN",
-        "engine.type.thrust_lbs AS Thrust",
-        "mount_position AS pos OMIT 0"
+        "employee.emp_code AS Employee",
+        "project.type.name AS Project Type",
+        "role AS Role OMIT 0"
     ]
 }
 ```
 
-- **Dot-notation paths** follow FK relationships: `engine.type.thrust_lbs` → EngineAllocation → Engine → EngineType
+- **Dot-notation paths** follow FK relationships: `project.type.name` → Deployment → Project → ProjectType
 - **AS alias** for custom column headers
 - **OMIT** suppresses specific values from display (FK columns default to `OMIT null`)
 - Materialized as SQL views (`uv_*`) at startup — no runtime overhead
@@ -110,14 +110,14 @@ Define read-only views in `config.json` that join data across entities via FK ch
 
 ```json
 {
-    "name": "Engine Overview",
-    "base": "Engine",
+    "name": "Employee Overview",
+    "base": "Employee",
     "columns": [
-        "serial_number AS ESN",
-        "type.designation AS Type",
-        "EngineAllocation<engine(COUNT) AS Allocations",
-        "EngineEvent<engine(COUNT) AS Events OMIT 0",
-        "EngineAllocation<engine(WHERE end_date=null, LIMIT 1).aircraft.registration AS Current Aircraft"
+        "emp_code AS Code",
+        "department.name AS Department",
+        "Deployment<employee(COUNT) AS Deployments",
+        "Milestone<employee(COUNT) AS Milestones OMIT 0",
+        "Deployment<employee(WHERE end_date=null, LIMIT 1).project.name AS Current Project"
     ]
 }
 ```
@@ -126,10 +126,10 @@ Syntax: `Entity<fk_field(params).column`
 
 | Part | Description | Example |
 |------|-------------|---------|
-| `Entity` | Child entity with FK to base | `EngineAllocation` |
-| `<fk_field` | FK column pointing to base (without `_id`) | `<engine` |
+| `Entity` | Child entity with FK to base | `Deployment` |
+| `<fk_field` | FK column pointing to base (without `_id`) | `<employee` |
 | `(params)` | Comma-separated: `COUNT`, `LIST`, `WHERE col=val`, `ORDER BY col`, `LIMIT n` | `(WHERE end_date=null, LIMIT 1)` |
-| `.column` | Target column, supports FK-chain dot-paths | `.aircraft.registration` |
+| `.column` | Target column, supports FK-chain dot-paths | `.project.name` |
 
 See [Views Configuration](procedures/views-config.md) for the full syntax reference.
 
