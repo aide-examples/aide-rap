@@ -36,6 +36,20 @@ const ProcessPanel = {
   },
 
   /**
+   * Set the active step and update tab highlight + content.
+   * @param {number} index - Step index (0-based)
+   */
+  setActiveStep(index) {
+    if (!this.currentProcess || index < 0 || index >= this.currentProcess.steps.length) return;
+    this.activeStepIndex = index;
+    this.renderStep();
+    // Update active tab highlight
+    this.container?.querySelectorAll('.process-tab').forEach(t =>
+      t.classList.toggle('active', parseInt(t.dataset.step, 10) === index)
+    );
+  },
+
+  /**
    * Clear the process panel.
    */
   clear() {

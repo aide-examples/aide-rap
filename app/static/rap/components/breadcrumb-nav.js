@@ -475,14 +475,32 @@ const BreadcrumbNav = {
         return false;
       }
 
-      // Clean URL (remove crumbs parameter)
+      // Check for process state before cleaning URL
+      const procParam = params.get('proc');
+
+      // Clean URL (remove crumbs and proc parameters)
       const cleanParams = new URLSearchParams(location.search);
       cleanParams.delete('crumbs');
+      cleanParams.delete('proc');
       const cleanUrl = location.pathname + (cleanParams.size ? '?' + cleanParams.toString() : '');
       history.replaceState({ rapBreadcrumb: false }, '', cleanUrl);
 
       // Restore the stack
       await this.restoreFromCompact(compactStack);
+
+      // Restore active process (deferred to run after crumbs are fully applied)
+      if (procParam) {
+        try {
+          const proc = JSON.parse(atob(procParam));
+          setTimeout(() => {
+            if (typeof EntityExplorer !== 'undefined') {
+              EntityExplorer.restoreProcess(proc);
+            }
+          }, 0);
+        } catch (e) {
+          console.warn('BreadcrumbNav: Invalid proc parameter:', e);
+        }
+      }
 
       return true;
     } catch (e) {

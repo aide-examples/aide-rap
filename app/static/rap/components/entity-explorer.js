@@ -2177,7 +2177,7 @@ const EntityExplorer = {
     this.hideWelcome();
   },
 
-  async openProcess(name, color) {
+  async openProcess(name, color, options = {}) {
     this.closeProcessDropdown();
     this.dismissContent();
 
@@ -2196,9 +2196,9 @@ const EntityExplorer = {
       const processData = await ApiClient.request(`/api/processes/${encodeURIComponent(name)}`);
       processData.color = color;
 
-      // Check for required entity selection
-      let initialContext = null;
-      if (processData.required) {
+      // Check for required entity selection (skip if context provided via options)
+      let initialContext = options.initialContext || null;
+      if (!initialContext && processData.required) {
         const [entityName] = processData.required.split(':');
         initialContext = await this.showRequiredEntityDialog(entityName.trim());
         if (!initialContext) {
@@ -2215,6 +2215,12 @@ const EntityExplorer = {
 
       // Show process panel (with initial context if required entity was selected)
       ProcessPanel.show(processData, initialContext);
+
+      // Restore active step if specified (URL restore)
+      if (options.activeStep > 0) {
+        ProcessPanel.setActiveStep(options.activeStep);
+      }
+
       this.toggleProcess(true);
     } catch (err) {
       console.error('Failed to load process:', err);
@@ -2403,6 +2409,39 @@ const EntityExplorer = {
       this.updateViewToggle();
       await this.loadRecords(filter);
     }
+  },
+
+  /**
+   * Restore an active process from compact URL state.
+   * @param {Object} compact - { n: processName, e: contextEntity, i: contextId, s: activeStep }
+   */
+  async restoreProcess(compact) {
+    if (!compact?.n) return;
+
+    // Find process in dropdown for color
+    const item = this.processSelectorMenu?.querySelector(
+      `.process-selector-item[data-value="${compact.n}"]`
+    );
+    if (!item) {
+      console.warn('restoreProcess: process not found:', compact.n);
+      return;
+    }
+
+    // Resolve initial context from entity + ID (if required entity was selected)
+    let initialContext = null;
+    if (compact.e && compact.i) {
+      try {
+        const schema = await ApiClient.getExtendedSchema(compact.e);
+        initialContext = await this.resolveProcessContext(compact.e, compact.i, schema);
+      } catch (e) {
+        console.warn('restoreProcess: failed to resolve context:', e);
+      }
+    }
+
+    await this.openProcess(compact.n, item.dataset.color, {
+      initialContext,
+      activeStep: compact.s || 0
+    });
   },
 
 };

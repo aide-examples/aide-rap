@@ -142,6 +142,20 @@ const BreadcrumbShareDialog = {
     }
     params.set('crumbs', encoded);
 
+    // Include active process state (if any)
+    if (typeof EntityExplorer !== 'undefined' && EntityExplorer.activeProcess) {
+      const proc = { n: EntityExplorer.activeProcess.name, s: ProcessPanel.activeStepIndex };
+      const ctx = ProcessPanel.context;
+      if (ctx._ids) {
+        const reqEntity = EntityExplorer.activeProcess.required?.split(':')[0]?.trim();
+        if (reqEntity && ctx._ids[reqEntity]) {
+          proc.e = reqEntity;
+          proc.i = ctx._ids[reqEntity];
+        }
+      }
+      params.set('proc', btoa(JSON.stringify(proc)));
+    }
+
     return `${baseUrl}?${params.toString()}`;
   },
 
