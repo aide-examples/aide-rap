@@ -215,6 +215,27 @@ const ContextMenu = {
       });
     }
 
+    // "Use for Process" — only when a process step expects a selection of this entity type
+    if (typeof ProcessPanel !== 'undefined') {
+      const pendingSelect = ProcessPanel.getPendingSelect();
+      if (pendingSelect && context.entity === pendingSelect) {
+        let procHtml = '<div class="context-menu-separator"></div>';
+        procHtml += `<div class="context-menu-item context-menu-process-select">
+          <span class="context-menu-icon">&#9654;</span>
+          <span>Use for Process</span>
+        </div>`;
+        viewsContainer.insertAdjacentHTML('beforeend', procHtml);
+        viewsContainer.querySelector('.context-menu-process-select').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const recordId = this.currentContext.recordId;
+          if (recordId && typeof EntityExplorer !== 'undefined') {
+            EntityExplorer.handleProcessSelect(pendingSelect, recordId);
+          }
+          this.hide();
+        });
+      }
+    }
+
     // Adjust if menu goes off-screen
     const rect = this.menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {

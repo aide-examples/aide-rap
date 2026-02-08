@@ -678,12 +678,28 @@ const ProcessPanel = {
       const callMatch = step.call.match(/^(.+?)\((\w+)\)$/);
       const callLabel = callMatch ? callMatch[1].trim() : step.call;
       const callContextKey = callMatch ? callMatch[2] : null;
+      const hasCallContext = !callContextKey || this.context[callContextKey];
       actionsHtml += `<button class="process-action-btn process-action-call"
                               data-call-label="${DomUtils.escapeHtml(callLabel)}"
-                              data-call-context="${DomUtils.escapeHtml(callContextKey || '')}">
+                              data-call-context="${DomUtils.escapeHtml(callContextKey || '')}"
+                              ${!hasCallContext ? 'disabled title="Select entity first"' : ''}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="3" x2="7" y2="8" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="8" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/></svg>
         ${DomUtils.escapeHtml(callLabel)}
       </button>`;
+    }
+    // Select status indicator
+    if (step.select) {
+      const selectedLabel = this.context[step.select];
+      if (selectedLabel) {
+        actionsHtml += `<div class="process-select-status">
+          <span class="process-select-check">&#10003;</span>
+          Selected: <strong>${DomUtils.escapeHtml(selectedLabel)}</strong>
+        </div>`;
+      } else {
+        actionsHtml += `<div class="process-select-status process-select-pending">
+          Right-click a ${DomUtils.escapeHtml(step.select)} record and choose "Use for Process"
+        </div>`;
+      }
     }
     return actionsHtml;
   },
@@ -726,10 +742,21 @@ const ProcessPanel = {
       btn.addEventListener('click', () => {
         const label = btn.dataset.callLabel;
         const contextKey = btn.dataset.callContext;
-        const searchTerm = contextKey ? (this.context[contextKey] || '') : '';
         const eqConfig = contextKey ? EntityExplorer.getExternalQueriesForEntity(contextKey) : [];
-        if (eqConfig.length > 0 && typeof ExternalQueryDialog !== 'undefined') {
-          ExternalQueryDialog.open(eqConfig[0].provider, searchTerm, label);
+        // Match by label (supports multiple providers per entity)
+        const matched = eqConfig.find(eq => eq.label === label) || eqConfig[0];
+        if (!matched) return;
+
+        // Use stored record field if available, otherwise fall back to entity label
+        let searchTerm;
+        if (this.context._records?.[contextKey] && matched.searchField) {
+          searchTerm = this.context._records[contextKey][matched.searchField] || '';
+        } else {
+          searchTerm = contextKey ? (this.context[contextKey] || '') : '';
+        }
+
+        if (typeof ExternalQueryDialog !== 'undefined') {
+          ExternalQueryDialog.open(matched.provider, searchTerm, label);
         }
       });
     });
@@ -742,6 +769,50 @@ const ProcessPanel = {
    * @param {string} entityType - Entity type name
    * @param {string} label - Label value
    */
+  /**
+   * Get the entity name expected by the current step's Select directive.
+   * Returns null if no process is active or no select is pending.
+   */
+  getPendingSelect() {
+    if (!this.currentProcess) return null;
+    const step = this.currentProcess.steps[this.activeStepIndex];
+    return step?.select || null;
+  },
+
+  /**
+   * Add a selected record to the process context (called from "Use for Process").
+   * Stores label, ID, full record, and resolves FK relationships.
+   */
+  selectForProcess(entityName, record, schema) {
+    const lbl = ColumnUtils.getRecordLabel(record, schema);
+    this.context[entityName] = lbl.title;
+
+    this.context._ids = this.context._ids || {};
+    this.context._ids[entityName] = record.id;
+
+    this.context._records = this.context._records || {};
+    this.context._records[entityName] = record;
+
+    // Resolve FK relationships (additive)
+    this.context._fkColumns = this.context._fkColumns || {};
+    for (const col of schema.columns) {
+      if (col.foreignKey) {
+        const labelCol = col.name.replace(/_id$/, '') + '_label';
+        if (record[labelCol]) {
+          this.context[col.foreignKey.entity] = record[labelCol];
+          this.context._ids[col.foreignKey.entity] = record[col.name];
+          this.context._fkColumns[col.foreignKey.entity] = col.name.replace(/_id$/, '');
+        }
+      }
+    }
+
+    // Re-render current step (updates select status + enables Call buttons)
+    this.renderStep(this.activeStepIndex);
+
+    // Update context display in header
+    this.addContext(entityName, lbl.title);
+  },
+
   addContext(entityType, label) {
     if (entityType && label) {
       this.context[entityType] = label;

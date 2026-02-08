@@ -164,7 +164,8 @@ module.exports = function(processesConfig, docsDir) {
           body: s.body,
           view: s.view || null,
           entities: s.entities || [],
-          call: s.call || null
+          call: s.call || null,
+          select: s.select || null
         }))
       });
     } catch (err) {
@@ -252,7 +253,8 @@ module.exports = function(processesConfig, docsDir) {
           body: steps[i].body !== undefined ? steps[i].body : origStep.body,
           view: origStep.view,
           entities: origStep.entities,
-          call: origStep.call
+          call: origStep.call,
+          select: origStep.select
         }))
       };
 

@@ -2350,6 +2350,23 @@ const EntityExplorer = {
 
       this.activeProcess = processData;
 
+      // Push breadcrumb for the initially selected entity (so user sees it immediately)
+      if (initialContext && typeof BreadcrumbNav !== 'undefined') {
+        const [entityName] = (processData.required || '').split(':');
+        const entityKey = entityName?.trim();
+        if (entityKey && initialContext[entityKey] && initialContext._ids?.[entityKey]) {
+          const item = this.selectorMenu?.querySelector(`[data-value="${entityKey}"]`);
+          BreadcrumbNav.push({
+            type: 'record',
+            entity: entityKey,
+            recordId: initialContext._ids[entityKey],
+            recordLabel: initialContext[entityKey],
+            viewMode: 'tree-h',
+            color: item?.dataset.color || '#f5f5f5'
+          });
+        }
+      }
+
       // Show toggle button
       if (this.processToggleBtn) this.processToggleBtn.style.display = '';
 
@@ -2559,6 +2576,33 @@ const EntityExplorer = {
         });
       }
     }
+  },
+
+  /**
+   * Handle "Use for Process" — fetch record, navigate, update process context, reopen panel.
+   * @param {string} entityName - Entity type name
+   * @param {number} recordId - Record ID selected by the user
+   */
+  async handleProcessSelect(entityName, recordId) {
+    const schema = await SchemaCache.getExtended(entityName);
+    const record = await ApiClient.getById(entityName, recordId);
+
+    // Breadcrumb deduplication: don't push if already viewing this record
+    if (typeof BreadcrumbNav !== 'undefined') {
+      const topCrumb = BreadcrumbNav.stack[BreadcrumbNav.stack.length - 1];
+      const alreadyThere = topCrumb?.type === 'record'
+        && topCrumb.entity === entityName
+        && topCrumb.recordId === recordId;
+      if (!alreadyThere) {
+        this.navigateToEntityRecord(entityName, recordId);
+      }
+    }
+
+    // Update process context with selected record
+    ProcessPanel.selectForProcess(entityName, record, schema);
+
+    // Reopen process panel
+    this.toggleProcess(true);
   },
 
   /**

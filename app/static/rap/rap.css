@@ -6521,6 +6521,33 @@ html[data-theme="dark"] .process-selector-group-label {
     filter: brightness(1.1);
 }
 
+/* Select status in process step */
+.process-select-status {
+    margin: 8px 0;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+.process-select-status.process-select-pending {
+    background: var(--color-gray-50);
+    color: var(--color-text-secondary);
+    border-color: var(--border-color);
+    font-style: italic;
+}
+.process-select-check {
+    margin-right: 4px;
+    font-weight: bold;
+}
+
+/* "Use for Process" context menu item */
+.context-menu-process-select {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
 /* Raw markdown editor */
 
 .process-raw-editor {

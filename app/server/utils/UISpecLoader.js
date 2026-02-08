@@ -328,7 +328,7 @@ function parseProcessFile(content, filename) {
     if (trimmed.startsWith('## ')) {
       foundFirstH2 = true;
       if (currentStep) steps.push(currentStep);
-      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entities: [], call: null };
+      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entities: [], call: null, select: null };
       continue;
     }
 
@@ -340,12 +340,15 @@ function parseProcessFile(content, filename) {
       const viewMatch = trimmed.match(/^View:\s*(.+)$/i);
       const entityMatch = trimmed.match(/^Entity:\s*(.+)$/i);
       const callMatch = trimmed.match(/^Call:\s*(.+)$/i);
+      const selectMatch = trimmed.match(/^Select:\s*(.+)$/i);
       if (viewMatch) {
         currentStep.view = viewMatch[1].trim();
       } else if (entityMatch) {
         currentStep.entities.push(entityMatch[1].trim());
       } else if (callMatch) {
         currentStep.call = callMatch[1].trim();
+      } else if (selectMatch) {
+        currentStep.select = selectMatch[1].trim();
       } else {
         currentStep.bodyLines.push(line);
       }
@@ -373,7 +376,8 @@ function parseProcessFile(content, filename) {
       body: trimBody(s.bodyLines),
       view: s.view,
       entities: s.entities,
-      call: s.call
+      call: s.call,
+      select: s.select || null
     }))
   };
 }
@@ -418,9 +422,12 @@ function reconstructProcessFile(process) {
     if (step.call) {
       lines.push(`Call: ${step.call}`);
     }
+    if (step.select) {
+      lines.push(`Select: ${step.select}`);
+    }
 
     // Add blank line after directives (if any were written)
-    const hasDirectives = (step.entities && step.entities.length > 0) || step.view || step.call;
+    const hasDirectives = (step.entities && step.entities.length > 0) || step.view || step.call || step.select;
     if (hasDirectives) {
       lines.push('');
     }
