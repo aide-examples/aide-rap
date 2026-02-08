@@ -153,13 +153,17 @@ const ProcessPanel = {
       </button>`;
     }
     for (const entityDef of (step.entities || [])) {
-      // Parse "EntityName(ContextKey)" syntax, e.g. "Engine(EngineType)"
-      const entityMatch = entityDef.match(/^(.+?)\((\w+)\)$/);
+      // Parse "EntityName(ContextKey)" with optional label: Engine(EngineType) "All of type {EngineType}"
+      const entityMatch = entityDef.match(/^(.+?)\((\w+)\)(?:\s+"(.+)")?$/);
       const entityName = entityMatch ? entityMatch[1].trim() : entityDef;
       const contextKey = entityMatch ? entityMatch[2] : null;
+      const labelTemplate = entityMatch ? entityMatch[3] : null;
       // Build context-aware label
       let entityLabel;
-      if (contextKey && contextKey === entityName) {
+      if (labelTemplate) {
+        // Replace {Key} placeholders with context values
+        entityLabel = labelTemplate.replace(/\{(\w+)\}/g, (_, key) => this.context[key] || key);
+      } else if (contextKey && contextKey === entityName) {
         entityLabel = `${entityName}: ${this.context[contextKey] || ''}`;
       } else if (contextKey) {
         entityLabel = `${entityName} (${this.context[contextKey] || contextKey})`;
