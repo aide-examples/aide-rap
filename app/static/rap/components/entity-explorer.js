@@ -92,6 +92,95 @@ const EntityExplorer = {
   },
 
   /**
+   * Generic single-select dialog. Reusable for any "pick one from a list" scenario.
+   * @param {Object} config
+   * @param {string} config.title - Dialog title
+   * @param {Array}  config.options - [{value, label}]
+   * @param {string} [config.placeholder] - Placeholder text
+   * @param {number} [config.threshold=20] - Above this count: input+datalist instead of select
+   * @returns {Promise<*|null>} - Selected value or null if cancelled
+   */
+  async showSelectDialog({ title, options, placeholder = '', threshold = 20 }) {
+    const dialogId = 'rap-select-dialog';
+    let existing = document.getElementById(dialogId);
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('dialog');
+    dialog.id = dialogId;
+    dialog.className = 'rap-dialog';
+
+    let selectorHtml;
+    if (options.length > threshold) {
+      const datalistHtml = options.map(o =>
+        `<option value="${DomUtils.escapeHtml(o.label)}" data-value="${DomUtils.escapeHtml(String(o.value))}">`
+      ).join('');
+      selectorHtml = `
+        <input type="text" list="${dialogId}-list" class="rap-dialog-select"
+               placeholder="${DomUtils.escapeHtml(placeholder)}" autocomplete="off">
+        <datalist id="${dialogId}-list">${datalistHtml}</datalist>`;
+    } else {
+      const optsHtml = options.map(o =>
+        `<option value="${DomUtils.escapeHtml(String(o.value))}">${DomUtils.escapeHtml(o.label)}</option>`
+      ).join('');
+      selectorHtml = `
+        <select class="rap-dialog-select">
+          <option value="">${DomUtils.escapeHtml(placeholder)}</option>
+          ${optsHtml}
+        </select>`;
+    }
+
+    dialog.innerHTML = `
+      <div class="rap-dialog-header">
+        <h3>${DomUtils.escapeHtml(title)}</h3>
+        <button class="rap-dialog-close" title="${i18n.t('cancel')}">&times;</button>
+      </div>
+      <div class="rap-dialog-body">
+        ${selectorHtml}
+      </div>
+      <div class="rap-dialog-actions">
+        <button type="button" class="btn-secondary" data-action="cancel">${i18n.t('cancel')}</button>
+        <button type="button" class="btn-primary" data-action="ok">${i18n.t('ok')}</button>
+      </div>`;
+
+    document.body.appendChild(dialog);
+
+    return new Promise((resolve) => {
+      let resolved = false;
+      const finish = (val) => { if (!resolved) { resolved = true; resolve(val); } };
+
+      dialog.showModal();
+      const sel = dialog.querySelector('.rap-dialog-select');
+      if (sel) sel.focus();
+
+      const getSelectedValue = () => {
+        if (sel.tagName === 'SELECT') return sel.value || null;
+        const match = options.find(o => o.label === sel.value.trim());
+        return match ? match.value : null;
+      };
+
+      dialog.querySelector('[data-action="ok"]').addEventListener('click', () => {
+        const val = getSelectedValue();
+        if (val == null) return;
+        dialog.close(); dialog.remove(); finish(val);
+      });
+
+      dialog.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+        dialog.close(); dialog.remove(); finish(null);
+      });
+
+      dialog.querySelector('.rap-dialog-close').addEventListener('click', () => {
+        dialog.close(); dialog.remove(); finish(null);
+      });
+
+      dialog.addEventListener('close', () => { dialog.remove(); finish(null); });
+
+      sel.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); dialog.querySelector('[data-action="ok"]').click(); }
+      });
+    });
+  },
+
+  /**
    * Show prefilter dialog before loading data
    * Returns selected filter values or null if cancelled
    * Supports text input (LIKE matching) and select dropdown (exact match)
@@ -107,7 +196,7 @@ const EntityExplorer = {
 
     const dialog = document.createElement('dialog');
     dialog.id = dialogId;
-    dialog.className = 'prefilter-dialog';
+    dialog.className = 'rap-dialog';
 
     // Parse field specs and prepare data
     const parsedFields = [];
@@ -165,7 +254,7 @@ const EntityExplorer = {
           <div class="prefilter-field">
             <label>${f.label}${typeLabel}</label>
             <input type="text" list="${listId}" data-field="${f.field}" data-type="${f.type}" ${colAttr}
-                   class="prefilter-select" placeholder="${i18n.t('prefilter_select_or_type')}">
+                   class="rap-dialog-select" placeholder="${i18n.t('prefilter_select_or_type')}">
             <datalist id="${listId}">
               ${f.options.map(v => `<option value="${DomUtils.escapeHtml(String(v))}">`).join('')}
             </datalist>
@@ -177,7 +266,7 @@ const EntityExplorer = {
         fieldsHtml += `
           <div class="prefilter-field">
             <label>${f.label}</label>
-            <input type="text" data-field="${f.field}" data-type="text" ${textColAttr} class="prefilter-input"
+            <input type="text" data-field="${f.field}" data-type="text" ${textColAttr} class="rap-dialog-input"
                    placeholder="${i18n.t('placeholder_text_match')}">
           </div>
         `;
@@ -186,12 +275,12 @@ const EntityExplorer = {
     fieldsHtml += '</div>';
 
     dialog.innerHTML = `
-      <div class="prefilter-header">
+      <div class="rap-dialog-header">
         <h3>${i18n.t('prefilter_title', { name: contextName })}</h3>
         <p>${parsedFields.some(f => f.type === 'select') ? i18n.t('prefilter_select_hint') : i18n.t('prefilter_text_hint')}</p>
       </div>
       ${fieldsHtml}
-      <div class="prefilter-actions">
+      <div class="rap-dialog-actions">
         <button type="button" class="btn-secondary" data-action="skip">${i18n.t('prefilter_load_all')}</button>
         <button type="button" class="btn-primary" data-action="apply">${i18n.t('prefilter_apply')}</button>
       </div>
@@ -200,7 +289,7 @@ const EntityExplorer = {
     document.body.appendChild(dialog);
 
     // Show dialog and wait for user action
-    const inputs = dialog.querySelectorAll('.prefilter-input, .prefilter-select');
+    const inputs = dialog.querySelectorAll('.rap-dialog-input, .rap-dialog-select');
 
     return new Promise((resolve) => {
       dialog.showModal();
@@ -2135,123 +2224,31 @@ const EntityExplorer = {
 
   /**
    * Show a dialog for the user to select a required entity before opening a process.
+   * Uses showSelectDialog() for the UI, then resolves FK context from the selection.
    * @param {string} entityName - Entity type to select from (e.g. "Engine")
    * @returns {Promise<Object|null>} - Resolved context map or null if cancelled
    */
   async showRequiredEntityDialog(entityName) {
-    const dialogId = 'process-required-dialog';
-    let existing = document.getElementById(dialogId);
-    if (existing) existing.remove();
-
-    // Fetch schema and records
     const schema = await ApiClient.getExtendedSchema(entityName);
     const result = await ApiClient.getAll(entityName);
     const records = result.data || [];
 
-    // Build options with labels
     const options = records.map(rec => {
       const lbl = ColumnUtils.getRecordLabel(rec, schema);
-      const display = lbl.subtitle ? `${lbl.title} (${lbl.subtitle})` : lbl.title;
-      return { id: rec.id, display };
-    });
-
-    // Create <dialog>
-    const dialog = document.createElement('dialog');
-    dialog.id = dialogId;
-    dialog.className = 'process-required-dialog';
-
-    const THRESHOLD = 20;
-    let selectorHtml;
-    if (options.length > THRESHOLD) {
-      const datalistHtml = options.map(o =>
-        `<option value="${DomUtils.escapeHtml(o.display)}" data-id="${o.id}">`
-      ).join('');
-      selectorHtml = `
-        <input type="text" list="${dialogId}-list" class="process-required-select"
-               placeholder="${i18n.t('process_select_placeholder')}" autocomplete="off">
-        <datalist id="${dialogId}-list">${datalistHtml}</datalist>`;
-    } else {
-      const optsHtml = options.map(o =>
-        `<option value="${o.id}">${DomUtils.escapeHtml(o.display)}</option>`
-      ).join('');
-      selectorHtml = `
-        <select class="process-required-select">
-          <option value="">${i18n.t('process_select_placeholder')}</option>
-          ${optsHtml}
-        </select>`;
-    }
-
-    dialog.innerHTML = `
-      <div class="process-required-header">
-        <h3>${i18n.t('process_select_required', { entity: entityName })}</h3>
-        <button class="process-required-close" title="${i18n.t('cancel')}">&times;</button>
-      </div>
-      <div class="process-required-body">
-        ${selectorHtml}
-      </div>
-      <div class="process-required-actions">
-        <button type="button" class="btn-secondary" data-action="cancel">${i18n.t('cancel')}</button>
-        <button type="button" class="btn-primary" data-action="ok">${i18n.t('ok')}</button>
-      </div>`;
-
-    document.body.appendChild(dialog);
-
-    return new Promise((resolve) => {
-      let resolved = false;
-      const finish = (val) => { if (!resolved) { resolved = true; resolve(val); } };
-
-      dialog.showModal();
-
-      // Focus selector
-      const sel = dialog.querySelector('.process-required-select');
-      if (sel) sel.focus();
-
-      const getSelectedId = () => {
-        if (sel.tagName === 'SELECT') {
-          return sel.value ? parseInt(sel.value, 10) : null;
-        }
-        // Input + datalist: match typed text to options
-        const match = options.find(o => o.display === sel.value.trim());
-        return match ? match.id : null;
+      return {
+        value: rec.id,
+        label: lbl.subtitle ? `${lbl.title} (${lbl.subtitle})` : lbl.title
       };
-
-      // OK
-      dialog.querySelector('[data-action="ok"]').addEventListener('click', async () => {
-        const id = getSelectedId();
-        if (!id) return;
-        dialog.close();
-        dialog.remove();
-        finish(await this.resolveProcessContext(entityName, id, schema));
-      });
-
-      // Cancel button
-      dialog.querySelector('[data-action="cancel"]').addEventListener('click', () => {
-        dialog.close();
-        dialog.remove();
-        finish(null);
-      });
-
-      // X button
-      dialog.querySelector('.process-required-close').addEventListener('click', () => {
-        dialog.close();
-        dialog.remove();
-        finish(null);
-      });
-
-      // ESC (native dialog close)
-      dialog.addEventListener('close', () => {
-        dialog.remove();
-        finish(null);
-      });
-
-      // Enter submits
-      sel.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          dialog.querySelector('[data-action="ok"]').click();
-        }
-      });
     });
+
+    const selectedId = await this.showSelectDialog({
+      title: i18n.t('process_select_required', { entity: entityName }),
+      options,
+      placeholder: i18n.t('process_select_placeholder')
+    });
+
+    if (!selectedId) return null;
+    return this.resolveProcessContext(entityName, selectedId, schema);
   },
 
   /**

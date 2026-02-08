@@ -5012,10 +5012,10 @@ html[data-theme="dark"] .process-selector-group-label {
 }
 
 /* -----------------------------------------------------------------------------
-   Prefilter Dialog
+   Generic Dialog (shared by prefilter, process required, etc.)
    ----------------------------------------------------------------------------- */
 
-.prefilter-dialog {
+.rap-dialog {
     max-width: 400px;
     width: 90%;
     padding: 0;
@@ -5024,28 +5024,50 @@ html[data-theme="dark"] .process-selector-group-label {
     box-shadow: var(--shadow-lg);
 }
 
-.prefilter-dialog::backdrop {
+.rap-dialog::backdrop {
     background: var(--shadow-overlay-strong);
 }
 
-.prefilter-header {
+.rap-dialog-header {
     padding: 16px 20px;
     background: var(--table-row-hover);
     border-bottom: 1px solid var(--color-slate-200);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
-.prefilter-header h3 {
-    margin: 0 0 4px 0;
+.rap-dialog-header h3 {
+    margin: 0;
     font-size: 1.1rem;
     color: var(--color-gray-900);
 }
 
-.prefilter-header p {
+.rap-dialog-header p {
     margin: 0;
     font-size: 0.85rem;
     color: var(--color-gray-550);
 }
 
+.rap-dialog-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--color-gray-550);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.rap-dialog-close:hover {
+    color: var(--color-gray-900);
+}
+
+.rap-dialog-body {
+    padding: 20px;
+}
+
+/* Prefilter-specific: multi-field layout */
 .prefilter-fields {
     padding: 20px;
     display: flex;
@@ -5066,21 +5088,23 @@ html[data-theme="dark"] .process-selector-group-label {
     text-transform: capitalize;
 }
 
-.prefilter-select {
+.rap-dialog-select {
     padding: 8px 12px;
     border: 1px solid var(--color-slate-300);
     border-radius: 4px;
     font-size: 0.9rem;
     background: var(--color-bg);
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.prefilter-select:focus {
+.rap-dialog-select:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px var(--color-primary-light);
 }
 
-.prefilter-input {
+.rap-dialog-input {
     padding: 10px 12px;
     border: 1px solid var(--color-slate-300);
     border-radius: 4px;
@@ -5090,23 +5114,23 @@ html[data-theme="dark"] .process-selector-group-label {
     box-sizing: border-box;
 }
 
-.prefilter-input:focus {
+.rap-dialog-input:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px var(--color-primary-light);
 }
 
-.prefilter-input::placeholder {
+.rap-dialog-input::placeholder {
     color: var(--color-gray-400);
 }
 
-.prefilter-loading {
+.rap-dialog-loading {
     font-size: 0.8rem;
     color: var(--color-gray-400);
     font-style: italic;
 }
 
-.prefilter-actions {
+.rap-dialog-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -5115,7 +5139,7 @@ html[data-theme="dark"] .process-selector-group-label {
     border-top: 1px solid var(--color-slate-200);
 }
 
-.prefilter-actions .btn-secondary {
+.rap-dialog-actions .btn-secondary {
     padding: 8px 16px;
     background: var(--color-bg);
     border: 1px solid var(--color-slate-300);
@@ -5125,11 +5149,11 @@ html[data-theme="dark"] .process-selector-group-label {
     font-size: 0.9rem;
 }
 
-.prefilter-actions .btn-secondary:hover {
+.rap-dialog-actions .btn-secondary:hover {
     background: var(--table-header-bg);
 }
 
-.prefilter-actions .btn-primary {
+.rap-dialog-actions .btn-primary {
     padding: 8px 16px;
     background: var(--color-primary);
     border: none;
@@ -5139,109 +5163,7 @@ html[data-theme="dark"] .process-selector-group-label {
     font-size: 0.9rem;
 }
 
-.prefilter-actions .btn-primary:hover {
-    background: var(--color-primary-hover);
-}
-
-/* -----------------------------------------------------------------------------
-   Process Required Entity Dialog
-   ----------------------------------------------------------------------------- */
-.process-required-dialog {
-    max-width: 400px;
-    width: 90%;
-    padding: 0;
-    border: none;
-    border-radius: 8px;
-    box-shadow: var(--shadow-lg);
-}
-
-.process-required-dialog::backdrop {
-    background: var(--shadow-overlay-strong);
-}
-
-.process-required-header {
-    padding: 16px 20px;
-    background: var(--table-row-hover);
-    border-bottom: 1px solid var(--color-slate-200);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.process-required-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: var(--color-gray-900);
-}
-
-.process-required-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    color: var(--color-gray-550);
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.process-required-close:hover {
-    color: var(--color-gray-900);
-}
-
-.process-required-body {
-    padding: 20px;
-}
-
-.process-required-select {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 8px 12px;
-    border: 1px solid var(--color-slate-300);
-    border-radius: 4px;
-    font-size: 0.9rem;
-    background: var(--color-bg);
-}
-
-.process-required-select:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-light);
-}
-
-.process-required-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 16px 20px;
-    background: var(--table-row-hover);
-    border-top: 1px solid var(--color-slate-200);
-}
-
-.process-required-actions .btn-secondary {
-    padding: 8px 16px;
-    background: var(--color-bg);
-    border: 1px solid var(--color-slate-300);
-    border-radius: 4px;
-    color: var(--color-gray-650);
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.process-required-actions .btn-secondary:hover {
-    background: var(--table-header-bg);
-}
-
-.process-required-actions .btn-primary {
-    padding: 8px 16px;
-    background: var(--color-primary);
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.process-required-actions .btn-primary:hover {
+.rap-dialog-actions .btn-primary:hover {
     background: var(--color-primary-hover);
 }
 
