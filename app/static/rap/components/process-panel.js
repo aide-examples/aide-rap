@@ -157,6 +157,18 @@ const ProcessPanel = {
         Open Entity: ${DomUtils.escapeHtml(step.entity)}
       </button>`;
     }
+    if (step.call) {
+      // Parse "Label(ContextKey)" syntax, e.g. "Search Regulations(ProductType)"
+      const callMatch = step.call.match(/^(.+?)\((\w+)\)$/);
+      const callLabel = callMatch ? callMatch[1].trim() : step.call;
+      const callContextKey = callMatch ? callMatch[2] : null;
+      actionsHtml += `<button class="process-action-btn process-action-call"
+                              data-call-label="${DomUtils.escapeHtml(callLabel)}"
+                              data-call-context="${DomUtils.escapeHtml(callContextKey || '')}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="3" x2="7" y2="8" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="8" x2="10" y2="10" stroke="currentColor" stroke-width="1.5"/></svg>
+        ${DomUtils.escapeHtml(callLabel)}
+      </button>`;
+    }
 
     contentEl.innerHTML = `
       <div class="process-step-body">${bodyHtml}</div>
@@ -180,6 +192,21 @@ const ProcessPanel = {
         if (typeof EntityExplorer !== 'undefined') {
           EntityExplorer.toggleProcess(false); // hide process panel
           EntityExplorer.selectEntityByName(entityName);
+        }
+      });
+    });
+
+    contentEl.querySelectorAll('.process-action-call').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const label = btn.dataset.callLabel;
+        const contextKey = btn.dataset.callContext;
+        // Resolve search term from process context
+        const searchTerm = contextKey ? (this.context[contextKey] || '') : '';
+        // Find matching provider from externalQueries config
+        const eqConfig = contextKey ? EntityExplorer.getExternalQueriesForEntity(contextKey) : [];
+        const provider = eqConfig.length > 0 ? eqConfig[0].provider : 'federal-register-ad';
+        if (typeof ExternalQueryDialog !== 'undefined') {
+          ExternalQueryDialog.open(provider, searchTerm, label);
         }
       });
     });

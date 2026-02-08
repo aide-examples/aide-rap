@@ -102,7 +102,16 @@ Create a workscope document for the maintenance work.
 Entity: Workscope
 ```
 
-Each `##` becomes a tab. `View:` and `Entity:` directives become action buttons.
+Each `##` becomes a tab. `View:`, `Entity:`, and `Call:` directives become action buttons.
+
+`Call:` triggers an external API query dialog (see [External Queries](#external-queries)):
+```markdown
+## Verify Compliance
+Check external databases for relevant regulations.
+
+Call: Search Regulations(ProductType)
+```
+The syntax is `Call: Label(ContextKey)` — `Label` is the button text, `ContextKey` references a process context entity whose value becomes the search term. The provider is resolved from the `externalQueries` config for that entity type.
 
 **views/{Area}/{ViewName}.md** — Cross-entity join views (one file per view):
 ```
@@ -124,6 +133,73 @@ Each view file contains a JSON block with the view definition:
 ```
 
 See [Views Configuration](procedures/views-config.md) for the full syntax.
+
+### External Queries
+
+Query external REST APIs at runtime from context menus and process steps. Two configuration layers:
+
+**1. Provider Definitions** (`app/api_providers.json`) — which APIs are available:
+
+```json
+{
+  "my-provider": {
+    "name": "Human-readable name",
+    "description": "What this provider searches",
+    "baseUrl": "https://api.example.com/search.json",
+    "params": {
+      "q": "\"${term}\"",
+      "per_page": "25",
+      "fields[]": ["title", "date", "url"]
+    },
+    "resultMapping": {
+      "title": "title",
+      "date": "publication_date",
+      "number": "document_number",
+      "abstract": "abstract",
+      "url": "html_url"
+    },
+    "pagination": {
+      "pageParam": "page",
+      "totalCountField": "total_count",
+      "hasMoreField": "next_page_url"
+    }
+  }
+}
+```
+
+`${term}` in param values is replaced with the user's search term at runtime. The `resultMapping` maps API response fields to the standard dialog columns (title, date, number, abstract, url).
+
+**2. System Configuration** (`config.json`) — which entities offer external lookups:
+
+```json
+{
+  "externalQueries": {
+    "MyEntity": {
+      "provider": "my-provider",
+      "searchField": "name",
+      "label": "Search External DB"
+    }
+  }
+}
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `provider` | Provider ID from `api_providers.json` |
+| `searchField` | Entity field whose value is used as search term |
+| `label` | Display label for context menu item and dialog title |
+
+**Trigger Locations:**
+- **Context Menu** — Right-click on an entity row or FK cell of a configured type
+- **Process Steps** — `Call: Label(EntityType)` directive in process definitions
+
+**Built-in Providers** (shipped with RAP in `api_providers.json`):
+
+| Provider | Source | Description |
+|----------|--------|-------------|
+| `federal-register-ad` | US Federal Register API | FAA Airworthiness Directives (free, no API key) |
+
+**API Endpoint:** `GET /api/admin/external-query?provider=...&term=...&page=1` (admin role required)
 
 ### Authentication
 

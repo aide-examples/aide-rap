@@ -105,7 +105,7 @@ function buildPrompt(entityName, schema, instruction, existingData, contextData 
         }
         // Priority 3: Fallback to common field names
         if (!label) {
-          label = r.name || r.title || r.designation || r.registration || r.serial_number || r.icao_code || `#${r.id}`;
+          label = r.name || r.title || r.designation || r.serial_number || r.code || `#${r.id}`;
         }
         return { id: r.id, label };
       });
@@ -199,7 +199,7 @@ function buildCompletePrompt(entityName, schema, instruction, existingRecords, f
         }
         // Priority 3: Fallback to common field names
         if (!label) {
-          label = r.name || r.title || r.designation || r.registration || r.serial_number || r.icao_code || `#${r.id}`;
+          label = r.name || r.title || r.designation || r.serial_number || r.code || `#${r.id}`;
         }
         return { id: r.id, label };
       });
@@ -501,7 +501,7 @@ function loadBackReferenceData(entityName, getDatabase, fullSchema) {
         const labelFieldsArr = labelFieldsObj?.primary
           ? [labelFieldsObj.primary, labelFieldsObj.secondary].filter(Boolean)
           : (Array.isArray(labelFieldsObj) ? labelFieldsObj : []);
-        const fallbackFields = ['name', 'title', 'designation', 'serial_number', 'registration', 'icao_code'];
+        const fallbackFields = ['name', 'title', 'designation', 'serial_number', 'code'];
 
         backRefData[rel.entity] = {
           records: records.map(r => {

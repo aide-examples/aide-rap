@@ -6,6 +6,7 @@
 const express = require('express');
 const logger = require('../utils/logger');
 const { reloadUserViews, getDatabasePath } = require('../config/database');
+const ExternalQueryService = require('../services/ExternalQueryService');
 
 module.exports = function() {
   const router = express.Router();
@@ -39,6 +40,24 @@ module.exports = function() {
     } catch (err) {
       logger.error('Failed to serve database file', { error: err.message });
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/admin/external-query
+   * Query an external API provider (e.g., regulatory databases)
+   */
+  router.get('/api/admin/external-query', async (req, res) => {
+    const { provider, term, page } = req.query;
+    if (!provider || !term) {
+      return res.status(400).json({ error: 'Missing required parameters: provider, term' });
+    }
+    try {
+      const result = await ExternalQueryService.query(provider, term, parseInt(page) || 1);
+      res.json(result);
+    } catch (err) {
+      logger.error('External query failed', { provider, term, error: err.message });
+      res.status(502).json({ error: err.message });
     }
   });
 

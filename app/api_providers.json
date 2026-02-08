@@ -1,0 +1,25 @@
+{
+  "federal-register-ad": {
+    "name": "Federal Register – Airworthiness Directives",
+    "description": "Search FAA Airworthiness Directives via the US Federal Register API",
+    "baseUrl": "https://www.federalregister.gov/api/v1/documents.json",
+    "params": {
+      "conditions[term]": "\"airworthiness directive\" \"${term}\"",
+      "conditions[agencies][]": "federal-aviation-administration",
+      "per_page": "25",
+      "fields[]": ["title", "abstract", "publication_date", "document_number", "html_url"]
+    },
+    "resultMapping": {
+      "title": "title",
+      "date": "publication_date",
+      "number": "document_number",
+      "abstract": "abstract",
+      "url": "html_url"
+    },
+    "pagination": {
+      "pageParam": "page",
+      "totalCountField": "total_count",
+      "hasMoreField": "next_page_url"
+    }
+  }
+}

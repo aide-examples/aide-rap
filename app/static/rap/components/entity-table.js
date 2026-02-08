@@ -446,10 +446,16 @@ const EntityTable = {
         }
       });
 
-      // Context menu (right-click) — export only
+      // Context menu (right-click) — export + external queries on FK cells
       row.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        ContextMenu.show(e.clientX, e.clientY, { source: 'view' });
+        const ctx = { source: 'view', entity: this.currentViewConfig?.base || null };
+        const fkEl = e.target.closest('.fk-value');
+        if (fkEl) {
+          ctx.fkEntity = fkEl.dataset.entity;
+          ctx.fkLabel = fkEl.textContent.trim();
+        }
+        ContextMenu.show(e.clientX, e.clientY, ctx);
       });
 
       // Cursor indicates clickable

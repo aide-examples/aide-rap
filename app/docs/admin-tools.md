@@ -118,3 +118,30 @@ Seed files can reference media by URL. The system automatically fetches and stor
   }
 ]
 ```
+
+### SQL Browser
+
+Admin-only SQLite database inspector, accessible via the **SQL** link in the admin footer area.
+
+- Client-side only (sql.js/WASM) — no server-side query execution
+- Based on [inloop/sqlite-viewer](https://github.com/inloop/sqlite-viewer) (Apache 2.0)
+- Auto-loads the database file from `/api/admin/db-file`
+- URL: `/sql-browser/?url=/api/admin/db-file`
+
+### External Query Dialog
+
+Query external REST APIs at runtime. Providers are defined in `app/api_providers.json`, entity mappings in the system's `config.json`.
+
+**Access Points:**
+1. **Context Menu** — Right-click on an entity row or FK cell of a configured entity type
+2. **Process Steps** — Via `Call:` directive in process definitions
+
+**Dialog Features:**
+- Search field pre-filled with entity field value (editable for refinement)
+- Results table with Date, Document Number, and Title
+- Full abstract with search term highlighting
+- Links to original source documents (new tab)
+- "Load more" pagination
+- Loading spinner, abort on close, error handling
+
+**Configuration:** See [External Queries](configuration.md#external-queries) in Configuration.

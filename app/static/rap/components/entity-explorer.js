@@ -28,6 +28,7 @@ const EntityExplorer = {
   currentView: null, // null = entity mode, object = view mode { name, base, color }
   entityMetadata: {}, // Map of entity name -> { readonly, system, ... }
   viewsList: [], // All views from API (for context menu matching)
+  externalQueries: {}, // Config: entity -> { provider, searchField, label }
   // Process selector
   processSelector: null,
   processSelectorTrigger: null,
@@ -533,6 +534,7 @@ const EntityExplorer = {
     // Load entity types, views, and processes
     await this.loadEntityTypes();
     await this.loadViews();
+    await this.loadExternalQueries();
     await this.loadProcesses();
 
     // Event listeners for entity dropdown
@@ -918,6 +920,31 @@ const EntityExplorer = {
       }
     }
     return results;
+  },
+
+  /**
+   * Load external query configuration from server.
+   */
+  async loadExternalQueries() {
+    try {
+      const resp = await fetch('/api/config/external-queries');
+      if (resp.ok) {
+        this.externalQueries = await resp.json();
+      }
+    } catch (e) {
+      // Non-critical — external queries simply won't appear in context menu
+    }
+  },
+
+  /**
+   * Get external query configs for a given entity.
+   * Returns array of { provider, searchField, label } objects.
+   */
+  getExternalQueriesForEntity(entityName) {
+    if (!entityName || !this.externalQueries) return [];
+    const cfg = this.externalQueries[entityName];
+    if (!cfg) return [];
+    return Array.isArray(cfg) ? cfg : [cfg];
   },
 
   /**
@@ -1745,7 +1772,7 @@ const EntityExplorer = {
       }
     } else {
       // Fallback to heuristics
-      const candidates = ['name', 'title', 'registration', 'designation', 'code'];
+      const candidates = ['name', 'title', 'designation', 'code'];
       for (const name of candidates) {
         if (schema.columns.find(c => c.name === name)) {
           primary = name;
@@ -1753,7 +1780,7 @@ const EntityExplorer = {
         }
       }
 
-      const subtitleCandidates = ['serial_number', 'description', 'country', 'icao_code'];
+      const subtitleCandidates = ['serial_number', 'description', 'country'];
       for (const name of subtitleCandidates) {
         if (name !== primary && schema.columns.find(c => c.name === name)) {
           secondary = name;

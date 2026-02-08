@@ -328,7 +328,7 @@ function parseProcessFile(content, filename) {
     if (trimmed.startsWith('## ')) {
       foundFirstH2 = true;
       if (currentStep) steps.push(currentStep);
-      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entity: null };
+      currentStep = { title: trimmed.substring(3).trim(), bodyLines: [], view: null, entity: null, call: null };
       continue;
     }
 
@@ -339,10 +339,13 @@ function parseProcessFile(content, filename) {
       // Inside a step — check for directives
       const viewMatch = trimmed.match(/^View:\s*(.+)$/i);
       const entityMatch = trimmed.match(/^Entity:\s*(.+)$/i);
+      const callMatch = trimmed.match(/^Call:\s*(.+)$/i);
       if (viewMatch) {
         currentStep.view = viewMatch[1].trim();
       } else if (entityMatch) {
         currentStep.entity = entityMatch[1].trim();
+      } else if (callMatch) {
+        currentStep.call = callMatch[1].trim();
       } else {
         currentStep.bodyLines.push(line);
       }
@@ -369,7 +372,8 @@ function parseProcessFile(content, filename) {
       title: s.title,
       body: trimBody(s.bodyLines),
       view: s.view,
-      entity: s.entity
+      entity: s.entity,
+      call: s.call
     }))
   };
 }

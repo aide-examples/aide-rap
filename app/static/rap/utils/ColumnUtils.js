@@ -129,7 +129,7 @@ const ColumnUtils = {
       }
     } else {
       // Fallback: use heuristics
-      const candidates = ['name', 'title', 'registration', 'designation', 'code'];
+      const candidates = ['name', 'title', 'designation', 'code'];
       for (const name of candidates) {
         if (record[name]) {
           title = String(record[name]);

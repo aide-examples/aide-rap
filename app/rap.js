@@ -229,6 +229,10 @@ app.get('/api/config/tree', (req, res) => {
     res.json(cfg.tree || { backRefPreviewLimit: 10 });
 });
 
+app.get('/api/config/external-queries', (req, res) => {
+    res.json(cfg.externalQueries || {});
+});
+
 // Welcome screen content (system-specific)
 app.get('/api/config/welcome', (req, res) => {
     const welcomePath = path.join(cfg.paths.docs, 'welcome.html');

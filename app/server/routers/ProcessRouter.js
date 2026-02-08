@@ -103,7 +103,8 @@ module.exports = function(processesConfig) {
           title: s.title,
           body: s.body,
           view: s.view || null,
-          entity: s.entity || null
+          entity: s.entity || null,
+          call: s.call || null
         }))
       });
     } catch (err) {

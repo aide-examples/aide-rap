@@ -178,6 +178,41 @@ const ContextMenu = {
     }
     } // end !isViewMode
 
+    // External query items — config-driven per entity + FK entity
+    // Available in both entity and view mode (FK cells in views)
+    const entityExtQ = context.entity ? EntityExplorer.getExternalQueriesForEntity(context.entity).map(eq => ({ ...eq, fk: false })) : [];
+    const fkExtQ = context.fkEntity ? EntityExplorer.getExternalQueriesForEntity(context.fkEntity).map(eq => ({ ...eq, fk: true })) : [];
+    const allExtQueries = [...entityExtQ, ...fkExtQ];
+    if (allExtQueries.length > 0) {
+      let extHtml = '<div class="context-menu-separator"></div>';
+      for (const eq of allExtQueries) {
+        extHtml += `<div class="context-menu-item context-menu-ext-query-item"
+                         data-provider="${DomUtils.escapeHtml(eq.provider)}"
+                         data-search-field="${DomUtils.escapeHtml(eq.searchField)}"
+                         data-fk="${eq.fk ? '1' : ''}">
+          <span class="context-menu-icon">&#128270;</span>
+          <span>${DomUtils.escapeHtml(eq.label)}</span>
+        </div>`;
+      }
+      viewsContainer.insertAdjacentHTML('beforeend', extHtml);
+      viewsContainer.querySelectorAll('.context-menu-ext-query-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          let searchTerm;
+          if (item.dataset.fk) {
+            searchTerm = this.currentContext.fkLabel || '';
+          } else {
+            const record = (EntityTable.records || []).find(r => r.id === this.currentContext.recordId);
+            searchTerm = record ? record[item.dataset.searchField] : '';
+          }
+          if (typeof ExternalQueryDialog !== 'undefined') {
+            ExternalQueryDialog.open(item.dataset.provider, searchTerm || '', item.textContent.trim());
+          }
+          this.hide();
+        });
+      });
+    }
+
     // Adjust if menu goes off-screen
     const rect = this.menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {

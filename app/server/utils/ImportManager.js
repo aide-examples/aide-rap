@@ -473,7 +473,7 @@ class ImportManager {
     // Simple transforms
     switch (transform) {
       case 'string':
-        // Force value to string (useful for numeric-looking cells like ESN)
+        // Force value to string (useful for numeric-looking cells like serial numbers or codes)
         return str;
 
       case 'number':
