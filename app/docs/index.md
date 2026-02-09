@@ -315,6 +315,7 @@ GET    /api/entities/:entity/schema/extended  # + UI hints, enums, FK info
 GET    /api/entities/:entity              # List records (filter, sort, page)
 GET    /api/entities/:entity/:id          # Single record (ETag header for OCC)
 GET    /api/entities/:entity/:id/references   # Back-references
+GET    /api/entities/:entity/:id/lineage     # Ancestor chain (hierarchical entities)
 POST   /api/entities/:entity              # Create (with validation)
 PUT    /api/entities/:entity/:id          # Update (If-Match header for OCC)
 DELETE /api/entities/:entity/:id          # Delete (with FK check)

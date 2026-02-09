@@ -164,3 +164,41 @@ When in Tree View mode, PDF export captures the currently expanded structure:
 - Uses indentation to show hierarchy depth
 - Includes symbols for relationships: `▸` root, `→` FK, `←` back-reference, `↻` cycle
 - Respects current sort settings (attribute order, reference position)
+
+### Hierarchical Entities and Lineage
+
+Entities with a **self-referencing foreign key** (e.g., `parent_type` pointing to the same entity) form a hierarchy. The framework supports these hierarchies in several ways:
+
+**Hierarchy View:** The Entity Explorer provides a tree-view toggle for hierarchical entities (detected via `selfRefFK` in the schema). Records where the self-ref FK is NULL are root nodes; children are loaded on expand.
+
+**Lineage Endpoint:** For any record in a hierarchical entity, the lineage API returns the ancestor chain — the record's own ID plus all parent IDs up to the root:
+
+```
+GET /api/entities/EngineType/47/lineage
+→ { "ids": [47, 15, 3] }   // self → parent → grandparent
+```
+
+This is used by **view context filtering** (see below) to automatically expand filters across the hierarchy. For non-hierarchical entities, it returns just the single ID.
+
+### View Context Filtering in Processes
+
+Process steps can reference views with a **context key** that filters the view based on accumulated process context:
+
+```markdown
+View: Stand Tracking(EngineType)
+```
+
+**Syntax:** `View: ViewName(ContextKey)` — the context key names an entity type whose value was selected in a previous step.
+
+**How filtering works:**
+
+1. The process panel reads `viewContext: "EngineType"` from the step definition
+2. It passes the context (e.g., `{ EngineType: "CFM56-5B4/3", _ids: { EngineType: 47 } }`) to the Entity Explorer
+3. The explorer fetches the view schema and finds the column whose `fkEntity` matches the context key
+4. It calls the **lineage endpoint** to get the ancestor chain: `[47, 15, 3]`
+5. If the lineage has multiple IDs (hierarchical entity), it builds an **IN-filter** on the FK ID column: `_fk_Engine Type:47,15,3`
+6. If only one ID (flat entity), it uses a simple **exact-match** filter on the label: `=Engine Type:CFM56-5B4/3`
+
+This means a stand typed as "CFM56" (a parent type) will correctly appear when filtering for the specific subtype "CFM56-5B4/3", because the lineage includes all ancestors.
+
+**Non-hierarchical example:** `View: Fleet Overview(Operator)` — filters the view to show only records matching the selected operator (exact match, no lineage expansion).
