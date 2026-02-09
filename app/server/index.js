@@ -7,7 +7,7 @@
 
 const path = require('path');
 const express = require('express');
-const { initDatabase, closeDatabase, watchViewsFile } = require('./config/database');
+const { initDatabase, closeDatabase, watchViewsFile, populateComputedEntities } = require('./config/database');
 const { correlationId, requestLogger, errorHandler } = require('./middleware');
 const GenericCrudRouter = require('./routers/GenericCrudRouter');
 const AuditRouter = require('./routers/audit.router');
@@ -118,6 +118,16 @@ function init(app, config) {
     }
   } catch (err) {
     logger.error('Failed to rebuild server calculations', { error: err.message });
+  }
+
+  // Populate computed entities (PAIRS) at startup
+  try {
+    const pairsResult = populateComputedEntities();
+    if (pairsResult.populated > 0) {
+      logger.info('Computed entities populated at startup', pairsResult);
+    }
+  } catch (err) {
+    logger.error('Failed to populate computed entities', { error: err.message });
   }
 
   // Run computed field updates (DAILY fields) at startup

@@ -7,6 +7,7 @@
  * - "@Ycolumn:value" - year filter using strftime (e.g., "@Yreading_at:2024")
  * - "@Mcolumn:value" - month filter using strftime (e.g., "@Mreading_at:2024-03")
  * - "column:value" - exact match on entity column (e.g., "type_id:5")
+ * - "column:v1,v2,v3" - IN match for comma-separated numeric values (e.g., "type_id:1,3,7")
  * - "text" - LIKE search across all string columns
  */
 
@@ -86,6 +87,12 @@ function parseFilter(filter, options) {
         // Handle null specially for IS NULL queries (especially for FK columns)
         if (value.toLowerCase() === 'null') {
           conditions.push(`"${col.sqlName}" IS NULL`);
+        } else if (value.includes(',') && value.split(',').every(v => /^\d+$/.test(v.trim()))) {
+          // IN filter: comma-separated numeric values (e.g., "type_id:1,3,7")
+          const values = value.split(',').map(v => parseInt(v.trim(), 10));
+          const placeholders = values.map(() => '?').join(', ');
+          conditions.push(`"${col.sqlName}" IN (${placeholders})`);
+          params.push(...values);
         } else {
           conditions.push(`"${col.sqlName}" = ?`);
           const paramValue = col.jsType === 'number' ? parseInt(value, 10) : value;

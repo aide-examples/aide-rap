@@ -331,7 +331,7 @@ GET    /api/audit/:id                     # Single audit entry
 GET    /api/audit/schema/extended         # Audit schema for UI
 ```
 
-**Filtering**: `?filter=column:value` or `?filter=searchterm` (LIKE search)
+**Filtering**: `?filter=column:value` or `?filter=type_id:1,3,7` (IN match) or `?filter=searchterm` (LIKE search)
 **Sorting**: `?sort=column&order=asc|desc`
 **Pagination**: `?limit=50&offset=100`
 **OCC**: PUT with `If-Match: "Entity:id:version"` → 409 on conflict
@@ -359,6 +359,7 @@ See [Configuration](configuration.md) for the full reference.
 - [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
 - [Aggregate Types](aggregate-types.md) – `geo`, `address`, and custom composite types
 - [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships
+- [Computed Entities](attribute-markers.md#computed-entity-pairs) – `[PAIRS=Source(chain1, chain2)]` for auto-derived M:N mapping tables
 - [Calculations](calculations.md) – `## Client Calculations` and `## Server Calculations` for derived field values
 - [Seed Data](seed-data.md) – Import, export, and AI-generate test data
 

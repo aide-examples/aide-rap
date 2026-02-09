@@ -233,6 +233,61 @@ app.get('/api/config/external-queries', (req, res) => {
     res.json(cfg.externalQueries || {});
 });
 
+// Bridge filter: resolve indirect FK filtering via computed PAIRS entities
+// Example: /api/config/bridge-filter?entity=Aircraft&target=EngineType&id=5
+app.get('/api/config/bridge-filter', (req, res) => {
+    const { entity: entityName, target: targetEntity, id: targetId } = req.query;
+    if (!entityName || !targetEntity || !targetId) {
+        return res.json({ filter: null });
+    }
+
+    try {
+        const { getDatabase } = require('./server/config/database');
+        const schema = getSchema();
+        const db = getDatabase();
+        const entity = schema.entities[entityName];
+        if (!entity) return res.json({ filter: null });
+
+        // For each FK on the entity, check if a bridge entity connects
+        // the FK target to the requested target entity
+        for (const col of entity.columns) {
+            if (!col.foreignKey) continue;
+            const intermediateEntity = col.foreignKey.entity;
+
+            // Look for a computed bridge entity with FKs to both intermediate and target
+            for (const bridgeEntity of Object.values(schema.entities)) {
+                if (!bridgeEntity.computed) continue;
+                const fkToIntermediate = bridgeEntity.columns.find(c =>
+                    c.foreignKey?.entity === intermediateEntity
+                );
+                const fkToTarget = bridgeEntity.columns.find(c =>
+                    c.foreignKey?.entity === targetEntity
+                );
+                if (!fkToIntermediate || !fkToTarget) continue;
+
+                // Found bridge! Query matching intermediate IDs
+                const sql = `SELECT DISTINCT ${fkToIntermediate.name} FROM ${bridgeEntity.tableName} WHERE ${fkToTarget.name} = ?`;
+                const rows = db.prepare(sql).all(parseInt(targetId, 10));
+                const ids = rows.map(r => r[fkToIntermediate.name]);
+
+                if (ids.length > 0) {
+                    return res.json({
+                        filter: `${col.name}:${ids.join(',')}`,
+                        bridgeEntity: bridgeEntity.className,
+                        matchCount: ids.length
+                    });
+                }
+                return res.json({ filter: null, bridgeEntity: bridgeEntity.className, matchCount: 0 });
+            }
+        }
+
+        res.json({ filter: null });
+    } catch (e) {
+        console.error('Bridge filter error:', e);
+        res.json({ filter: null });
+    }
+});
+
 // Welcome screen content (system-specific)
 app.get('/api/config/welcome', (req, res) => {
     const welcomePath = path.join(cfg.paths.docs, 'welcome.html');

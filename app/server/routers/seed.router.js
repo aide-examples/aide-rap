@@ -10,7 +10,7 @@ const fs = require('fs');
 module.exports = function(cfg) {
     const router = express.Router();
     const SeedManager = require('../utils/SeedManager');
-    const { getSchema, getDatabase } = require('../config/database');
+    const { getSchema, getDatabase, populateComputedEntities } = require('../config/database');
 
     // Initialize SeedManager with system-specific seed directory
     SeedManager.init(cfg.paths.seed);
@@ -114,6 +114,7 @@ module.exports = function(cfg) {
     router.post('/api/seed/load-all', async (req, res) => {
         try {
             const results = await SeedManager.loadAll();
+            populateComputedEntities();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to load all seeds:', e);
@@ -125,6 +126,7 @@ module.exports = function(cfg) {
     router.post('/api/seed/import-all', async (req, res) => {
         try {
             const results = await SeedManager.importAll();
+            populateComputedEntities();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to import all:', e);
@@ -147,6 +149,7 @@ module.exports = function(cfg) {
     router.post('/api/seed/reset-all', async (req, res) => {
         try {
             const results = await SeedManager.resetAll();
+            populateComputedEntities();
             res.json({ success: true, ...results });
         } catch (e) {
             console.error('Failed to reset all:', e);
@@ -239,6 +242,7 @@ module.exports = function(cfg) {
 
             // Re-run computed field setup
             ComputedFieldService.applyDefaults();
+            populateComputedEntities();
             ComputedFieldService.runAll();
             ComputedFieldService.stopScheduler();
             ComputedFieldService.scheduleDailyRun();
@@ -272,6 +276,7 @@ module.exports = function(cfg) {
     router.post('/api/seed/restore-backup', async (req, res) => {
         try {
             const results = await SeedManager.restoreBackup();
+            populateComputedEntities();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to restore backup:', e);

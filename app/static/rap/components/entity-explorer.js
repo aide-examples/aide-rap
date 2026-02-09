@@ -2559,8 +2559,25 @@ const EntityExplorer = {
     // Find FK column that targets fkEntity
     const schema = await SchemaCache.getExtended(entityName);
     const fkCol = schema.columns.find(c => c.foreignKey?.entity === fkEntity);
+    let filter = null;
+
     if (fkCol && fkId) {
-      const filter = `${fkCol.name}:${fkId}`;
+      // Direct FK match
+      filter = `${fkCol.name}:${fkId}`;
+    } else if (fkId) {
+      // No direct FK — try indirect filtering via bridge entity
+      try {
+        const resp = await fetch(`/api/config/bridge-filter?entity=${entityName}&target=${fkEntity}&id=${fkId}`);
+        if (resp.ok) {
+          const result = await resp.json();
+          if (result.filter) filter = result.filter;
+        }
+      } catch (e) {
+        console.warn('Bridge filter lookup failed:', e);
+      }
+    }
+
+    if (filter) {
       if (this.filterInput) this.filterInput.value = filter;
       this.viewMode = 'table';
       this.updateViewToggle();

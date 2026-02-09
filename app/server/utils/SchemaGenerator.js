@@ -296,6 +296,14 @@ function parseEntityLevelAnnotations(headerLines) {
     if (label2Match) {
       annotations.label2Expression = parseLabelExpression(label2Match[1]);
     }
+
+    // Match [PAIRS=SourceEntity(chain1, chain2)]
+    const pairsMatch = line.match(/\[PAIRS=(\w+)\(([^)]+)\)\]/i);
+    if (pairsMatch) {
+      const chains = pairsMatch[2].split(',').map(c => c.trim().split('.'));
+      annotations.pairs = { sourceEntity: pairsMatch[1], chains };
+      annotations.computed = true;
+    }
   }
 
   return Object.keys(annotations).length > 0 ? annotations : null;
@@ -1537,7 +1545,10 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     localTypes: classDef.localTypes || {},
     // Entity-level label expression (takes precedence over column [LABEL])
     labelExpression: entityAnnotations?.labelExpression || null,
-    label2Expression: entityAnnotations?.label2Expression || null
+    label2Expression: entityAnnotations?.label2Expression || null,
+    // Computed entity: PAIRS annotation for auto-populated M:N mapping
+    pairs: entityAnnotations?.pairs || null,
+    computed: entityAnnotations?.computed || false
   };
 }
 
@@ -1909,6 +1920,81 @@ function generateSchema(mdPath, enabledEntities = null) {
   };
 }
 
+/**
+ * Generate SQL to populate a computed PAIRS entity from its source entity.
+ * Follows FK chains to resolve the target IDs for each column.
+ *
+ * Example: [PAIRS=EngineAllocation(engine.type, aircraft.type)]
+ * → SELECT DISTINCT engine.type_id, aircraft.type_id FROM engine_allocation ...
+ *
+ * @param {object} entity - The computed entity schema (must have entity.pairs)
+ * @param {object} allEntities - All entity schemas keyed by className
+ * @returns {string|null} - INSERT SQL statement, or null on error
+ */
+function generatePairsSQL(entity, allEntities) {
+  const { pairs } = entity;
+  if (!pairs) return null;
+
+  const sourceEntity = allEntities[pairs.sourceEntity];
+  if (!sourceEntity) {
+    console.warn(`[PAIRS] Source entity "${pairs.sourceEntity}" not found`);
+    return null;
+  }
+
+  const selects = [];
+  const joins = [];
+  const whereNotNull = [];
+  const fkColumns = entity.columns.filter(c => c.foreignKey);
+
+  for (let chainIdx = 0; chainIdx < pairs.chains.length; chainIdx++) {
+    const chain = pairs.chains[chainIdx];
+    if (!fkColumns[chainIdx]) {
+      console.warn(`[PAIRS] No FK column at index ${chainIdx} for chain "${chain.join('.')}"`);
+      return null;
+    }
+
+    let currentEntity = sourceEntity;
+    let currentAlias = 'src';
+
+    for (let stepIdx = 0; stepIdx < chain.length; stepIdx++) {
+      const fkName = chain[stepIdx];
+      const isLastStep = stepIdx === chain.length - 1;
+
+      const fkCol = currentEntity.columns.find(c =>
+        c.foreignKey && c.name === `${fkName}_id`
+      );
+      if (!fkCol) {
+        console.warn(`[PAIRS] FK "${fkName}" (${fkName}_id) not found in ${currentEntity.className}`);
+        return null;
+      }
+
+      if (isLastStep) {
+        selects.push(`${currentAlias}.${fkCol.name}`);
+        whereNotNull.push(`${currentAlias}.${fkCol.name} IS NOT NULL`);
+      } else {
+        const targetEntity = allEntities[fkCol.foreignKey.entity];
+        if (!targetEntity) {
+          console.warn(`[PAIRS] Target entity "${fkCol.foreignKey.entity}" not found`);
+          return null;
+        }
+        const joinAlias = `j${chainIdx}_${stepIdx}`;
+        joins.push(`JOIN ${targetEntity.tableName} ${joinAlias} ON ${joinAlias}.id = ${currentAlias}.${fkCol.name}`);
+        whereNotNull.push(`${currentAlias}.${fkCol.name} IS NOT NULL`);
+        currentEntity = targetEntity;
+        currentAlias = joinAlias;
+      }
+    }
+  }
+
+  const targetCols = fkColumns.slice(0, pairs.chains.length).map(c => c.name);
+  const joinClause = joins.length > 0 ? '\n' + joins.join('\n') : '';
+
+  return `INSERT OR IGNORE INTO ${entity.tableName} (${targetCols.join(', ')})
+SELECT DISTINCT ${selects.join(', ')}
+FROM ${sourceEntity.tableName} src${joinClause}
+WHERE ${whereNotNull.join(' AND ')}`;
+}
+
 // Note: Extended schema generation (UI annotations, labelFields, etc.) is handled by
 // GenericRepository.getExtendedSchemaInfo() which is used by the API.
 // This keeps schema generation focused on DB structure, while the repository
@@ -1934,5 +2020,7 @@ module.exports = {
   // Entity-level label expression utilities
   buildLabelSQL,
   buildLabelSQLWithJoins,
-  parseLabelExpression
+  parseLabelExpression,
+  // Computed entity utilities
+  generatePairsSQL
 };

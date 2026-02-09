@@ -13,7 +13,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const eventBus = require('../utils/EventBus');
-const { generateSchema, generateCreateTableSQL, generateViewSQL } = require('../utils/SchemaGenerator');
+const { generateSchema, generateCreateTableSQL, generateViewSQL, generatePairsSQL } = require('../utils/SchemaGenerator');
 const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
 const { parseAllUserViews, generateUserViewSQL } = require('../utils/UserViewGenerator');
 
@@ -805,6 +805,40 @@ function unwatchViewsFile() {
   }
 }
 
+/**
+ * Populate computed entities (PAIRS annotation).
+ * Clears and repopulates each computed table from its source SQL.
+ * Safe to call multiple times (idempotent).
+ */
+function populateComputedEntities() {
+  if (!db || !schema) return { populated: 0 };
+
+  const entities = schema.entities;
+  let populated = 0;
+
+  for (const entity of Object.values(entities)) {
+    if (!entity.pairs) continue;
+
+    const sql = generatePairsSQL(entity, entities);
+    if (!sql) {
+      logger.warn(`[PAIRS] Could not generate SQL for ${entity.className}`);
+      continue;
+    }
+
+    try {
+      db.exec(`DELETE FROM ${entity.tableName}`);
+      const result = db.exec(sql);
+      const count = db.prepare(`SELECT COUNT(*) AS cnt FROM ${entity.tableName}`).get();
+      logger.info(`[PAIRS] Populated ${entity.className}`, { rows: count.cnt });
+      populated++;
+    } catch (err) {
+      logger.error(`[PAIRS] Failed to populate ${entity.className}`, { error: err.message });
+    }
+  }
+
+  return { populated };
+}
+
 module.exports = {
   initDatabase,
   getDatabase,
@@ -824,5 +858,6 @@ module.exports = {
   tableExists,
   viewExists,
   migrateSystemColumns,
+  populateComputedEntities,
   getDatabasePath: () => storedDbPath
 };

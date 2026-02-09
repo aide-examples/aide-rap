@@ -114,6 +114,64 @@ Instead of marking a column with `[LABEL]`, you can define a **computed label ex
 
 **Precedence:** Entity-level `[LABEL=...]` overrides any column-level `[LABEL]` annotation.
 
+### Computed Entity (PAIRS)
+
+Define an entity whose data is **automatically derived** from existing relationships. The `[PAIRS=...]` annotation creates an M:N mapping table by extracting distinct FK chain combinations from a source entity.
+
+**Syntax** (placed before `## Attributes`):
+
+```markdown
+# EngineTypeCompatibility
+
+[PAIRS=EngineAllocation(engine.type, aircraft.type)]
+
+Maps engine types to compatible aircraft types, derived from allocation history.
+
+## Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| engine_type | EngineType | Engine type [UK1] | 1 |
+| aircraft_type | AircraftType | Compatible aircraft type [UK1] | 1 |
+```
+
+**Annotation format:** `[PAIRS=SourceEntity(chain1, chain2)]`
+
+| Part | Meaning | Example |
+|------|---------|---------|
+| `SourceEntity` | Table to scan | `EngineAllocation` |
+| `chain1` | FK chain for first attribute | `engine.type` → Allocation.engine → Engine.type → EngineType |
+| `chain2` | FK chain for second attribute | `aircraft.type` → Allocation.aircraft → Aircraft.type → AircraftType |
+
+Each chain follows foreign key columns through intermediate entities using dot notation. The final entity of each chain must match the type of the corresponding attribute in the computed entity.
+
+**How it works:**
+
+1. **SQL generation**: The framework resolves the FK chains and generates:
+   ```sql
+   INSERT OR IGNORE INTO engine_type_compatibility (engine_type_id, aircraft_type_id)
+   SELECT DISTINCT e.type_id, a.type_id
+   FROM engine_allocation src
+   JOIN engine j0 ON j0.id = src.engine_id
+   JOIN aircraft j1 ON j1.id = src.aircraft_id
+   WHERE src.engine_id IS NOT NULL AND j0.type_id IS NOT NULL
+     AND src.aircraft_id IS NOT NULL AND j1.type_id IS NOT NULL
+   ```
+
+2. **Population**: Table is cleared and repopulated at server startup, after seed/import operations, and on the daily schedule.
+
+3. **Bridge filtering**: When a process step references `Entity: Aircraft(EngineType)` and Aircraft has no direct FK to EngineType, the system automatically detects the computed bridge entity and filters through it. This enables indirect FK filtering across M:N relationships.
+
+4. **Read-only**: Computed entities are implicitly read-only — data cannot be edited manually.
+
+**When to use:**
+
+| Scenario | Approach |
+|----------|----------|
+| Direct FK exists | Use `Entity: Target(ContextKey)` directly |
+| Relationship is indirect (via intermediate entities) | Define a PAIRS entity as a bridge |
+| M:N mapping needed | PAIRS with `[UK1]` on both attributes |
+
 ### Visual Styling in Diagrams
 
 | Marker | Diagram Effect |
