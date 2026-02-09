@@ -138,6 +138,14 @@ const ApiClient = {
   },
 
   /**
+   * Get ancestor lineage (self + parent + grandparent + ...) for hierarchical entities
+   * @returns {{ ids: number[] }}
+   */
+  async getLineage(entityName, id) {
+    return this.request(`${this.getEntityUrl(entityName)}/${id}/lineage`);
+  },
+
+  /**
    * Get distinct values for a column (for prefilter dropdowns)
    * @param {string} entityName - Entity name
    * @param {string} columnPath - Column path (e.g., "meter" or "reading_at")

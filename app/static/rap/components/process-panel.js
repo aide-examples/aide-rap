@@ -640,9 +640,14 @@ const ProcessPanel = {
   _buildActionButtons(step) {
     let actionsHtml = '';
     if (step.view) {
-      actionsHtml += `<button class="process-action-btn process-action-view" data-view="${DomUtils.escapeHtml(step.view)}">
+      const viewContext = step.viewContext || null;
+      const viewLabel = viewContext && this.context[viewContext]
+        ? `${step.view} (${this.context[viewContext]})`
+        : step.view;
+      actionsHtml += `<button class="process-action-btn process-action-view" data-view="${DomUtils.escapeHtml(step.view)}"
+                              ${viewContext ? `data-view-context="${DomUtils.escapeHtml(viewContext)}"` : ''}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="0" y="8" width="3" height="6"/><rect x="4" y="4" width="3" height="10"/><rect x="8" y="6" width="3" height="8"/><rect x="12" y="2" width="2" height="12"/></svg>
-        Open View: ${DomUtils.escapeHtml(step.view)}
+        Open View: ${DomUtils.escapeHtml(viewLabel)}
       </button>`;
     }
     for (const entityDef of (step.entities || [])) {
@@ -711,9 +716,10 @@ const ProcessPanel = {
     contentEl.querySelectorAll('.process-action-view').forEach(btn => {
       btn.addEventListener('click', () => {
         const viewName = btn.dataset.view;
+        const viewContext = btn.dataset.viewContext || null;
         if (typeof EntityExplorer !== 'undefined') {
           EntityExplorer.toggleProcess(false);
-          EntityExplorer.selectViewByName(viewName, this.context);
+          EntityExplorer.selectViewByName(viewName, this.context, viewContext);
         }
       });
     });

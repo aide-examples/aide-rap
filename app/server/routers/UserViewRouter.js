@@ -178,7 +178,11 @@ module.exports = function() {
         resolveColumn: (colName) => {
           if (colName === 'id') return { sqlName: 'id', jsType: 'number' };
           const col = view.columns.find(c => c.sqlAlias === colName || c.label === colName);
-          return col ? { sqlName: col.sqlAlias, jsType: col.jsType } : null;
+          if (col) return { sqlName: col.sqlAlias, jsType: col.jsType };
+          // Also resolve FK ID columns (e.g., "_fk_Engine Type") for IN-filter support
+          const fkCol = view.columns.find(c => c.fkIdColumn === colName);
+          if (fkCol) return { sqlName: fkCol.fkIdColumn, jsType: 'number' };
+          return null;
         },
         // For global text search: use view's string columns
         getStringColumns: () => view.columns

@@ -163,6 +163,7 @@ module.exports = function(processesConfig, docsDir) {
           title: s.title,
           body: s.body,
           view: s.view || null,
+          viewContext: s.viewContext || null,
           entities: s.entities || [],
           call: s.call || null,
           select: s.select || null
@@ -252,6 +253,7 @@ module.exports = function(processesConfig, docsDir) {
           title: steps[i].title || origStep.title,
           body: steps[i].body !== undefined ? steps[i].body : origStep.body,
           view: origStep.view,
+          viewContext: origStep.viewContext,
           entities: origStep.entities,
           call: origStep.call,
           select: origStep.select

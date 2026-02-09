@@ -337,12 +337,13 @@ function parseProcessFile(content, filename) {
       if (name) descriptionLines.push(line);
     } else if (currentStep) {
       // Inside a step — check for directives
-      const viewMatch = trimmed.match(/^View:\s*(.+)$/i);
+      const viewMatch = trimmed.match(/^View:\s*(.+?)(?:\((\w+)\))?$/i);
       const entityMatch = trimmed.match(/^Entity:\s*(.+)$/i);
       const callMatch = trimmed.match(/^Call:\s*(.+)$/i);
       const selectMatch = trimmed.match(/^Select:\s*(.+)$/i);
       if (viewMatch) {
         currentStep.view = viewMatch[1].trim();
+        if (viewMatch[2]) currentStep.viewContext = viewMatch[2];
       } else if (entityMatch) {
         currentStep.entities.push(entityMatch[1].trim());
       } else if (callMatch) {
@@ -375,6 +376,7 @@ function parseProcessFile(content, filename) {
       title: s.title,
       body: trimBody(s.bodyLines),
       view: s.view,
+      viewContext: s.viewContext || null,
       entities: s.entities,
       call: s.call,
       select: s.select || null
@@ -417,7 +419,8 @@ function reconstructProcessFile(process) {
       lines.push(`Entity: ${entity}`);
     }
     if (step.view) {
-      lines.push(`View: ${step.view}`);
+      const viewCtx = step.viewContext ? `(${step.viewContext})` : '';
+      lines.push(`View: ${step.view}${viewCtx}`);
     }
     if (step.call) {
       lines.push(`Call: ${step.call}`);

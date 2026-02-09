@@ -957,7 +957,7 @@ const EntityExplorer = {
     }
   },
 
-  selectViewFromDropdown(viewName, baseName, color) {
+  selectViewFromDropdown(viewName, baseName, color, options) {
     this.viewSelectorValue = viewName;
     // Update trigger text
     const viewText = this.viewSelectorTrigger.querySelector('.view-selector-text');
@@ -990,7 +990,7 @@ const EntityExplorer = {
       });
     }
 
-    this.onViewChange(viewName, baseName, color);
+    this.onViewChange(viewName, baseName, color, options);
   },
 
   /**
@@ -2511,15 +2511,46 @@ const EntityExplorer = {
   },
 
   /**
-   * Navigate to a view by name (called from ProcessPanel action buttons)
+   * Navigate to a view by name (called from ProcessPanel action buttons).
+   * If contextKey is provided, resolves a filter on the view's matching FK column.
+   * @param {string} viewName - View display name
+   * @param {Object} [context] - Process context { EntityType: "label", _ids: { EntityType: id } }
+   * @param {string} [contextKey] - Entity type name to filter by (e.g. "EngineType")
    */
-  selectViewByName(viewName, context) {
+  async selectViewByName(viewName, context, contextKey) {
     const view = this.viewsList.find(v => v.name === viewName);
-    if (view) {
-      this.selectViewFromDropdown(view.name, view.base, view.color);
-    } else {
+    if (!view) {
       DomUtils.toastError(`View not found: ${viewName}`);
+      return;
     }
+
+    // If contextKey provided with a matching context value, resolve a record filter
+    let recordFilter = null;
+    if (contextKey && context?.[contextKey] && context?._ids?.[contextKey]) {
+      try {
+        const viewSchema = await ApiClient.getViewSchema(viewName);
+        // Find a view column whose fkEntity matches the context key
+        const matchCol = viewSchema.columns.find(c => c.fkEntity === contextKey);
+        if (matchCol) {
+          // Check if the context entity has a hierarchy (reflexive FK)
+          // If so, use lineage IDs with IN-filter on the FK ID column
+          const contextId = context._ids[contextKey];
+          const lineage = await ApiClient.getLineage(contextKey, contextId);
+          if (lineage.ids.length > 1 && matchCol.fkIdColumn) {
+            // Hierarchical: filter on FK ID column with ancestor chain
+            recordFilter = `${matchCol.fkIdColumn}:${lineage.ids.join(',')}`;
+          } else {
+            // Flat: exact match on label value
+            recordFilter = `=${matchCol.key}:${context[contextKey]}`;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not resolve view context filter:', e);
+      }
+    }
+
+    this.selectViewFromDropdown(view.name, view.base, view.color,
+      recordFilter ? { recordFilter } : undefined);
   },
 
   /**

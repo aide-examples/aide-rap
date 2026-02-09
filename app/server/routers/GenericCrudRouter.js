@@ -15,6 +15,7 @@ const express = require('express');
 const service = require('../services/GenericService');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 const calculationService = require('../services/CalculationService');
+const { getDatabase } = require('../config/database');
 
 const router = express.Router();
 
@@ -199,6 +200,44 @@ router.get('/:entity/hierarchy/children/:parentId', validateEntity, (req, res, n
     }, req.correlationId);
 
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/entities/:entity/:id/lineage - Get ancestor chain for hierarchical entities
+ * Returns the ID itself plus all ancestor IDs (walking up the self-referential FK).
+ * For non-hierarchical entities, returns just the given ID.
+ */
+router.get('/:entity/:id/lineage', validateEntity, (req, res, next) => {
+  try {
+    const { entity, id } = req.params;
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+
+    const schema = service.getExtendedSchema(entity);
+
+    if (!schema.selfRefFK) {
+      // No hierarchy — just return the ID itself
+      return res.json({ ids: [numId] });
+    }
+
+    const db = getDatabase();
+    const rows = db.prepare(`
+      WITH RECURSIVE lineage(id) AS (
+        SELECT id FROM "${schema.tableName}" WHERE id = ?
+        UNION ALL
+        SELECT t."${schema.selfRefFK}" FROM "${schema.tableName}" t
+        JOIN lineage l ON l.id = t.id
+        WHERE t."${schema.selfRefFK}" IS NOT NULL
+      )
+      SELECT id FROM lineage
+    `).all(numId);
+
+    res.json({ ids: rows.map(r => r.id) });
   } catch (err) {
     next(err);
   }
