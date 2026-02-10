@@ -708,7 +708,9 @@ const SeedGeneratorDialog = {
       }
 
       // Step 2: Load into database
-      const mode = (this.conflicts.length > 0 || this.conflictCount > 0) ? this.selectedMode : 'replace';
+      // Completer always updates existing records → force merge mode
+      const mode = this.instructionType === 'completer' ? 'merge'
+        : (this.conflicts.length > 0 || this.conflictCount > 0) ? this.selectedMode : 'replace';
       const loadResp = await fetch(`/api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -721,10 +723,12 @@ const SeedGeneratorDialog = {
 
       if (loadResult.success) {
         const hasErrors = loadResult.errors && loadResult.errors.length > 0;
-        if (hasErrors && loadResult.loaded === 0) {
+        if (hasErrors && loadResult.loaded === 0 && (loadResult.updated || 0) === 0) {
           this.showMessage(`Load failed: ${loadResult.errors[0]}`, true);
         } else {
-          const parts = [`${loadResult.loaded} loaded`];
+          const parts = [];
+          if (loadResult.loaded > 0) parts.push(`${loadResult.loaded} loaded`);
+          if (loadResult.updated > 0) parts.push(`${loadResult.updated} updated`);
           if (loadResult.replaced > 0) parts.push(`${loadResult.replaced} replaced`);
           if (loadResult.skipped > 0) parts.push(`${loadResult.skipped} skipped`);
           const msg = `Saved: ${parts.join(', ')}`;
