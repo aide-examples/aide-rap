@@ -187,13 +187,19 @@ const DomUtils = {
     container.querySelectorAll('[data-action="open-ai"]').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
+        // Copy prompt to clipboard FIRST (synchronous via hidden textarea, before focus shifts)
         const text = getPromptText();
         if (text) {
-          navigator.clipboard.writeText(text).catch(() => {
-            const textarea = container.querySelector(textareaSelector);
-            if (textarea) { textarea.select(); document.execCommand('copy'); }
-          });
+          const tmp = document.createElement('textarea');
+          tmp.value = text;
+          tmp.style.position = 'fixed';
+          tmp.style.opacity = '0';
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand('copy');
+          document.body.removeChild(tmp);
         }
+        // Then open AI window (still synchronous in click context, no popup blocker)
         window.open(link.href, link.target);
       });
     });
