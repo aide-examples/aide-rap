@@ -59,12 +59,16 @@ const EntityChart = {
       legend: { labelColor: '#333', titleColor: '#111' }
     };
 
+    // Use view description as default chart title (overridden by explicit chart.title)
+    const autoTitle = (!schema.chart?.title && schema.description) ? { title: schema.description } : {};
+
     const spec = {
       $schema: 'https://vega.github.io/schema/vega-lite/v5.json',
       width: 'container',
       height: 400,
       padding: { left: 40, right: 20, top: 20, bottom: 40 },
       data: { values: this.prepareData(schema, records) },
+      ...autoTitle,
       ...schema.chart,
       config: {
         range: { category: { scheme: 'set2' } },

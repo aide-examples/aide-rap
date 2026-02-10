@@ -150,6 +150,8 @@ function parseViewFile(content, filename) {
 
   const lines = content.split('\n');
   let name = null;
+  let description = null;
+  let collectDesc = false;
   let jsonBlock = null;
   let jsBlock = null;
   let inJson = false;
@@ -162,7 +164,18 @@ function parseViewFile(content, filename) {
     // H1 = View Name
     if (trimmed.startsWith('# ') && !name) {
       name = trimmed.substring(2).trim();
-    } else if (trimmed === '```json') {
+      collectDesc = true;
+    } else if (collectDesc && trimmed && !inJson && !inJs) {
+      if (trimmed.startsWith('```')) {
+        // Don't consume fence as description — fall through
+        collectDesc = false;
+      } else {
+        description = trimmed;
+        collectDesc = false;
+      }
+    }
+
+    if (trimmed === '```json') {
       inJson = true;
       blockContent = [];
     } else if (trimmed === '```js') {
@@ -186,6 +199,7 @@ function parseViewFile(content, filename) {
   try {
     const viewDef = JSON.parse(jsonBlock);
     viewDef.name = name || filename.replace('.md', '');
+    if (description) viewDef.description = description;
     if (jsBlock && jsBlock.trim()) {
       viewDef.calculator = jsBlock.trim();
     }

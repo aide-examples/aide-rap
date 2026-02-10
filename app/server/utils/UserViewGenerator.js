@@ -1008,7 +1008,8 @@ function parseAllUserViews(viewsConfig, schema) {
       requiredFilter: entry.requiredFilter || null,
       defaultSort: defaultSort,
       chart: entry.chart || null,
-      filter: entry.filter || null  // SQL WHERE clause for view-level filtering
+      filter: entry.filter || null,  // SQL WHERE clause for view-level filtering
+      description: entry.description || null
     };
 
     // Deduplicate joins by alias

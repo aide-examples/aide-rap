@@ -35,10 +35,12 @@ docs/views/
 
 ## View File Format
 
-Each view is a Markdown file containing an H1 header (view name), a JSON block (view definition), and optionally a JS block (calculator):
+Each view is a Markdown file containing an H1 header (view name), an optional description line, a JSON block (view definition), and optionally a JS block (calculator):
 
 ```markdown
 # Project Status
+
+Overview of all projects with type and client information.
 
 ```json
 {
@@ -60,6 +62,26 @@ for (const row of data) {
 ```
 ```
 
+### Description
+
+A single text line between the H1 header and the JSON block serves as the view **description**. It is optional and used in three places:
+
+1. **View dropdown**: Shown as subtitle below the view name and as tooltip on hover
+2. **Breadcrumb**: Shown as tooltip when hovering over the view crumb
+3. **Chart title**: Automatically used as Vega-Lite chart title when no explicit `title` is set in the `chart` object
+
+```markdown
+# AC Lease Distribution
+
+Distribution of currently active aircraft leases by lessor.
+
+```json
+{ ... }
+```
+```
+
+If omitted, no tooltip or subtitle is shown, and charts have no auto-title.
+
 ### View Object (JSON block)
 
 | Key | Required | Description |
@@ -71,7 +93,7 @@ for (const row of data) {
 | `requiredFilter` | No | Fields requiring user filter before loading (always shows dialog) |
 | `prefilter` | No | Fields for optional prefilter (dialog shown when dataset is large) |
 
-The `name` property is extracted from the H1 header (or filename), so it's not needed in the JSON block.
+The `name` property is extracted from the H1 header (or filename) and the `description` from the text line after the header, so neither is needed in the JSON block.
 
 ---
 

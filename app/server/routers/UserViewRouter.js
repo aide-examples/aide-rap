@@ -49,6 +49,7 @@ module.exports = function() {
           color: v.color,
           group: v.group,
           columns: v.columns.map(c => c.label),
+          ...(v.description ? { description: v.description } : {}),
           ...(requiredFilterEntities.length > 0 ? { requiredFilterEntities } : {})
         };
       }), groups });
@@ -97,7 +98,8 @@ module.exports = function() {
         ...(view.prefilter ? { prefilter: view.prefilter } : {}),
         ...(view.requiredFilter ? { requiredFilter: view.requiredFilter } : {}),
         ...(view.defaultSort ? { defaultSort: view.defaultSort } : {}),
-        ...(view.chart ? { chart: view.chart } : {})
+        ...(view.chart ? { chart: view.chart } : {}),
+        ...(view.description ? { description: view.description } : {})
       });
     } catch (err) {
       logger.error('Failed to get view schema', { error: err.message });

@@ -365,6 +365,7 @@ const BreadcrumbNav = {
 
       case 'view':
         text = crumb.view?.name || '';
+        tooltip = crumb.view?.description || '';
         break;
 
       case 'record':

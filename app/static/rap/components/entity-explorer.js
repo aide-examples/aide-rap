@@ -935,8 +935,11 @@ const EntityExplorer = {
         } else if (entry.type === 'view') {
           const view = viewsData.views.find(v => v.name === entry.name);
           if (view) {
-            groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" style="border-left-color: ${view.color};">
-              <span class="view-name">${view.name}</span>
+            const desc = view.description || '';
+            const titleAttr = desc ? ` title="${DomUtils.escapeHtml(desc)}"` : '';
+            const subtitle = desc ? `<span class="view-description">${DomUtils.escapeHtml(desc)}</span>` : '';
+            groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" data-description="${DomUtils.escapeHtml(desc)}" style="border-left-color: ${view.color};"${titleAttr}>
+              <span class="view-name">${view.name}</span>${subtitle}
             </div>`;
           }
         }
@@ -948,7 +951,7 @@ const EntityExplorer = {
       // Add click handlers
       this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
         item.addEventListener('click', () => {
-          this.selectViewFromDropdown(item.dataset.value, item.dataset.base, item.dataset.color);
+          this.selectViewFromDropdown(item.dataset.value, item.dataset.base, item.dataset.color, { description: item.dataset.description || '' });
         });
       });
     } catch (err) {
@@ -984,7 +987,7 @@ const EntityExplorer = {
     if (typeof BreadcrumbNav !== 'undefined') {
       BreadcrumbNav.setBase({
         type: 'view',
-        view: { name: viewName, base: baseName, color: color },
+        view: { name: viewName, base: baseName, color: color, description: options?.description || '' },
         color: color || '#f5f5f5',
         viewMode: this.viewMode
       });
@@ -1089,9 +1092,11 @@ const EntityExplorer = {
 
     // Push breadcrumb (not setBase — preserves history)
     if (typeof BreadcrumbNav !== 'undefined') {
+      const viewItem = this.viewSelectorMenu.querySelector(`.view-selector-item[data-value="${viewName}"]`);
+      const desc = viewItem?.dataset.description || '';
       BreadcrumbNav.push({
         type: 'view',
-        view: { name: viewName, base: baseName, color: color },
+        view: { name: viewName, base: baseName, color: color, description: desc },
         color: color || '#f5f5f5',
         filter: recordFilter
       });

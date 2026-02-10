@@ -892,6 +892,8 @@ html[data-theme="dark"] .process-selector-group-label {
 
 .entity-selector-item { justify-content: space-between; gap: 12px; }
 .view-selector-item { gap: 8px; }
+.view-selector-item:has(.view-description) { flex-wrap: wrap; white-space: normal; }
+.view-description { display: block; width: 100%; font-size: 0.75em; color: var(--color-gray-400); margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .process-selector-item { gap: 8px; }
 
 .entity-selector-item .entity-count {
