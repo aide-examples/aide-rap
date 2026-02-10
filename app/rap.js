@@ -48,9 +48,8 @@ const { Command } = require('commander');
 const program = new Command();
 
 program.description('AIDE RAP - Rapid Application Prototyping');
-args.addCommonArgs(program);  // Adds --log-level, --config, --regenerate-icons
+args.addCommonArgs(program);  // Adds --log-level, --config, --regenerate-icons, --port
 program.requiredOption('-s, --system <name>', 'System name (required, subdirectory in systems/)');
-program.option('-p, --port <number>', 'Override port', parseInt);
 program.option('--noauth', 'Disable authentication (for development)');
 program.option('--import [entity]', 'Run import in batch mode (entity name or "all")');
 program.parse();
@@ -110,10 +109,6 @@ if (cfg.paths) {
 cfg.systemName = systemName;
 cfg.systemDir = SYSTEM_DIR;
 cfg.paths = systemPaths;
-
-if (opts.port) {
-    cfg.port = opts.port;
-}
 
 // Initialize logger with system-specific logs directory
 const logger = require('./server/utils/logger');
