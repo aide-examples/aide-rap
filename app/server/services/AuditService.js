@@ -92,7 +92,7 @@ function registerListeners() {
       action: 'CREATE',
       beforeData: null,
       afterData: record,
-      changedBy: context.clientIp || null,
+      changedBy: context.changedBy || context.clientIp || null,
       correlationId: context.correlationId || null
     });
   });
@@ -131,7 +131,7 @@ function registerListeners() {
       action: 'UPDATE',
       beforeData: pending?.beforeRecord || null,
       afterData: record,
-      changedBy: context.clientIp || pending?.context?.clientIp || null,
+      changedBy: context.changedBy || context.clientIp || pending?.context?.changedBy || pending?.context?.clientIp || null,
       correlationId: context.correlationId || null
     });
   });
@@ -170,7 +170,7 @@ function registerListeners() {
       action: 'DELETE',
       beforeData: pending?.beforeRecord || null,
       afterData: null,
-      changedBy: context.clientIp || pending?.context?.clientIp || null,
+      changedBy: context.changedBy || context.clientIp || pending?.context?.changedBy || pending?.context?.clientIp || null,
       correlationId: context.correlationId || null
     });
   });

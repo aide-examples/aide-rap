@@ -51,11 +51,9 @@ router.get('/', (req, res, next) => {
 
     res.json({
       data,
-      pagination: {
-        total,
-        limit: parseInt(limit, 10),
-        offset: parseInt(offset, 10)
-      }
+      totalCount: total,
+      limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10)
     });
   } catch (err) {
     next(err);
@@ -89,10 +87,11 @@ router.get('/:id', (req, res, next) => {
 });
 
 /**
- * GET /api/audit/schema - Get audit trail schema for UI
+ * Static schema definition for the AuditTrail system entity.
+ * Used by both the /schema/extended endpoint and /api/meta.
  */
-router.get('/schema/extended', (req, res) => {
-  res.json({
+function getAuditSchema() {
+  return {
     name: 'AuditTrail',
     tableName: '_audit_trail',
     readonly: true,
@@ -116,7 +115,14 @@ router.get('/schema/extended', (req, res) => {
       labelFields: ['entity_name', 'action'],
       readonly: true
     }
-  });
+  };
+}
+
+/**
+ * GET /api/audit/schema - Get audit trail schema for UI
+ */
+router.get('/schema/extended', (req, res) => {
+  res.json(getAuditSchema());
 });
 
 /**
@@ -140,4 +146,5 @@ router.delete('/:id', (req, res) => {
   });
 });
 
+router.getAuditSchema = getAuditSchema;
 module.exports = router;

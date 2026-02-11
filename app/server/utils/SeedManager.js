@@ -1919,6 +1919,7 @@ module.exports = {
   resetAll,
   uploadEntity,
   buildLabelLookup,
+  resolveConceptualFKs,
   countSeedConflicts,
   backupAll,
   restoreEntity,

@@ -192,6 +192,19 @@ const app = server.getApp();
 const sessionSecret = cfg.auth?.sessionSecret || 'aide-rap-default-secret';
 app.use(cookieParser(sessionSecret));
 
+// API key authentication (for external workflow tools like HCL Leap, Power Automate)
+// Must be registered BEFORE session auth so API key requests skip cookie checks
+const { apiKeyAuth, checkEntityScope } = require('./server/middleware/apiKeyAuth');
+app.use('/api', apiKeyAuth(cfg.apiKeys));
+
+// CORS preflight handler for API-key-authenticated origins
+app.options('/api/*', (req, res) => {
+    if (res.getHeader('Access-Control-Allow-Origin')) {
+        return res.status(204).end();
+    }
+    res.status(204).end();
+});
+
 // Auth router (login, logout, session check)
 app.use(require('./server/routers/auth.router')(cfg));
 
@@ -348,6 +361,21 @@ if (enabledEntitiesRaw.length > 0) {
         viewsConfig: mdViews || [],
         systemConfig: cfg
     });
+
+    // Integration API (for external workflow tools)
+    // Supports both API key auth and session auth (for testing from UI)
+    if (authEnabled) {
+        app.use('/api/integrate', (req, res, next) => {
+            // If already authenticated via API key, skip session auth
+            if (req.user) return next();
+            authMiddleware(req, res, (err) => {
+                if (err) return next(err);
+                requireRole('user', 'admin')(req, res, next);
+            });
+        });
+    }
+    app.use('/api/integrate/:entity', checkEntityScope);
+    app.use('/api/integrate', require('./server/routers/IntegrationRouter'));
 }
 
 // =============================================================================
@@ -375,6 +403,11 @@ app.get('/api/meta', (req, res) => {
             if (e.name) {
                 try { schemas[e.name] = GenericService.getExtendedSchema(e.name); } catch {}
             }
+        }
+        // System entities with static schemas (not in GenericService)
+        if (!schemas.AuditTrail) {
+            const { getAuditSchema } = require('./server/routers/audit.router');
+            schemas.AuditTrail = getAuditSchema();
         }
 
         // Views: list, groups, and all view schemas
