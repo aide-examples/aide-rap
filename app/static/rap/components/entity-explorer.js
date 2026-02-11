@@ -620,11 +620,13 @@ const EntityExplorer = {
     }
     this.updateViewToggle();
 
-    // Load entity types, views, and processes
-    await this.loadEntityTypes();
-    await this.loadViews();
-    await this.loadExternalQueries();
-    await this.loadProcesses();
+    // Load all metadata in a single call
+    const meta = await ApiClient.getMeta();
+    SchemaCache.preload(meta.schemas);
+    this.renderEntityTypes(meta.entities, meta.areas);
+    this.renderViews(meta.views);
+    this.externalQueries = meta.externalQueries || {};
+    this.renderProcesses(meta.processes);
 
     // Event listeners for entity dropdown
     this.selectorTrigger.addEventListener('click', () => this.toggleDropdown());
@@ -749,63 +751,61 @@ const EntityExplorer = {
     return result;
   },
 
-  async loadEntityTypes() {
-    try {
-      const { entities, areas } = await ApiClient.getEntityTypes();
+  renderEntityTypes(entities, areas) {
+    // Store entity metadata for readonly/system checks
+    this.entityMetadata = {};
+    entities.filter(e => e.name).forEach(e => {
+      this.entityMetadata[e.name] = {
+        readonly: e.readonly || false,
+        system: e.system || false
+      };
+    });
 
-      // Store entity metadata for readonly/system checks
-      this.entityMetadata = {};
-      entities.filter(e => e.name).forEach(e => {
-        this.entityMetadata[e.name] = {
-          readonly: e.readonly || false,
-          system: e.system || false
-        };
-      });
+    // Build segments: groups of entities by area, with column breaks
+    const segments = [];
+    let currentGroup = null;
 
-      // Build segments: groups of entities by area, with column breaks
-      const segments = [];
-      let currentGroup = null;
-
-      for (const e of entities) {
-        if (e.type === 'column_break') {
-          if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
-          segments.push({ columnBreak: true });
-          currentGroup = null;
-          continue;
-        }
-
-        // New area → start new group
-        if (!currentGroup || currentGroup.areaName !== e.areaName) {
-          if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
-          currentGroup = {
-            areaName: e.areaName,
-            html: `<div class="entity-selector-group"><div class="entity-selector-group-label" style="background-color: ${e.areaColor};">${e.areaName}</div>`
-          };
-        }
-
-        currentGroup.html += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};">
-            <span class="entity-name">${e.name}</span>
-            <span class="entity-count">${e.count || ''}</span>
-          </div>`;
+    for (const e of entities) {
+      if (e.type === 'column_break') {
+        if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
+        segments.push({ columnBreak: true });
+        currentGroup = null;
+        continue;
       }
-      if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
 
-      this.selectorMenu.innerHTML = this.buildColumnsHtml(segments);
+      // New area → start new group
+      if (!currentGroup || currentGroup.areaName !== e.areaName) {
+        if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
+        currentGroup = {
+          areaName: e.areaName,
+          html: `<div class="entity-selector-group"><div class="entity-selector-group-label" style="background-color: ${e.areaColor};">${e.areaName}</div>`
+        };
+      }
 
-      // Add click handlers for menu items
-      this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
-        item.addEventListener('click', () => {
-          this.selectEntityFromDropdown(item.dataset.value, item.dataset.color);
-        });
-      });
-    } catch (err) {
-      console.error('Failed to load entity types:', err);
+      const desc = SchemaCache.getExtended(e.name)?.description || '';
+      const titleAttr = desc ? ` title="${DomUtils.escapeHtml(desc)}"` : '';
+      currentGroup.html += `<div class="entity-selector-item" data-value="${e.name}" data-color="${e.areaColor}" style="border-left-color: ${e.areaColor};"${titleAttr}>
+          <span class="entity-name">${e.name}</span>
+          <span class="entity-count">${e.count || ''}</span>
+        </div>`;
     }
+    if (currentGroup) segments.push({ html: currentGroup.html + '</div>' });
+
+    this.selectorMenu.innerHTML = this.buildColumnsHtml(segments);
+
+    // Add click handlers for menu items
+    this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.selectEntityFromDropdown(item.dataset.value, item.dataset.color);
+      });
+    });
   },
 
   async refreshCounts() {
     const currentSelection = this.selectorValue;
-    await this.loadEntityTypes();
+    const meta = await ApiClient.getMeta();
+    SchemaCache.preload(meta.schemas);
+    this.renderEntityTypes(meta.entities, meta.areas);
     // Restore selection state in menu
     if (currentSelection) {
       this.selectorMenu.querySelectorAll('.entity-selector-item').forEach(item => {
@@ -909,55 +909,51 @@ const EntityExplorer = {
     await this.onEntityChange();
   },
 
-  async loadViews() {
-    try {
-      const viewsData = await ApiClient.getViews();
-      this.viewsList = viewsData.views || [];
-      if (!viewsData.views || viewsData.views.length === 0) {
-        this.viewSelector.style.display = 'none';
-        return;
-      }
+  renderViews(viewsData) {
+    this.viewsList = viewsData.views || [];
+    if (!viewsData.views || viewsData.views.length === 0) {
+      this.viewSelector.style.display = 'none';
+      return;
+    }
 
-      // Show view selector
-      this.viewSelector.style.display = '';
+    // Store view schemas for later use
+    this.viewSchemas = viewsData.schemas || {};
 
-      const segments = [];
-      let groupHtml = null;
+    // Show view selector
+    this.viewSelector.style.display = '';
 
-      for (const entry of viewsData.groups) {
-        if (entry.type === 'column_break') {
-          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
-          segments.push({ columnBreak: true });
-          groupHtml = null;
-        } else if (entry.type === 'separator') {
-          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
-          groupHtml = `<div class="view-selector-group"><div class="view-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
-        } else if (entry.type === 'view') {
-          const view = viewsData.views.find(v => v.name === entry.name);
-          if (view) {
-            const desc = view.description || '';
-            const titleAttr = desc ? ` title="${DomUtils.escapeHtml(desc)}"` : '';
-            const subtitle = desc ? `<span class="view-description">${DomUtils.escapeHtml(desc)}</span>` : '';
-            groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" data-description="${DomUtils.escapeHtml(desc)}" style="border-left-color: ${view.color};"${titleAttr}>
-              <span class="view-name">${view.name}</span>${subtitle}
-            </div>`;
-          }
+    const segments = [];
+    let groupHtml = null;
+
+    for (const entry of viewsData.groups) {
+      if (entry.type === 'column_break') {
+        if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+        segments.push({ columnBreak: true });
+        groupHtml = null;
+      } else if (entry.type === 'separator') {
+        if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+        groupHtml = `<div class="view-selector-group"><div class="view-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
+      } else if (entry.type === 'view') {
+        const view = viewsData.views.find(v => v.name === entry.name);
+        if (view) {
+          const desc = view.description || '';
+          const titleAttr = desc ? ` title="${DomUtils.escapeHtml(desc)}"` : '';
+          groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" data-description="${DomUtils.escapeHtml(desc)}" style="border-left-color: ${view.color};"${titleAttr}>
+            <span class="view-name">${view.name}</span>
+          </div>`;
         }
       }
-      if (groupHtml) segments.push({ html: groupHtml + '</div>' });
-
-      this.viewSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
-
-      // Add click handlers
-      this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
-        item.addEventListener('click', () => {
-          this.selectViewFromDropdown(item.dataset.value, item.dataset.base, item.dataset.color, { description: item.dataset.description || '' });
-        });
-      });
-    } catch (err) {
-      console.warn('Failed to load user views:', err);
-      this.viewSelector.style.display = 'none';
     }
+    if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+
+    this.viewSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
+
+    // Add click handlers
+    this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.selectViewFromDropdown(item.dataset.value, item.dataset.base, item.dataset.color, { description: item.dataset.description || '' });
+      });
+    });
   },
 
   selectViewFromDropdown(viewName, baseName, color, options) {
@@ -1012,20 +1008,6 @@ const EntityExplorer = {
       }
     }
     return results;
-  },
-
-  /**
-   * Load external query configuration from server.
-   */
-  async loadExternalQueries() {
-    try {
-      const resp = await fetch('/api/config/external-queries');
-      if (resp.ok) {
-        this.externalQueries = await resp.json();
-      }
-    } catch (e) {
-      // Non-critical — external queries simply won't appear in context menu
-    }
   },
 
   /**
@@ -1208,7 +1190,7 @@ const EntityExplorer = {
 
     // Load view data with optional prefilter and pagination
     try {
-      const viewSchema = await ApiClient.getViewSchema(viewName);
+      const viewSchema = this.viewSchemas[viewName] || {};
       this.currentViewSchema = viewSchema;  // Cache for loadMoreRecords
       this.prefilterFields = viewSchema.prefilter || null;
       this.requiredFilterFields = viewSchema.requiredFilter || null;
@@ -2125,67 +2107,65 @@ const EntityExplorer = {
 
   // ─── Process methods ──────────────────────────────────────────────────
 
-  async loadProcesses() {
+  renderProcesses(data) {
     if (!this.processSelector) return;
-    try {
-      const data = await ApiClient.request('/api/processes');
-      this.processList = data.processes || [];
-      this._processGroups = data.groups || [];
+    if (!data) { this.processSelector.style.display = 'none'; return; }
 
-      const isAdmin = window.currentUser && window.currentUser.role === 'admin';
+    this.processList = data.processes || [];
+    this._processGroups = data.groups || [];
 
-      // Show process selector if there are processes or admin can create new ones
-      if (this.processList.length === 0 && !isAdmin) {
-        this.processSelector.style.display = 'none';
-        return;
-      }
-      this.processSelector.style.display = '';
+    const isAdmin = window.currentUser && window.currentUser.role === 'admin';
 
-      const segments = [];
-      let groupHtml = null;
+    // Show process selector if there are processes or admin can create new ones
+    if (this.processList.length === 0 && !isAdmin) {
+      this.processSelector.style.display = 'none';
+      return;
+    }
+    this.processSelector.style.display = '';
 
-      for (const entry of data.groups) {
-        if (entry.type === 'column_break') {
-          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
-          segments.push({ columnBreak: true });
-          groupHtml = null;
-        } else if (entry.type === 'separator') {
-          if (groupHtml) segments.push({ html: groupHtml + '</div>' });
-          groupHtml = `<div class="process-selector-group"><div class="process-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
-        } else if (entry.type === 'process') {
-          const proc = this.processList.find(p => p.name === entry.name);
-          if (proc) {
-            groupHtml += `<div class="process-selector-item" data-value="${proc.name}" data-color="${proc.color}" style="border-left-color: ${proc.color};">
-              <span class="process-name">${proc.name}</span>
-            </div>`;
-          }
+    const segments = [];
+    let groupHtml = null;
+
+    for (const entry of data.groups) {
+      if (entry.type === 'column_break') {
+        if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+        segments.push({ columnBreak: true });
+        groupHtml = null;
+      } else if (entry.type === 'separator') {
+        if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+        groupHtml = `<div class="process-selector-group"><div class="process-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
+      } else if (entry.type === 'process') {
+        const proc = this.processList.find(p => p.name === entry.name);
+        if (proc) {
+          const desc = proc.description || '';
+          const titleAttr = desc ? ` title="${DomUtils.escapeHtml(desc)}"` : '';
+          groupHtml += `<div class="process-selector-item" data-value="${proc.name}" data-color="${proc.color}" style="border-left-color: ${proc.color};"${titleAttr}>
+            <span class="process-name">${proc.name}</span>
+          </div>`;
         }
       }
-      if (groupHtml) segments.push({ html: groupHtml + '</div>' });
-
-      // Admin: add "New Process" button at the end
-      if (isAdmin) {
-        segments.push({ html: '<div class="process-selector-new"><button class="process-selector-new-btn">+ New Process</button></div>' });
-      }
-
-      this.processSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
-
-      // Add click handlers
-      this.processSelectorMenu.querySelectorAll('.process-selector-item').forEach(item => {
-        item.addEventListener('click', () => {
-          this.openProcess(item.dataset.value, item.dataset.color);
-        });
-      });
-
-      // New process button
-      this.processSelectorMenu.querySelector('.process-selector-new-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.showNewProcessDialog();
-      });
-    } catch (err) {
-      console.warn('Failed to load processes:', err);
-      if (this.processSelector) this.processSelector.style.display = 'none';
     }
+    if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+
+    // Admin: add "New Process" button at the end
+    if (isAdmin) {
+      segments.push({ html: '<div class="process-selector-new"><button class="process-selector-new-btn">+ New Process</button></div>' });
+    }
+
+    this.processSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
+
+    // Add click handlers
+    this.processSelectorMenu.querySelectorAll('.process-selector-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.openProcess(item.dataset.value, item.dataset.color);
+      });
+    });
+
+    // New process button
+    this.processSelectorMenu.querySelector('.process-selector-new-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showNewProcessDialog();
+    });
   },
 
   /**
@@ -2286,7 +2266,8 @@ const EntityExplorer = {
         closeDialog();
 
         // Reload process list and open the new process
-        await this.loadProcesses();
+        const freshMeta = await ApiClient.getMeta();
+        this.renderProcesses(freshMeta.processes);
         await this.openProcess(result.name);
 
         // Enter raw-edit mode for the new process
@@ -2397,7 +2378,7 @@ const EntityExplorer = {
    * @returns {Promise<Object|null>} - Resolved context map or null if cancelled
    */
   async showRequiredEntityDialog(entityName) {
-    const schema = await ApiClient.getExtendedSchema(entityName);
+    const schema = SchemaCache.getExtended(entityName);
     const result = await ApiClient.getAll(entityName);
     const records = result.data || [];
 
@@ -2533,7 +2514,7 @@ const EntityExplorer = {
     let recordFilter = null;
     if (contextKey && context?.[contextKey] && context?._ids?.[contextKey]) {
       try {
-        const viewSchema = await ApiClient.getViewSchema(viewName);
+        const viewSchema = this.viewSchemas[viewName] || {};
         // Find a view column whose fkEntity matches the context key
         const matchCol = viewSchema.columns.find(c => c.fkEntity === contextKey);
         if (matchCol) {
@@ -2678,7 +2659,7 @@ const EntityExplorer = {
     let initialContext = null;
     if (compact.e && compact.i) {
       try {
-        const schema = await ApiClient.getExtendedSchema(compact.e);
+        const schema = SchemaCache.getExtended(compact.e);
         initialContext = await this.resolveProcessContext(compact.e, compact.i, schema);
       } catch (e) {
         console.warn('restoreProcess: failed to resolve context:', e);

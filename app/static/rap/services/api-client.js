@@ -95,28 +95,6 @@ const ApiClient = {
   },
 
   /**
-   * Get list of available entity types with area info
-   */
-  async getEntityTypes() {
-    const data = await this.request(this.baseUrl);
-    return { entities: data.entities, areas: data.areas };
-  },
-
-  /**
-   * Get schema for an entity type
-   */
-  async getSchema(entityName) {
-    return this.request(`${this.getEntityUrl(entityName)}/schema`);
-  },
-
-  /**
-   * Get extended schema with UI metadata
-   */
-  async getExtendedSchema(entityName) {
-    return this.request(`${this.getEntityUrl(entityName)}/schema/extended`);
-  },
-
-  /**
    * Get back-references to a specific record
    */
   async getBackReferences(entityName, id) {
@@ -212,27 +190,12 @@ const ApiClient = {
   // --- User Views ---
 
   /**
-   * Get list of user views with groups
-   */
-  async getViews() {
-    return this.request('/api/views');
-  },
-
-  /**
    * Get view data with optional filter/sort/pagination
    * @param {string} viewName - View display name
    * @param {Object} options - { filter, sort, order, limit, offset }
    */
   async getViewData(viewName, options = {}) {
     return this._fetchData(`/api/views/${encodeURIComponent(viewName)}`, options);
-  },
-
-  /**
-   * Get view schema (column metadata)
-   * @param {string} viewName - View display name
-   */
-  async getViewSchema(viewName) {
-    return this.request(`/api/views/${encodeURIComponent(viewName)}/schema`);
   },
 
   /**
@@ -244,29 +207,34 @@ const ApiClient = {
   async getViewDistinctValues(viewName, columnName, type = 'select') {
     return this._fetchDistinct(`/api/views/${encodeURIComponent(viewName)}`, columnName, type);
   },
+
+  /**
+   * Get consolidated metadata (entities, schemas, views, processes) in a single call
+   */
+  async getMeta() {
+    return this.request('/api/meta');
+  },
 };
 
-// Schema cache to avoid repeated fetches
+// Schema cache — pre-loaded from /api/meta at startup
 const SchemaCache = {
-  cache: {},
   extendedCache: {},
 
-  async get(entityName) {
-    if (!this.cache[entityName]) {
-      this.cache[entityName] = await ApiClient.getSchema(entityName);
-    }
-    return this.cache[entityName];
+  /**
+   * Pre-load all extended schemas from meta response
+   */
+  preload(schemas) {
+    this.extendedCache = { ...schemas };
   },
 
-  async getExtended(entityName) {
-    if (!this.extendedCache[entityName]) {
-      this.extendedCache[entityName] = await ApiClient.getExtendedSchema(entityName);
-    }
-    return this.extendedCache[entityName];
+  /**
+   * Get extended schema (synchronous cache lookup)
+   */
+  getExtended(entityName) {
+    return this.extendedCache[entityName] || null;
   },
 
   clear() {
-    this.cache = {};
     this.extendedCache = {};
   },
 };

@@ -26,6 +26,7 @@ let storedEnabledEntities = null;
 let storedEntityPrefilters = null;
 let storedRequiredFilters = null;
 let storedTableOptions = null;
+let metaVersion = 1;
 
 /**
  * Check if table exists
@@ -714,7 +715,8 @@ function reloadSchema() {
   createAllViews(schema.orderedEntities);
   createUserViews(storedViewsConfig);
 
-  logger.info('Schema reloaded from markdown', { oldHash, newHash });
+  metaVersion++;
+  logger.info('Schema reloaded from markdown', { oldHash, newHash, metaVersion });
 
   // Warn if schema changed (table structure might be out of sync)
   const warning = oldHash !== newHash
@@ -743,7 +745,8 @@ function reloadUserViews() {
   if (mdViews) {
     storedViewsConfig = mdViews;
     createUserViews(storedViewsConfig);
-    logger.info('User views reloaded from views/');
+    metaVersion++;
+    logger.info('User views reloaded from views/', { metaVersion });
     eventBus.emit('views:reload:after', schema.userViews);
   }
 
@@ -859,5 +862,6 @@ module.exports = {
   viewExists,
   migrateSystemColumns,
   populateComputedEntities,
+  getMetaVersion: () => metaVersion,
   getDatabasePath: () => storedDbPath
 };

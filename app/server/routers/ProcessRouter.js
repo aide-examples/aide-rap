@@ -356,3 +356,6 @@ module.exports = function(processesConfig, docsDir) {
 
   return router;
 };
+
+// Exported for /api/meta consolidation
+module.exports.buildProcessData = buildProcessData;

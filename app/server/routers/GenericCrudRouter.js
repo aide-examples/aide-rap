@@ -62,58 +62,6 @@ function validateEntity(req, res, next) {
 }
 
 /**
- * GET /api/entities - List all entity types with area info
- */
-router.get('/', (req, res, next) => {
-  try {
-    const { entities, areas } = service.getEnabledEntitiesWithAreas();
-
-    res.json({
-      areas,
-      entities: entities.map(e => e.type === 'column_break' ? e : ({
-        name: e.name,
-        area: e.area,
-        areaName: e.areaName,
-        areaColor: e.areaColor,
-        count: e.count,
-        schema: `/api/entities/${e.name}/schema`,
-        endpoint: `/api/entities/${e.name}`
-      }))
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * GET /api/entities/:entity/schema - Get schema info
- */
-router.get('/:entity/schema', validateEntity, (req, res, next) => {
-  try {
-    const { entity } = req.params;
-    const schema = service.getSchema(entity);
-
-    res.json(schema);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
- * GET /api/entities/:entity/schema/extended - Get extended schema with UI metadata
- */
-router.get('/:entity/schema/extended', validateEntity, (req, res, next) => {
-  try {
-    const { entity } = req.params;
-    const schema = service.getExtendedSchema(entity);
-
-    res.json(schema);
-  } catch (err) {
-    next(err);
-  }
-});
-
-/**
  * GET /api/entities/:entity/distinct/:column - Get distinct values for a column (for prefilter dropdowns)
  * Query params:
  *   type: 'select' (default), 'year', or 'month' - extraction mode for date columns

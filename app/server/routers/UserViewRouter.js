@@ -10,6 +10,63 @@ const express = require('express');
 const logger = require('../utils/logger');
 const { parseFilter, buildWhereClause } = require('../utils/FilterParser');
 
+/**
+ * Build view summary for list response
+ */
+function buildViewSummary(v) {
+  const requiredFilterEntities = [];
+  for (const spec of (v.requiredFilter || [])) {
+    const fieldPath = spec.replace(/:(\w+)$/, '');
+    const fkPrefix = fieldPath.split('.')[0];
+    const col = v.columns.find(c => c.fkEntity && c.path && c.path.split('.')[0] === fkPrefix);
+    if (col) {
+      requiredFilterEntities.push({ entity: col.fkEntity, viewColumn: col.sqlAlias });
+    }
+  }
+  return {
+    name: v.name,
+    base: v.base,
+    color: v.color,
+    group: v.group,
+    columns: v.columns.map(c => c.label),
+    ...(v.description ? { description: v.description } : {}),
+    ...(requiredFilterEntities.length > 0 ? { requiredFilterEntities } : {})
+  };
+}
+
+/**
+ * Build view schema response (column metadata for UI)
+ */
+function buildViewSchema(view) {
+  const hasGeo = view.columns.some(c => c.aggregateType === 'geo');
+  return {
+    name: view.name,
+    base: view.base,
+    color: view.color,
+    hasGeo,
+    columns: view.columns.map(c => {
+      const col = { key: c.sqlAlias, label: c.label, type: c.jsType };
+      if (c.path) col.path = c.path;
+      if (c.omit !== undefined) col.omit = c.omit;
+      if (c.areaColor) col.areaColor = c.areaColor;
+      if (c.calculated) col.calculated = c.calculated;
+      if (c.autoHidden) col.autoHidden = c.autoHidden;
+      if (c.aggregateSource) col.aggregateSource = c.aggregateSource;
+      if (c.aggregateType) col.aggregateType = c.aggregateType;
+      if (c.aggregateField) col.aggregateField = c.aggregateField;
+      if (c.fkEntity) col.fkEntity = c.fkEntity;
+      if (c.fkIdColumn) col.fkIdColumn = c.fkIdColumn;
+      return col;
+    }),
+    ...(view.calculator ? { calculator: view.calculator } : {}),
+    ...(view.prefilter ? { prefilter: view.prefilter } : {}),
+    ...(view.requiredFilter ? { requiredFilter: view.requiredFilter } : {}),
+    ...(view.defaultSort ? { defaultSort: view.defaultSort } : {}),
+    ...(view.chart ? { chart: view.chart } : {}),
+    ...(view.description ? { description: view.description } : {})
+  };
+}
+
 module.exports = function() {
   const router = express.Router();
   const { getSchema, getDatabase } = require('../config/database');
@@ -22,90 +79,6 @@ module.exports = function() {
     if (!schema.userViews) return null;
     return schema.userViews.find(v => v.name === name) || null;
   }
-
-  /**
-   * GET /api/views - List all views with grouping info
-   */
-  router.get('/api/views', (req, res) => {
-    try {
-      const schema = getSchema();
-      const views = schema.userViews || [];
-      const groups = schema.userViewGroups || [];
-
-      res.json({ views: views.map(v => {
-        // Resolve requiredFilter fields to their FK target entities
-        const requiredFilterEntities = [];
-        for (const spec of (v.requiredFilter || [])) {
-          const fieldPath = spec.replace(/:(\w+)$/, ''); // "aircraft._label:select" → "aircraft._label"
-          const fkPrefix = fieldPath.split('.')[0];       // "aircraft"
-          const col = v.columns.find(c => c.fkEntity && c.path && c.path.split('.')[0] === fkPrefix);
-          if (col) {
-            requiredFilterEntities.push({ entity: col.fkEntity, viewColumn: col.sqlAlias });
-          }
-        }
-        return {
-          name: v.name,
-          base: v.base,
-          color: v.color,
-          group: v.group,
-          columns: v.columns.map(c => c.label),
-          ...(v.description ? { description: v.description } : {}),
-          ...(requiredFilterEntities.length > 0 ? { requiredFilterEntities } : {})
-        };
-      }), groups });
-    } catch (err) {
-      logger.error('Failed to list views', { error: err.message });
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  /**
-   * GET /api/views/:name/schema - Column metadata for UI
-   */
-  router.get('/api/views/:name/schema', (req, res) => {
-    try {
-      const view = findView(req.params.name);
-      if (!view) {
-        return res.status(404).json({ error: `View "${req.params.name}" not found` });
-      }
-
-      // Check if view has any geo columns (for map view toggle)
-      // Geo columns are expanded to latitude/longitude with aggregateType='geo'
-      const hasGeo = view.columns.some(c => c.aggregateType === 'geo');
-
-      res.json({
-        name: view.name,
-        base: view.base,
-        color: view.color,
-        hasGeo,
-        columns: view.columns.map(c => {
-          const col = { key: c.sqlAlias, label: c.label, type: c.jsType };
-          if (c.path) col.path = c.path; // Original column path for prefilter matching
-          if (c.omit !== undefined) col.omit = c.omit;
-          if (c.areaColor) col.areaColor = c.areaColor;
-          if (c.calculated) col.calculated = c.calculated;
-          if (c.autoHidden) col.autoHidden = c.autoHidden;
-          // Aggregate metadata for client-side grouping
-          if (c.aggregateSource) col.aggregateSource = c.aggregateSource;
-          if (c.aggregateType) col.aggregateType = c.aggregateType;
-          if (c.aggregateField) col.aggregateField = c.aggregateField;
-          // FK link metadata for navigation
-          if (c.fkEntity) col.fkEntity = c.fkEntity;
-          if (c.fkIdColumn) col.fkIdColumn = c.fkIdColumn;
-          return col;
-        }),
-        ...(view.calculator ? { calculator: view.calculator } : {}),
-        ...(view.prefilter ? { prefilter: view.prefilter } : {}),
-        ...(view.requiredFilter ? { requiredFilter: view.requiredFilter } : {}),
-        ...(view.defaultSort ? { defaultSort: view.defaultSort } : {}),
-        ...(view.chart ? { chart: view.chart } : {}),
-        ...(view.description ? { description: view.description } : {})
-      });
-    } catch (err) {
-      logger.error('Failed to get view schema', { error: err.message });
-      res.status(500).json({ error: err.message });
-    }
-  });
 
   /**
    * GET /api/views/:name/distinct/:column - Get distinct values for a column
@@ -230,3 +203,7 @@ module.exports = function() {
 
   return router;
 };
+
+// Exported for /api/meta consolidation
+module.exports.buildViewSummary = buildViewSummary;
+module.exports.buildViewSchema = buildViewSchema;

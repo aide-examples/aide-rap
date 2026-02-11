@@ -562,8 +562,8 @@ const BreadcrumbNav = {
     if (compact.e) {
       // Fetch entity schema for color
       try {
-        const schema = await ApiClient.getExtendedSchema(compact.e);
-        color = schema.areaColor || color;
+        const schema = SchemaCache.getExtended(compact.e);
+        color = schema?.areaColor || color;
       } catch (e) {
         // Use default color if schema fetch fails
       }
@@ -589,20 +589,14 @@ const BreadcrumbNav = {
     // Handle view crumbs
     let view = null;
     if (type === 'view' && compact.v) {
-      try {
-        const viewsRes = await fetch('/api/views');
-        const viewsData = await viewsRes.json();
-        const viewInfo = viewsData.views?.find(v => v.name === compact.v);
-        if (viewInfo) {
-          view = {
-            name: viewInfo.name,
-            base: viewInfo.base,
-            color: viewInfo.color || '#e3f2fd'
-          };
-          color = view.color;
-        }
-      } catch (e) {
-        // Use default
+      const viewInfo = EntityExplorer.viewsList?.find(v => v.name === compact.v);
+      if (viewInfo) {
+        view = {
+          name: viewInfo.name,
+          base: viewInfo.base,
+          color: viewInfo.color || '#e3f2fd'
+        };
+        color = view.color;
       }
     }
 

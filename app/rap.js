@@ -224,10 +224,6 @@ app.get('/api/config/tree', (req, res) => {
     res.json(cfg.tree || { backRefPreviewLimit: 10 });
 });
 
-app.get('/api/config/external-queries', (req, res) => {
-    res.json(cfg.externalQueries || {});
-});
-
 // Bridge filter: resolve indirect FK filtering via computed PAIRS entities
 // Example: /api/config/bridge-filter?entity=Aircraft&target=EngineType&id=5
 app.get('/api/config/bridge-filter', (req, res) => {
@@ -298,7 +294,7 @@ app.get('/api/config/welcome', (req, res) => {
 // =============================================================================
 
 const UISpecLoader = require('./server/utils/UISpecLoader');
-const { getSchema } = require('./server/config/database');
+const { getSchema, getMetaVersion } = require('./server/config/database');
 const mdCrud = UISpecLoader.loadCrudConfig(cfg.paths.docs);
 const mdViews = UISpecLoader.loadViewsConfig(cfg.paths.docs);
 const mdProcesses = UISpecLoader.loadProcessesConfig(cfg.paths.docs);
@@ -355,7 +351,75 @@ if (enabledEntitiesRaw.length > 0) {
 }
 
 // =============================================================================
-// 7c. STATIC ROUTES
+// 7d. CONSOLIDATED META ENDPOINT
+// =============================================================================
+
+const GenericService = require('./server/services/GenericService');
+const { buildViewSummary, buildViewSchema } = require('./server/routers/UserViewRouter');
+const { buildProcessData } = require('./server/routers/ProcessRouter');
+
+app.get('/api/meta/version', (req, res) => {
+    res.json({ metaVersion: getMetaVersion() });
+});
+
+app.get('/api/meta', (req, res) => {
+    try {
+        const schema = getSchema();
+
+        // Entity list with counts and areas
+        const { entities, areas } = GenericService.getEnabledEntitiesWithAreas();
+
+        // All extended schemas
+        const schemas = {};
+        for (const e of entities) {
+            if (e.name) {
+                try { schemas[e.name] = GenericService.getExtendedSchema(e.name); } catch {}
+            }
+        }
+
+        // Views: list, groups, and all view schemas
+        const userViews = schema.userViews || [];
+        const viewGroups = schema.userViewGroups || [];
+        const viewSchemas = {};
+        for (const v of userViews) {
+            viewSchemas[v.name] = buildViewSchema(v);
+        }
+
+        // Processes: list and groups
+        const processesConfig = UISpecLoader.loadProcessesConfig(cfg.paths.docs);
+        const { processes: processList, groups: processGroups } = buildProcessData(processesConfig, schema);
+
+        res.json({
+            metaVersion: getMetaVersion(),
+            entities,
+            areas,
+            schemas,
+            views: {
+                views: userViews.map(buildViewSummary),
+                groups: viewGroups,
+                schemas: viewSchemas
+            },
+            externalQueries: cfg.externalQueries || {},
+            processes: {
+                processes: processList.map(p => ({
+                    name: p.name,
+                    color: processGroups.find(g => g.type === 'separator' && g.label === p.group)?.color || '#f5f5f5',
+                    group: p.group,
+                    stepCount: p.steps.length,
+                    required: p.required || null,
+                    description: p.description || ''
+                })),
+                groups: processGroups
+            }
+        });
+    } catch (err) {
+        console.error('Failed to build meta response:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// =============================================================================
+// 7e. STATIC ROUTES
 // =============================================================================
 
 // SQL Browser — embedded sqlite-viewer (static files, no auth needed for files,
