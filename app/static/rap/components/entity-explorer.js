@@ -626,6 +626,7 @@ const EntityExplorer = {
     this.renderEntityTypes(meta.entities, meta.areas);
     this.renderViews(meta.views);
     this.externalQueries = meta.externalQueries || {};
+    this.workflowsConfig = meta.workflows || {};
     this.renderProcesses(meta.processes);
 
     // Event listeners for entity dropdown
@@ -2357,6 +2358,7 @@ const EntityExplorer = {
       if (this.processToggleBtn) this.processToggleBtn.style.display = '';
 
       // Show process panel (with initial context if required entity was selected)
+      ProcessPanel.workflowsConfig = this.workflowsConfig;
       ProcessPanel.show(processData, initialContext);
 
       // Restore active step if specified (URL restore)

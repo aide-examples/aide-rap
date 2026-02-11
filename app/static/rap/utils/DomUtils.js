@@ -294,5 +294,34 @@ const DomUtils = {
         if (textarea) textarea.value = text;
       }
     });
+  },
+
+  // ---------------------------------------------------------------------------
+  // Image lightbox (click img[data-lightbox] to view fullscreen)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Initialize delegated click handler for img[data-lightbox] elements.
+   * Click opens a fullscreen overlay; click overlay or press Escape to close.
+   */
+  initLightbox() {
+    document.addEventListener('click', (e) => {
+      const img = e.target.closest('img[data-lightbox]');
+      if (!img) return;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'image-lightbox';
+      overlay.innerHTML = `<img src="${img.src}">`;
+
+      const close = () => { overlay.remove(); document.removeEventListener('keydown', escHandler); };
+      const escHandler = (e) => { if (e.key === 'Escape') close(); };
+
+      overlay.addEventListener('click', close);
+      document.addEventListener('keydown', escHandler);
+      document.body.appendChild(overlay);
+    });
   }
 };
+
+// Auto-initialize lightbox
+DomUtils.initLightbox();

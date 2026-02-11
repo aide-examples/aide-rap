@@ -121,6 +121,7 @@ module.exports = function(processesConfig, docsDir) {
           group: p.group,
           stepCount: p.steps.length,
           required: p.required || null,
+          workflow: p.workflow || null,
           description: p.description || ''
         })),
         groups
@@ -157,6 +158,7 @@ module.exports = function(processesConfig, docsDir) {
         description: process.description || '',
         color,
         required: process.required || null,
+        workflow: process.workflow || null,
         _sourceFile: process._sourceFile || null,
         _area: process._area || null,
         steps: process.steps.map(s => ({
@@ -248,6 +250,7 @@ module.exports = function(processesConfig, docsDir) {
       const updated = {
         name: current.name,
         required: current.required,
+        workflow: current.workflow,
         description: description !== undefined ? description : current.description,
         steps: current.steps.map((origStep, i) => ({
           title: steps[i].title || origStep.title,

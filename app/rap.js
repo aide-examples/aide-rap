@@ -400,6 +400,7 @@ app.get('/api/meta', (req, res) => {
                 schemas: viewSchemas
             },
             externalQueries: cfg.externalQueries || {},
+            workflows: cfg.workflows || {},
             processes: {
                 processes: processList.map(p => ({
                     name: p.name,
@@ -407,6 +408,7 @@ app.get('/api/meta', (req, res) => {
                     group: p.group,
                     stepCount: p.steps.length,
                     required: p.required || null,
+                    workflow: p.workflow || null,
                     description: p.description || ''
                 })),
                 groups: processGroups

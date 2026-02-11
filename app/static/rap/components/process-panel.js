@@ -16,6 +16,7 @@ const ProcessPanel = {
   currentProcess: null,
   activeStepIndex: 0,
   context: {},           // { EntityType: "label" } — accumulated context
+  workflowsConfig: {},   // { providers: { name: { baseUrl, urlPattern } }, apps: { key: { provider, label, ... } } }
 
   // Edit state
   editingStep: null,        // Step index being edited (null = view mode)
@@ -35,6 +36,56 @@ const ProcessPanel = {
 
   _isAdmin() {
     return window.currentUser && window.currentUser.role === 'admin';
+  },
+
+  /**
+   * Build the workflow link HTML for the process header.
+   * Parses the stored workflow value (e.g. "leap:engine-reinstallation(Engine)"),
+   * extracts the provider type and app key, looks up config, and builds a URL.
+   */
+  _buildWorkflowLink() {
+    const process = this.currentProcess;
+    if (!process?.workflow) return '';
+
+    // Split "leap:engine-reinstallation(Engine)" into provider type + app reference
+    const colonIdx = process.workflow.indexOf(':');
+    if (colonIdx < 0) return '';
+    const providerKey = process.workflow.substring(0, colonIdx);
+    const appRef = process.workflow.substring(colonIdx + 1);
+
+    const match = appRef.match(/^(.+?)(?:\((\w+)\))?$/);
+    const appKey = match ? match[1].trim() : appRef;
+    const contextKey = match ? match[2] : null;
+
+    const cfg = this.workflowsConfig;
+    const app = cfg?.apps?.[appKey];
+    const provider = cfg?.providers?.[providerKey];
+
+    if (!app || !provider?.urlPattern) {
+      return `<span class="process-workflow-link process-workflow-disabled" title="Workflow '${DomUtils.escapeHtml(appKey)}' not configured">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        ${DomUtils.escapeHtml(appKey)} (not configured)
+      </span>`;
+    }
+
+    // Build URL from provider urlPattern + app fields + provider fields
+    const vars = { ...provider, ...app };
+    let url = provider.urlPattern.replace(/\{(\w+)\}/g, (_, key) => encodeURIComponent(vars[key] || ''));
+    if (contextKey && this.context[contextKey]) {
+      const sep = url.includes('?') ? '&' : '?';
+      url += `${sep}${encodeURIComponent(contextKey)}=${encodeURIComponent(this.context[contextKey])}`;
+    }
+
+    const label = app.label || appKey;
+    const contextInfo = contextKey && this.context[contextKey]
+      ? ` (${DomUtils.escapeHtml(String(this.context[contextKey]))})`
+      : '';
+
+    return `<a href="${DomUtils.escapeHtml(url)}" target="_blank" rel="noopener"
+               class="process-workflow-link" id="process-workflow-link" title="${DomUtils.escapeHtml(url)}">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      ${DomUtils.escapeHtml(label)}${contextInfo}
+    </a>`;
   },
 
   init() {
@@ -134,6 +185,7 @@ const ProcessPanel = {
           </div>
         </div>
         <div id="process-desc-container">${descHtml}</div>
+        ${this._buildWorkflowLink()}
         ${contextHtml}
       </div>
       <div class="process-tabs-bar">
@@ -822,6 +874,14 @@ const ProcessPanel = {
   addContext(entityType, label) {
     if (entityType && label) {
       this.context[entityType] = label;
+      // Update workflow link if context changed (URL includes context parameter)
+      const wfEl = this.container?.querySelector('#process-workflow-link');
+      if (wfEl) {
+        const newHtml = this._buildWorkflowLink();
+        if (newHtml) {
+          wfEl.outerHTML = newHtml;
+        }
+      }
       // Re-render context display if visible (filter internal keys like _ids)
       const entries = Object.entries(this.context).filter(([k]) => !k.startsWith('_'));
       const contextEl = this.container?.querySelector('.process-context');

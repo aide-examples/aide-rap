@@ -318,6 +318,7 @@ function parseProcessFile(content, filename) {
   const lines = content.split('\n');
   let name = null;
   let required = null;
+  let workflow = null;
   let descriptionLines = [];
   let steps = [];
   let currentStep = null;
@@ -335,6 +336,13 @@ function parseProcessFile(content, filename) {
     // Required directive (before first H2)
     if (!foundFirstH2 && /^Required:\s*(.+)$/i.test(trimmed)) {
       required = trimmed.match(/^Required:\s*(.+)$/i)[1].trim();
+      continue;
+    }
+
+    // Workflow directives: Leap: or Power: (before first H2)
+    const wfMatch = !foundFirstH2 && trimmed.match(/^(Leap|Power):\s*(.+)$/i);
+    if (wfMatch) {
+      workflow = wfMatch[1].toLowerCase() + ':' + wfMatch[2].trim();
       continue;
     }
 
@@ -385,6 +393,7 @@ function parseProcessFile(content, filename) {
   return {
     name: name || filename.replace('.md', ''),
     required,
+    workflow,
     description: trimBody(descriptionLines),
     steps: steps.map(s => ({
       title: s.title,
@@ -412,6 +421,13 @@ function reconstructProcessFile(process) {
 
   if (process.required) {
     lines.push(`Required: ${process.required}`);
+    lines.push('');
+  }
+
+  if (process.workflow) {
+    const [wfType, ...wfRest] = process.workflow.split(':');
+    const wfKeyword = wfType === 'power' ? 'Power' : 'Leap';
+    lines.push(`${wfKeyword}: ${wfRest.join(':')}`);
     lines.push('');
   }
 
