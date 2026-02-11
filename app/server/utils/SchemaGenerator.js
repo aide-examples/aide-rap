@@ -204,6 +204,12 @@ function parseUIAnnotations(description) {
     ui.nowrap = true;
   }
 
+  // Parse [API: name] - field populated by API refresh
+  const apiMatch = description.match(/\[API:\s*(\w+)\]/i);
+  if (apiMatch) {
+    ui.apiSource = apiMatch[1];
+  }
+
   return Object.keys(ui).length > 0 ? ui : null;
 }
 
@@ -303,6 +309,25 @@ function parseEntityLevelAnnotations(headerLines) {
       const chains = pairsMatch[2].split(',').map(c => c.trim().split('.'));
       annotations.pairs = { sourceEntity: pairsMatch[1], chains };
       annotations.computed = true;
+    }
+
+    // Match [API_REFRESH: name] — entity can be refreshed from external API
+    const apiRefreshMatch = line.match(/\[API_REFRESH:\s*(\w+)\]/i);
+    if (apiRefreshMatch) {
+      if (!annotations.apiRefresh) annotations.apiRefresh = [];
+      annotations.apiRefresh.push(apiRefreshMatch[1]);
+    }
+
+    // Match [API_REFRESH_ON_LOAD: name] — auto-refresh when CRUD dialog opens
+    const apiRefreshOnLoadMatch = line.match(/\[API_REFRESH_ON_LOAD:\s*(\w+)\]/i);
+    if (apiRefreshOnLoadMatch) {
+      if (!annotations.apiRefreshOnLoad) annotations.apiRefreshOnLoad = [];
+      annotations.apiRefreshOnLoad.push(apiRefreshOnLoadMatch[1]);
+      // Also add to apiRefresh (ON_LOAD implies refresh capability)
+      if (!annotations.apiRefresh) annotations.apiRefresh = [];
+      if (!annotations.apiRefresh.includes(apiRefreshOnLoadMatch[1])) {
+        annotations.apiRefresh.push(apiRefreshOnLoadMatch[1]);
+      }
     }
   }
 
@@ -1548,7 +1573,10 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     label2Expression: entityAnnotations?.label2Expression || null,
     // Computed entity: PAIRS annotation for auto-populated M:N mapping
     pairs: entityAnnotations?.pairs || null,
-    computed: entityAnnotations?.computed || false
+    computed: entityAnnotations?.computed || false,
+    // API Refresh: entity can be updated from external API
+    apiRefresh: entityAnnotations?.apiRefresh || null,
+    apiRefreshOnLoad: entityAnnotations?.apiRefreshOnLoad || null
   };
 }
 

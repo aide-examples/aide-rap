@@ -7,6 +7,7 @@
 
 const express = require('express');
 const ImportManager = require('../utils/ImportManager');
+const SeedManager = require('../utils/SeedManager');
 const logger = require('../utils/logger');
 const { getSchema } = require('../config/database');
 
@@ -402,6 +403,84 @@ module.exports = function(cfg) {
       });
     } catch (e) {
       console.error(`Failed to validate import for ${req.params.entity}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * POST /api/import/refresh/:entity/:refreshName
+   * Runs an API refresh for an entity (bulk: all records)
+   * Returns: { matched, updated, skipped, notFound, recordsRead, duration }
+   */
+  router.post('/api/import/refresh/:entity/:refreshName', async (req, res) => {
+    try {
+      const { entity: entityName, refreshName } = req.params;
+      const startTime = Date.now();
+
+      // Step 1: Fetch and map API data
+      const refreshResult = await importManager.runRefresh(entityName, refreshName);
+      if (!refreshResult.records) {
+        return res.status(400).json({ error: refreshResult.error });
+      }
+
+      // Step 2: Apply updates to DB
+      const updateResult = SeedManager.refreshEntity(
+        entityName,
+        refreshResult.records,
+        refreshResult.match
+      );
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      res.json({
+        ...updateResult,
+        recordsRead: refreshResult.recordsRead,
+        duration: parseFloat(duration)
+      });
+    } catch (e) {
+      console.error(`Failed to refresh ${req.params.entity}/${req.params.refreshName}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * POST /api/import/refresh/:entity/:refreshName/:id
+   * Runs an API refresh for a single entity record
+   * Returns: { matched, updated, skipped, notFound, recordsRead, duration }
+   */
+  router.post('/api/import/refresh/:entity/:refreshName/:id', async (req, res) => {
+    try {
+      const { entity: entityName, refreshName, id } = req.params;
+      const recordId = parseInt(id, 10);
+      if (isNaN(recordId)) {
+        return res.status(400).json({ error: 'Invalid record ID' });
+      }
+
+      const startTime = Date.now();
+
+      // Step 1: Fetch and map API data (bulk — single-record API not always available)
+      const refreshResult = await importManager.runRefresh(entityName, refreshName);
+      if (!refreshResult.records) {
+        return res.status(400).json({ error: refreshResult.error });
+      }
+
+      // Step 2: Apply update to single DB record
+      const updateResult = SeedManager.refreshEntity(
+        entityName,
+        refreshResult.records,
+        refreshResult.match,
+        { singleId: recordId }
+      );
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+      res.json({
+        ...updateResult,
+        recordsRead: refreshResult.recordsRead,
+        duration: parseFloat(duration)
+      });
+    } catch (e) {
+      console.error(`Failed to refresh ${req.params.entity}/${req.params.refreshName}/${req.params.id}:`, e);
       res.status(500).json({ error: e.message });
     }
   });

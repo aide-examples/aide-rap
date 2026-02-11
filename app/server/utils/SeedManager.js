@@ -1903,6 +1903,108 @@ async function restoreBackup() {
   return results;
 }
 
+/**
+ * Refresh entity records from external API data.
+ * Matches API records to existing DB records via a match field, then UPDATEs.
+ *
+ * @param {string} entityName - Entity name
+ * @param {Array} apiRecords - Mapped API records (from ImportManager.runRefresh)
+ * @param {Object} matchConfig - { entityField, apiField }
+ * @param {Object} [options] - { singleId: number } - If set, only update this record
+ * @returns {Object} - { matched, updated, skipped, notFound }
+ */
+function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+
+  if (!entity) {
+    throw new Error(`Entity ${entityName} not found in schema`);
+  }
+
+  const { entityField, apiField } = matchConfig;
+
+  // Get existing records from DB
+  let existingRows;
+  if (options.singleId) {
+    existingRows = db.prepare(
+      `SELECT id, ${entityField} FROM ${entity.tableName} WHERE id = ?`
+    ).all(options.singleId);
+  } else {
+    existingRows = db.prepare(
+      `SELECT id, ${entityField} FROM ${entity.tableName} WHERE ${entityField} IS NOT NULL`
+    ).all();
+  }
+
+  // Build match index: entityFieldValue -> dbId
+  const matchIndex = new Map();
+  for (const row of existingRows) {
+    const key = String(row[entityField]);
+    matchIndex.set(key, row.id);
+  }
+
+  // Determine which columns to update (from mapping targets, excluding the match field)
+  const updateFields = [];
+  for (const record of apiRecords) {
+    for (const key of Object.keys(record)) {
+      if (key !== apiField && !updateFields.includes(key)) {
+        updateFields.push(key);
+      }
+    }
+    break; // Only need first record for field list
+  }
+
+  if (updateFields.length === 0) {
+    return { matched: 0, updated: 0, skipped: 0, notFound: apiRecords.length };
+  }
+
+  // Prepare UPDATE statement
+  const setClause = updateFields.map(f => `${f} = ?`).join(', ');
+  const updateStmt = db.prepare(
+    `UPDATE ${entity.tableName} SET ${setClause}, _updated_at = datetime('now') WHERE id = ?`
+  );
+
+  let matched = 0;
+  let updated = 0;
+  let skipped = 0;
+  let notFound = 0;
+
+  const updateMany = db.transaction((records) => {
+    for (const record of records) {
+      const apiKey = String(record[apiField]);
+      const dbId = matchIndex.get(apiKey);
+
+      if (dbId === undefined) {
+        notFound++;
+        continue;
+      }
+
+      matched++;
+
+      // Check if any field actually changed (skip no-op updates)
+      const values = updateFields.map(f => {
+        const v = record[f];
+        return v === undefined ? null : v;
+      });
+
+      try {
+        const result = updateStmt.run(...values, dbId);
+        if (result.changes > 0) {
+          updated++;
+        } else {
+          skipped++;
+        }
+      } catch (err) {
+        console.warn(`[refreshEntity] Error updating ${entityName} id=${dbId}:`, err.message);
+        skipped++;
+      }
+    }
+  });
+
+  updateMany(apiRecords);
+
+  return { matched, updated, skipped, notFound };
+}
+
 module.exports = {
   init,
   setMediaService,
@@ -1924,6 +2026,7 @@ module.exports = {
   backupAll,
   restoreEntity,
   restoreBackup,
+  refreshEntity,
   // Export getter for path (for testing and external access)
   get SEED_DIR() { return getSeedDir(); }
 };

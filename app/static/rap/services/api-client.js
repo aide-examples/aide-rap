@@ -214,6 +214,31 @@ const ApiClient = {
   async getMeta() {
     return this.request('/api/meta');
   },
+
+  // --- API Refresh ---
+
+  /**
+   * Refresh entity records from external API (bulk)
+   * @param {string} entityName - Entity name
+   * @param {string} refreshName - Refresh name (e.g., "tracker")
+   */
+  async refreshEntity(entityName, refreshName) {
+    return this.request(`/api/import/refresh/${entityName}/${refreshName}`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * Refresh a single entity record from external API
+   * @param {string} entityName - Entity name
+   * @param {string} refreshName - Refresh name (e.g., "tracker")
+   * @param {number} id - Record ID
+   */
+  async refreshRecord(entityName, refreshName, id) {
+    return this.request(`/api/import/refresh/${entityName}/${refreshName}/${id}`, {
+      method: 'POST',
+    });
+  },
 };
 
 // Schema cache — pre-loaded from /api/meta at startup

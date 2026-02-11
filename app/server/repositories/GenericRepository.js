@@ -541,7 +541,10 @@ function getExtendedSchemaInfo(entityName) {
     // Self-referential FK column (for hierarchy view)
     selfRefFK: (entity.foreignKeys || []).find(
       fk => (fk.references?.entity || entityName) === entityName
-    )?.column || null
+    )?.column || null,
+    // API Refresh: entity can be updated from external API
+    apiRefresh: entity.apiRefresh || null,
+    apiRefreshOnLoad: entity.apiRefreshOnLoad || null
   };
 }
 

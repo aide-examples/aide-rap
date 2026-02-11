@@ -215,6 +215,46 @@ const ContextMenu = {
       });
     }
 
+    // API Refresh items — only when entity has apiRefresh configured
+    if (!isViewMode && context.entity) {
+      const schema = SchemaCache.getExtended(context.entity);
+      const refreshNames = schema?.apiRefresh || [];
+      if (refreshNames.length > 0) {
+        let refreshHtml = '<div class="context-menu-separator"></div>';
+        for (const name of refreshNames) {
+          refreshHtml += `<div class="context-menu-item context-menu-refresh-item"
+                               data-refresh-name="${DomUtils.escapeHtml(name)}">
+            <span class="context-menu-icon">&#128260;</span>
+            <span>Refresh ${DomUtils.escapeHtml(name)}</span>
+          </div>`;
+        }
+        viewsContainer.insertAdjacentHTML('beforeend', refreshHtml);
+        viewsContainer.querySelectorAll('.context-menu-refresh-item').forEach(item => {
+          item.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const refreshName = item.dataset.refreshName;
+            const recordId = this.currentContext.recordId;
+            const entityName = this.currentContext.entity;
+            this.hide();
+            try {
+              Toast.show(`Refreshing ${refreshName}...`, 'info');
+              const result = await ApiClient.refreshRecord(entityName, refreshName, recordId);
+              const msg = result.updated > 0
+                ? `Updated ${result.updated} field(s) in ${result.duration}s`
+                : `No changes (${result.duration}s)`;
+              Toast.show(msg, result.updated > 0 ? 'success' : 'info');
+              // Reload current view
+              if (typeof EntityExplorer !== 'undefined') {
+                EntityExplorer.loadRecords();
+              }
+            } catch (err) {
+              Toast.show(`Refresh failed: ${err.message}`, 'error');
+            }
+          });
+        });
+      }
+    }
+
     // "Use for Process" — only when a process step expects a selection of this entity type
     if (typeof ProcessPanel !== 'undefined') {
       const pendingSelect = ProcessPanel.getPendingSelect();

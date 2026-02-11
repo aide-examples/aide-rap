@@ -802,6 +802,53 @@ const EntityExplorer = {
     });
   },
 
+  /**
+   * Show or hide the API Refresh button based on entity schema
+   */
+  _updateApiRefreshButton(schema) {
+    // Remove existing button if any
+    const existing = document.getElementById('btn-api-refresh');
+    if (existing) existing.remove();
+
+    if (!schema?.apiRefresh || schema.apiRefresh.length === 0) return;
+
+    // Create button next to refresh-counts
+    const btnRefreshCounts = document.getElementById('btn-refresh-counts');
+    if (!btnRefreshCounts) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'btn-api-refresh';
+    btn.className = 'btn-icon';
+    btn.title = `Refresh from API (${schema.apiRefresh.join(', ')})`;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 2v6h-6"/>
+      <path d="M3 12a9 9 0 0115-6.7L21 8"/>
+      <circle cx="12" cy="16" r="1" fill="currentColor"/>
+      <circle cx="8" cy="18" r="1" fill="currentColor"/>
+      <circle cx="16" cy="18" r="1" fill="currentColor"/>
+    </svg>`;
+    btn.addEventListener('click', async () => {
+      const entityName = this.currentEntity;
+      if (!entityName) return;
+      for (const refreshName of schema.apiRefresh) {
+        try {
+          Toast.show(`Refreshing ${entityName} from API...`, 'info');
+          const result = await ApiClient.refreshEntity(entityName, refreshName);
+          Toast.show(
+            `${refreshName}: ${result.updated} updated, ${result.matched} matched (${result.duration}s)`,
+            result.updated > 0 ? 'success' : 'info'
+          );
+        } catch (err) {
+          Toast.show(`Refresh failed: ${err.message}`, 'error');
+        }
+      }
+      // Reload records
+      this.loadRecords();
+    });
+
+    btnRefreshCounts.parentNode.insertBefore(btn, btnRefreshCounts);
+  },
+
   async refreshCounts() {
     const currentSelection = this.selectorValue;
     const meta = await ApiClient.getMeta();
@@ -1145,10 +1192,14 @@ const EntityExplorer = {
         this.viewMode = 'table';
         this.updateViewToggle();
       }
+
+      // Show/hide API Refresh button
+      this._updateApiRefreshButton(schema);
     } catch (e) {
       this.currentEntitySchema = null;
       this.prefilterFields = null;
       this.requiredFilterFields = null;
+      this._updateApiRefreshButton(null);
     }
 
     // Pass default sort to loadRecords
@@ -1176,6 +1227,7 @@ const EntityExplorer = {
     if (this.btnViewHierarchy) this.btnViewHierarchy.style.display = 'none';
     this.selfRefFK = null;
     this.mapLabelsToggle.style.display = 'none';
+    this._updateApiRefreshButton(null); // Hide API refresh button in view mode
     this.viewMode = 'table';
     this.updateViewToggle();
 

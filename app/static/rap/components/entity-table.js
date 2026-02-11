@@ -713,6 +713,7 @@ const EntityTable = {
         ? col.name
         : DomUtils.splitCamelCase(rawName).replace(/[_ ]/g, '<br>');
       const systemClass = isSystem ? ' system-col' : '';
+      const apiClass = col.ui?.apiSource ? ' api-source-col' : '';
 
       // Use area color for FK columns
       const bgStyle = col.foreignKey?.areaColor
@@ -731,7 +732,7 @@ const EntityTable = {
           📎 ${displayName} ▾
         </th>`;
       } else {
-        html += `<th class="sortable${isFK}${systemClass}" data-column="${col.name}"${bgStyle}${titleAttr}>
+        html += `<th class="sortable${isFK}${systemClass}${apiClass}" data-column="${col.name}"${bgStyle}${titleAttr}>
           ${displayName}${sortIcon}
         </th>`;
       }

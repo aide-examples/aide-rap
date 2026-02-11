@@ -564,14 +564,161 @@ app/systems/<system>/
 
 ---
 
+## API Refresh — Live Updates from External APIs
+
+API Refresh is a mechanism for periodically pulling data from external REST APIs into existing entity records. Unlike the XLSX import pipeline (which creates new records), a refresh **updates** existing records by matching on a key field.
+
+### Use Case
+
+An entity has some fields that are managed locally (e.g., `serial_number`, `type`) and others that come from an external system (e.g., GPS coordinates, sensor readings from a tracking API). API Refresh fetches the external data and writes it into the matching records.
+
+```
+External API  →  docs/imports/Entity.refreshName.md  →  UPDATE existing records
+  (JSON)              (Mapping + Match Rule)                  (SQLite)
+```
+
+### Entity Annotations
+
+Two entity-level annotations and one column-level annotation control API Refresh:
+
+**Entity level** (in the header area of the entity `.md` file):
+
+| Annotation | Description |
+|------------|-------------|
+| `[API_REFRESH: name]` | Declares that this entity can be refreshed from an external API. `name` identifies the refresh definition (e.g., `tracker`). Multiple annotations allowed. |
+| `[API_REFRESH_ON_LOAD: name]` | (Reserved) Auto-refresh when the CRUD dialog opens. Implies `[API_REFRESH: name]`. Not yet implemented in UI. |
+
+**Column level** (in the Description column of the attribute table):
+
+| Annotation | Description |
+|------------|-------------|
+| `[API: name]` | Marks this column as populated by API refresh. Used for visual styling in the table header (dashed underline). |
+
+### Example Entity
+
+```markdown
+# EngineStand
+
+[API_REFRESH: tracker]
+
+Engine transport stand. Location data refreshed via tracking API.
+
+## Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| serial_number | string | Stand identifier [LABEL] [UNIQUE] | Stand-A1 |
+| kirsen_id | int [OPTIONAL] | Tracking device ID | 4711 |
+| latitude | number [OPTIONAL] | GPS latitude [READONLY] [API: tracker] | |
+| longitude | number [OPTIONAL] | GPS longitude [READONLY] [API: tracker] | |
+| battery_pct | number [OPTIONAL] | Battery level [READONLY] [API: tracker] | |
+```
+
+### Refresh Import Definition
+
+Refresh definitions follow the same format as regular import definitions but live in files named `{Entity}.{refreshName}.md` and include a `Match:` directive:
+
+```markdown
+# EngineStand Refresh: tracker
+
+Source: https://control.example.com/api/v2/locations/
+AuthKey: exampleApi
+Match: kirsen_id = id
+
+## Mapping
+
+| Source | Target | Transform |
+|--------|--------|-----------|
+| latitude | latitude | |
+| longitude | longitude | |
+| temperature | temperature_c | |
+| battery | battery_pct | |
+| datetime_coords | last_position_at | timestamp |
+```
+
+**Directives specific to refresh:**
+
+| Directive | Required | Description |
+|-----------|----------|-------------|
+| `Match:` | Yes | Match rule: `entityField = apiField`. Links entity records to API records. |
+| `AuthKey:` | No | Key in `config.json` containing `login` and `password` for HTTP Basic Auth. |
+| `Source:` | Yes | API URL (must return JSON array or object with data path). |
+
+The `Match:` directive defines how entity records are joined to API records:
+- **entityField**: Column in the entity table (e.g., `kirsen_id`)
+- **apiField**: Field in the API response (e.g., `id`)
+
+Only records where the entity field matches an API record's field are updated. Records without a match value (NULL) are skipped.
+
+### Timestamp Transform
+
+The `timestamp` transform converts Unix timestamps (seconds since epoch) to ISO datetime strings:
+
+| Transform | Input | Output |
+|-----------|-------|--------|
+| `timestamp` | `1770799075` | `2026-02-11 08:37:55` |
+
+### How It Works
+
+```
+1. Fetch all records from external API (GET Source URL)
+2. Apply mapping + transforms to each API record
+3. Build match index: entityField value → database record ID
+4. For each API record with a matching entity record: UPDATE mapped fields
+5. Return statistics: { matched, updated, skipped, notFound }
+```
+
+Updates are executed as direct SQL within a transaction. They do **not** go through the GenericService event pipeline and therefore:
+- Do **not** trigger AuditTrail entries
+- Do **not** emit `entity:update:before/after` events
+- Do **not** increment the `_version` field
+
+This is intentional — API refreshes are high-frequency, automated data updates that would create noise in the audit trail.
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/import/refresh/:entity/:refreshName` | POST | Bulk refresh — updates all matching records |
+| `/api/import/refresh/:entity/:refreshName/:id` | POST | Single record refresh — updates only the specified record |
+
+Both endpoints require admin authentication.
+
+### UI Integration
+
+When an entity has `[API_REFRESH]` configured:
+
+- **Entity Explorer toolbar**: A refresh button appears when the entity is selected. Clicking it triggers a bulk refresh for all configured refresh names and reloads the table.
+- **Context menu**: Right-clicking a record shows "Refresh *name*" items. Clicking triggers a single-record refresh for that record.
+- **Table headers**: Columns with `[API: name]` get a dashed underline (CSS class `api-source-col`) to visually distinguish API-populated fields.
+
+### Config: API Credentials
+
+API credentials referenced by `AuthKey:` are stored in `config.json`:
+
+```json
+{
+    "exampleApi": {
+        "login": "user",
+        "password": "secret"
+    }
+}
+```
+
+The system uses HTTP Basic Auth with these credentials when fetching the API.
+
+---
+
 ## Files
 
 | File | Role |
 |------|------|
-| `app/server/utils/ImportManager.js` | Core: parse definitions, read XLSX, apply mapping, filter, write JSON |
-| `app/server/routers/import.router.js` | REST API for import operations |
+| `app/server/utils/ImportManager.js` | Core: parse definitions, read XLSX, apply mapping, filter, write JSON, run API refresh |
+| `app/server/utils/SeedManager.js` | Seed loading, FK resolution, refresh entity updates |
+| `app/server/routers/import.router.js` | REST API for import and refresh operations |
 | `app/static/rap/components/seed-import-dialog.js` | UI: unified import dialog with tabs |
 | `app/systems/*/docs/imports/*.md` | Import definition files |
+| `app/systems/*/docs/imports/*.*.md` | Refresh definition files (Entity.refreshName.md) |
 | `app/systems/*/data/extern/*.xlsx` | Source XLSX files |
 | `app/systems/*/data/import/*.json` | Generated import JSON files |
 

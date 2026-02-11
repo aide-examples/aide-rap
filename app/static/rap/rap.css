@@ -2312,6 +2312,11 @@ html[data-theme="dark"] .process-selector-group-label {
     font-style: italic;
 }
 
+.api-source-col {
+    border-bottom: 2px dashed var(--color-primary);
+    opacity: 0.75;
+}
+
 .entity-table tbody tr {
     background: var(--color-bg);
     cursor: pointer;
@@ -6701,8 +6706,9 @@ html[data-theme="dark"] .process-selector-group-label {
 }
 
 .welcome-content {
-    max-width: 680px;
+    max-width: 900px;
     text-align: center;
+    font-size: 150%;
 }
 
 .welcome-content h2 {

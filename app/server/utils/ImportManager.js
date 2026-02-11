@@ -288,6 +288,7 @@ class ImportManager {
       sheet: null,
       dataPath: null,   // JSON path to data array (e.g. "data" or "response.items")
       authKey: null,    // Config key for API credentials (e.g. "kirsenApi")
+      match: null,      // Match directive for refresh imports { entityField, apiField }
       maxRows: null,  // Optional row limit for large files (limits XLSX reading)
       limit: null,    // Optional output limit for testing (limits final output after filtering)
       first: null,    // Column name for deduplication (keep first occurrence)
@@ -373,6 +374,18 @@ class ImportManager {
       // Parse AuthKey: directive (config key for API credentials, e.g. "kirsenApi")
       if (trimmed.startsWith('AuthKey:')) {
         definition.authKey = trimmed.substring(8).trim();
+        continue;
+      }
+
+      // Parse Match: directive (for refresh imports: Match: entity_field = api_field)
+      if (trimmed.startsWith('Match:')) {
+        const matchParts = trimmed.substring(6).trim().split('=').map(s => s.trim());
+        if (matchParts.length === 2) {
+          definition.match = {
+            entityField: matchParts[0],
+            apiField: matchParts[1]
+          };
+        }
         continue;
       }
 
@@ -541,6 +554,14 @@ class ImportManager {
       case 'string':
         // Force value to string (useful for numeric-looking cells like serial numbers or codes)
         return str;
+
+      case 'timestamp':
+        // Convert Unix timestamp (seconds) to ISO datetime string
+        const ts = parseFloat(str);
+        if (!isNaN(ts)) {
+          return new Date(ts * 1000).toISOString().replace('T', ' ').substring(0, 19);
+        }
+        return value;
 
       case 'number':
         // Handle German number format: 1.234,56 → 1234.56
@@ -1377,6 +1398,86 @@ class ImportManager {
     } catch (e) {
       this.logger.error('Import error:', { error: e.message });
       return { success: false, error: e.message };
+    }
+  }
+  /**
+   * Parse a refresh import definition (docs/imports/Entity.refreshName.md)
+   * @param {string} entityName - Entity name
+   * @param {string} refreshName - Refresh name (e.g., "tracker")
+   * @returns {Object|null} - Parsed definition with match config
+   */
+  parseRefreshDefinition(entityName, refreshName) {
+    const defName = `${entityName}.${refreshName}`;
+    const definition = this.parseImportDefinition(defName);
+
+    if (!definition) {
+      return null;
+    }
+
+    if (!definition.match) {
+      this.logger.warn(`Refresh definition ${defName} has no Match: directive`);
+      return null;
+    }
+
+    return definition;
+  }
+
+  /**
+   * Run an API refresh: fetch data from API, apply mapping, return mapped records + match config
+   * Does NOT write to DB — that's done by SeedManager.refreshEntity()
+   *
+   * @param {string} entityName - Entity name
+   * @param {string} refreshName - Refresh name (e.g., "tracker")
+   * @returns {Promise<Object>} - { records, match, recordsRead, error }
+   */
+  async runRefresh(entityName, refreshName) {
+    const definition = this.parseRefreshDefinition(entityName, refreshName);
+
+    if (!definition) {
+      return { records: null, error: `No refresh definition found for ${entityName}.${refreshName}` };
+    }
+
+    if (!definition.source) {
+      return { records: null, error: 'No source URL specified in refresh definition' };
+    }
+
+    try {
+      // Load data from API
+      const { rawData, error: loadError } = await this.loadFromApi(definition);
+      if (!rawData) {
+        return { records: null, error: loadError };
+      }
+
+      const recordsRead = rawData.length;
+
+      // Apply mapping with transforms
+      const mappedRecords = rawData.map(row => {
+        const mapped = {};
+        // Always include the API match field (so SeedManager can match)
+        mapped[definition.match.apiField] = row[definition.match.apiField];
+
+        for (const { source: sourceExprStr, target: targetCol, transform } of definition.mapping) {
+          const sourceExpr = this.parseSourceExpression(sourceExprStr);
+          let value = this.resolveSourceValue(sourceExpr, row);
+
+          if (value !== undefined) {
+            if (transform) {
+              value = this.applyTransform(value, transform, row);
+            }
+            mapped[targetCol] = value;
+          }
+        }
+        return mapped;
+      });
+
+      return {
+        records: mappedRecords,
+        match: definition.match,
+        recordsRead
+      };
+    } catch (e) {
+      this.logger.error('Refresh error:', { error: e.message });
+      return { records: null, error: e.message };
     }
   }
 }
