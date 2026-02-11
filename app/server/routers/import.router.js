@@ -117,9 +117,9 @@ module.exports = function(cfg) {
    * GET /api/import/schema/:entity
    * Returns column names from the XLSX source file
    */
-  router.get('/api/import/schema/:entity', (req, res) => {
+  router.get('/api/import/schema/:entity', async (req, res) => {
     try {
-      const result = importManager.getSourceSchema(req.params.entity);
+      const result = await importManager.getSourceSchema(req.params.entity);
 
       if (result.error) {
         res.status(400).json(result);
@@ -137,10 +137,10 @@ module.exports = function(cfg) {
    * Returns first N rows from the XLSX source file as JSON
    * Query params: count (default: 3)
    */
-  router.get('/api/import/sample/:entity', (req, res) => {
+  router.get('/api/import/sample/:entity', async (req, res) => {
     try {
       const count = parseInt(req.query.count) || 3;
-      const result = importManager.getSourceSample(req.params.entity, count);
+      const result = await importManager.getSourceSample(req.params.entity, count);
 
       if (result.error) {
         res.status(400).json(result);
@@ -158,7 +158,7 @@ module.exports = function(cfg) {
    * Validates import rule mapping against source schema and entity schema
    * Returns: { valid, sourceErrors[], targetErrors[] }
    */
-  router.get('/api/import/validate/:entity', (req, res) => {
+  router.get('/api/import/validate/:entity', async (req, res) => {
     try {
       const entityName = req.params.entity;
       const errors = { source: [], target: [] };
@@ -169,8 +169,8 @@ module.exports = function(cfg) {
         return res.json({ valid: false, error: 'No import definition found', sourceErrors: [], targetErrors: [] });
       }
 
-      // Get XLSX source schema
-      const sourceSchema = importManager.getSourceSchema(entityName);
+      // Get source schema
+      const sourceSchema = await importManager.getSourceSchema(entityName);
       const sourceColumns = sourceSchema.columns || [];
       const sourceColumnSet = new Set(sourceColumns);
 

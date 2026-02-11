@@ -55,13 +55,36 @@ function mapResult(doc, mapping) {
 }
 
 /**
+ * Build fetch options (headers) for a provider, including auth if configured.
+ * Supports: { type: "basic", login, password } or { type: "basic", configKey: "myApi" }
+ *           { type: "bearer", token } or { type: "bearer", configKey: "myApi" }
+ * When configKey is set, credentials are read from systemConfig[configKey].
+ */
+function buildFetchOptions(provider, systemConfig) {
+  const headers = {};
+  if (provider.auth) {
+    let creds = provider.auth;
+    if (creds.configKey && systemConfig) {
+      creds = { ...creds, ...systemConfig[creds.configKey] };
+    }
+    if (creds.type === 'basic' && creds.login && creds.password) {
+      headers['Authorization'] = `Basic ${Buffer.from(`${creds.login}:${creds.password}`).toString('base64')}`;
+    } else if (creds.type === 'bearer' && creds.token) {
+      headers['Authorization'] = `Bearer ${creds.token}`;
+    }
+  }
+  return Object.keys(headers).length ? { headers } : {};
+}
+
+/**
  * Query an external API provider.
  * @param {string} providerId - Provider key from api_providers.json
  * @param {string} searchTerm - Search term
  * @param {number} [page=1] - Page number for pagination
+ * @param {Object} [systemConfig=null] - System config for credential resolution
  * @returns {Promise<{results: Object[], totalCount: number, hasMore: boolean}>}
  */
-async function query(providerId, searchTerm, page = 1) {
+async function query(providerId, searchTerm, page = 1, systemConfig = null) {
   const provider = PROVIDERS[providerId];
   if (!provider) {
     throw new Error(`Unknown external query provider: ${providerId}`);
@@ -75,7 +98,8 @@ async function query(providerId, searchTerm, page = 1) {
 
   let response;
   try {
-    response = await fetch(url, { signal: controller.signal });
+    const fetchOpts = buildFetchOptions(provider, systemConfig);
+    response = await fetch(url, { ...fetchOpts, signal: controller.signal });
   } catch (err) {
     if (err.name === 'AbortError') {
       throw new Error('External API request timed out');
@@ -96,8 +120,14 @@ async function query(providerId, searchTerm, page = 1) {
     throw new Error('External API returned invalid JSON');
   }
 
-  const resultsField = provider.resultsField || 'results';
-  const results = (data[resultsField] || []).map(doc => mapResult(doc, provider.resultMapping));
+  let rawResults;
+  if (provider.singleResult) {
+    rawResults = Array.isArray(data) ? data : [data];
+  } else {
+    const resultsField = provider.resultsField || 'results';
+    rawResults = data[resultsField] || [];
+  }
+  const results = rawResults.map(doc => mapResult(doc, provider.resultMapping));
   const pag = provider.pagination || {};
   const totalCount = pag.totalCountField ? (data[pag.totalCountField] || results.length) : results.length;
   const hasMore = pag.hasMoreField ? !!data[pag.hasMoreField] : false;

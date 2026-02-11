@@ -349,7 +349,8 @@ if (enabledEntitiesRaw.length > 0) {
         requiredFilters,
         entityTableOptions,
         paths: cfg.paths,
-        viewsConfig: mdViews || []
+        viewsConfig: mdViews || [],
+        systemConfig: cfg
     });
 }
 

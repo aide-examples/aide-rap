@@ -213,5 +213,43 @@
     ],
     "pagination": null,
     "highlightKeywords": []
+  },
+
+  "kirsen-location": {
+    "name": "Tracker Location (Kirsen)",
+    "description": "Live GPS position and sensor data from Kirsen tracker",
+    "urlTemplate": "https://control.kirsenglobalsecurity.com/api/v2/locations/${term}/",
+    "auth": {
+      "type": "basic",
+      "configKey": "kirsenApi"
+    },
+    "singleResult": true,
+    "resultMapping": {
+      "description": "description",
+      "container": "container",
+      "lat": "latitude",
+      "lon": "longitude",
+      "altitude": "altitude",
+      "velocity": "velocity",
+      "coordType": "coord",
+      "battery": "battery",
+      "temperature": "temperature",
+      "humidity": "humidity",
+      "alerts": "alerts",
+      "lastCoords": "datetime_coords",
+      "lastSensors": "datetime_sensors"
+    },
+    "columns": [
+      { "key": "description", "header": "Device", "width": "120px" },
+      { "key": "position", "header": "Position", "type": "map-link", "latKey": "lat", "lonKey": "lon" },
+      { "key": "altitude", "header": "Alt", "width": "60px", "type": "number", "suffix": " m" },
+      { "key": "velocity", "header": "Speed", "width": "70px", "type": "number", "suffix": " m/s" },
+      { "key": "coordType", "header": "Fix", "width": "50px" },
+      { "key": "battery", "header": "Bat", "width": "50px", "type": "number", "suffix": "%" },
+      { "key": "temperature", "header": "Temp", "width": "60px", "type": "number", "suffix": " °C" },
+      { "key": "humidity", "header": "Hum", "width": "50px", "type": "number", "suffix": "%" }
+    ],
+    "pagination": null,
+    "highlightKeywords": []
   }
 }

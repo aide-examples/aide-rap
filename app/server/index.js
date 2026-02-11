@@ -34,7 +34,7 @@ const logger = require('./utils/logger');
  * @param {string} config.paths.database - Database filename
  */
 function init(app, config) {
-  const { appDir, enabledEntities, entityPrefilters, requiredFilters, entityTableOptions, paths, viewsConfig } = config;
+  const { appDir, enabledEntities, entityPrefilters, requiredFilters, entityTableOptions, paths, viewsConfig, systemConfig } = config;
 
   // Paths (use config paths if provided, fallback to legacy paths)
   const dbPath = paths ? path.join(paths.data, paths.database) : path.join(appDir, 'data', 'rap.sqlite');
@@ -89,7 +89,7 @@ function init(app, config) {
   app.use('/api/media', mediaRouter(mediaService, config));
 
   // Mount Admin router (development tools)
-  app.use(adminRouter());
+  app.use(adminRouter(systemConfig));
 
   // Error handler (after routes)
   app.use('/api', errorHandler);

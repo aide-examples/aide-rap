@@ -1,12 +1,15 @@
 /**
- * ImportManager - Manages XLSX imports based on MD definitions
+ * ImportManager - Manages data imports based on MD definitions
+ *
+ * Supports XLSX files, JSON files, and API URLs as data sources.
  *
  * Workflow:
  * 1. Parse import definition from docs/imports/*.md
- * 2. Read XLSX from data/extern/
- * 3. Apply column mapping
- * 4. Apply SQL-like filter
- * 5. Write JSON to data/import/
+ * 2. Load source data (XLSX, JSON file, or API URL)
+ * 3. Apply source edits and filters
+ * 4. Apply column mapping with transforms
+ * 5. Apply SQL-like filter
+ * 6. Write JSON to data/import/
  */
 
 const XLSX = require('xlsx');
@@ -54,8 +57,12 @@ class ImportManager {
       let sourceFile = null;
 
       if (definition && definition.source) {
-        const sourcePath = path.join(this.systemDir, 'data', definition.source);
-        hasSource = fs.existsSync(sourcePath);
+        if (definition.source.startsWith('http://') || definition.source.startsWith('https://')) {
+          hasSource = true; // API sources are always "available"
+        } else {
+          const sourcePath = path.join(this.systemDir, 'data', definition.source);
+          hasSource = fs.existsSync(sourcePath);
+        }
         sourceFile = definition.source;
       }
 
@@ -110,7 +117,7 @@ class ImportManager {
    * @param {string} entityName - Entity name
    * @returns {Object} - { columns, sourceFile, sheet, error }
    */
-  getSourceSchema(entityName) {
+  async getSourceSchema(entityName) {
     const definition = this.parseImportDefinition(entityName);
 
     if (!definition) {
@@ -121,6 +128,27 @@ class ImportManager {
       return { error: 'No source file specified in import definition' };
     }
 
+    // JSON/API sources: load first page and extract keys
+    const isUrl = definition.source.startsWith('http://') || definition.source.startsWith('https://');
+    const isJson = !isUrl && definition.source.endsWith('.json');
+
+    if (isUrl || isJson) {
+      try {
+        const { rawData, error } = isUrl
+          ? await this.loadFromApi(definition, 1)
+          : this.loadFromJson(path.join(this.systemDir, 'data', definition.source), definition);
+        if (!rawData || rawData.length === 0) {
+          return { error: error || 'No data returned from source' };
+        }
+        const columns = Object.keys(rawData[0]);
+        return { columns, sourceFile: definition.source };
+      } catch (e) {
+        this.logger.error('Failed to read source schema:', { error: e.message });
+        return { error: e.message };
+      }
+    }
+
+    // XLSX source
     const sourcePath = path.join(this.systemDir, 'data', definition.source);
 
     if (!fs.existsSync(sourcePath)) {
@@ -170,7 +198,7 @@ class ImportManager {
    * @param {number} count - Number of rows to return (default: 3)
    * @returns {Object} - { records, sourceFile, sheet, error }
    */
-  getSourceSample(entityName, count = 3) {
+  async getSourceSample(entityName, count = 3) {
     const definition = this.parseImportDefinition(entityName);
 
     if (!definition) {
@@ -181,6 +209,30 @@ class ImportManager {
       return { error: 'No source file specified in import definition' };
     }
 
+    // JSON/API sources: load first page and return first N records
+    const isUrl = definition.source.startsWith('http://') || definition.source.startsWith('https://');
+    const isJson = !isUrl && definition.source.endsWith('.json');
+
+    if (isUrl || isJson) {
+      try {
+        const { rawData, error } = isUrl
+          ? await this.loadFromApi(definition, 1)
+          : this.loadFromJson(path.join(this.systemDir, 'data', definition.source), definition);
+        if (!rawData) {
+          return { error: error || 'No data returned from source' };
+        }
+        return {
+          records: rawData.slice(0, count),
+          sourceFile: definition.source,
+          totalRows: rawData.length
+        };
+      } catch (e) {
+        this.logger.error('Failed to read source sample:', { error: e.message });
+        return { error: e.message };
+      }
+    }
+
+    // XLSX source
     const sourcePath = path.join(this.systemDir, 'data', definition.source);
 
     if (!fs.existsSync(sourcePath)) {
@@ -234,6 +286,8 @@ class ImportManager {
     const definition = {
       source: null,
       sheet: null,
+      dataPath: null,   // JSON path to data array (e.g. "data" or "response.items")
+      authKey: null,    // Config key for API credentials (e.g. "kirsenApi")
       maxRows: null,  // Optional row limit for large files (limits XLSX reading)
       limit: null,    // Optional output limit for testing (limits final output after filtering)
       first: null,    // Column name for deduplication (keep first occurrence)
@@ -307,6 +361,18 @@ class ImportManager {
             track: parts[1].split(',').map(s => s.trim()).filter(Boolean)
           };
         }
+        continue;
+      }
+
+      // Parse DataPath: directive (path to data array in JSON response, e.g. "data" or "response.items")
+      if (trimmed.startsWith('DataPath:')) {
+        definition.dataPath = trimmed.substring(9).trim();
+        continue;
+      }
+
+      // Parse AuthKey: directive (config key for API credentials, e.g. "kirsenApi")
+      if (trimmed.startsWith('AuthKey:')) {
+        definition.authKey = trimmed.substring(8).trim();
         continue;
       }
 
@@ -963,6 +1029,174 @@ class ImportManager {
   }
 
   /**
+   * Flatten nested JSON object to dot-notation keys
+   * { location: { lat: 48.1 } } → { "location": {...}, "location.lat": 48.1, "lat": 48.1 }
+   * Top-level keys are kept without prefix for convenience.
+   */
+  flattenObject(obj, prefix = '') {
+    const result = {};
+    for (const [key, value] of Object.entries(obj || {})) {
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        Object.assign(result, this.flattenObject(value, fullKey));
+      } else {
+        result[fullKey] = value;
+      }
+      // Top-level keys also without prefix for simple access
+      if (!prefix) result[key] = value;
+    }
+    return result;
+  }
+
+  /**
+   * Build HTTP auth headers from system config
+   * @param {string} authKey - Config key (e.g. "kirsenApi")
+   * @returns {Object} - Headers object
+   */
+  buildAuthHeaders(authKey) {
+    if (!authKey) return {};
+    const configPath = path.join(this.systemDir, 'config.json');
+    if (!fs.existsSync(configPath)) return {};
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const creds = config[authKey];
+    if (creds?.login && creds?.password) {
+      return { 'Authorization': `Basic ${Buffer.from(creds.login + ':' + creds.password).toString('base64')}` };
+    }
+    return {};
+  }
+
+  /**
+   * Navigate into a nested JSON object using a dot-path
+   * @param {*} data - Root data
+   * @param {string} dataPath - Dot-separated path (e.g. "data" or "response.items")
+   * @returns {*} - The value at the path
+   */
+  resolveDataPath(data, dataPath) {
+    if (!dataPath) return data;
+    for (const key of dataPath.split('.')) {
+      data = data?.[key];
+    }
+    return data;
+  }
+
+  /**
+   * Load data from a local JSON file
+   * @param {string} filePath - Absolute path to JSON file
+   * @param {Object} definition - Import definition with dataPath
+   * @returns {Object} - { rawData } or { rawData: null, error }
+   */
+  loadFromJson(filePath, definition) {
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    let data = this.resolveDataPath(raw, definition.dataPath);
+    if (!Array.isArray(data)) {
+      return { rawData: null, error: `JSON does not contain array${definition.dataPath ? ` at DataPath '${definition.dataPath}'` : ''}` };
+    }
+    return { rawData: data.map(item => this.flattenObject(item)) };
+  }
+
+  /**
+   * Load data from an API URL (with pagination support)
+   * @param {Object} definition - Import definition with source URL, authKey, dataPath
+   * @param {number} [maxPages=100] - Maximum pages to fetch
+   * @returns {Promise<Object>} - { rawData } or { rawData: null, error }
+   */
+  async loadFromApi(definition, maxPages = 100) {
+    let allData = [];
+    let url = definition.source;
+    const headers = this.buildAuthHeaders(definition.authKey);
+    let page = 0;
+
+    while (url && page < maxPages) {
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) {
+        return { rawData: null, error: `API returned HTTP ${resp.status}: ${resp.statusText}` };
+      }
+      const json = await resp.json();
+
+      let pageData = this.resolveDataPath(json, definition.dataPath);
+      if (Array.isArray(pageData)) {
+        allData = allData.concat(pageData);
+      } else if (pageData && typeof pageData === 'object') {
+        // Single-object response (no array)
+        allData.push(pageData);
+      }
+
+      // Follow pagination links (Kirsen pattern: links.next)
+      url = json?.links?.next || null;
+      page++;
+    }
+
+    if (allData.length === 0) {
+      return { rawData: null, error: 'API returned no data' };
+    }
+    return { rawData: allData.map(item => this.flattenObject(item)) };
+  }
+
+  /**
+   * Load data from XLSX file (extracted from original runImport)
+   * @param {string} sourcePath - Absolute path to XLSX file
+   * @param {Object} definition - Import definition with sheet, maxRows, limit
+   * @returns {Object} - { rawData } or { rawData: null, error }
+   */
+  loadFromXlsx(sourcePath, definition) {
+    // Check for LibreOffice/Excel lock file
+    const sourceDir = path.dirname(sourcePath);
+    const sourceFile = path.basename(sourcePath);
+    const lockFile = path.join(sourceDir, `.~lock.${sourceFile}#`);
+    if (fs.existsSync(lockFile)) {
+      return {
+        rawData: null,
+        error: `File is locked (open in another application): ${sourceFile}. Please close the file and try again.`
+      };
+    }
+
+    const maxRows = definition.maxRows || 100000;
+    const effectiveMaxRows = definition.limit ? Math.min(maxRows, definition.limit + 1) : maxRows;
+    const workbook = XLSX.readFile(sourcePath, { sheetRows: effectiveMaxRows });
+
+    let sheetName = definition.sheet;
+    if (!sheetName) {
+      sheetName = workbook.SheetNames[0];
+    }
+
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) {
+      return { rawData: null, error: `Sheet '${sheetName}' not found in XLSX` };
+    }
+
+    const rawData = XLSX.utils.sheet_to_json(sheet, { defval: null });
+    return { rawData };
+  }
+
+  /**
+   * Load source data based on definition type (URL, JSON file, or XLSX)
+   * @param {Object} definition - Import definition
+   * @returns {Promise<Object>} - { rawData } or { rawData: null, error }
+   */
+  async loadSourceData(definition) {
+    const source = definition.source;
+
+    // API URL
+    if (source.startsWith('http://') || source.startsWith('https://')) {
+      return this.loadFromApi(definition);
+    }
+
+    // Local file
+    const sourcePath = path.join(this.systemDir, 'data', source);
+    if (!fs.existsSync(sourcePath)) {
+      return { rawData: null, error: `Source not found: ${source}` };
+    }
+
+    // JSON file
+    if (source.endsWith('.json')) {
+      return this.loadFromJson(sourcePath, definition);
+    }
+
+    // XLSX file (default)
+    return this.loadFromXlsx(sourcePath, definition);
+  }
+
+  /**
    * Run import for an entity
    * @param {string} entityName - Entity name
    * @returns {Promise<Object>} - { success, recordsRead, recordsFiltered, recordsWritten, error }
@@ -978,46 +1212,16 @@ class ImportManager {
       return { success: false, error: 'No source file specified in import definition' };
     }
 
-    const sourcePath = path.join(this.systemDir, 'data', definition.source);
-
-    if (!fs.existsSync(sourcePath)) {
-      return { success: false, error: `Source file not found: ${definition.source}` };
-    }
-
-    // Check for LibreOffice/Excel lock file
-    const sourceDir = path.dirname(sourcePath);
-    const sourceFile = path.basename(sourcePath);
-    const lockFile = path.join(sourceDir, `.~lock.${sourceFile}#`);
-    if (fs.existsSync(lockFile)) {
-      return {
-        success: false,
-        error: `File is locked (open in another application): ${sourceFile}. Please close the file and try again.`
-      };
-    }
-
     try {
-      // Read XLSX with row limit to avoid processing empty rows
-      // (Excel files sometimes have range extending to max rows due to formatting)
-      const maxRows = definition.maxRows || 100000;
-      // When Limit is set, also cap XLSX reading (+1 for header row)
-      const effectiveMaxRows = definition.limit ? Math.min(maxRows, definition.limit + 1) : maxRows;
-      const workbook = XLSX.readFile(sourcePath, { sheetRows: effectiveMaxRows });
-
-      // Select sheet
-      let sheetName = definition.sheet;
-      if (!sheetName) {
-        sheetName = workbook.SheetNames[0];
+      // Load source data (XLSX, JSON file, or API)
+      const { rawData: loadedData, error: loadError } = await this.loadSourceData(definition);
+      if (!loadedData) {
+        return { success: false, error: loadError };
       }
 
-      const sheet = workbook.Sheets[sheetName];
-      if (!sheet) {
-        return { success: false, error: `Sheet '${sheetName}' not found in XLSX` };
-      }
-
-      // Convert to JSON (array of objects with original column names)
-      let rawData = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      let rawData = loadedData;
       const recordsRead = rawData.length;
-      this.logger.debug('XLSX parsed:', { recordsRead });
+      this.logger.debug('Source loaded:', { recordsRead, source: definition.source });
 
       // Apply limit early (truncate before any processing to save time)
       let recordsLimited = 0;

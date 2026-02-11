@@ -8,7 +8,7 @@ const logger = require('../utils/logger');
 const { reloadUserViews, getDatabasePath } = require('../config/database');
 const ExternalQueryService = require('../services/ExternalQueryService');
 
-module.exports = function() {
+module.exports = function(systemConfig) {
   const router = express.Router();
 
   /**
@@ -79,7 +79,7 @@ module.exports = function() {
       return res.status(400).json({ error: 'Missing required parameters: provider, term' });
     }
     try {
-      const result = await ExternalQueryService.query(provider, term, parseInt(page) || 1);
+      const result = await ExternalQueryService.query(provider, term, parseInt(page) || 1, systemConfig);
       res.json(result);
     } catch (err) {
       logger.error('External query failed', { provider, term, error: err.message });
