@@ -216,16 +216,19 @@ const ContextMenu = {
     }
 
     // API Refresh items — only when entity has apiRefresh configured
+    // apiRefresh is now an array of { name, mode, label }
     if (!isViewMode && context.entity) {
       const schema = SchemaCache.getExtended(context.entity);
-      const refreshNames = schema?.apiRefresh || [];
-      if (refreshNames.length > 0) {
+      const refreshList = schema?.apiRefresh || [];
+      if (refreshList.length > 0) {
         let refreshHtml = '<div class="context-menu-separator"></div>';
-        for (const name of refreshNames) {
+        for (const refresh of refreshList) {
+          const isBulk = refresh.mode === 'bulk';
           refreshHtml += `<div class="context-menu-item context-menu-refresh-item"
-                               data-refresh-name="${DomUtils.escapeHtml(name)}">
-            <span class="context-menu-icon">&#128260;</span>
-            <span>Refresh ${DomUtils.escapeHtml(name)}</span>
+                               data-refresh-name="${DomUtils.escapeHtml(refresh.name)}"
+                               data-refresh-mode="${DomUtils.escapeHtml(refresh.mode || 'bulk')}">
+            <span class="context-menu-icon">${isBulk ? '&#128260;' : '&#128269;'}</span>
+            <span>${DomUtils.escapeHtml(refresh.label)}</span>
           </div>`;
         }
         viewsContainer.insertAdjacentHTML('beforeend', refreshHtml);
@@ -233,22 +236,39 @@ const ContextMenu = {
           item.addEventListener('click', async (e) => {
             e.stopPropagation();
             const refreshName = item.dataset.refreshName;
+            const refreshMode = item.dataset.refreshMode;
             const recordId = this.currentContext.recordId;
             const entityName = this.currentContext.entity;
             this.hide();
             try {
-              Toast.show(`Refreshing ${refreshName}...`, 'info');
-              const result = await ApiClient.refreshRecord(entityName, refreshName, recordId);
-              const msg = result.updated > 0
-                ? `Updated ${result.updated} field(s) in ${result.duration}s`
-                : `No changes (${result.duration}s)`;
-              Toast.show(msg, result.updated > 0 ? 'success' : 'info');
+              DomUtils.toast(`Refreshing ${refreshName}...`, 'info');
+              let result;
+              if (refreshMode === 'single') {
+                result = await ApiClient.refreshRecord(entityName, refreshName, recordId);
+              } else {
+                result = await ApiClient.refreshEntity(entityName, refreshName);
+              }
+              // Show FK errors in a dialog if any
+              if (result.fkErrors && result.fkErrors.length > 0) {
+                const errorLines = result.fkErrors.map(e =>
+                  `${e.field}: "${e.value}" not found in ${e.targetEntity}`
+                );
+                const msg = result.updated > 0
+                  ? `Updated ${result.updated} field(s), but with warnings:`
+                  : 'No fields updated. Errors:';
+                DomUtils.toast(`${msg}\n${errorLines.join('\n')}`, result.updated > 0 ? 'warning' : 'error', 8000);
+              } else {
+                const msg = result.updated > 0
+                  ? `Updated ${result.updated} field(s) in ${result.duration}s`
+                  : `No changes (${result.duration}s)`;
+                DomUtils.toast(msg, result.updated > 0 ? 'success' : 'info');
+              }
               // Reload current view
               if (typeof EntityExplorer !== 'undefined') {
                 EntityExplorer.loadRecords();
               }
             } catch (err) {
-              Toast.show(`Refresh failed: ${err.message}`, 'error');
+              DomUtils.toast(`Refresh failed: ${err.message}`, 'error');
             }
           });
         });

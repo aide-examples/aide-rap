@@ -49,8 +49,10 @@ const EntityMap = {
    * Load data onto the map (works with both views and entities)
    * @param {Object} schema - View schema or entity schema (both have columns)
    * @param {Array} records - Data records
+   * @param {Object} [options] - { entityName } for entity-specific features
    */
-  load(schema, records) {
+  load(schema, records, options = {}) {
+    this.entityName = options.entityName || null;
     if (!this.container) {
       this.container = document.getElementById('entity-map-container');
     }
@@ -122,9 +124,37 @@ const EntityMap = {
       marker.bindPopup(popupContent, { maxWidth: 300 });
 
       // Track selection when popup opens (for deep-link serialization)
-      marker.on('popupopen', () => {
+      // Also attach click handlers for API action links
+      marker.on('popupopen', (e) => {
         if (typeof EntityExplorer !== 'undefined') {
           EntityExplorer.selectedId = record.id;
+        }
+        // Attach API link click handlers
+        const popupEl = e.popup.getElement();
+        if (popupEl) {
+          popupEl.querySelectorAll('.map-popup-api-link').forEach(link => {
+            link.addEventListener('click', async (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              const refreshName = link.dataset.refresh;
+              const recordId = link.dataset.recordId;
+              if (!this.entityName || !refreshName || !recordId) return;
+              try {
+                const result = await ApiClient.request(
+                  `/api/import/refresh/${this.entityName}/${refreshName}/${recordId}/preview`
+                );
+                if (typeof JsonPreviewDialog !== 'undefined') {
+                  JsonPreviewDialog.show(refreshName, result.url, result.raw, {
+                    entityName: this.entityName,
+                    refreshName,
+                    recordId
+                  });
+                }
+              } catch (err) {
+                DomUtils.toast(`Preview failed: ${err.message}`, 'error');
+              }
+            });
+          });
         }
       });
 
@@ -227,6 +257,23 @@ const EntityMap = {
     }
 
     html += '</table>';
+
+    // API action links for single-mode refreshes (when in entity mode with apiRefresh)
+    if (this.entityName && record.id) {
+      const entitySchema = SchemaCache.getExtended(this.entityName);
+      const singleRefreshes = (entitySchema?.apiRefresh || []).filter(r => r.mode === 'single');
+      if (singleRefreshes.length > 0) {
+        html += '<div class="map-popup-actions">';
+        for (const refresh of singleRefreshes) {
+          html += `<a href="#" class="map-popup-api-link"
+                      data-refresh="${DomUtils.escapeHtml(refresh.name)}"
+                      data-record-id="${record.id}">
+            ${DomUtils.escapeHtml(refresh.label)} &#8599;</a>`;
+        }
+        html += '</div>';
+      }
+    }
+
     html += '</div>';
     return html;
   },

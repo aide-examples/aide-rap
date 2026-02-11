@@ -289,6 +289,8 @@ class ImportManager {
       dataPath: null,   // JSON path to data array (e.g. "data" or "response.items")
       authKey: null,    // Config key for API credentials (e.g. "kirsenApi")
       match: null,      // Match directive for refresh imports { entityField, apiField }
+      mode: null,       // 'bulk' or 'single' (for API refresh definitions)
+      label: null,      // Display label for UI (e.g. "Refresh GPS (all stands)")
       maxRows: null,  // Optional row limit for large files (limits XLSX reading)
       limit: null,    // Optional output limit for testing (limits final output after filtering)
       first: null,    // Column name for deduplication (keep first occurrence)
@@ -386,6 +388,18 @@ class ImportManager {
             apiField: matchParts[1]
           };
         }
+        continue;
+      }
+
+      // Parse Mode: directive (bulk or single — for API refresh definitions)
+      if (trimmed.startsWith('Mode:')) {
+        definition.mode = trimmed.substring(5).trim().toLowerCase();
+        continue;
+      }
+
+      // Parse Label: directive (display label for UI)
+      if (trimmed.startsWith('Label:')) {
+        definition.label = trimmed.substring(6).trim();
         continue;
       }
 
@@ -515,13 +529,12 @@ class ImportManager {
     // Regex replace: replace:/pattern/replacement/flags
     if (transform.startsWith('replace:')) {
       const spec = transform.substring(8);
-      // Parse /pattern/replacement/flags format
-      const match = spec.match(/^\/(.+?)\/(.*)\/([gimsuy]*)$/);
-      if (match) {
-        const [, pattern, replacement, flags] = match;
+      // Parse /pattern/replacement/flags format, handling escaped slashes in pattern
+      const parsed = this._parseReplaceSpec(spec);
+      if (parsed) {
         try {
-          const regex = new RegExp(pattern, flags || 'g');
-          return str.replace(regex, replacement);
+          const regex = new RegExp(parsed.pattern, parsed.flags || 'g');
+          return str.replace(regex, parsed.replacement);
         } catch (e) {
           this.logger.warn(`Invalid regex in replace transform: ${e.message}`);
           return value;
@@ -577,6 +590,50 @@ class ImportManager {
         this.logger.warn(`Unknown transform: ${transform}`);
         return value;
     }
+  }
+
+  /**
+   * Parse /pattern/replacement/flags spec, handling escaped slashes within pattern/replacement.
+   * @param {string} spec - The replace spec (e.g. /foo/bar/gi)
+   * @returns {{ pattern: string, replacement: string, flags: string } | null}
+   */
+  _parseReplaceSpec(spec) {
+    if (!spec.startsWith('/')) return null;
+    let i = 1;
+    let pattern = '';
+    let replacement = '';
+
+    // Parse pattern until unescaped /
+    while (i < spec.length) {
+      if (spec[i] === '\\' && i + 1 < spec.length) {
+        pattern += spec[i] + spec[i + 1];
+        i += 2;
+      } else if (spec[i] === '/') {
+        i++;
+        break;
+      } else {
+        pattern += spec[i];
+        i++;
+      }
+    }
+
+    // Parse replacement until unescaped /
+    while (i < spec.length) {
+      if (spec[i] === '\\' && i + 1 < spec.length) {
+        replacement += spec[i] + spec[i + 1];
+        i += 2;
+      } else if (spec[i] === '/') {
+        i++;
+        break;
+      } else {
+        replacement += spec[i];
+        i++;
+      }
+    }
+
+    const flags = spec.substring(i);
+    if (!pattern) return null;
+    return { pattern, replacement, flags };
   }
 
   /**
@@ -1478,6 +1535,112 @@ class ImportManager {
     } catch (e) {
       this.logger.error('Refresh error:', { error: e.message });
       return { records: null, error: e.message };
+    }
+  }
+
+  /**
+   * Run a single-record API refresh: fetch one record by match value, apply mapping
+   * Used for mode=single refresh definitions where API URL is per-record.
+   *
+   * @param {string} entityName - Entity name
+   * @param {string} refreshName - Refresh name (e.g., "engines")
+   * @param {string|number} matchValue - The match field value (e.g., kirsen_id = 10717)
+   * @returns {Promise<Object>} - { records, match, recordsRead, error }
+   */
+  async runSingleRefresh(entityName, refreshName, matchValue) {
+    const definition = this.parseRefreshDefinition(entityName, refreshName);
+
+    if (!definition) {
+      return { records: null, error: `No refresh definition found for ${entityName}.${refreshName}` };
+    }
+
+    if (!definition.source) {
+      return { records: null, error: 'No source URL specified in refresh definition' };
+    }
+
+    try {
+      // Build single-record URL: base URL + match value
+      const singleUrl = definition.source + encodeURIComponent(matchValue);
+      const headers = this.buildAuthHeaders(definition.authKey);
+
+      const resp = await fetch(singleUrl, { headers });
+      if (!resp.ok) {
+        return { records: null, error: `API returned HTTP ${resp.status}: ${resp.statusText}` };
+      }
+
+      const json = await resp.json();
+
+      // Resolve data path if configured, then ensure array
+      let data = this.resolveDataPath(json, definition.dataPath);
+      if (!Array.isArray(data)) {
+        data = data ? [data] : [];
+      }
+
+      if (data.length === 0) {
+        return { records: null, error: 'API returned no data' };
+      }
+
+      const rawData = data.map(item => this.flattenObject(item));
+      const recordsRead = rawData.length;
+
+      // Apply mapping with transforms
+      const mappedRecords = rawData.map(row => {
+        const mapped = {};
+        // Always include the API match field (so SeedManager can match)
+        mapped[definition.match.apiField] = row[definition.match.apiField];
+
+        for (const { source: sourceExprStr, target: targetCol, transform } of definition.mapping) {
+          const sourceExpr = this.parseSourceExpression(sourceExprStr);
+          let value = this.resolveSourceValue(sourceExpr, row);
+
+          if (value !== undefined) {
+            if (transform) {
+              value = this.applyTransform(value, transform, row);
+            }
+            mapped[targetCol] = value;
+          }
+        }
+        return mapped;
+      });
+
+      return {
+        records: mappedRecords,
+        match: definition.match,
+        recordsRead
+      };
+    } catch (e) {
+      this.logger.error('Single refresh error:', { error: e.message });
+      return { records: null, error: e.message };
+    }
+  }
+
+  /**
+   * Fetch raw API response for preview (no mapping, no DB update)
+   * @param {string} entityName - Entity name
+   * @param {string} refreshName - Refresh name
+   * @param {string|number} matchValue - The match field value
+   * @returns {Promise<Object>} - { url, raw, error }
+   */
+  async fetchRawPreview(entityName, refreshName, matchValue) {
+    const definition = this.parseRefreshDefinition(entityName, refreshName);
+
+    if (!definition) {
+      return { url: null, raw: null, error: `No refresh definition found for ${entityName}.${refreshName}` };
+    }
+
+    try {
+      const url = definition.source + encodeURIComponent(matchValue);
+      const headers = this.buildAuthHeaders(definition.authKey);
+
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) {
+        return { url, raw: null, error: `API returned HTTP ${resp.status}: ${resp.statusText}` };
+      }
+
+      const raw = await resp.json();
+      return { url, raw };
+    } catch (e) {
+      return { url: null, raw: null, error: e.message };
     }
   }
 }

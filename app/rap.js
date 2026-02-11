@@ -292,11 +292,14 @@ app.get('/api/config/bridge-filter', (req, res) => {
     }
 });
 
-// Welcome screen content (system-specific)
+// Welcome screen content (system-specific, markdown preferred, HTML fallback)
 app.get('/api/config/welcome', (req, res) => {
-    const welcomePath = path.join(cfg.paths.docs, 'welcome.html');
-    if (fs.existsSync(welcomePath)) {
-        res.json({ html: fs.readFileSync(welcomePath, 'utf-8') });
+    const mdPath = path.join(cfg.paths.docs, 'welcome.md');
+    const htmlPath = path.join(cfg.paths.docs, 'welcome.html');
+    if (fs.existsSync(mdPath)) {
+        res.json({ markdown: fs.readFileSync(mdPath, 'utf-8') });
+    } else if (fs.existsSync(htmlPath)) {
+        res.json({ html: fs.readFileSync(htmlPath, 'utf-8') });
     } else {
         res.json({ html: '' });
     }
@@ -385,6 +388,8 @@ if (enabledEntitiesRaw.length > 0) {
 const GenericService = require('./server/services/GenericService');
 const { buildViewSummary, buildViewSchema } = require('./server/routers/UserViewRouter');
 const { buildProcessData } = require('./server/routers/ProcessRouter');
+const ImportManager = require('./server/utils/ImportManager');
+const metaImportManager = new ImportManager(SYSTEM_DIR, require('./server/utils/logger'));
 
 app.get('/api/meta/version', (req, res) => {
     res.json({ metaVersion: getMetaVersion() });
@@ -407,6 +412,20 @@ app.get('/api/meta', (req, res) => {
         // System entities (AuditTrail etc.) register their schemas via SystemEntityRegistry
         const systemSchemas = require('./server/utils/SystemEntityRegistry').getAll();
         Object.assign(schemas, systemSchemas);
+
+        // Enrich apiRefresh: string array → object array with mode/label from definitions
+        for (const [entityName, extSchema] of Object.entries(schemas)) {
+            if (extSchema.apiRefresh && Array.isArray(extSchema.apiRefresh)) {
+                extSchema.apiRefresh = extSchema.apiRefresh.map(name => {
+                    const def = metaImportManager.parseRefreshDefinition(entityName, name);
+                    return {
+                        name,
+                        mode: def?.mode || 'bulk',
+                        label: def?.label || `Refresh ${name}`
+                    };
+                });
+            }
+        }
 
         // Views: list, groups, and all view schemas
         const userViews = schema.userViews || [];

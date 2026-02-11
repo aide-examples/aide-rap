@@ -258,6 +258,21 @@ function buildLookupFromRows(rows, labelCol, label2Col) {
 }
 
 /**
+ * Add normalized keys to a lookup for whitespace-insensitive fallback matching.
+ * Strips all whitespace and lowercases to build a parallel _normalized map.
+ * Used when exact label match fails — e.g., "PW1100G-JM" matches "PW 1100G-JM".
+ */
+function addNormalizedKeys(lookup) {
+  const normalized = {};
+  for (const [key, id] of Object.entries(lookup)) {
+    if (key.startsWith('#')) continue;
+    const norm = key.replace(/\s+/g, '').toLowerCase();
+    if (!(norm in normalized)) normalized[norm] = id;
+  }
+  lookup._normalized = normalized;
+}
+
+/**
  * Build a lookup map for an entity: LABEL value -> id
  * Used to resolve conceptual FK references (e.g., "manufacturer": "Airbus" -> manufacturer_id: 1)
  *
@@ -276,31 +291,40 @@ function buildLabelLookup(entityName) {
 
   if (!entity) return {};
 
+  let lookup;
+
   // Check if entity has computed labelExpression (from entity-level [LABEL=expr])
   if (entity.labelExpression) {
     // Query from view which has the computed _label column
     const sql = `SELECT id, _label FROM ${entity.tableName}_view ORDER BY id`;
     try {
       const rows = db.prepare(sql).all();
-      return buildLookupFromComputedLabel(rows);
+      lookup = buildLookupFromComputedLabel(rows);
     } catch (e) {
       // Fallback to column-based lookup if view doesn't exist yet
       console.warn(`Warning: Could not use _label from view for ${entityName}, falling back to column lookup`);
     }
   }
 
-  // Standard column-based lookup
-  const labelCol = entity.columns.find(c => c.ui?.label);
-  const label2Col = entity.columns.find(c => c.ui?.label2);
+  if (!lookup) {
+    // Standard column-based lookup
+    const labelCol = entity.columns.find(c => c.ui?.label);
+    const label2Col = entity.columns.find(c => c.ui?.label2);
 
-  const selectCols = ['id'];
-  if (labelCol) selectCols.push(labelCol.name);
-  if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
+    const selectCols = ['id'];
+    if (labelCol) selectCols.push(labelCol.name);
+    if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
 
-  const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} ORDER BY id`;
-  const rows = db.prepare(sql).all();
+    const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} ORDER BY id`;
+    const rows = db.prepare(sql).all();
 
-  return buildLookupFromRows(rows, labelCol, label2Col);
+    lookup = buildLookupFromRows(rows, labelCol, label2Col);
+  }
+
+  // Build normalized lookup for whitespace-insensitive fallback matching
+  addNormalizedKeys(lookup);
+
+  return lookup;
 }
 
 /**
@@ -462,24 +486,29 @@ function buildLabelLookupFromSeed(entityName) {
     const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
     if (!Array.isArray(seedData) || seedData.length === 0) return { lookup: {}, found: false };
 
+    let lookup;
+
     // Check for entity-level labelExpression first
     if (entity.labelExpression) {
-      return { lookup: buildLookupFromExpressionRecords(seedData, entity.labelExpression), found: true };
+      lookup = buildLookupFromExpressionRecords(seedData, entity.labelExpression);
+    } else {
+      // Standard column-based lookup
+      const labelCol = entity.columns.find(c => c.ui?.label);
+      const label2Col = entity.columns.find(c => c.ui?.label2);
+
+      // Seed files use attribute names (not DB column names with _id suffix).
+      // LABEL/LABEL2 columns are always non-FK attributes, so names match.
+      const rows = seedData.map((r, idx) => ({
+        id: idx + 1,
+        ...(labelCol ? { [labelCol.name]: r[labelCol.name] ?? null } : {}),
+        ...(label2Col ? { [label2Col.name]: r[label2Col.name] ?? null } : {})
+      }));
+
+      lookup = buildLookupFromRows(rows, labelCol, label2Col);
     }
 
-    // Standard column-based lookup
-    const labelCol = entity.columns.find(c => c.ui?.label);
-    const label2Col = entity.columns.find(c => c.ui?.label2);
-
-    // Seed files use attribute names (not DB column names with _id suffix).
-    // LABEL/LABEL2 columns are always non-FK attributes, so names match.
-    const rows = seedData.map((r, idx) => ({
-      id: idx + 1,
-      ...(labelCol ? { [labelCol.name]: r[labelCol.name] ?? null } : {}),
-      ...(label2Col ? { [label2Col.name]: r[label2Col.name] ?? null } : {})
-    }));
-
-    return { lookup: buildLookupFromRows(rows, labelCol, label2Col), found: true };
+    addNormalizedKeys(lookup);
+    return { lookup, found: true };
   } catch (e) {
     return { lookup: {}, found: false };
   }
@@ -539,60 +568,62 @@ function resolveConceptualFKs(entityName, record, lookups) {
     const technicalName = fk.column;        // e.g., "manufacturer_id"
     const targetEntity = fk.references?.entity || entityName; // Fall back to self for self-refs
 
-    // Check if record uses conceptual name (e.g., "manufacturer": "Airbus")
+    // Determine which key the record uses and extract the label value
+    let recordKey, labelValue;
     if (conceptualName && conceptualName in record && typeof record[conceptualName] === 'string') {
-      const labelValue = record[conceptualName];
-      const lookup = lookups[targetEntity] || {};
-      const resolvedId = lookup[labelValue];
+      recordKey = conceptualName;
+      labelValue = record[conceptualName];
+    } else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
+      // AI sometimes uses _id suffix despite prompt instructions
+      recordKey = technicalName;
+      labelValue = record[technicalName];
+    }
 
-      if (resolvedId !== undefined) {
-        // Replace conceptual name with technical name and resolved ID
-        resolved[technicalName] = resolvedId;
-        delete resolved[conceptualName];
-      } else {
-        // Try fuzzy matching for concat-based labels
-        const targetEntitySchema = schema.entities[targetEntity];
-        const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
-        const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+    if (!labelValue) continue;
 
-        if (fuzzyResult) {
-          resolved[technicalName] = fuzzyResult.id;
-          delete resolved[conceptualName];
-          lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
-          fuzzyMatches.push({ field: conceptualName, value: labelValue, matchedLabel: fuzzyResult.matchedLabel, targetEntity });
-        } else {
-          console.warn(`  Warning: Could not resolve ${conceptualName}="${labelValue}" for ${entityName}`);
-          eventBus.emit('seed:resolve:warning', { entityName, field: conceptualName, value: labelValue, targetEntity });
-          fkWarnings.push({ field: conceptualName, value: labelValue, targetEntity });
-          delete resolved[conceptualName];
-        }
+    const lookup = lookups[targetEntity] || {};
+    const fieldLabel = conceptualName || technicalName;
+    let resolvedId = lookup[labelValue];
+
+    // Fallback 1: whitespace-normalized match (e.g., "PW1100G-JM" matches "PW 1100G-JM")
+    if (resolvedId === undefined && lookup._normalized) {
+      const norm = labelValue.replace(/\s+/g, '').toLowerCase();
+      resolvedId = lookup._normalized[norm];
+      if (resolvedId !== undefined) lookup[labelValue] = resolvedId; // cache
+    }
+
+    // Fallback 2: fuzzy match for concat-based labels (subsequence matching)
+    if (resolvedId === undefined) {
+      const targetEntitySchema = schema.entities[targetEntity];
+      const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
+      const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+      if (fuzzyResult) {
+        resolvedId = fuzzyResult.id;
+        lookup[labelValue] = resolvedId; // cache
+        fuzzyMatches.push({ field: fieldLabel, value: labelValue, matchedLabel: fuzzyResult.matchedLabel, targetEntity });
       }
     }
-    // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
-    // AI sometimes uses _id suffix despite prompt instructions
-    else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
-      const labelValue = record[technicalName];
-      const lookup = lookups[targetEntity] || {};
-      const resolvedId = lookup[labelValue];
 
-      if (resolvedId !== undefined) {
-        resolved[technicalName] = resolvedId;
+    // Fallback 3: UNIQUE field match (e.g., Engine serial_number "771706")
+    if (resolvedId === undefined) {
+      const uniqueId = findByUniqueField(targetEntity, labelValue);
+      if (uniqueId !== null) {
+        resolvedId = uniqueId;
+        lookup[labelValue] = resolvedId; // cache
+      }
+    }
+
+    if (resolvedId !== undefined) {
+      resolved[technicalName] = resolvedId;
+      if (recordKey !== technicalName) delete resolved[recordKey];
+    } else {
+      console.warn(`  Warning: Could not resolve ${fieldLabel}="${labelValue}" for ${entityName}`);
+      eventBus.emit('seed:resolve:warning', { entityName, field: fieldLabel, value: labelValue, targetEntity });
+      fkWarnings.push({ field: fieldLabel, value: labelValue, targetEntity });
+      if (recordKey === technicalName) {
+        resolved[technicalName] = null;
       } else {
-        // Try fuzzy matching for concat-based labels
-        const targetEntitySchema = schema.entities[targetEntity];
-        const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
-        const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
-
-        if (fuzzyResult) {
-          resolved[technicalName] = fuzzyResult.id;
-          lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
-          fuzzyMatches.push({ field: conceptualName || technicalName, value: labelValue, matchedLabel: fuzzyResult.matchedLabel, targetEntity });
-        } else {
-          console.warn(`  Warning: Could not resolve ${technicalName}="${labelValue}" for ${entityName}`);
-          eventBus.emit('seed:resolve:warning', { entityName, field: technicalName, value: labelValue, targetEntity });
-          fkWarnings.push({ field: conceptualName || technicalName, value: labelValue, targetEntity });
-          resolved[technicalName] = null;
-        }
+        delete resolved[recordKey];
       }
     }
   }
@@ -853,54 +884,48 @@ function validateImport(entityName, records) {
       const conceptualName = fk.displayName;
       const technicalName = fk.column;
       const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
+      const fkColumn = entity.columns.find(c => c.name === technicalName);
+      const isOptionalFK = fkColumn?.optional === true;
 
-      // Check conceptual name (e.g., "manufacturer": "Airbus")
+      // Determine which key the record uses and extract the label value
+      let fieldName, labelValue;
       if (conceptualName && record[conceptualName]) {
-        const labelValue = record[conceptualName];
-        const lookup = lookups[targetEntity] || {};
-
-        if (!lookup[labelValue]) {
-          // Try fuzzy matching before marking as invalid
-          const targetEntitySchema = schema.entities[targetEntity];
-          const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
-          const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
-
-          if (fuzzyResult) {
-            lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
-          } else {
-            warnings.push({
-              row: i + 1,
-              field: conceptualName,
-              value: labelValue,
-              targetEntity,
-              message: `"${labelValue}" not found in ${targetEntity}`
-            });
-            invalidRows.add(i + 1);
-          }
-        }
+        fieldName = conceptualName;
+        labelValue = record[conceptualName];
+      } else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
+        fieldName = technicalName;
+        labelValue = record[technicalName];
       }
-      // Fallback: technical name with label string (e.g., "engine_id": "GE-900101")
-      else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
-        const labelValue = record[technicalName];
-        const lookup = lookups[targetEntity] || {};
 
-        if (!lookup[labelValue]) {
-          // Try fuzzy matching before marking as invalid
-          const targetEntitySchema = schema.entities[targetEntity];
-          const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
-          const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+      if (!labelValue) continue;
 
-          if (fuzzyResult) {
-            lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
+      const lookup = lookups[targetEntity] || {};
+
+      if (!lookup[labelValue]) {
+        // Fallback 1: fuzzy matching for concat-based labels
+        const targetEntitySchema = schema.entities[targetEntity];
+        const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
+        const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
+
+        if (fuzzyResult) {
+          lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
+        } else {
+          // Fallback 2: UNIQUE field match (e.g., Engine.serial_number)
+          const uniqueId = findByUniqueField(targetEntity, labelValue);
+          if (uniqueId !== null) {
+            lookup[labelValue] = uniqueId; // cache for subsequent records
           } else {
             warnings.push({
               row: i + 1,
-              field: technicalName,
+              field: fieldName,
               value: labelValue,
               targetEntity,
               message: `"${labelValue}" not found in ${targetEntity}`
             });
-            invalidRows.add(i + 1);
+            // Only invalidate row for required FK fields — optional FKs get set to NULL during load
+            if (!isOptionalFK) {
+              invalidRows.add(i + 1);
+            }
           }
         }
       }
@@ -1610,7 +1635,7 @@ async function importAll() {
         // Load entity using loadEntity which handles both directories
         const result = await loadEntity(entity.className, lookups, {
           mode: 'merge',
-          sourceDirectory: path.dirname(sourceFile)
+          sourceDir: source
         });
 
         results[entity.className] = { ...result, source };
@@ -1904,14 +1929,37 @@ async function restoreBackup() {
 }
 
 /**
+ * Find a record by searching all UNIQUE columns of an entity
+ * Used as fallback when LABEL matching fails during refresh FK resolution.
+ *
+ * @param {string} entityName - Entity name
+ * @param {string} value - The value to search for
+ * @returns {number|null} - The record ID or null
+ */
+function findByUniqueField(entityName, value) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+  if (!entity) return null;
+
+  const uniqueCols = entity.columns.filter(c => c.unique);
+  for (const col of uniqueCols) {
+    const row = db.prepare(`SELECT id FROM ${entity.tableName} WHERE ${col.name} = ?`).get(value);
+    if (row) return row.id;
+  }
+  return null;
+}
+
+/**
  * Refresh entity records from external API data.
  * Matches API records to existing DB records via a match field, then UPDATEs.
+ * Supports FK resolution: if a mapped target field is a foreign key and the value
+ * is a string, it will be resolved via LABEL lookup or UNIQUE field matching.
  *
  * @param {string} entityName - Entity name
  * @param {Array} apiRecords - Mapped API records (from ImportManager.runRefresh)
  * @param {Object} matchConfig - { entityField, apiField }
  * @param {Object} [options] - { singleId: number } - If set, only update this record
- * @returns {Object} - { matched, updated, skipped, notFound }
+ * @returns {Object} - { matched, updated, skipped, notFound, fkErrors }
  */
 function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
   const { db, schema } = getDbAndSchema();
@@ -1922,6 +1970,23 @@ function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
   }
 
   const { entityField, apiField } = matchConfig;
+
+  // Build FK map: conceptual name (displayName) -> FK definition
+  const fkMap = new Map();
+  for (const fk of entity.foreignKeys) {
+    if (fk.displayName) {
+      fkMap.set(fk.displayName, fk);
+    }
+  }
+
+  // Build label lookups for FK target entities (lazy, only when needed)
+  const fkLookups = {};
+  function getFkLookup(targetEntity) {
+    if (!fkLookups[targetEntity]) {
+      fkLookups[targetEntity] = buildLabelLookup(targetEntity);
+    }
+    return fkLookups[targetEntity];
+  }
 
   // Get existing records from DB
   let existingRows;
@@ -1942,9 +2007,50 @@ function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
     matchIndex.set(key, row.id);
   }
 
-  // Determine which columns to update (from mapping targets, excluding the match field)
+  const fkErrors = [];
+
+  // Resolve FK fields in all records before determining update columns
+  const resolvedRecords = apiRecords.map(record => {
+    const resolved = { ...record };
+    for (const [conceptualName, fk] of fkMap) {
+      if (conceptualName in resolved && resolved[conceptualName] !== null && resolved[conceptualName] !== undefined) {
+        const value = resolved[conceptualName];
+        // Only resolve string values (numeric IDs are already resolved)
+        if (typeof value === 'string') {
+          const targetEntity = fk.references?.entity;
+          if (!targetEntity) continue;
+
+          const lookup = getFkLookup(targetEntity);
+          let resolvedId = lookup[value];
+
+          // Fallback 1: whitespace-normalized match
+          if (resolvedId === undefined && lookup._normalized) {
+            const norm = value.replace(/\s+/g, '').toLowerCase();
+            resolvedId = lookup._normalized[norm];
+            if (resolvedId !== undefined) lookup[value] = resolvedId; // cache
+          }
+
+          // Fallback 2: try UNIQUE field matching
+          if (resolvedId === undefined) {
+            resolvedId = findByUniqueField(targetEntity, value);
+          }
+
+          if (resolvedId !== undefined && resolvedId !== null) {
+            resolved[fk.column] = resolvedId;  // e.g., engine_type_id = 5
+          } else {
+            fkErrors.push({ field: conceptualName, value, targetEntity });
+            // Don't set the field — leave it unchanged
+          }
+          delete resolved[conceptualName];
+        }
+      }
+    }
+    return resolved;
+  });
+
+  // Determine which columns to update (from resolved targets, excluding the match field)
   const updateFields = [];
-  for (const record of apiRecords) {
+  for (const record of resolvedRecords) {
     for (const key of Object.keys(record)) {
       if (key !== apiField && !updateFields.includes(key)) {
         updateFields.push(key);
@@ -1954,7 +2060,7 @@ function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
   }
 
   if (updateFields.length === 0) {
-    return { matched: 0, updated: 0, skipped: 0, notFound: apiRecords.length };
+    return { matched: 0, updated: 0, skipped: 0, notFound: apiRecords.length, fkErrors };
   }
 
   // Prepare UPDATE statement
@@ -1980,7 +2086,6 @@ function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
 
       matched++;
 
-      // Check if any field actually changed (skip no-op updates)
       const values = updateFields.map(f => {
         const v = record[f];
         return v === undefined ? null : v;
@@ -2000,9 +2105,9 @@ function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
     }
   });
 
-  updateMany(apiRecords);
+  updateMany(resolvedRecords);
 
-  return { matched, updated, skipped, notFound };
+  return { matched, updated, skipped, notFound, fkErrors };
 }
 
 module.exports = {

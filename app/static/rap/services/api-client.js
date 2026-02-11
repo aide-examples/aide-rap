@@ -84,7 +84,10 @@ const ApiClient = {
     const data = await response.json();
 
     if (!response.ok) {
-      const error = new Error(data.error?.message || 'Request failed');
+      const errorMsg = typeof data.error === 'string'
+        ? data.error
+        : data.error?.message || 'Request failed';
+      const error = new Error(errorMsg);
       error.status = response.status;
       error.code = data.error?.code;
       error.details = data.error?.details;

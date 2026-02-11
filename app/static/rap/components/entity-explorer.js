@@ -812,6 +812,11 @@ const EntityExplorer = {
 
     if (!schema?.apiRefresh || schema.apiRefresh.length === 0) return;
 
+    // apiRefresh is now array of { name, mode, label }
+    // Toolbar button only triggers bulk refreshes
+    const bulkRefreshes = schema.apiRefresh.filter(r => r.mode === 'bulk');
+    if (bulkRefreshes.length === 0) return;
+
     // Create button next to refresh-counts
     const btnRefreshCounts = document.getElementById('btn-refresh-counts');
     if (!btnRefreshCounts) return;
@@ -819,7 +824,7 @@ const EntityExplorer = {
     const btn = document.createElement('button');
     btn.id = 'btn-api-refresh';
     btn.className = 'btn-icon';
-    btn.title = `Refresh from API (${schema.apiRefresh.join(', ')})`;
+    btn.title = bulkRefreshes.map(r => r.label).join(', ');
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M21 2v6h-6"/>
       <path d="M3 12a9 9 0 0115-6.7L21 8"/>
@@ -830,16 +835,16 @@ const EntityExplorer = {
     btn.addEventListener('click', async () => {
       const entityName = this.currentEntity;
       if (!entityName) return;
-      for (const refreshName of schema.apiRefresh) {
+      for (const refresh of bulkRefreshes) {
         try {
-          Toast.show(`Refreshing ${entityName} from API...`, 'info');
-          const result = await ApiClient.refreshEntity(entityName, refreshName);
-          Toast.show(
-            `${refreshName}: ${result.updated} updated, ${result.matched} matched (${result.duration}s)`,
+          DomUtils.toast(`${refresh.label}...`, 'info');
+          const result = await ApiClient.refreshEntity(entityName, refresh.name);
+          DomUtils.toast(
+            `${refresh.label}: ${result.updated} updated, ${result.matched} matched (${result.duration}s)`,
             result.updated > 0 ? 'success' : 'info'
           );
         } catch (err) {
-          Toast.show(`Refresh failed: ${err.message}`, 'error');
+          DomUtils.toast(`Refresh failed: ${err.message}`, 'error');
         }
       }
       // Reload records
@@ -1742,7 +1747,7 @@ const EntityExplorer = {
         this.mapContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
         return;
       }
-      EntityMap.load(this.currentEntitySchema, filteredRecords);
+      EntityMap.load(this.currentEntitySchema, filteredRecords, { entityName: this.currentEntity });
       return;
     }
 
@@ -2145,10 +2150,17 @@ const EntityExplorer = {
     this.mapContainer.classList.add('hidden');
     this.chartContainer.classList.add('hidden');
     if (this.processPanelContainer) this.processPanelContainer.classList.add('hidden');
-    // Fetch welcome content from API (system-specific)
+    // Fetch welcome content from API (system-specific, markdown or HTML)
     fetch('/api/config/welcome').then(r => r.ok ? r.json() : null).then(data => {
-      if (data && data.html) {
-        this.welcomeContainer.innerHTML = data.html;
+      if (!data) return;
+      let html;
+      if (data.markdown && typeof marked !== 'undefined') {
+        html = marked.parse(data.markdown);
+      } else if (data.html) {
+        html = data.html;
+      }
+      if (html) {
+        this.welcomeContainer.innerHTML = `<div class="welcome-content"><div class="welcome-text" style="text-align: justify;">${html}</div></div>`;
       }
     }).catch(() => {});
     this.welcomeContainer.classList.remove('hidden');

@@ -9,7 +9,7 @@ const express = require('express');
 const ImportManager = require('../utils/ImportManager');
 const SeedManager = require('../utils/SeedManager');
 const logger = require('../utils/logger');
-const { getSchema } = require('../config/database');
+const { getSchema, getDatabase } = require('../config/database');
 
 module.exports = function(cfg) {
   const router = express.Router();
@@ -445,8 +445,10 @@ module.exports = function(cfg) {
 
   /**
    * POST /api/import/refresh/:entity/:refreshName/:id
-   * Runs an API refresh for a single entity record
-   * Returns: { matched, updated, skipped, notFound, recordsRead, duration }
+   * Runs an API refresh for a single entity record.
+   * For mode=single: fetches per-record API URL with match value.
+   * For mode=bulk: fetches bulk API, then applies only to the specified record.
+   * Returns: { matched, updated, skipped, notFound, fkErrors, recordsRead, duration }
    */
   router.post('/api/import/refresh/:entity/:refreshName/:id', async (req, res) => {
     try {
@@ -457,14 +459,43 @@ module.exports = function(cfg) {
       }
 
       const startTime = Date.now();
+      const definition = importManager.parseRefreshDefinition(entityName, refreshName);
+      if (!definition) {
+        return res.status(404).json({ error: `No refresh definition for ${entityName}.${refreshName}` });
+      }
 
-      // Step 1: Fetch and map API data (bulk — single-record API not always available)
-      const refreshResult = await importManager.runRefresh(entityName, refreshName);
+      let refreshResult;
+
+      if (definition.mode === 'single') {
+        // Look up match field value from DB record
+        const db = getDatabase();
+        const schema = getSchema();
+        const entity = schema.entities[entityName];
+        if (!entity) {
+          return res.status(404).json({ error: `Entity ${entityName} not found` });
+        }
+
+        const record = db.prepare(
+          `SELECT ${definition.match.entityField} FROM ${entity.tableName} WHERE id = ?`
+        ).get(recordId);
+
+        const matchValue = record?.[definition.match.entityField];
+        if (!matchValue) {
+          return res.status(400).json({ error: `Record ${recordId} has no ${definition.match.entityField} value` });
+        }
+
+        // Fetch single record from API
+        refreshResult = await importManager.runSingleRefresh(entityName, refreshName, matchValue);
+      } else {
+        // Bulk mode: fetch all, then apply only to single record
+        refreshResult = await importManager.runRefresh(entityName, refreshName);
+      }
+
       if (!refreshResult.records) {
         return res.status(400).json({ error: refreshResult.error });
       }
 
-      // Step 2: Apply update to single DB record
+      // Apply update to single DB record (with FK resolution)
       const updateResult = SeedManager.refreshEntity(
         entityName,
         refreshResult.records,
@@ -481,6 +512,54 @@ module.exports = function(cfg) {
       });
     } catch (e) {
       console.error(`Failed to refresh ${req.params.entity}/${req.params.refreshName}/${req.params.id}:`, e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  /**
+   * GET /api/import/refresh/:entity/:refreshName/:id/preview
+   * Fetches raw API response without applying mapping or DB updates.
+   * Used for JSON preview in map popups and debugging.
+   */
+  router.get('/api/import/refresh/:entity/:refreshName/:id/preview', async (req, res) => {
+    try {
+      const { entity: entityName, refreshName, id } = req.params;
+      const recordId = parseInt(id, 10);
+      if (isNaN(recordId)) {
+        return res.status(400).json({ error: 'Invalid record ID' });
+      }
+
+      const definition = importManager.parseRefreshDefinition(entityName, refreshName);
+      if (!definition) {
+        return res.status(404).json({ error: `No refresh definition for ${entityName}.${refreshName}` });
+      }
+
+      // Look up match field value from DB record
+      const db = getDatabase();
+      const schema = getSchema();
+      const entity = schema.entities[entityName];
+      if (!entity) {
+        return res.status(404).json({ error: `Entity ${entityName} not found` });
+      }
+
+      const record = db.prepare(
+        `SELECT ${definition.match.entityField} FROM ${entity.tableName} WHERE id = ?`
+      ).get(recordId);
+
+      const matchValue = record?.[definition.match.entityField];
+      if (!matchValue) {
+        return res.status(400).json({ error: `Record ${recordId} has no ${definition.match.entityField} value` });
+      }
+
+      // Fetch raw API response (no mapping, no DB update)
+      const result = await importManager.fetchRawPreview(entityName, refreshName, matchValue);
+      if (result.error) {
+        return res.status(400).json(result);
+      }
+
+      res.json(result);
+    } catch (e) {
+      console.error(`Failed to preview ${req.params.entity}/${req.params.refreshName}/${req.params.id}:`, e);
       res.status(500).json({ error: e.message });
     }
   });
