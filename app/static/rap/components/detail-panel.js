@@ -191,9 +191,9 @@ const DetailPanel = {
         // Media: Thumbnail and download link
         displayValue = `
           <div class="media-display">
-            <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" class="media-link">
-              <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-small"
-                   onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+            <a href="api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" class="media-link">
+              <img src="api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-small"
+                   onerror="this.onerror=null; this.src='icons/file.svg'; this.classList.add('media-thumb-fallback')">
               <span class="media-view-text">Datei oeffnen</span>
             </a>
           </div>

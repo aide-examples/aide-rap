@@ -123,7 +123,7 @@ const SeedManager = {
   async runImport(entityName) {
     try {
       this.showMessage(`Running import for ${entityName}...`);
-      const response = await fetch(`/api/import/run/${entityName}`, { method: 'POST' });
+      const response = await fetch(`api/import/run/${entityName}`, { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -171,8 +171,8 @@ const SeedManager = {
     try {
       // Fetch seed status and import definitions in parallel
       const [seedResponse, importResponse] = await Promise.all([
-        fetch('/api/seed/status'),
-        fetch('/api/import/status')
+        fetch('api/seed/status'),
+        fetch('api/import/status')
       ]);
 
       const seedData = await seedResponse.json();
@@ -465,7 +465,7 @@ const SeedManager = {
         fetchOptions.headers = { 'Content-Type': 'application/json' };
         fetchOptions.body = JSON.stringify(body);
       }
-      const response = await fetch(`/api/seed/load/${entityName}`, fetchOptions);
+      const response = await fetch(`api/seed/load/${entityName}`, fetchOptions);
       const data = await response.json();
 
       if (data.success) {
@@ -506,7 +506,7 @@ const SeedManager = {
     if (!confirm(`Restore ${entityName} from backup? This will clear current data and load from backup.`)) return;
 
     try {
-      const response = await fetch(`/api/seed/restore/${entityName}`, { method: 'POST' });
+      const response = await fetch(`api/seed/restore/${entityName}`, { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -529,7 +529,7 @@ const SeedManager = {
    */
   async clearEntity(entityName) {
     try {
-      const response = await fetch(`/api/seed/clear/${entityName}`, { method: 'POST' });
+      const response = await fetch(`api/seed/clear/${entityName}`, { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -584,14 +584,14 @@ const SeedManager = {
    * Load all seed files
    */
   async loadAll() {
-    await this._bulkLoad('/api/seed/load-all', 'admin_loaded_entities');
+    await this._bulkLoad('api/seed/load-all', 'admin_loaded_entities');
   },
 
   /**
    * Import all (prefers import/ over seed/)
    */
   async importAll() {
-    await this._bulkLoad('/api/seed/import-all', 'admin_imported_entities');
+    await this._bulkLoad('api/seed/import-all', 'admin_imported_entities');
   },
 
   /**
@@ -601,7 +601,7 @@ const SeedManager = {
     if (!confirm('Clear ALL data from all entities?')) return;
 
     try {
-      const response = await fetch('/api/seed/clear-all', { method: 'POST' });
+      const response = await fetch('api/seed/clear-all', { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -621,7 +621,7 @@ const SeedManager = {
     if (!confirm('Reset ALL data (clear and reload from seed files)?')) return;
 
     try {
-      const response = await fetch('/api/seed/reset-all', { method: 'POST' });
+      const response = await fetch('api/seed/reset-all', { method: 'POST' });
       const data = await response.json();
 
       if (data.success) {
@@ -672,7 +672,7 @@ const SeedManager = {
    */
   async backupAll() {
     try {
-      const response = await fetch('/api/seed/backup', { method: 'POST' });
+      const response = await fetch('api/seed/backup', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         await this.refreshAndMessage(`Backup created: ${data.totalRecords} records`);
@@ -690,7 +690,7 @@ const SeedManager = {
   async restoreBackup() {
     if (!confirm('Restore from backup? This clears all current data and loads from backup files.')) return;
     try {
-      const response = await fetch('/api/seed/restore-backup', { method: 'POST' });
+      const response = await fetch('api/seed/restore-backup', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         const loaded = Object.values(data.results).filter(r => r.loaded > 0).length;
@@ -708,7 +708,7 @@ const SeedManager = {
    */
   async restoreMediaLinks() {
     try {
-      const response = await fetch('/api/media/restore-links', { method: 'POST' });
+      const response = await fetch('api/media/restore-links', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         const msg = `Media links restored: ${data.restored} updated`;
@@ -731,7 +731,7 @@ const SeedManager = {
    */
   async reloadViews() {
     try {
-      const res = await fetch('/api/admin/reload-views', { method: 'POST' });
+      const res = await fetch('api/admin/reload-views', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Reload failed');
       this.showMessage(`Views reloaded (${data.viewCount} views). Refresh browser to see changes.`);
@@ -758,7 +758,7 @@ const SeedManager = {
     const doBackup = confirm('Create a backup of current data before reinitializing?');
     if (doBackup) {
       try {
-        const backupRes = await fetch('/api/seed/backup', { method: 'POST' });
+        const backupRes = await fetch('api/seed/backup', { method: 'POST' });
         const backupData = await backupRes.json();
         if (!backupData.success) {
           this.showMessage('Backup failed: ' + (backupData.error || 'unknown error'), true);
@@ -773,7 +773,7 @@ const SeedManager = {
 
     // Step 3: Reinitialize
     try {
-      const response = await fetch('/api/seed/reinitialize', { method: 'POST' });
+      const response = await fetch('api/seed/reinitialize', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         // Clear client-side diagram cache (schema changed)

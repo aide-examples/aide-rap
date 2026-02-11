@@ -2,6 +2,36 @@
  * AIDE RAP - Client-side initialization
  */
 
+// Base-path URL rewriter: automatically fix absolute paths in dynamically injected content
+// Only active when <base> tag is present (i.e., --base-path is set)
+(function setupBasePathRewriter() {
+  const base = document.querySelector('base');
+  if (!base) return;
+  const bp = new URL(base.href).pathname.replace(/\/$/, '');
+  if (!bp) return;
+
+  function fixElement(el) {
+    for (const attr of ['href', 'src']) {
+      const val = el.getAttribute(attr);
+      if (val && val.startsWith('/') && !val.startsWith('//')) {
+        el.setAttribute(attr, bp + val);
+      }
+    }
+  }
+
+  function fixTree(node) {
+    if (node.nodeType !== 1) return;
+    if (node.matches('a, img')) fixElement(node);
+    node.querySelectorAll('a[href^="/"], img[src^="/"]').forEach(fixElement);
+  }
+
+  new MutationObserver(mutations => {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) fixTree(node);
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+})();
+
 /**
  * Try login via URL parameters
  * Supports: ?user=admin&password=xxx or ?user=admin&pwh=<sha256-hash>
@@ -34,7 +64,7 @@ async function tryUrlLogin() {
     // Use pre-hashed password, hash plaintext, or empty string for passwordless guest
     const hash = pwh || (password ? await sha256(password) : '');
 
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch('api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ role: user, hash })
@@ -59,7 +89,7 @@ async function tryUrlLogin() {
     let appName = 'AIDE RAP';
     let titleHtml = null;
     try {
-      const configRes = await fetch('/api/app/config');
+      const configRes = await fetch('api/app/config');
       if (configRes.ok) {
         const config = await configRes.json();
         appName = config.app_name || appName;
@@ -79,13 +109,13 @@ async function tryUrlLogin() {
         showHelp: true,
         showLanguage: true,
         showGoogleTranslate: true,
-        aboutLink: '/about',
-        helpLink: '/help'
+        aboutLink: 'about',
+        helpLink: 'help'
       });
 
       // Add Settings dropdown to header (before About link)
       const headerRight = document.querySelector('#app-header .header > div:last-child');
-      const aboutLink = headerRight?.querySelector('a[href="/about"]');
+      const aboutLink = headerRight?.querySelector('a[href="about"]');
       if (headerRight && aboutLink) {
         const settingsDropdown = document.createElement('div');
         settingsDropdown.className = 'header-settings-dropdown';
@@ -256,7 +286,7 @@ async function tryUrlLogin() {
     // Check authentication status
     if (typeof LoginDialog !== 'undefined') {
       // First check if auth is enabled at all
-      const authConfigRes = await fetch('/api/auth/config');
+      const authConfigRes = await fetch('api/auth/config');
       const authConfig = await authConfigRes.json();
 
       if (!authConfig.enabled && !authConfig.notConfigured) {
@@ -264,7 +294,7 @@ async function tryUrlLogin() {
         window.currentUser = { role: 'admin', noauth: true };
       } else {
         // Auth enabled - check session
-        const authRes = await fetch('/api/auth/me');
+        const authRes = await fetch('api/auth/me');
         if (authRes.status === 401) {
           // Not authenticated - try URL-parameter login first
           const urlLoginSuccess = await tryUrlLogin();
@@ -274,7 +304,7 @@ async function tryUrlLogin() {
             return; // Stop initialization until login completes
           }
           // URL login succeeded - continue initialization
-          const meRes = await fetch('/api/auth/me');
+          const meRes = await fetch('api/auth/me');
           window.currentUser = await meRes.json();
         } else {
           // Already authenticated
@@ -339,7 +369,7 @@ async function tryUrlLogin() {
           sqlSep.textContent = '·';
 
           const sqlEl = document.createElement('a');
-          sqlEl.href = '/sql-browser/?url=/api/admin/db-file';
+          sqlEl.href = 'sql-browser/?url=api/admin/db-file';
           sqlEl.target = '_blank';
           sqlEl.className = 'status-admin-link';
           sqlEl.textContent = 'SQL';

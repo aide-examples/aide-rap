@@ -82,7 +82,7 @@ const SeedGeneratorDialog = {
    */
   async checkSeedFileExists() {
     try {
-      const resp = await fetch(`/api/seed/content/${this.entityName}?checkOnly=true`);
+      const resp = await fetch(`api/seed/content/${this.entityName}?checkOnly=true`);
       const data = await resp.json();
       this.hasSeedFile = data.exists || false;
       this.seedFileCount = data.count || 0;
@@ -97,8 +97,8 @@ const SeedGeneratorDialog = {
    */
   async loadInstruction() {
     const endpoint = this.instructionType === 'completer'
-      ? `/api/entity/${this.entityName}/completer-instruction`
-      : `/api/entity/${this.entityName}/generator-instruction`;
+      ? `api/entity/${this.entityName}/completer-instruction`
+      : `api/entity/${this.entityName}/generator-instruction`;
     try {
       const resp = await fetch(endpoint);
       const data = await resp.json();
@@ -516,8 +516,8 @@ const SeedGeneratorDialog = {
     }
 
     const endpoint = this.instructionType === 'completer'
-      ? `/api/entity/${this.entityName}/completer-instruction`
-      : `/api/entity/${this.entityName}/generator-instruction`;
+      ? `api/entity/${this.entityName}/completer-instruction`
+      : `api/entity/${this.entityName}/generator-instruction`;
 
     try {
       const resp = await fetch(endpoint, {
@@ -551,8 +551,8 @@ const SeedGeneratorDialog = {
     }
 
     const endpoint = this.instructionType === 'completer'
-      ? `/api/seed/complete-prompt/${this.entityName}`
-      : `/api/seed/prompt/${this.entityName}`;
+      ? `api/seed/complete-prompt/${this.entityName}`
+      : `api/seed/prompt/${this.entityName}`;
 
     try {
       const resp = await fetch(endpoint, {
@@ -600,7 +600,7 @@ const SeedGeneratorDialog = {
         if (records.length === 0) throw new Error('No records found in CSV input');
         for (const record of records) { delete record.id; }
 
-        const resp = await fetch(`/api/seed/validate/${this.entityName}`, {
+        const resp = await fetch(`api/seed/validate/${this.entityName}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ records })
@@ -611,7 +611,7 @@ const SeedGeneratorDialog = {
         result.success = true;
       } else {
         // JSON: server-side parse (strips markdown) + validate
-        const resp = await fetch(`/api/seed/parse/${this.entityName}`, {
+        const resp = await fetch(`api/seed/parse/${this.entityName}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text })
@@ -646,7 +646,7 @@ const SeedGeneratorDialog = {
    */
   async loadSeedPreview() {
     try {
-      const url = `/api/seed/content/${this.entityName}`;
+      const url = `api/seed/content/${this.entityName}`;
       const response = await fetch(url);
       const data = await response.json();
       this.generatedData = data.records || [];
@@ -668,7 +668,7 @@ const SeedGeneratorDialog = {
     if (!this.generatedData) return;
 
     try {
-      const resp = await fetch(`/api/seed/upload/${this.entityName}`, {
+      const resp = await fetch(`api/seed/upload/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.generatedData)
@@ -695,7 +695,7 @@ const SeedGeneratorDialog = {
 
     try {
       // Step 1: Save to seed file
-      const saveResp = await fetch(`/api/seed/upload/${this.entityName}`, {
+      const saveResp = await fetch(`api/seed/upload/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.generatedData)
@@ -711,7 +711,7 @@ const SeedGeneratorDialog = {
       // Completer always updates existing records → force merge mode
       const mode = this.instructionType === 'completer' ? 'merge'
         : (this.conflicts.length > 0 || this.conflictCount > 0) ? this.selectedMode : 'replace';
-      const loadResp = await fetch(`/api/seed/load/${this.entityName}`, {
+      const loadResp = await fetch(`api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -764,7 +764,7 @@ const SeedGeneratorDialog = {
    */
   async loadDbContent() {
     try {
-      const response = await fetch(`/api/entities/${this.entityName}?limit=10000`);
+      const response = await fetch(`api/entities/${this.entityName}?limit=10000`);
       const data = await response.json();
       const rawRecords = data.data || [];
 

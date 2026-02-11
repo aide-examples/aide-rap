@@ -141,7 +141,7 @@ const EntityMap = {
               if (!this.entityName || !refreshName || !recordId) return;
               try {
                 const result = await ApiClient.request(
-                  `/api/import/refresh/${this.entityName}/${refreshName}/${recordId}/preview`
+                  `api/import/refresh/${this.entityName}/${refreshName}/${recordId}/preview`
                 );
                 if (typeof JsonPreviewDialog !== 'undefined') {
                   JsonPreviewDialog.show(refreshName, result.url, result.raw, {

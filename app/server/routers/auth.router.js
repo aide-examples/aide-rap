@@ -107,7 +107,8 @@ module.exports = function(cfg) {
             httpOnly: true,
             signed: true,
             maxAge: sessionTimeout * 1000,
-            sameSite: 'strict'
+            sameSite: 'strict',
+            path: cfg.basePath || '/'
         });
 
         // Emit success event
@@ -129,7 +130,7 @@ module.exports = function(cfg) {
             role = sessionData?.role;
         } catch { /* ignore */ }
 
-        res.clearCookie('rap-session');
+        res.clearCookie('rap-session', { path: cfg.basePath || '/' });
 
         // Emit logout event
         eventBus.emit('auth:logout:after', { role, ip: req.ip });
@@ -153,7 +154,7 @@ module.exports = function(cfg) {
 
             // Check expiry
             if (sessionData.expires && Date.now() > sessionData.expires) {
-                res.clearCookie('rap-session');
+                res.clearCookie('rap-session', { path: cfg.basePath || '/' });
                 return res.status(401).json({ error: 'Session expired' });
             }
 
@@ -162,7 +163,7 @@ module.exports = function(cfg) {
 
             res.json({ role: sessionData.role, ip });
         } catch (e) {
-            res.clearCookie('rap-session');
+            res.clearCookie('rap-session', { path: cfg.basePath || '/' });
             return res.status(401).json({ error: 'Invalid session' });
         }
     });

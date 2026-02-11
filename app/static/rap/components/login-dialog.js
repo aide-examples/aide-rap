@@ -115,7 +115,7 @@ const LoginDialog = {
     async show() {
         // Load auth config from server
         try {
-            const res = await fetch('/api/auth/config');
+            const res = await fetch('api/auth/config');
             this.authConfig = await res.json();
 
             // If auth is not configured at all, show error and block access
@@ -319,7 +319,7 @@ const LoginDialog = {
             // Hash password client-side before sending
             const hash = password ? await sha256(password) : '';
 
-            const res = await fetch('/api/auth/login', {
+            const res = await fetch('api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role, hash })
@@ -354,7 +354,7 @@ const LoginDialog = {
      */
     async checkAuth() {
         try {
-            const res = await fetch('/api/auth/me');
+            const res = await fetch('api/auth/me');
             if (res.ok) {
                 const data = await res.json();
                 window.currentUser = { role: data.role };
@@ -371,7 +371,7 @@ const LoginDialog = {
      */
     async logout() {
         try {
-            await fetch('/api/auth/logout', { method: 'POST' });
+            await fetch('api/auth/logout', { method: 'POST' });
         } catch (e) {
             console.error('Logout error:', e);
         }

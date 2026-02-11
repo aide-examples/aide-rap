@@ -41,7 +41,7 @@ const MediaBrowser = {
         offset: this.pagination.offset
       });
 
-      const response = await fetch(`/api/media?${params}`);
+      const response = await fetch(`api/media?${params}`);
       const data = await response.json();
 
       this.mediaList = data.data || [];
@@ -133,15 +133,15 @@ const MediaBrowser = {
     const items = this.mediaList.map(media => {
       const isImage = media.mimeType?.startsWith('image/');
       const thumbnailSrc = media.hasThumbnail
-        ? `/api/media/${media.id}/thumbnail`
-        : '/icons/file.svg';
+        ? `api/media/${media.id}/thumbnail`
+        : 'icons/file.svg';
 
       return `
         <div class="media-browser-item" data-media-id="${media.id}">
           <div class="media-browser-thumb">
-            <a href="/api/media/${media.id}/file" target="_blank" rel="noopener">
+            <a href="api/media/${media.id}/file" target="_blank" rel="noopener">
               <img src="${thumbnailSrc}" alt="${this.escapeHtml(media.originalName)}"
-                   onerror="this.onerror=null; this.src='/icons/file.svg'">
+                   onerror="this.onerror=null; this.src='icons/file.svg'">
             </a>
           </div>
           <div class="media-browser-info">

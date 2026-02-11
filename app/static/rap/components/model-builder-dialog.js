@@ -50,7 +50,7 @@ const ModelBuilderDialog = {
 
         // Load existing systems for selection
         try {
-            const resp = await fetch('/api/model-builder/systems');
+            const resp = await fetch('api/model-builder/systems');
             const data = await resp.json();
             this.existingSystems = data.systems || [];
         } catch (e) {
@@ -592,7 +592,7 @@ const ModelBuilderDialog = {
      */
     async loadSystemState(systemName) {
         try {
-            const resp = await fetch(`/api/model-builder/systems/${encodeURIComponent(systemName)}`);
+            const resp = await fetch(`api/model-builder/systems/${encodeURIComponent(systemName)}`);
             const data = await resp.json();
 
             if (data.success) {
@@ -622,7 +622,7 @@ const ModelBuilderDialog = {
         // For new systems, create the minimal system directory
         if (!this.systemCreated && this.selectedSystem === null) {
             try {
-                const resp = await fetch(`/api/model-builder/systems/${encodeURIComponent(this.systemName)}`, {
+                const resp = await fetch(`api/model-builder/systems/${encodeURIComponent(this.systemName)}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -708,7 +708,7 @@ const ModelBuilderDialog = {
 
         // Save design brief to system
         try {
-            const saveResp = await fetch(`/api/model-builder/systems/${encodeURIComponent(this.systemName)}/design`, {
+            const saveResp = await fetch(`api/model-builder/systems/${encodeURIComponent(this.systemName)}/design`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ designBrief: this.designBrief })
@@ -725,7 +725,7 @@ const ModelBuilderDialog = {
 
         // Build the prompt
         try {
-            const resp = await fetch('/api/model-builder/prompt', {
+            const resp = await fetch('api/model-builder/prompt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -771,7 +771,7 @@ const ModelBuilderDialog = {
         }
 
         try {
-            const resp = await fetch('/api/model-builder/parse', {
+            const resp = await fetch('api/model-builder/parse', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mermaidCode: this.mermaidCode })
@@ -810,7 +810,7 @@ const ModelBuilderDialog = {
         this.render();
 
         try {
-            const resp = await fetch(`/api/model-builder/systems/${encodeURIComponent(this.systemName)}/import`, {
+            const resp = await fetch(`api/model-builder/systems/${encodeURIComponent(this.systemName)}/import`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -895,7 +895,7 @@ const ModelBuilderDialog = {
         if (!confirmed) return;
 
         try {
-            const resp = await fetch(`/api/model-builder/systems/${encodeURIComponent(systemName)}`, {
+            const resp = await fetch(`api/model-builder/systems/${encodeURIComponent(systemName)}`, {
                 method: 'DELETE'
             });
             const result = await resp.json();

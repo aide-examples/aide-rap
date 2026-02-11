@@ -120,7 +120,7 @@ const MediaUpload = {
       state.files = Array.from(files);
 
       const formData = new FormData();
-      const endpoint = files.length > 1 ? '/api/media/bulk' : '/api/media';
+      const endpoint = files.length > 1 ? 'api/media/bulk' : 'api/media';
       const fieldName = files.length > 1 ? 'files' : 'file';
 
       for (const file of state.files) {
@@ -264,7 +264,7 @@ const MediaUpload = {
       btn.disabled = true;
 
       try {
-        const response = await fetch('/api/media', {
+        const response = await fetch('api/media', {
           method: 'POST',
           body: formData
         });

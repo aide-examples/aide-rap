@@ -392,7 +392,7 @@ const ProcessPanel = {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
     try {
-      const res = await fetch(`/api/processes/${encodeURIComponent(process.name)}`, {
+      const res = await fetch(`api/processes/${encodeURIComponent(process.name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -457,7 +457,7 @@ const ProcessPanel = {
 
     // Load raw content
     try {
-      const res = await fetch(`/api/processes/${encodeURIComponent(process.name)}/raw`);
+      const res = await fetch(`api/processes/${encodeURIComponent(process.name)}/raw`);
       const data = await res.json();
 
       if (data.error) {
@@ -524,7 +524,7 @@ const ProcessPanel = {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
     try {
-      const res = await fetch(`/api/processes/${encodeURIComponent(process.name)}/raw`, {
+      const res = await fetch(`api/processes/${encodeURIComponent(process.name)}/raw`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
@@ -555,7 +555,7 @@ const ProcessPanel = {
     if (!process) return;
 
     try {
-      const res = await fetch(`/api/processes/${encodeURIComponent(process.name)}`);
+      const res = await fetch(`api/processes/${encodeURIComponent(process.name)}`);
       const data = await res.json();
 
       if (data.error) {
@@ -640,7 +640,7 @@ const ProcessPanel = {
     };
 
     try {
-      const res = await fetch(`/api/processes/${encodeURIComponent(process.name)}`, {
+      const res = await fetch(`api/processes/${encodeURIComponent(process.name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -63,7 +63,7 @@ const EntityExplorer = {
   async getPaginationConfig() {
     if (this.paginationConfig) return this.paginationConfig;
     try {
-      const resp = await fetch('/api/config/pagination');
+      const resp = await fetch('api/config/pagination');
       if (resp.ok) {
         this.paginationConfig = await resp.json();
       } else {
@@ -2151,7 +2151,7 @@ const EntityExplorer = {
     this.chartContainer.classList.add('hidden');
     if (this.processPanelContainer) this.processPanelContainer.classList.add('hidden');
     // Fetch welcome content from API (system-specific, markdown or HTML)
-    fetch('/api/config/welcome').then(r => r.ok ? r.json() : null).then(data => {
+    fetch('api/config/welcome').then(r => r.ok ? r.json() : null).then(data => {
       if (!data) return;
       let html;
       if (data.markdown && typeof marked !== 'undefined') {
@@ -2244,7 +2244,7 @@ const EntityExplorer = {
     // Fetch available areas
     let areas = [];
     try {
-      const data = await ApiClient.request('/api/processes/_areas');
+      const data = await ApiClient.request('api/processes/_areas');
       areas = data.areas || [];
     } catch (err) {
       alert('Failed to load areas: ' + err.message);
@@ -2314,7 +2314,7 @@ const EntityExplorer = {
       createBtn.textContent = 'Creating...';
 
       try {
-        const res = await fetch('/api/processes', {
+        const res = await fetch('api/processes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, area })
@@ -2384,7 +2384,7 @@ const EntityExplorer = {
 
     // Load full process data
     try {
-      const processData = await ApiClient.request(`/api/processes/${encodeURIComponent(name)}`);
+      const processData = await ApiClient.request(`api/processes/${encodeURIComponent(name)}`);
       processData.color = color;
 
       // Check for required entity selection (skip if context provided via options)
@@ -2650,7 +2650,7 @@ const EntityExplorer = {
     } else if (fkId) {
       // No direct FK — try indirect filtering via bridge entity
       try {
-        const resp = await fetch(`/api/config/bridge-filter?entity=${entityName}&target=${fkEntity}&id=${fkId}`);
+        const resp = await fetch(`api/config/bridge-filter?entity=${entityName}&target=${fkEntity}&id=${fkId}`);
         if (resp.ok) {
           const result = await resp.json();
           if (result.filter) filter = result.filter;

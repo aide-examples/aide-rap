@@ -41,7 +41,7 @@ const TreePdfExport = {
         const entityColor = schema.areaColor || '#1a365d';
 
         try {
-            const response = await fetch(`/api/entities/${currentEntity}/export-tree-pdf`, {
+            const response = await fetch(`api/entities/${currentEntity}/export-tree-pdf`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -108,7 +108,7 @@ const TreePdfExport = {
         const entityColor = schema.areaColor || '#1a365d';
 
         try {
-            const response = await fetch(`/api/entities/${currentEntity}/export-tree-docx`, {
+            const response = await fetch(`api/entities/${currentEntity}/export-tree-docx`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

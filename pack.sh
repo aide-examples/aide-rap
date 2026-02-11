@@ -19,10 +19,6 @@ zip -r "$OUTPUT_FILE" \
     -x "*.git*" \
     -x "*node_modules*" \
     -x "*.log" \
-    -x "*/logs/*" \
-    -x "*.sqlite" \
-    -x "*.sqlite-shm" \
-    -x "*.sqlite-wal" \
-    -x "*/backup/*"
+    -x "*/logs/*"
 
 echo "Done: $(du -h "$OUTPUT_FILE" | cut -f1)"

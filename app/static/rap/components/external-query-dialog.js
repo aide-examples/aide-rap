@@ -176,7 +176,7 @@ const ExternalQueryDialog = {
     });
 
     try {
-      const resp = await fetch(`/api/admin/external-query?${params}`, {
+      const resp = await fetch(`api/admin/external-query?${params}`, {
         signal: this.abortController.signal
       });
 
@@ -256,7 +256,7 @@ const ExternalQueryDialog = {
       return;
     }
     try {
-      const resp = await fetch(`/api/admin/external-query/columns/${encodeURIComponent(providerId)}`);
+      const resp = await fetch(`api/admin/external-query/columns/${encodeURIComponent(providerId)}`);
       if (resp.ok) {
         const data = await resp.json();
         this._columnsCache[providerId] = data.columns;
@@ -320,7 +320,7 @@ const ExternalQueryDialog = {
     }
 
     try {
-      const resp = await fetch(`/api/admin/external-query/keywords/${encodeURIComponent(providerId)}`);
+      const resp = await fetch(`api/admin/external-query/keywords/${encodeURIComponent(providerId)}`);
       if (resp.ok) {
         const data = await resp.json();
         const keywords = data.keywords || [];

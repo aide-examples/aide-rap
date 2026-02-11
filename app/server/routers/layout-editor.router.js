@@ -62,7 +62,14 @@ module.exports = function(cfg, options = {}) {
 
     // Layout Editor page
     router.get('/layout-editor', (req, res) => {
-        res.sendFile(path.join(appDir, 'static', 'rap', 'diagram', 'layout-editor.html'));
+        const htmlPath = path.join(appDir, 'static', 'rap', 'diagram', 'layout-editor.html');
+        if (cfg.basePath) {
+            let html = fs.readFileSync(htmlPath, 'utf8');
+            html = html.replace('<head>', `<head>\n    <base href="${cfg.basePath}/">`);
+            res.type('html').send(html);
+        } else {
+            res.sendFile(htmlPath);
+        }
     });
 
     // API: List available data model documents

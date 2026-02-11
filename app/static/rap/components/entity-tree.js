@@ -35,7 +35,7 @@ const EntityTree = {
     async loadTreeConfig() {
         if (this.treeConfig) return this.treeConfig;
         try {
-            const resp = await fetch('/api/config/tree');
+            const resp = await fetch('api/config/tree');
             if (resp.ok) {
                 this.treeConfig = await resp.json();
             } else {

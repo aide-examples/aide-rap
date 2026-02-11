@@ -835,9 +835,9 @@ const EntityTable = {
           // Media: Thumbnail link (with max-height if mediaRowHeight is configured)
           const imgStyle = mediaRowHeight ? ` style="max-height: ${mediaRowHeight - 8}px;"` : '';
           html += `<td class="media-cell">
-            <a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="${i18n.t('tooltip_open_file')}">
-              <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"${imgStyle}
-                   onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+            <a href="api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" title="${i18n.t('tooltip_open_file')}">
+              <img src="api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="media-thumb-tiny"${imgStyle}
+                   onerror="this.onerror=null; this.src='icons/file.svg'; this.classList.add('media-thumb-fallback')">
             </a>
           </td>`;
         } else if (col.isAggregateCanonical) {
@@ -1401,7 +1401,7 @@ const EntityTable = {
 
     const exportName = this.currentEntity || EntityExplorer.currentView?.name || 'export';
     try {
-      const response = await fetch(`/api/entities/${encodeURIComponent(exportName)}/export-${format}`, {
+      const response = await fetch(`api/entities/${encodeURIComponent(exportName)}/export-${format}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)

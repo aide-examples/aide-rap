@@ -2,7 +2,7 @@
  * API Client - REST API Wrapper for Entity CRUD operations
  */
 const ApiClient = {
-  baseUrl: '/api/entities',
+  baseUrl: 'api/entities',
 
   /**
    * Get the correct API base URL for an entity
@@ -10,7 +10,7 @@ const ApiClient = {
    */
   getEntityUrl(entityName) {
     if (entityName === 'AuditTrail') {
-      return '/api/audit';
+      return 'api/audit';
     }
     return `${this.baseUrl}/${entityName}`;
   },
@@ -198,7 +198,7 @@ const ApiClient = {
    * @param {Object} options - { filter, sort, order, limit, offset }
    */
   async getViewData(viewName, options = {}) {
-    return this._fetchData(`/api/views/${encodeURIComponent(viewName)}`, options);
+    return this._fetchData(`api/views/${encodeURIComponent(viewName)}`, options);
   },
 
   /**
@@ -208,14 +208,14 @@ const ApiClient = {
    * @param {string} type - Extraction type: 'select' (default), 'year', or 'month'
    */
   async getViewDistinctValues(viewName, columnName, type = 'select') {
-    return this._fetchDistinct(`/api/views/${encodeURIComponent(viewName)}`, columnName, type);
+    return this._fetchDistinct(`api/views/${encodeURIComponent(viewName)}`, columnName, type);
   },
 
   /**
    * Get consolidated metadata (entities, schemas, views, processes) in a single call
    */
   async getMeta() {
-    return this.request('/api/meta');
+    return this.request('api/meta');
   },
 
   // --- API Refresh ---
@@ -226,7 +226,7 @@ const ApiClient = {
    * @param {string} refreshName - Refresh name (e.g., "tracker")
    */
   async refreshEntity(entityName, refreshName) {
-    return this.request(`/api/import/refresh/${entityName}/${refreshName}`, {
+    return this.request(`api/import/refresh/${entityName}/${refreshName}`, {
       method: 'POST',
     });
   },
@@ -238,7 +238,7 @@ const ApiClient = {
    * @param {number} id - Record ID
    */
   async refreshRecord(entityName, refreshName, id) {
-    return this.request(`/api/import/refresh/${entityName}/${refreshName}/${id}`, {
+    return this.request(`api/import/refresh/${entityName}/${refreshName}/${id}`, {
       method: 'POST',
     });
   },
@@ -357,9 +357,9 @@ const ValueFormatter = {
     if (col.customType === 'media') {
       const size = options.size || 'tiny';
       const thumbClass = size === 'small' ? 'media-thumb-small' : 'media-thumb-tiny';
-      return `<a href="/api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" class="media-link">
-        <img src="/api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="${thumbClass}"
-             onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+      return `<a href="api/media/${DomUtils.escapeHtml(value)}/file" target="_blank" rel="noopener" class="media-link">
+        <img src="api/media/${DomUtils.escapeHtml(value)}/thumbnail" class="${thumbClass}"
+             onerror="this.onerror=null; this.src='icons/file.svg'; this.classList.add('media-thumb-fallback')">
       </a>`;
     }
 

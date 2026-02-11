@@ -70,7 +70,7 @@
             typesDocPath = typesEntry ? typesEntry.path : false;
             if (typesDocPath) {
                 externalTypesPromise = fetch(
-                    `/api/viewer/content?root=${viewerRoot}&path=${encodeURIComponent(typesDocPath)}`
+                    `api/viewer/content?root=${viewerRoot}&path=${encodeURIComponent(typesDocPath)}`
                 )
                 .then(res => res.json())
                 .then(data => {

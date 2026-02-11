@@ -12,10 +12,10 @@
         if (t === 'dark') document.documentElement.dataset.theme = 'dark';
       })();
     </script>
-    <link rel="icon" href="/favicon.ico" type="image/svg+xml">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/static/frame/css/base.css">
-    <link rel="stylesheet" href="/static/rap/rap.css">
+    <link rel="icon" href="favicon.ico" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="static/frame/css/base.css">
+    <link rel="stylesheet" href="static/rap/rap.css">
     <!-- Leaflet for geo field maps -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -34,7 +34,7 @@
     <!-- Mermaid for ER diagrams -->
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <!-- Marked for markdown rendering (processes) -->
-    <script src="/static/frame/vendor/marked/marked.min.js"></script>
+    <script src="static/frame/vendor/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="app-container page-fill">
@@ -151,7 +151,7 @@
                                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                             </svg>
                         </button>
-                        <a href="/about?doc=index.md" class="btn-icon" title="Documentation" data-i18n-title="tooltip_documentation">
+                        <a href="about?doc=index.md" class="btn-icon" title="Documentation" data-i18n-title="tooltip_documentation">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <!-- Two stacked rectangles (class diagram style) -->
                                 <rect x="3" y="3" width="8" height="7" rx="1"/>
@@ -240,47 +240,47 @@
     </dialog>
 
     <!-- Framework Scripts -->
-    <script src="/static/frame/vendor/polyglot/polyglot.min.js"></script>
-    <script src="/static/frame/js/vendor/qrcode-generator/qrcode.min.js"></script>
-    <script src="/static/frame/js/i18n.js"></script>
-    <script src="/static/frame/js/google-translate.js"></script>
-    <script src="/static/frame/js/header-widget.js"></script>
-    <script src="/static/frame/js/status-widget.js"></script>
-    <script src="/static/frame/js/pwa.js"></script>
+    <script src="static/frame/vendor/polyglot/polyglot.min.js"></script>
+    <script src="static/frame/js/vendor/qrcode-generator/qrcode.min.js"></script>
+    <script src="static/frame/js/i18n.js"></script>
+    <script src="static/frame/js/google-translate.js"></script>
+    <script src="static/frame/js/header-widget.js"></script>
+    <script src="static/frame/js/status-widget.js"></script>
+    <script src="static/frame/js/pwa.js"></script>
 
     <!-- RAP Scripts -->
-    <script src="/static/rap/utils/DomUtils.js"></script>
-    <script src="/static/rap/utils/ColumnUtils.js"></script>
-    <script src="/static/rap/services/api-client.js"></script>
-    <script src="/static/rap/components/context-menu.js"></script>
+    <script src="static/rap/utils/DomUtils.js"></script>
+    <script src="static/rap/utils/ColumnUtils.js"></script>
+    <script src="static/rap/services/api-client.js"></script>
+    <script src="static/rap/components/context-menu.js"></script>
     <!-- Entity Tree modules (must load before entity-tree.js) -->
-    <script src="/static/rap/components/entity-tree-state.js"></script>
-    <script src="/static/rap/components/entity-tree-renderer.js"></script>
-    <script src="/static/rap/components/entity-tree-pdf.js"></script>
-    <script src="/static/rap/components/entity-tree.js"></script>
-    <script src="/static/rap/components/entity-table.js"></script>
-    <script src="/static/rap/components/entity-map.js"></script>
-    <script src="/static/rap/components/json-preview-dialog.js"></script>
-    <script src="/static/rap/components/entity-chart.js"></script>
-    <script src="/static/rap/components/hierarchy-tree.js"></script>
-    <script src="/static/rap/components/process-panel.js"></script>
-    <script src="/static/rap/components/external-query-dialog.js"></script>
-    <script src="/static/rap/components/entity-explorer.js"></script>
-    <script src="/static/rap/components/data-model-diagram.js"></script>
-    <script src="/static/rap/components/breadcrumb-nav.js"></script>
-    <script src="/static/rap/components/breadcrumb-share-dialog.js"></script>
-    <script src="/static/rap/components/detail-panel.js"></script>
-    <script src="/static/rap/components/media-upload.js"></script>
-    <script src="/static/rap/components/media-browser.js"></script>
-    <script src="/static/rap/components/entity-form.js"></script>
-    <script src="/static/rap/components/conflict-dialog.js"></script>
-    <script src="/static/rap/utils/CsvParser.js"></script>
-    <script src="/static/rap/utils/DialogUtils.js"></script>
-    <script src="/static/rap/components/seed-import-dialog.js"></script>
-    <script src="/static/rap/components/seed-manager.js"></script>
-    <script src="/static/rap/components/seed-generator-dialog.js"></script>
-    <script src="/static/rap/components/model-builder-dialog.js"></script>
-    <script src="/static/rap/components/login-dialog.js"></script>
-    <script src="/static/rap/rap.js"></script>
+    <script src="static/rap/components/entity-tree-state.js"></script>
+    <script src="static/rap/components/entity-tree-renderer.js"></script>
+    <script src="static/rap/components/entity-tree-pdf.js"></script>
+    <script src="static/rap/components/entity-tree.js"></script>
+    <script src="static/rap/components/entity-table.js"></script>
+    <script src="static/rap/components/entity-map.js"></script>
+    <script src="static/rap/components/json-preview-dialog.js"></script>
+    <script src="static/rap/components/entity-chart.js"></script>
+    <script src="static/rap/components/hierarchy-tree.js"></script>
+    <script src="static/rap/components/process-panel.js"></script>
+    <script src="static/rap/components/external-query-dialog.js"></script>
+    <script src="static/rap/components/entity-explorer.js"></script>
+    <script src="static/rap/components/data-model-diagram.js"></script>
+    <script src="static/rap/components/breadcrumb-nav.js"></script>
+    <script src="static/rap/components/breadcrumb-share-dialog.js"></script>
+    <script src="static/rap/components/detail-panel.js"></script>
+    <script src="static/rap/components/media-upload.js"></script>
+    <script src="static/rap/components/media-browser.js"></script>
+    <script src="static/rap/components/entity-form.js"></script>
+    <script src="static/rap/components/conflict-dialog.js"></script>
+    <script src="static/rap/utils/CsvParser.js"></script>
+    <script src="static/rap/utils/DialogUtils.js"></script>
+    <script src="static/rap/components/seed-import-dialog.js"></script>
+    <script src="static/rap/components/seed-manager.js"></script>
+    <script src="static/rap/components/seed-generator-dialog.js"></script>
+    <script src="static/rap/components/model-builder-dialog.js"></script>
+    <script src="static/rap/components/login-dialog.js"></script>
+    <script src="static/rap/rap.js"></script>
 </body>
 </html>

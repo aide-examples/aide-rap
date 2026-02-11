@@ -150,6 +150,7 @@ paths.register('RAP_DOCS_DIR', path.join(APP_DIR, 'docs'));   // Generic RAP pla
 
 const server = new HttpServer({
     port: cfg.port,
+    basePath: cfg.basePath || '',
     appDir: APP_DIR,
     docsConfig: {
         appName: `AIDE RAP [${systemName}]`,
@@ -497,7 +498,14 @@ app.use('/icons', require('express').static(path.join(SYSTEM_DIR, 'icons')));
 
 // Main page
 app.get('/', (req, res) => {
-    res.sendFile(path.join(APP_DIR, 'static', 'rap', 'rap.html'));
+    const htmlPath = path.join(APP_DIR, 'static', 'rap', 'rap.html');
+    if (cfg.basePath) {
+        let html = fs.readFileSync(htmlPath, 'utf8');
+        html = html.replace('<head>', `<head>\n    <base href="${cfg.basePath}/">`);
+        res.type('html').send(html);
+    } else {
+        res.sendFile(htmlPath);
+    }
 });
 
 app.get('/index.html', (req, res) => {

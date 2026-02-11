@@ -50,7 +50,7 @@ const SeedImportDialog = {
    */
   async checkDefinition() {
     try {
-      const res = await fetch(`/api/import/definition/${this.entityName}`);
+      const res = await fetch(`api/import/definition/${this.entityName}`);
       this.hasDefinition = res.ok;
     } catch {
       this.hasDefinition = false;
@@ -436,7 +436,7 @@ const SeedImportDialog = {
     if (!editor) return;
 
     try {
-      const res = await fetch(`/api/import/definition/${this.entityName}/raw`);
+      const res = await fetch(`api/import/definition/${this.entityName}/raw`);
       const data = await res.json();
 
       if (data.error) {
@@ -475,7 +475,7 @@ const SeedImportDialog = {
 
   async validateRule() {
     try {
-      const res = await fetch(`/api/import/validate/${this.entityName}`);
+      const res = await fetch(`api/import/validate/${this.entityName}`);
       const result = await res.json();
 
       if (result.error) {
@@ -521,7 +521,7 @@ const SeedImportDialog = {
     saveBtn.textContent = 'Saving...';
 
     try {
-      const res = await fetch(`/api/import/definition/${this.entityName}/raw`, {
+      const res = await fetch(`api/import/definition/${this.entityName}/raw`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: editor.value })
@@ -557,9 +557,9 @@ const SeedImportDialog = {
     try {
       // Fetch source schema, sample data, and target entity schema in parallel
       const [schemaRes, sampleRes, entitySchemaRes] = await Promise.all([
-        fetch(`/api/import/schema/${this.entityName}`),
-        fetch(`/api/import/sample/${this.entityName}?count=3`),
-        fetch(`/api/schema`)
+        fetch(`api/import/schema/${this.entityName}`),
+        fetch(`api/import/sample/${this.entityName}?count=3`),
+        fetch(`api/schema`)
       ]);
 
       const schemaData = await schemaRes.json();
@@ -649,7 +649,7 @@ ${mappingTable}
     this.log('info', 'Starting XLSX → JSON conversion...');
 
     try {
-      const res = await fetch(`/api/import/run/${this.entityName}`, { method: 'POST' });
+      const res = await fetch(`api/import/run/${this.entityName}`, { method: 'POST' });
       const result = await res.json();
 
       if (result.success) {
@@ -707,7 +707,7 @@ ${mappingTable}
     this.log('info', 'Loading import file preview...');
 
     try {
-      const res = await fetch(`/api/seed/content/${this.entityName}?sourceDir=import`);
+      const res = await fetch(`api/seed/content/${this.entityName}?sourceDir=import`);
       const data = await res.json();
 
       if (data.error) {
@@ -789,7 +789,7 @@ ${mappingTable}
     this.log('info', `Loading into database (mode: ${mode})...`);
 
     try {
-      const res = await fetch(`/api/seed/load/${this.entityName}`, {
+      const res = await fetch(`api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceDir: 'import', mode, skipInvalid: true })
@@ -862,7 +862,7 @@ ${mappingTable}
     }
 
     try {
-      const res = await fetch(`/api/seed/clear/${this.entityName}`, { method: 'POST' });
+      const res = await fetch(`api/seed/clear/${this.entityName}`, { method: 'POST' });
       const result = await res.json();
 
       if (result.success) {
@@ -926,7 +926,7 @@ ${mappingTable}
 
   async validateWithServer() {
     try {
-      const res = await fetch(`/api/seed/validate/${this.entityName}`, {
+      const res = await fetch(`api/seed/validate/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ records: this.parsedData })
@@ -1067,7 +1067,7 @@ ${mappingTable}
 
     this.log('info', 'Saving to seed file...');
     try {
-      const res = await fetch(`/api/seed/upload/${this.entityName}`, {
+      const res = await fetch(`api/seed/upload/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.parsedData)
@@ -1091,7 +1091,7 @@ ${mappingTable}
     this.log('info', 'Saving and loading...');
     try {
       // Save
-      const uploadRes = await fetch(`/api/seed/upload/${this.entityName}`, {
+      const uploadRes = await fetch(`api/seed/upload/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.parsedData)
@@ -1106,7 +1106,7 @@ ${mappingTable}
 
       // Load
       const mode = this.conflicts.length > 0 ? this.selectedMode : 'replace';
-      const loadRes = await fetch(`/api/seed/load/${this.entityName}`, {
+      const loadRes = await fetch(`api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skipInvalid: true, mode })

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Layout Editor - AIDE RAP</title>
-    <link rel="stylesheet" href="/static/rap/diagram/layout-editor.css">
+    <link rel="stylesheet" href="static/rap/diagram/layout-editor.css">
 </head>
 <body>
     <div class="toolbar">
@@ -28,7 +28,7 @@
         <button id="saveBtn">Save</button>
         <button id="reloadModelBtn" class="secondary" style="display: none;">↻ Reload Model</button>
         <span class="status" id="status"></span>
-        <a href="/" class="back-link" id="backLink">BACK</a>
+        <a href="./" class="back-link" id="backLink">BACK</a>
     </div>
     <div class="canvas-container">
         <div class="canvas" id="canvas">
@@ -37,8 +37,8 @@
     </div>
 
     <!-- Diagram modules -->
-    <script src="/static/rap/diagram/DiagramConstants.js"></script>
-    <script src="/static/rap/diagram/ConnectionCalculator.js"></script>
+    <script src="static/rap/diagram/DiagramConstants.js"></script>
+    <script src="static/rap/diagram/ConnectionCalculator.js"></script>
 
     <script>
         // Create local references to shared modules (loaded via <script> tags above)
@@ -219,7 +219,7 @@
         // Load available documents
         async function loadDocuments() {
             try {
-                const response = await fetch('/api/layout-editor/documents');
+                const response = await fetch('api/layout-editor/documents');
                 const docs = await response.json();
                 docSelect.innerHTML = '<option value="">-- Select --</option>';
                 docs.forEach(doc => {
@@ -257,7 +257,7 @@
             statusEl.textContent = '';
 
             try {
-                const response = await fetch(`/api/layout-editor/load?doc=${encodeURIComponent(docName)}`);
+                const response = await fetch(`api/layout-editor/load?doc=${encodeURIComponent(docName)}`);
                 const data = await response.json();
 
                 if (!data.success) {
@@ -271,10 +271,10 @@
 
 
                 // Update diagram links
-                linkCompact.href = `/docs-assets/${docName}-diagram.svg`;
-                linkDetailed.href = `/docs-assets/${docName}-diagram-detailed.svg`;
-                linkCardsPdf.href = `/docs-assets/EntityCards.pdf`;
-                linkCardsDocx.href = `/docs-assets/EntityCards.docx`;
+                linkCompact.href = `docs-assets/${docName}-diagram.svg`;
+                linkDetailed.href = `docs-assets/${docName}-diagram-detailed.svg`;
+                linkCardsPdf.href = `docs-assets/EntityCards.pdf`;
+                linkCardsDocx.href = `docs-assets/EntityCards.docx`;
                 linkCompact.style.display = 'inline';
                 linkDetailed.style.display = 'inline';
                 linkCardsPdf.style.display = 'inline';
@@ -296,7 +296,7 @@
          */
         async function checkForModelChanges() {
             try {
-                const resp = await fetch('/api/schema/check-changes');
+                const resp = await fetch('api/schema/check-changes');
                 const { changed } = await resp.json();
 
                 if (changed) {
@@ -328,7 +328,7 @@
         async function reloadModel() {
             statusEl.textContent = 'Reloading model...';
             try {
-                const resp = await fetch('/api/schema/reload', { method: 'POST' });
+                const resp = await fetch('api/schema/reload', { method: 'POST' });
                 const result = await resp.json();
 
                 if (!result.success) {
@@ -975,7 +975,7 @@
                 const svgDetailed = generateSVG(true);
 
                 // Save everything in one request
-                const response = await fetch('/api/layout-editor/save', {
+                const response = await fetch('api/layout-editor/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1034,7 +1034,7 @@
         // Load app config for title
         async function loadAppConfig() {
             try {
-                const res = await fetch('/api/app/config');
+                const res = await fetch('api/app/config');
                 if (res.ok) {
                     const config = await res.json();
                     const appName = config.app_name || 'AIDE RAP';

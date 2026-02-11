@@ -814,7 +814,7 @@ const EntityForm = {
    */
   async loadMediaMetadata(mediaId, filenameSpan) {
     try {
-      const response = await fetch(`/api/media/${mediaId}`);
+      const response = await fetch(`api/media/${mediaId}`);
       if (response.ok) {
         const data = await response.json();
         filenameSpan.textContent = data.originalName || mediaId;
@@ -853,7 +853,7 @@ const EntityForm = {
     dropzone.innerHTML = `<span class="uploading">${i18n.t('media_loading_url')}</span>`;
 
     try {
-      const response = await fetch('/api/media/from-url', {
+      const response = await fetch('api/media/from-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url })
@@ -873,7 +873,7 @@ const EntityForm = {
         thumbnail.src = result.thumbnailUrl;
         thumbnail.classList.remove('media-thumb-fallback');
       } else {
-        thumbnail.src = '/icons/file.svg';
+        thumbnail.src = 'icons/file.svg';
         thumbnail.classList.add('media-thumb-fallback');
       }
 
@@ -926,7 +926,7 @@ const EntityForm = {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/media', {
+      const response = await fetch('api/media', {
         method: 'POST',
         body: formData
       });
@@ -945,7 +945,7 @@ const EntityForm = {
         thumbnail.src = result.thumbnailUrl;
         thumbnail.classList.remove('media-thumb-fallback');
       } else {
-        thumbnail.src = '/icons/file.svg';
+        thumbnail.src = 'icons/file.svg';
         thumbnail.classList.add('media-thumb-fallback');
       }
 
@@ -1211,8 +1211,8 @@ const EntityForm = {
                  value="${DomUtils.escapeHtml(mediaId)}">
           <div class="media-preview ${hasValue ? '' : 'hidden'}">
             <img class="media-thumbnail"
-                 src="${hasValue ? `/api/media/${mediaId}/thumbnail` : ''}"
-                 onerror="this.onerror=null; this.src='/icons/file.svg'; this.classList.add('media-thumb-fallback')">
+                 src="${hasValue ? `api/media/${mediaId}/thumbnail` : ''}"
+                 onerror="this.onerror=null; this.src='icons/file.svg'; this.classList.add('media-thumb-fallback')">
             <span class="media-filename"></span>
             <button type="button" class="media-remove btn-icon" ${disabled} title="${i18n.t('delete')}">&times;</button>
           </div>

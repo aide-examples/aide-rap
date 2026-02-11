@@ -44,7 +44,7 @@ const DataModelDiagram = {
         } else {
             // Fetch from server (cached there too)
             try {
-                const result = await ApiClient.request(`/api/schema/diagram/${type}/${encodeURIComponent(name)}`);
+                const result = await ApiClient.request(`api/schema/diagram/${type}/${encodeURIComponent(name)}`);
                 mermaidCode = result.mermaid;
                 entities = result.entities;
                 this.cache.set(cacheKey, { mermaidCode, entities });
