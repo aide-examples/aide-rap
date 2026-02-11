@@ -152,10 +152,14 @@ const TreeRenderer = {
      * @param {Object} context - Render context with state and settings
      */
     async renderForeignKeyNode(col, fkId, parentRecord, visitedPath, context) {
+        const displayName = col.name.endsWith('_id')
+            ? col.name.slice(0, -3)  // type_id -> type
+            : col.name;
+
         if (!fkId) {
             return `
             <div class="tree-attribute fk-field">
-              <span class="attr-name">${col.name}:</span>
+              <span class="attr-name">${displayName}:</span>
               <span class="attr-value"></span>
             </div>
           `;
@@ -167,11 +171,6 @@ const TreeRenderer = {
 
         const nodeId = `fk-${targetEntity}-${fkId}-from-${parentRecord.id}`;
         const isExpanded = !isCycle && context.state.isExpanded(nodeId);
-
-        // Check for preloaded label from View (FK-Label-Enrichment)
-        const displayName = col.name.endsWith('_id')
-            ? col.name.slice(0, -3)  // type_id -> type
-            : col.name;
         const labelField = displayName + '_label';
         const preloadedLabel = parentRecord[labelField];
 
@@ -201,7 +200,7 @@ const TreeRenderer = {
                  data-record-id="${fkId}">
               <div class="tree-fk-header disabled" style="background-color: ${areaColor};">
                 <span class="cycle-icon" title="${i18n.t('tooltip_cycle_detected')}">&#8635;</span>
-                <span class="attr-name">${col.name}:</span>
+                <span class="attr-name">${displayName}:</span>
                 <span class="fk-label">${DomUtils.escapeHtml(refLabel)}</span>
                 <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
               </div>
@@ -217,7 +216,7 @@ const TreeRenderer = {
                data-record-id="${fkId}">
             <div class="tree-fk-header" data-action="toggle-fk" style="background-color: ${areaColor};">
               <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
-              <span class="attr-name">${col.name}:</span>
+              <span class="attr-name">${displayName}:</span>
               <span class="fk-label">${DomUtils.escapeHtml(refLabel)}</span>
               <span class="fk-entity-link" data-action="navigate-entity" data-entity="${targetEntity}" data-id="${fkId}">(${targetEntity})</span>
             </div>
@@ -279,6 +278,17 @@ const TreeRenderer = {
     },
 
     /**
+     * Build back-reference label, showing FK attribute name only when semantically relevant.
+     * Trivial: "Aircraft [5]" — Semantic: "is parent_type of EngineType [3]"
+     */
+    _backRefLabel(ref, targetEntity) {
+        const displayName = ref.column.replace(/_id$/, '');
+        const targetSnake = targetEntity.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+        if (targetSnake.endsWith(displayName)) return ref.entity;
+        return `is ${displayName} of ${ref.entity}`;
+    },
+
+    /**
      * Render back-references (entities that point to this record)
      * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
      * @param {Object} context - Render context with state and settings
@@ -286,24 +296,17 @@ const TreeRenderer = {
     async renderBackReferences(entityName, recordId, backRefs, visitedPath, context) {
         let html = '';
 
-        // Deduplicate by entity name (multiple FKs from same entity → one group)
-        const seen = new Set();
-        const uniqueRefs = backRefs.filter(ref => {
-            if (seen.has(ref.entity)) return false;
-            seen.add(ref.entity);
-            return true;
-        });
-
-        for (const ref of uniqueRefs) {
-            const nodeId = `backref-${ref.entity}-to-${entityName}-${recordId}`;
+        for (const ref of backRefs) {
+            const nodeId = `backref-${ref.entity}-${ref.column}-to-${entityName}-${recordId}`;
             const isExpanded = context.state.isExpanded(nodeId);
 
-            // Get count of referencing records
+            // Get count of referencing records (key includes column for multi-FK support)
             let count = 0;
             try {
                 const references = await ApiClient.getBackReferences(entityName, recordId);
-                if (references[ref.entity]) {
-                    count = references[ref.entity].count;
+                const refKey = `${ref.entity}:${ref.column}`;
+                if (references[refKey]) {
+                    count = references[refKey].count;
                 }
             } catch (e) {
                 // Ignore errors
@@ -334,7 +337,7 @@ const TreeRenderer = {
                  data-total-count="${count}">
               <div class="tree-backref-header" data-action="toggle-backref" style="background-color: ${areaColor};">
                 <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
-                <span class="backref-label">${ref.entity} [${displayCount}]</span>${navigateArrow}
+                <span class="backref-label">${this._backRefLabel(ref, entityName)} [${displayCount}]</span>${navigateArrow}
               </div>
           `;
 
@@ -356,7 +359,7 @@ const TreeRenderer = {
     async renderExpandedBackReferences(entityName, recordId, refEntity, refColumn, visitedPath, context) {
         try {
             const references = await ApiClient.getBackReferences(entityName, recordId);
-            const refData = references[refEntity];
+            const refData = references[`${refEntity}:${refColumn}`];
 
             if (!refData || refData.records.length === 0) {
                 return '<div class="tree-backref-content"><em>No references</em></div>';

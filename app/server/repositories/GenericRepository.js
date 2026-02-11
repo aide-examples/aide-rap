@@ -673,7 +673,10 @@ function getBackReferences(entityName, id) {
     if (rows.length > 0) {
       // Enrich with enum display values
       const enrichedRows = enrichRecords(rel.entity, rows);
-      references[rel.entity] = {
+      // Key includes column to support multiple FKs from the same entity
+      const refKey = `${rel.entity}:${rel.column}`;
+      references[refKey] = {
+        entity: rel.entity,
         column: rel.column,
         count: rows.length,
         records: enrichedRows

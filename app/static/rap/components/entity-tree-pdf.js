@@ -364,16 +364,17 @@ const TreePdfExport = {
         const { state, showCycles } = context;
 
         for (const ref of backRefs) {
-            const nodeId = `backref-${ref.entity}-to-${entityName}-${recordId}`;
+            const nodeId = `backref-${ref.entity}-${ref.column}-to-${entityName}-${recordId}`;
             const isExpanded = state.isExpanded(nodeId);
 
             let count = 0;
             let refRecords = [];
             try {
                 const references = await ApiClient.getBackReferences(entityName, recordId);
-                if (references[ref.entity]) {
-                    count = references[ref.entity].count;
-                    refRecords = references[ref.entity].records || [];
+                const refKey = `${ref.entity}:${ref.column}`;
+                if (references[refKey]) {
+                    count = references[refKey].count;
+                    refRecords = references[refKey].records || [];
                 }
             } catch (e) {
                 // Ignore
@@ -383,10 +384,17 @@ const TreePdfExport = {
 
             const refColor = ref.areaColor || '#e2e8f0';
 
+            // Show FK attribute name only when semantically relevant
+            const displayName = ref.column.replace(/_id$/, '');
+            const targetSnake = entityName.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+            const backRefLabel = targetSnake.endsWith(displayName)
+                ? ref.entity
+                : `is ${displayName} of ${ref.entity}`;
+
             nodes.push({
                 type: 'backref',
                 depth,
-                label: ref.entity,
+                label: backRefLabel,
                 value: `${count} record${count !== 1 ? 's' : ''}`,
                 color: refColor
             });
