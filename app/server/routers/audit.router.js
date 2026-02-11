@@ -87,42 +87,13 @@ router.get('/:id', (req, res, next) => {
 });
 
 /**
- * Static schema definition for the AuditTrail system entity.
- * Used by both the /schema/extended endpoint and /api/meta.
- */
-function getAuditSchema() {
-  return {
-    name: 'AuditTrail',
-    tableName: '_audit_trail',
-    readonly: true,
-    system: true,
-    columns: [
-      { name: 'id', type: 'number', required: true, ui: { readonly: true } },
-      { name: 'entity_name', type: 'string', required: true, ui: { readonly: true } },
-      { name: 'entity_id', type: 'number', required: true, ui: { readonly: true } },
-      { name: 'action', type: 'string', required: true, enumValues: [
-        { value: 'CREATE', label: 'Create' },
-        { value: 'UPDATE', label: 'Update' },
-        { value: 'DELETE', label: 'Delete' }
-      ], ui: { readonly: true } },
-      { name: 'before_data', type: 'string', customType: 'json', required: false, ui: { readonly: true } },
-      { name: 'after_data', type: 'string', customType: 'json', required: false, ui: { readonly: true } },
-      { name: 'changed_by', type: 'string', required: false, ui: { readonly: true } },
-      { name: 'changed_at', type: 'string', required: true, ui: { readonly: true } },
-      { name: 'correlation_id', type: 'string', required: false, ui: { readonly: true } }
-    ],
-    ui: {
-      labelFields: ['entity_name', 'action'],
-      readonly: true
-    }
-  };
-}
-
-/**
- * GET /api/audit/schema - Get audit trail schema for UI
+ * GET /api/audit/schema - Get audit trail schema from SystemEntityRegistry
  */
 router.get('/schema/extended', (req, res) => {
-  res.json(getAuditSchema());
+  const systemEntityRegistry = require('../utils/SystemEntityRegistry');
+  const schema = systemEntityRegistry.get('AuditTrail');
+  if (!schema) return res.status(404).json({ error: 'AuditTrail schema not registered' });
+  res.json(schema);
 });
 
 /**
@@ -146,5 +117,4 @@ router.delete('/:id', (req, res) => {
   });
 });
 
-router.getAuditSchema = getAuditSchema;
 module.exports = router;

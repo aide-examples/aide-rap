@@ -8,6 +8,7 @@
 const { getDatabase } = require('../config/database');
 const eventBus = require('../utils/EventBus');
 const logger = require('../utils/logger');
+const systemEntityRegistry = require('../utils/SystemEntityRegistry');
 
 // In-memory store for "before" records (keyed by correlationId + entityName + id)
 const pendingUpdates = new Map();
@@ -224,11 +225,43 @@ function queryAuditTrail(options = {}) {
 }
 
 /**
+ * Static schema definition for the AuditTrail system entity.
+ */
+function getAuditSchema() {
+  return {
+    name: 'AuditTrail',
+    tableName: '_audit_trail',
+    readonly: true,
+    system: true,
+    columns: [
+      { name: 'id', type: 'number', required: true, ui: { readonly: true } },
+      { name: 'entity_name', type: 'string', required: true, ui: { readonly: true } },
+      { name: 'entity_id', type: 'number', required: true, ui: { readonly: true } },
+      { name: 'action', type: 'string', required: true, enumValues: [
+        { value: 'CREATE', label: 'Create' },
+        { value: 'UPDATE', label: 'Update' },
+        { value: 'DELETE', label: 'Delete' }
+      ], ui: { readonly: true } },
+      { name: 'before_data', type: 'string', customType: 'json', required: false, ui: { readonly: true } },
+      { name: 'after_data', type: 'string', customType: 'json', required: false, ui: { readonly: true } },
+      { name: 'changed_by', type: 'string', required: false, ui: { readonly: true } },
+      { name: 'changed_at', type: 'string', required: true, ui: { readonly: true } },
+      { name: 'correlation_id', type: 'string', required: false, ui: { readonly: true } }
+    ],
+    ui: {
+      labelFields: ['entity_name', 'action'],
+      readonly: true
+    }
+  };
+}
+
+/**
  * Initialize the audit service
  */
 function init() {
   initAuditTable();
   registerListeners();
+  systemEntityRegistry.register('AuditTrail', getAuditSchema());
 }
 
 module.exports = {

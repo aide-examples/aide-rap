@@ -404,11 +404,9 @@ app.get('/api/meta', (req, res) => {
                 try { schemas[e.name] = GenericService.getExtendedSchema(e.name); } catch {}
             }
         }
-        // System entities with static schemas (not in GenericService)
-        if (!schemas.AuditTrail) {
-            const { getAuditSchema } = require('./server/routers/audit.router');
-            schemas.AuditTrail = getAuditSchema();
-        }
+        // System entities (AuditTrail etc.) register their schemas via SystemEntityRegistry
+        const systemSchemas = require('./server/utils/SystemEntityRegistry').getAll();
+        Object.assign(schemas, systemSchemas);
 
         // Views: list, groups, and all view schemas
         const userViews = schema.userViews || [];
