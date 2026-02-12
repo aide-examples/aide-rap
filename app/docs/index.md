@@ -364,6 +364,10 @@ See [Configuration](configuration.md) for the full reference.
 - [Calculations](calculations.md) – `## Client Calculations` and `## Server Calculations` for derived field values
 - [Seed Data](seed-data.md) – Import, export, and AI-generate test data
 
+### Operations
+
+- [Deployment](deployment.md) – Package, deploy (Node.js or Docker), update, and export pre-built images
+
 ### Procedures
 
 - [Create New System](procedures/system-create.md) – AI-assisted system creation via Model Builder

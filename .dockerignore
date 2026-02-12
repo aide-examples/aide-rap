@@ -1,0 +1,12 @@
+node_modules/
+aide-frame/js/aide_frame/node_modules/
+.git/
+.claude/
+*.zip
+releases/
+deploy/
+server_out.log
+server_err.log
+rap.sqlite
+app/logs/
+app/systems/*/logs/

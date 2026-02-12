@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TEST_DIR="/tmp/aide-docker-test"
 
 echo "=== Step 1: Pack ==="
+mkdir -p "$TEST_DIR"
 "$SCRIPT_DIR/pack.sh" "$TEST_DIR/aide-rap.zip"
 
 echo ""
