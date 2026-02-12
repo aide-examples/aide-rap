@@ -293,6 +293,36 @@ const TreeRenderer = {
     },
 
     /**
+     * Find a FK column by field name (with or without _id suffix)
+     */
+    _findFkColumn(schema, fieldName) {
+        return schema.columns.find(c =>
+            c.foreignKey && (c.name === fieldName || c.name === fieldName + '_id')
+        );
+    },
+
+    /**
+     * Resolve template attribute names to display column descriptors.
+     * Shared by renderDetailAttributeRow and renderDetailBackRefRecords.
+     * @returns {Array<{name, displayName, isFkLabel, originalCol}>}
+     */
+    _resolveTemplateColumns(attributes, schema) {
+        const cols = [];
+        for (const attrName of attributes) {
+            const col = schema.columns.find(c => c.name === attrName)
+                || this._findFkColumn(schema, attrName);
+            if (!col) continue;
+            if (col.foreignKey) {
+                const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
+                cols.push({ name: displayName + '_label', displayName, isFkLabel: true, originalCol: col });
+            } else {
+                cols.push({ name: col.name, displayName: col.name, isFkLabel: false, originalCol: col });
+            }
+        }
+        return cols;
+    },
+
+    /**
      * Build back-reference label, showing FK attribute name only when semantically relevant.
      * Trivial: "Aircraft [5]" — Semantic: "is parent_type of EngineType [3]"
      */
@@ -485,29 +515,50 @@ const TreeRenderer = {
     },
 
     /**
-     * Render content for an expanded back-reference row
-     * Shows FKs and back-references of the referenced record
+     * Render content for an expanded back-reference row.
+     * Generic mode: shows all FKs + back-references from schema.
+     * Template mode (templateChild): shows only template-specified children.
      * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
      * @param {Object} context - Render context with state and settings
+     * @param {Object} [templateChild] - Template child node (if in detail/template mode)
      */
-    async renderBackRefRowContent(entityName, record, schema, visitedPath, context) {
+    async renderBackRefRowContent(entityName, record, schema, visitedPath, context, templateChild = null) {
+        if (templateChild) {
+            // Template mode: render only template-specified children
+            if (!templateChild.children || templateChild.children.length === 0) return '';
+            let html = '<div class="backref-row-expanded">';
+            let hasContent = false;
+            for (const child of templateChild.children) {
+                if (child.type === 'fk') {
+                    const col = this._findFkColumn(schema, child.field);
+                    if (col && record[col.name]) {
+                        html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath, context, child);
+                        hasContent = true;
+                    }
+                } else if (child.type === 'backref') {
+                    html += await this.renderDetailBackReference(entityName, record.id, child, schema, visitedPath, context);
+                    hasContent = true;
+                }
+            }
+            if (!hasContent) html += '<em class="no-relations">No relations</em>';
+            html += '</div>';
+            return html;
+        }
+
+        // Generic mode: render all FKs + back-references
         let html = '<div class="backref-row-expanded">';
 
-        // Get FK columns that have values (respecting hidden and system column settings)
         const visibleCols = ColumnUtils.getVisibleColumns(schema, context.showSystem);
         const fkCols = visibleCols.filter(col => col.foreignKey && record[col.name]);
 
-        // Render FKs recursively
         for (const col of fkCols) {
             html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath, context);
         }
 
-        // Back-references of this record
         if (schema.backReferences && schema.backReferences.length > 0) {
             html += await this.renderBackReferences(entityName, record.id, schema.backReferences, visitedPath, context);
         }
 
-        // If no FKs and no back-refs, show a message
         if (fkCols.length === 0 && (!schema.backReferences || schema.backReferences.length === 0)) {
             html += '<em class="no-relations">No relations</em>';
         }
@@ -532,9 +583,7 @@ const TreeRenderer = {
         // Render children in template order (FKs and back-refs intermixed)
         for (const child of (templateNode.children || [])) {
             if (child.type === 'fk') {
-                const col = schema.columns.find(c =>
-                    c.foreignKey && (c.name === child.field || c.name === child.field + '_id')
-                );
+                const col = this._findFkColumn(schema, child.field);
                 if (col) {
                     html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath, context, child);
                 }
@@ -549,40 +598,33 @@ const TreeRenderer = {
 
     /**
      * Render only template-specified attributes as a compact row.
-     * Handles FK columns by showing their label values.
+     * Uses _resolveTemplateColumns for column resolution.
      */
     renderDetailAttributeRow(attributes, record, schema) {
-        const headers = [];
-        const cells = [];
+        const displayCols = this._resolveTemplateColumns(attributes, schema);
+        if (displayCols.length === 0) return '';
 
-        for (const attrName of attributes) {
-            let col = schema.columns.find(c => c.name === attrName);
-            if (!col) {
-                col = schema.columns.find(c => c.foreignKey && c.name === attrName + '_id');
-            }
-            if (!col) continue;
+        const headers = displayCols.map(col =>
+            `<th title="${col.displayName}">${col.displayName.replace(/_/g, ' ')}</th>`
+        ).join('');
 
-            if (col.foreignKey) {
-                const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
-                const labelField = displayName + '_label';
-                const labelValue = record[labelField];
-                const displayValue = labelValue
-                    ? DomUtils.escapeHtml(String(labelValue))
-                    : (record[col.name] ? `#${record[col.name]}` : '');
-                headers.push(`<th title="${displayName}">${displayName.replace(/_/g, ' ')}</th>`);
-                cells.push(`<td title="${displayName}">${displayValue}</td>`);
+        const cells = displayCols.map(col => {
+            const value = record[col.name];
+            let displayValue;
+            if (value === null || value === undefined) {
+                displayValue = col.isFkLabel && record[col.originalCol.name] ? `#${record[col.originalCol.name]}` : '';
+            } else if (col.isFkLabel) {
+                displayValue = DomUtils.escapeHtml(String(value));
             } else {
-                const displayValue = ValueFormatter.formatDisplayHtml(record[col.name], col, schema);
-                headers.push(`<th title="${col.name}">${col.name.replace(/_/g, ' ')}</th>`);
-                cells.push(`<td title="${col.name}">${displayValue}</td>`);
+                displayValue = ValueFormatter.formatDisplayHtml(value, col.originalCol, schema);
             }
-        }
+            return `<td title="${col.displayName}">${displayValue}</td>`;
+        }).join('');
 
-        if (cells.length === 0) return '';
         return `
             <table class="tree-attr-table">
-                <thead><tr>${headers.join('')}</tr></thead>
-                <tbody><tr>${cells.join('')}</tr></tbody>
+                <thead><tr>${headers}</tr></thead>
+                <tbody><tr>${cells}</tr></tbody>
             </table>
         `;
     },
@@ -667,25 +709,8 @@ const TreeRenderer = {
      * Render back-reference records as a table with only template-specified columns.
      */
     async renderDetailBackRefRecords(refEntity, records, refSchema, templateChild, visitedPath, context, parentEntity, parentId) {
-        const attributes = templateChild.attributes || [];
         const hasChildren = templateChild.children && templateChild.children.length > 0;
-
-        // Build display columns from template attributes
-        const displayCols = [];
-        for (const attrName of attributes) {
-            let col = refSchema.columns.find(c => c.name === attrName);
-            if (!col) {
-                col = refSchema.columns.find(c => c.foreignKey && c.name === attrName + '_id');
-            }
-            if (!col) continue;
-
-            if (col.foreignKey) {
-                const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
-                displayCols.push({ name: displayName + '_label', displayName, isFkLabel: true, originalCol: col });
-            } else {
-                displayCols.push({ name: col.name, displayName: col.name, isFkLabel: false, originalCol: col });
-            }
-        }
+        const displayCols = this._resolveTemplateColumns(templateChild.attributes || [], refSchema);
 
         if (displayCols.length === 0) return '';
         const areaColor = refSchema.areaColor || '#f5f5f5';
@@ -734,8 +759,8 @@ const TreeRenderer = {
             if (isRowExpanded) {
                 const colSpan = displayCols.length + (hasChildren ? 1 : 0);
                 const newPath = new Set([...visitedPath, `${refEntity}-${record.id}`]);
-                const expandedContent = await this.renderDetailBackRefRowContent(
-                    refEntity, record, refSchema, templateChild, newPath, context
+                const expandedContent = await this.renderBackRefRowContent(
+                    refEntity, record, refSchema, newPath, context, templateChild
                 );
                 rowsHtml += `
                     <tr class="backref-row-content">
@@ -757,35 +782,6 @@ const TreeRenderer = {
         `;
     },
 
-    /**
-     * Render expanded content for a back-ref row in detail/template mode.
-     * Shows template children (FKs auto-expanded, back-refs with params).
-     */
-    async renderDetailBackRefRowContent(refEntity, record, refSchema, templateChild, visitedPath, context) {
-        if (!templateChild.children || templateChild.children.length === 0) return '';
-
-        let html = '<div class="backref-row-expanded">';
-
-        for (const child of templateChild.children) {
-            if (child.type === 'fk') {
-                const col = refSchema.columns.find(c =>
-                    c.foreignKey && (c.name === child.field || c.name === child.field + '_id')
-                );
-                if (col && record[col.name]) {
-                    html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath, context, child);
-                }
-            } else if (child.type === 'backref') {
-                html += await this.renderDetailBackReference(refEntity, record.id, child, refSchema, visitedPath, context);
-            }
-        }
-
-        if (html === '<div class="backref-row-expanded">') {
-            html += '<em class="no-relations">No relations</em>';
-        }
-
-        html += '</div>';
-        return html;
-    }
 };
 
 // Make available globally
