@@ -78,9 +78,14 @@ const SeedImportDialog = {
   },
 
   /**
-   * Hide the dialog
+   * Hide the dialog (with unsaved-changes guard)
    */
-  hide() {
+  hide(force = false) {
+    if (!force && this.ruleModified) {
+      if (!confirm(i18n.t('unsaved_changes_warning'))) {
+        return;
+      }
+    }
     if (this.modalElement) {
       this.modalElement.remove();
       this.modalElement = null;
