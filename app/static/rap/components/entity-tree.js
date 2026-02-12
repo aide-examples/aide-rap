@@ -18,6 +18,7 @@ const EntityTree = {
     referencePosition: 'end', // 'end', 'start', or 'inline'
     attributeLayout: 'list', // 'row' (horizontal) or 'list' (vertical) - controlled by view mode buttons
     showCycles: false, // false = hide cycle nodes completely, true = show with cycle indicator (not expandable)
+    showNullFKs: false, // false = hide FK fields with NULL values, true = show as empty line
 
     // Config from server
     treeConfig: null, // { backRefPreviewLimit: 10 }
@@ -109,6 +110,23 @@ const EntityTree = {
                 this.render();
             });
         }
+
+        // Null FK visibility toggle
+        const nullFKToggle = document.getElementById('show-null-fk-toggle');
+        if (nullFKToggle) {
+            // Restore from sessionStorage
+            const savedNullFK = sessionStorage.getItem('tree-show-null-fk');
+            if (savedNullFK === 'true') {
+                this.showNullFKs = true;
+                nullFKToggle.checked = true;
+            }
+
+            nullFKToggle.addEventListener('change', (e) => {
+                this.showNullFKs = e.target.checked;
+                sessionStorage.setItem('tree-show-null-fk', e.target.checked ? 'true' : 'false');
+                this.render();
+            });
+        }
     },
 
     /**
@@ -122,6 +140,7 @@ const EntityTree = {
     async loadEntity(entityName, records, options = {}) {
         this.currentEntity = entityName;
         this.records = records;
+        this.detailTemplate = null;  // Clear detail template when loading normal entity
         this.state.clear();
 
         // If a selectedId is provided, pre-expand the node and its outbound FKs
@@ -147,6 +166,89 @@ const EntityTree = {
             const selectedNode = this.container.querySelector(`[data-node-id="${this.state.getSelectedNodeId()}"]`);
             if (selectedNode) {
                 selectedNode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    },
+
+    /**
+     * Load and display a detail (template-driven) view for a single record.
+     * The template controls which attributes, FKs, and back-refs are shown.
+     * @param {string} entityName - Base entity name
+     * @param {number} selectedId - ID of the selected record
+     * @param {Array} records - All records of the base entity
+     * @param {Object} template - Parsed detail template { base, rootAttributes, children }
+     */
+    async loadDetailView(entityName, selectedId, records, template) {
+        this.currentEntity = entityName;
+        this.records = records;
+        this.detailTemplate = template;
+        this.state.clear();
+
+        // Expand root node
+        const nodeId = `${entityName}-${selectedId}`;
+        this.state.setSelection(nodeId);
+        this.state.expand(nodeId);
+
+        // Pre-expand all template-defined children
+        const record = records.find(r => r.id === selectedId);
+        if (record) {
+            await this.expandFromTemplate(entityName, record, template.children);
+        }
+
+        // Force compact row layout for detail views
+        this.attributeLayout = 'row';
+
+        await this.render();
+
+        // Scroll to top
+        const selectedNode = this.container.querySelector(`[data-node-id="${nodeId}"]`);
+        if (selectedNode) {
+            selectedNode.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    },
+
+    /**
+     * Pre-expand nodes according to detail template children.
+     * @param {string} entityName - Current entity
+     * @param {Object} record - Current record
+     * @param {Array} children - Template children to expand
+     */
+    async expandFromTemplate(entityName, record, children) {
+        if (!children || children.length === 0) return;
+
+        const schema = await SchemaCache.getExtended(entityName);
+
+        for (const child of children) {
+            if (child.type === 'fk') {
+                // FK field: find the column and expand if has value
+                const col = schema.columns.find(c =>
+                    (c.name === child.field || c.name === child.field + '_id') && c.foreignKey
+                );
+                if (col && record[col.name]) {
+                    const fkId = record[col.name];
+                    const fkNodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${record.id}`;
+                    this.state.expand(fkNodeId);
+
+                    // Recurse into FK children if template has sub-children
+                    if (child.children.length > 0) {
+                        try {
+                            const fkRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
+                            if (fkRecord) {
+                                await this.expandFromTemplate(col.foreignKey.entity, fkRecord, child.children);
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+            } else if (child.type === 'backref') {
+                // Back-reference: find matching back-ref and expand
+                if (schema.backReferences) {
+                    for (const ref of schema.backReferences) {
+                        if (ref.entity === child.entity) {
+                            const backrefNodeId = `backref-${ref.entity}-${ref.column}-to-${entityName}-${record.id}`;
+                            this.state.expand(backrefNodeId);
+                        }
+                    }
+                }
             }
         }
     },
@@ -200,8 +302,10 @@ const EntityTree = {
             referencePosition: this.referencePosition,
             attributeLayout: this.attributeLayout,
             showCycles: this.showCycles,
+            showNullFKs: this.showNullFKs,
             showSystem: EntityTable.showSystem, // Shared with EntityTable
-            backRefPreviewLimit: this.treeConfig?.backRefPreviewLimit || 10
+            backRefPreviewLimit: this.treeConfig?.backRefPreviewLimit || 10,
+            detailTemplate: this.detailTemplate || null
         };
     },
 

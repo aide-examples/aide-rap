@@ -389,6 +389,7 @@ function createUserViews(viewsConfig) {
   const { views, groups } = parseAllUserViews(viewsConfig, schema);
 
   for (const view of views) {
+    if (view.detail) continue;  // Detail views are template-based, no SQL view
     try {
       const sql = generateUserViewSQL(view);
       db.exec(sql);

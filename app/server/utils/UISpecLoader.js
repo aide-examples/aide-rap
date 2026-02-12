@@ -153,8 +153,10 @@ function parseViewFile(content, filename) {
   let description = null;
   let collectDesc = false;
   let jsonBlock = null;
+  let detailBlock = null;
   let jsBlock = null;
   let inJson = false;
+  let inDetail = false;
   let inJs = false;
   let blockContent = [];
 
@@ -165,7 +167,7 @@ function parseViewFile(content, filename) {
     if (trimmed.startsWith('# ') && !name) {
       name = trimmed.substring(2).trim();
       collectDesc = true;
-    } else if (collectDesc && trimmed && !inJson && !inJs) {
+    } else if (collectDesc && trimmed && !inJson && !inDetail && !inJs) {
       if (trimmed.startsWith('```')) {
         // Don't consume fence as description — fall through
         collectDesc = false;
@@ -178,6 +180,9 @@ function parseViewFile(content, filename) {
     if (trimmed === '```json') {
       inJson = true;
       blockContent = [];
+    } else if (trimmed === '```detail') {
+      inDetail = true;
+      blockContent = [];
     } else if (trimmed === '```js') {
       inJs = true;
       blockContent = [];
@@ -185,13 +190,33 @@ function parseViewFile(content, filename) {
       if (inJson) {
         jsonBlock = blockContent.join('\n');
         inJson = false;
+      } else if (inDetail) {
+        detailBlock = blockContent;
+        inDetail = false;
       } else if (inJs) {
         jsBlock = blockContent.join('\n');
         inJs = false;
       }
-    } else if (inJson || inJs) {
+    } else if (inJson || inDetail || inJs) {
       blockContent.push(line);
     }
+  }
+
+  // Detail view (```detail block)
+  if (detailBlock) {
+    const template = parseDetailTemplate(detailBlock);
+    if (!template) {
+      console.error(`Failed to parse detail template in ${filename}`);
+      return null;
+    }
+    const viewDef = {
+      name: name || filename.replace('.md', ''),
+      base: template.base,
+      detail: true,
+      template
+    };
+    if (description) viewDef.description = description;
+    return viewDef;
   }
 
   if (!jsonBlock) return null;
@@ -208,6 +233,88 @@ function parseViewFile(content, filename) {
     console.error(`Failed to parse view ${filename}: ${e.message}`);
     return null;
   }
+}
+
+/**
+ * Parse a detail template block into a tree structure.
+ *
+ * Syntax:
+ *   base: EntityName
+ *   : attr1, attr2              → root attributes
+ *   EngineAllocation(ORDER BY start_date DESC, LIMIT 5): start_date, aircraft
+ *     aircraft: registration, type
+ *   current_lessor: name, country
+ *
+ * - PascalCase (first char uppercase) = back-reference entity
+ * - snake_case (first char lowercase) = FK field on parent
+ * - (params) = query params for back-refs (ORDER BY, LIMIT, WHERE)
+ * - : attr1, attr2 = visible attributes (omit for all)
+ * - Indentation (2 spaces) = nesting depth
+ *
+ * @param {string[]} lines - Lines from the detail block
+ * @returns {Object|null} Parsed template { base, rootAttributes, children }
+ */
+function parseDetailTemplate(lines) {
+  let base = null;
+  let rootAttributes = null;
+  const rootChildren = [];
+
+  // Stack for tracking parent nodes at each indentation level
+  // stack[depth] = children array to push into
+  const stack = [rootChildren];
+
+  for (const line of lines) {
+    // Skip empty lines
+    if (!line.trim()) continue;
+
+    // base: EntityName
+    const baseMatch = line.match(/^\s*base:\s*(\w+)\s*$/);
+    if (baseMatch) {
+      base = baseMatch[1];
+      continue;
+    }
+
+    // Determine indentation level (2 spaces per level)
+    const leadingSpaces = line.match(/^(\s*)/)[1].length;
+    const depth = Math.floor(leadingSpaces / 2);
+    const trimmed = line.trim();
+
+    // Root attributes line: ": attr1, attr2"
+    if (trimmed.startsWith(':') && depth === 0) {
+      rootAttributes = trimmed.substring(1).split(',').map(a => a.trim()).filter(Boolean);
+      continue;
+    }
+
+    // Parse node line: "Name(params): attr1, attr2" or "Name: attr1, attr2" or "Name(params)" or "Name"
+    const nodeMatch = trimmed.match(/^(\w+)(?:\(([^)]*)\))?(?:\s*:\s*(.+))?$/);
+    if (!nodeMatch) continue;
+
+    const nodeName = nodeMatch[1];
+    const params = nodeMatch[2] || null;
+    const attrStr = nodeMatch[3] || null;
+    const attributes = attrStr ? attrStr.split(',').map(a => a.trim()).filter(Boolean) : null;
+
+    // PascalCase (starts with uppercase) = back-reference, snake_case = FK field
+    const isPascal = nodeName[0] === nodeName[0].toUpperCase() && nodeName[0] !== nodeName[0].toLowerCase();
+    const node = isPascal
+      ? { type: 'backref', entity: nodeName, params, attributes, children: [] }
+      : { type: 'fk', field: nodeName, params: null, attributes, children: [] };
+
+    // Find correct parent level
+    // Nodes at depth 1 go into rootChildren (stack[0]),
+    // nodes at depth 2 go into the last depth-1 node's children (stack[1]), etc.
+    while (stack.length > depth) stack.pop();
+
+    const parentChildren = stack[stack.length - 1];
+    parentChildren.push(node);
+
+    // Push this node's children array for potential sub-nodes
+    stack.push(node.children);
+  }
+
+  if (!base) return null;
+
+  return { base, rootAttributes, children: rootChildren };
 }
 
 /**

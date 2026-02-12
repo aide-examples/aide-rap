@@ -23,6 +23,8 @@
     "settings_show_ids": "IDs anzeigen",
     "settings_show_cycles": "Zyklen anzeigen",
     "settings_show_cycles_hint": "(in Baumansichten)",
+    "settings_show_null_fk": "Leere FK anzeigen",
+    "settings_show_null_fk_hint": "(in Baumansichten)",
     "settings_show_system": "Systemattribute anzeigen",
     "settings_show_system_hint": "(Änderungszeiten, Version)",
 
@@ -30,6 +32,7 @@
     "tooltip_ref_position": "Referenzposition",
     "tooltip_show_ids": "Technische IDs im Detailbereich anzeigen",
     "tooltip_show_cycles": "Zyklische Referenzen in Baumansichten anzeigen (sonst verborgen)",
+    "tooltip_show_null_fk": "FK-Felder ohne Wert in Baumansichten anzeigen (sonst verborgen)",
     "tooltip_show_system": "Zeitstempel und Version anzeigen",
     "tooltip_refresh_counts": "Zählungen aktualisieren",
     "tooltip_table_view": "Tabellenansicht",
@@ -46,6 +49,8 @@
     "select_view": "Ansicht auswählen...",
     "details": "Details",
     "select_record_message": "Wählen Sie einen Datensatz aus, um Details anzuzeigen.",
+    "detail_select_record": "%{entity} auswählen",
+    "detail_search_placeholder": "Suchen...",
     "select_entity_message": "Wählen Sie eine Entität oder Ansicht, um Datensätze anzuzeigen.",
     "no_records_found": "Keine Datensätze gefunden.",
 

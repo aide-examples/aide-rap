@@ -23,6 +23,8 @@
     "settings_show_ids": "Mostrar IDs",
     "settings_show_cycles": "Mostrar ciclos",
     "settings_show_cycles_hint": "(en vistas de árbol)",
+    "settings_show_null_fk": "Mostrar FK vacíos",
+    "settings_show_null_fk_hint": "(en vistas de árbol)",
     "settings_show_system": "Mostrar atributos del sistema",
     "settings_show_system_hint": "(tiempos de modificación, versión)",
 
@@ -30,6 +32,7 @@
     "tooltip_ref_position": "Posición de referencias",
     "tooltip_show_ids": "Mostrar IDs técnicos en panel de detalles",
     "tooltip_show_cycles": "Mostrar referencias cíclicas en vistas de árbol (sino ocultas)",
+    "tooltip_show_null_fk": "Mostrar campos FK sin valor en vistas de árbol (sino ocultos)",
     "tooltip_show_system": "Mostrar marcas de tiempo y versión",
     "tooltip_refresh_counts": "Actualizar conteos",
     "tooltip_table_view": "Vista de tabla",
@@ -46,6 +49,8 @@
     "select_view": "Seleccionar vista...",
     "details": "Detalles",
     "select_record_message": "Seleccione un registro para ver los detalles.",
+    "detail_select_record": "Seleccionar %{entity}",
+    "detail_search_placeholder": "Buscar...",
     "select_entity_message": "Seleccione una entidad o vista para ver registros.",
     "no_records_found": "No se encontraron registros.",
 

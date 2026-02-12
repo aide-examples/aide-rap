@@ -30,7 +30,14 @@ const TreeRenderer = {
         if (isExpanded) {
             // Initialize visited path with root entity for cycle detection
             const visitedPath = new Set([`${entityName}-${record.id}`]);
-            html += await this.renderNodeContent(entityName, record, schema, visitedPath, context);
+            if (context.detailTemplate) {
+                html += await this.renderDetailNodeContent(entityName, record, schema, visitedPath, context, {
+                    attributes: context.detailTemplate.rootAttributes,
+                    children: context.detailTemplate.children
+                });
+            } else {
+                html += await this.renderNodeContent(entityName, record, schema, visitedPath, context);
+            }
         }
 
         html += '</div>';
@@ -151,12 +158,13 @@ const TreeRenderer = {
      * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
      * @param {Object} context - Render context with state and settings
      */
-    async renderForeignKeyNode(col, fkId, parentRecord, visitedPath, context) {
+    async renderForeignKeyNode(col, fkId, parentRecord, visitedPath, context, templateChild = null) {
         const displayName = col.name.endsWith('_id')
             ? col.name.slice(0, -3)  // type_id -> type
             : col.name;
 
         if (!fkId) {
+            if (!context.showNullFKs) return '';
             return `
             <div class="tree-attribute fk-field">
               <span class="attr-name">${displayName}:</span>
@@ -170,7 +178,7 @@ const TreeRenderer = {
         const isCycle = visitedPath.has(pairKey);
 
         const nodeId = `fk-${targetEntity}-${fkId}-from-${parentRecord.id}`;
-        const isExpanded = !isCycle && context.state.isExpanded(nodeId);
+        const isExpanded = !isCycle && (context.state.isExpanded(nodeId) || templateChild != null);
         const labelField = displayName + '_label';
         const preloadedLabel = parentRecord[labelField];
 
@@ -225,7 +233,7 @@ const TreeRenderer = {
         if (isExpanded) {
             // Extend path with current entity-id pair
             const newPath = new Set([...visitedPath, pairKey]);
-            html += await this.renderExpandedForeignKey(targetEntity, fkId, newPath, context);
+            html += await this.renderExpandedForeignKey(targetEntity, fkId, newPath, context, templateChild);
         }
 
         html += '</div>';
@@ -238,10 +246,17 @@ const TreeRenderer = {
      * @param {Set} visitedPath - Set of visited entity-id pairs for cycle detection
      * @param {Object} context - Render context with state and settings
      */
-    async renderExpandedForeignKey(entityName, id, visitedPath, context) {
+    async renderExpandedForeignKey(entityName, id, visitedPath, context, templateChild = null) {
         try {
             const schema = await SchemaCache.getExtended(entityName);
             const record = await ApiClient.getById(entityName, id);
+
+            // Template mode: render only template-specified content
+            if (templateChild) {
+                return '<div class="tree-fk-content">' +
+                    await this.renderDetailNodeContent(entityName, record, schema, visitedPath, context, templateChild) +
+                    '</div>';
+            }
 
             const isRowLayout = context.attributeLayout === 'row';
             let html = '<div class="tree-fk-content">';
@@ -494,6 +509,277 @@ const TreeRenderer = {
 
         // If no FKs and no back-refs, show a message
         if (fkCols.length === 0 && (!schema.backReferences || schema.backReferences.length === 0)) {
+            html += '<em class="no-relations">No relations</em>';
+        }
+
+        html += '</div>';
+        return html;
+    },
+
+    /**
+     * Render template-driven content for a detail view node.
+     * Only shows attributes and children specified in the template.
+     */
+    async renderDetailNodeContent(entityName, record, schema, visitedPath, context, templateNode) {
+        let html = '<div class="tree-node-content layout-row">';
+
+        // Render template-specified attributes as a compact row
+        const attributes = templateNode.attributes;
+        if (attributes && attributes.length > 0) {
+            html += this.renderDetailAttributeRow(attributes, record, schema);
+        }
+
+        // Render children in template order (FKs and back-refs intermixed)
+        for (const child of (templateNode.children || [])) {
+            if (child.type === 'fk') {
+                const col = schema.columns.find(c =>
+                    c.foreignKey && (c.name === child.field || c.name === child.field + '_id')
+                );
+                if (col) {
+                    html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath, context, child);
+                }
+            } else if (child.type === 'backref') {
+                html += await this.renderDetailBackReference(entityName, record.id, child, schema, visitedPath, context);
+            }
+        }
+
+        html += '</div>';
+        return html;
+    },
+
+    /**
+     * Render only template-specified attributes as a compact row.
+     * Handles FK columns by showing their label values.
+     */
+    renderDetailAttributeRow(attributes, record, schema) {
+        const headers = [];
+        const cells = [];
+
+        for (const attrName of attributes) {
+            let col = schema.columns.find(c => c.name === attrName);
+            if (!col) {
+                col = schema.columns.find(c => c.foreignKey && c.name === attrName + '_id');
+            }
+            if (!col) continue;
+
+            if (col.foreignKey) {
+                const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
+                const labelField = displayName + '_label';
+                const labelValue = record[labelField];
+                const displayValue = labelValue
+                    ? DomUtils.escapeHtml(String(labelValue))
+                    : (record[col.name] ? `#${record[col.name]}` : '');
+                headers.push(`<th title="${displayName}">${displayName.replace(/_/g, ' ')}</th>`);
+                cells.push(`<td title="${displayName}">${displayValue}</td>`);
+            } else {
+                const displayValue = ValueFormatter.formatDisplayHtml(record[col.name], col, schema);
+                headers.push(`<th title="${col.name}">${col.name.replace(/_/g, ' ')}</th>`);
+                cells.push(`<td title="${col.name}">${displayValue}</td>`);
+            }
+        }
+
+        if (cells.length === 0) return '';
+        return `
+            <table class="tree-attr-table">
+                <thead><tr>${headers.join('')}</tr></thead>
+                <tbody><tr>${cells.join('')}</tr></tbody>
+            </table>
+        `;
+    },
+
+    /**
+     * Render a back-reference in detail/template mode.
+     * Loads records via entity API with ORDER BY/LIMIT from template params.
+     */
+    async renderDetailBackReference(parentEntity, parentId, templateChild, parentSchema, visitedPath, context) {
+        const refEntity = templateChild.entity;
+        const refSchema = await SchemaCache.getExtended(refEntity);
+        const areaColor = refSchema.areaColor || '#f5f5f5';
+
+        // Find FK column via parent's backReferences
+        const parentBackRef = (parentSchema.backReferences || []).find(ref => ref.entity === refEntity);
+        if (!parentBackRef) return '';
+        const fkColumnName = parentBackRef.column;
+
+        const nodeId = `backref-${refEntity}-${fkColumnName}-to-${parentEntity}-${parentId}`;
+        const isExpanded = context.state.isExpanded(nodeId);
+
+        // Parse ORDER BY and LIMIT from template params
+        let sort = null, order = null, limit = null;
+        if (templateChild.params) {
+            const orderMatch = templateChild.params.match(/ORDER\s+BY\s+(\w+)(?:\s+(ASC|DESC))?/i);
+            if (orderMatch) {
+                sort = orderMatch[1];
+                order = (orderMatch[2] || 'ASC').toLowerCase();
+            }
+            const limitMatch = templateChild.params.match(/LIMIT\s+(\d+)/i);
+            if (limitMatch) {
+                limit = parseInt(limitMatch[1]);
+            }
+        }
+
+        // Load records via entity API
+        let records = [];
+        let totalCount = 0;
+        try {
+            const params = new URLSearchParams();
+            params.set('filter', `${fkColumnName}:${parentId}`);
+            if (sort) params.set('sort', sort);
+            if (order) params.set('order', order);
+            if (limit) params.set('limit', String(limit));
+            const resp = await fetch(`api/entities/${refEntity}?${params}`);
+            const result = await resp.json();
+            records = result.data || [];
+            totalCount = result.totalCount || result.total || records.length;
+        } catch (e) {
+            return '';
+        }
+
+        if (totalCount === 0) return '';
+        const displayCount = limit && totalCount > limit
+            ? `${records.length} of ${totalCount}`
+            : `${records.length}`;
+
+        let html = `
+            <div class="tree-backref-node ${isExpanded ? 'expanded' : ''}"
+                 data-node-id="${nodeId}"
+                 data-ref-entity="${refEntity}"
+                 data-ref-column="${fkColumnName}"
+                 data-parent-entity="${parentEntity}"
+                 data-parent-id="${parentId}">
+              <div class="tree-backref-header" data-action="toggle-backref" style="background-color: ${areaColor};">
+                <span class="tree-expand-icon">${isExpanded ? '&#9660;' : '&#9654;'}</span>
+                <span class="backref-label">${refEntity} [${displayCount}]</span>
+              </div>
+        `;
+
+        if (isExpanded && records.length > 0) {
+            html += await this.renderDetailBackRefRecords(
+                refEntity, records, refSchema, templateChild, visitedPath, context, parentEntity, parentId
+            );
+        }
+
+        html += '</div>';
+        return html;
+    },
+
+    /**
+     * Render back-reference records as a table with only template-specified columns.
+     */
+    async renderDetailBackRefRecords(refEntity, records, refSchema, templateChild, visitedPath, context, parentEntity, parentId) {
+        const attributes = templateChild.attributes || [];
+        const hasChildren = templateChild.children && templateChild.children.length > 0;
+
+        // Build display columns from template attributes
+        const displayCols = [];
+        for (const attrName of attributes) {
+            let col = refSchema.columns.find(c => c.name === attrName);
+            if (!col) {
+                col = refSchema.columns.find(c => c.foreignKey && c.name === attrName + '_id');
+            }
+            if (!col) continue;
+
+            if (col.foreignKey) {
+                const displayName = col.name.endsWith('_id') ? col.name.slice(0, -3) : col.name;
+                displayCols.push({ name: displayName + '_label', displayName, isFkLabel: true, originalCol: col });
+            } else {
+                displayCols.push({ name: col.name, displayName: col.name, isFkLabel: false, originalCol: col });
+            }
+        }
+
+        if (displayCols.length === 0) return '';
+        const areaColor = refSchema.areaColor || '#f5f5f5';
+
+        // Build table header
+        const expandHeader = hasChildren ? '<th class="expand-col"></th>' : '';
+        const headers = expandHeader + displayCols.map(col =>
+            `<th title="${col.displayName}">${col.displayName.replace(/_/g, ' ')}</th>`
+        ).join('');
+
+        // Build rows
+        let rowsHtml = '';
+        for (const record of records) {
+            const rowNodeId = `backref-row-${refEntity}-${record.id}-in-${parentEntity}-${parentId}`;
+            const isRowExpanded = hasChildren && context.state.isExpanded(rowNodeId);
+
+            const cells = displayCols.map(col => {
+                const value = record[col.name];
+                let displayValue;
+                if (value === null || value === undefined) {
+                    displayValue = '';
+                } else if (col.isFkLabel) {
+                    displayValue = DomUtils.escapeHtml(String(value));
+                } else {
+                    displayValue = DomUtils.escapeHtml(ValueFormatter.format(value, col.name, refSchema));
+                }
+                return `<td title="${col.displayName}">${displayValue}</td>`;
+            }).join('');
+
+            const expandCell = hasChildren ? `
+                <td class="expand-cell" data-action="toggle-backref-row">
+                  <span class="tree-expand-icon">${isRowExpanded ? '&#9660;' : '&#9654;'}</span>
+                </td>
+            ` : '';
+
+            rowsHtml += `
+                <tr class="backref-table-row ${isRowExpanded ? 'expanded' : ''}"
+                    data-node-id="${rowNodeId}"
+                    data-entity="${refEntity}"
+                    data-id="${record.id}">
+                  ${expandCell}
+                  ${cells}
+                </tr>
+            `;
+
+            if (isRowExpanded) {
+                const colSpan = displayCols.length + (hasChildren ? 1 : 0);
+                const newPath = new Set([...visitedPath, `${refEntity}-${record.id}`]);
+                const expandedContent = await this.renderDetailBackRefRowContent(
+                    refEntity, record, refSchema, templateChild, newPath, context
+                );
+                rowsHtml += `
+                    <tr class="backref-row-content">
+                      <td colspan="${colSpan}" style="background-color: ${areaColor};">
+                        ${expandedContent}
+                      </td>
+                    </tr>
+                `;
+            }
+        }
+
+        return `
+            <div class="tree-backref-content">
+              <table class="tree-backref-table">
+                <thead><tr>${headers}</tr></thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </div>
+        `;
+    },
+
+    /**
+     * Render expanded content for a back-ref row in detail/template mode.
+     * Shows template children (FKs auto-expanded, back-refs with params).
+     */
+    async renderDetailBackRefRowContent(refEntity, record, refSchema, templateChild, visitedPath, context) {
+        if (!templateChild.children || templateChild.children.length === 0) return '';
+
+        let html = '<div class="backref-row-expanded">';
+
+        for (const child of templateChild.children) {
+            if (child.type === 'fk') {
+                const col = refSchema.columns.find(c =>
+                    c.foreignKey && (c.name === child.field || c.name === child.field + '_id')
+                );
+                if (col && record[col.name]) {
+                    html += await this.renderForeignKeyNode(col, record[col.name], record, visitedPath, context, child);
+                }
+            } else if (child.type === 'backref') {
+                html += await this.renderDetailBackReference(refEntity, record.id, child, refSchema, visitedPath, context);
+            }
+        }
+
+        if (html === '<div class="backref-row-expanded">') {
             html += '<em class="no-relations">No relations</em>';
         }
 

@@ -1001,7 +1001,7 @@ function parseAllUserViews(viewsConfig, schema) {
       continue;
     }
 
-    if (!entry.name || !entry.base || !entry.columns) {
+    if (!entry.name || !entry.base) {
       logger.warn('Invalid view config entry, skipping', { entry });
       continue;
     }
@@ -1015,6 +1015,30 @@ function parseAllUserViews(viewsConfig, schema) {
     // Resolve area color
     const areaKey = baseEntity.area;
     const areaColor = schema.areas[areaKey]?.color || '#f5f5f5';
+
+    // Detail view (template-based tree, no SQL view)
+    if (entry.detail) {
+      views.push({
+        name: entry.name,
+        sqlName: toSqlName(entry.name),
+        base: entry.base,
+        baseTable: baseEntity.tableName,
+        color: areaColor,
+        group: currentGroup,
+        detail: true,
+        template: entry.template,
+        columns: [],
+        joins: [],
+        description: entry.description || null
+      });
+      groups.push({ type: 'view', name: entry.name, color: areaColor });
+      continue;
+    }
+
+    if (!entry.columns) {
+      logger.warn('Invalid view config entry (no columns), skipping', { entry });
+      continue;
+    }
 
     // Parse sort configuration: "column", "column DESC", or { column, order }
     let defaultSort = null;

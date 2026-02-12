@@ -1067,6 +1067,10 @@ const EntityExplorer = {
           results.push({ view: v, matchType: 'filter', viewColumn: match.viewColumn });
         }
       }
+      // Detail views: show when base entity matches
+      if (v.detail && v.base === entityName) {
+        results.push({ view: v, matchType: 'detail', viewColumn: null });
+      }
     }
     return results;
   },
@@ -1145,7 +1149,11 @@ const EntityExplorer = {
       });
     }
 
-    await this.onViewChange(viewName, baseName, color, { recordFilter });
+    const viewOptions = { recordFilter };
+    if (matchType === 'detail') {
+      viewOptions.preSelectedId = recordId;
+    }
+    await this.onViewChange(viewName, baseName, color, viewOptions);
   },
 
   async onEntityChange() {
@@ -1260,6 +1268,12 @@ const EntityExplorer = {
       this.currentViewSchema = viewSchema;  // Cache for loadMoreRecords
       this.prefilterFields = viewSchema.prefilter || null;
       this.requiredFilterFields = viewSchema.requiredFilter || null;
+
+      // Detail view: single record selection → tree display
+      if (viewSchema.detail) {
+        await this.handleDetailView(viewName, baseName, color, viewSchema, options?.preSelectedId);
+        return;
+      }
 
       // Show map button and labels toggle if view has geo column
       if (viewSchema.hasGeo) {
@@ -2061,6 +2075,74 @@ const EntityExplorer = {
       expandLevels: expandLevels
     };
     await EntityTree.loadEntity(this.currentEntity, this.records, options);
+  },
+
+  /**
+   * Handle detail view: show record selection dialog, then display template-driven TreeView.
+   * Detail views require exactly one record to be selected, then render a curated tree.
+   */
+  async handleDetailView(viewName, baseName, color, viewSchema, preSelectedId = null) {
+    // Load entity schema for label resolution
+    const entitySchema = await SchemaCache.getExtended(baseName);
+    if (!entitySchema) {
+      this.tableContainer.innerHTML = `<p class="empty-message">Entity "${baseName}" not found</p>`;
+      return;
+    }
+
+    // Show loading while fetching records
+    this.tableContainer.innerHTML = '<div class="loading-spinner"></div>';
+
+    // Fetch all records for selection
+    const result = await ApiClient.getAll(baseName);
+    const allRecords = result.data || [];
+
+    if (allRecords.length === 0) {
+      this.tableContainer.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}</p>`;
+      return;
+    }
+
+    // Use pre-selected ID (from context menu) or show selection dialog
+    let selectedId;
+    if (preSelectedId != null) {
+      selectedId = preSelectedId;
+    } else {
+      const options = allRecords.map(rec => ({
+        value: rec.id,
+        label: rec._label || ColumnUtils.getFullLabel(rec, entitySchema) || `#${rec.id}`
+      }));
+
+      selectedId = await this.showSelectDialog({
+        title: i18n.t('detail_select_record', { entity: baseName }),
+        options,
+        placeholder: i18n.t('detail_search_placeholder')
+      });
+
+      if (selectedId == null) {
+        this.tableContainer.innerHTML = '';
+        return;
+      }
+    }
+
+    // Set entity state for tree rendering
+    this.currentEntity = baseName;
+    this.currentEntitySchema = entitySchema;
+    this.records = allRecords;
+    this.selectedId = parseInt(selectedId, 10);
+    this.totalRecords = allRecords.length;
+
+    // Switch to tree-h mode and show tree buttons
+    this.btnViewTreeH.style.display = '';
+    this.btnViewTreeV.style.display = '';
+    this.viewMode = 'tree-h';
+    this.updateViewToggle();
+
+    // Show loading while building tree
+    this.tableContainer.innerHTML = '<div class="loading-spinner"></div>';
+
+    // Load detail view with template
+    await EntityTree.loadDetailView(baseName, this.selectedId, allRecords, viewSchema.template);
+
+    this.updateRecordStatus();
   },
 
   /**

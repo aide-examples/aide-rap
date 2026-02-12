@@ -158,7 +158,7 @@ const ContextMenu = {
                       data-match-type="${matchType}"
                       ${viewColumn ? `data-view-column="${DomUtils.escapeHtml(viewColumn)}"` : ''}
                       ${filterValue ? `data-filter-value="${DomUtils.escapeHtml(filterValue)}"` : ''}>
-          <span class="context-menu-icon">&#128202;</span>
+          <span class="context-menu-icon">${matchType === 'detail' ? '&#128269;' : '&#128202;'}</span>
           <span>${DomUtils.escapeHtml(view.name)}</span>
         </div>`;
       }

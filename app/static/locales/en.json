@@ -23,6 +23,8 @@
     "settings_show_ids": "Show IDs",
     "settings_show_cycles": "Show Cycles",
     "settings_show_cycles_hint": "(in tree views)",
+    "settings_show_null_fk": "Show empty FK",
+    "settings_show_null_fk_hint": "(in tree views)",
     "settings_show_system": "Show System Attributes",
     "settings_show_system_hint": "(modification times, version)",
 
@@ -30,6 +32,7 @@
     "tooltip_ref_position": "References position",
     "tooltip_show_ids": "Show technical IDs in detail panel",
     "tooltip_show_cycles": "Show cycle references in tree views (otherwise hidden)",
+    "tooltip_show_null_fk": "Show FK fields with no value in tree views (otherwise hidden)",
     "tooltip_show_system": "Show timestamps and version",
     "tooltip_refresh_counts": "Refresh counts",
     "tooltip_table_view": "Table view",
@@ -46,6 +49,8 @@
     "select_view": "Select View...",
     "details": "Details",
     "select_record_message": "Select a record to view details.",
+    "detail_select_record": "Select %{entity}",
+    "detail_search_placeholder": "Search...",
     "select_entity_message": "Select an entity type or view to see records.",
     "no_records_found": "No records found.",
 

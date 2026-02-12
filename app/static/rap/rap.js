@@ -146,6 +146,10 @@ async function tryUrlLogin() {
               <input type="checkbox" id="show-cycles-toggle">
               <span><span data-i18n="settings_show_cycles">Show Cycles</span> ↻<br><small data-i18n="settings_show_cycles_hint">(in tree views)</small></span>
             </label>
+            <label class="settings-checkbox" data-i18n-title="tooltip_show_null_fk">
+              <input type="checkbox" id="show-null-fk-toggle">
+              <span><span data-i18n="settings_show_null_fk">Show empty FK</span><br><small data-i18n="settings_show_null_fk_hint">(in tree views)</small></span>
+            </label>
             <label class="settings-checkbox" data-i18n-title="tooltip_show_system">
               <input type="checkbox" id="show-system-toggle">
               <span><span data-i18n="settings_show_system">Show System Attributes</span><br><small data-i18n="settings_show_system_hint">(modification times, version)</small></span>
@@ -193,7 +197,7 @@ async function tryUrlLogin() {
         });
 
         // Load and persist settings to localStorage
-        const settingsKeys = ['show-ids-toggle', 'show-cycles-toggle', 'show-system-toggle'];
+        const settingsKeys = ['show-ids-toggle', 'show-cycles-toggle', 'show-null-fk-toggle', 'show-system-toggle'];
         settingsKeys.forEach(key => {
           const checkbox = document.getElementById(key);
           if (checkbox) {

@@ -30,6 +30,7 @@ function buildViewSummary(v) {
     group: v.group,
     columns: v.columns.map(c => c.label),
     ...(v.description ? { description: v.description } : {}),
+    ...(v.detail ? { detail: true } : {}),
     ...(requiredFilterEntities.length > 0 ? { requiredFilterEntities } : {})
   };
 }
@@ -63,7 +64,8 @@ function buildViewSchema(view) {
     ...(view.requiredFilter ? { requiredFilter: view.requiredFilter } : {}),
     ...(view.defaultSort ? { defaultSort: view.defaultSort } : {}),
     ...(view.chart ? { chart: view.chart } : {}),
-    ...(view.description ? { description: view.description } : {})
+    ...(view.description ? { description: view.description } : {}),
+    ...(view.detail ? { detail: true, template: view.template } : {})
   };
 }
 
