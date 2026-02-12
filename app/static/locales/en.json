@@ -103,7 +103,7 @@
     "reload_changes": "Load Server Version",
     "overwrite": "Overwrite",
 
-    "admin_functions": "Admin Functions",
+    "admin_functions": "Configure",
     "admin_panel": "Open Admin Panel",
     "views": "Views",
     "records_count": "%{count} records",

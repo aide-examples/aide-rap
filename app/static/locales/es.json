@@ -95,7 +95,7 @@
     "no_references": "Sin referencias",
     "no_relations": "Sin relaciones",
 
-    "admin_functions": "Funciones Admin",
+    "admin_functions": "Configurar",
     "admin_panel": "Abrir panel de administración",
     "views": "Vistas",
     "records_count": "%{count} registros",

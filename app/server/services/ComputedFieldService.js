@@ -89,8 +89,15 @@ function buildUpdateSQL(field) {
 
   // Parse rule: sourceEntity, condition, targetField
   const sourceTable = toSnakeCase(rule.sourceEntity);
-  const sourceField = rule.targetField + '_id'; // aircraft -> aircraft_id
   const linkField = toSnakeCase(entity.className) + '_id'; // Engine -> engine_id
+
+  // Determine source column: check if targetField is a FK in the source entity
+  // If FK → column is "field_id", otherwise → use "field" directly (e.g., tail_sign)
+  const schema = getSchema();
+  const sourceEntity = schema.orderedEntities.find(e => e.className === rule.sourceEntity);
+  const isFKField = sourceEntity && sourceEntity.foreignKeys &&
+    sourceEntity.foreignKeys.some(fk => fk.displayName === rule.targetField);
+  const sourceField = isFKField ? rule.targetField + '_id' : rule.targetField;
 
   let whereClause;
   let orderByClause;

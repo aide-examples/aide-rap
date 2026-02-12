@@ -1321,8 +1321,8 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     const typeRegistry = getTypeRegistry();
 
     // Check if type is an aggregate (expands to multiple columns)
-    if (typeRegistry.isAggregate(cleanType)) {
-      const aggregateFields = typeRegistry.getAggregateFields(cleanType);
+    if (typeRegistry.isAggregate(cleanType, className)) {
+      const aggregateFields = typeRegistry.getAggregateFields(cleanType, className);
       const uiAnnotations = parseUIAnnotations(desc);
 
       // Create a column for each field in the aggregate with prefix

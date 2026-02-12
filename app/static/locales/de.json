@@ -103,7 +103,7 @@
     "reload_changes": "Server-Version laden",
     "overwrite": "Überschreiben",
 
-    "admin_functions": "Admin-Funktionen",
+    "admin_functions": "Konfigurieren",
     "admin_panel": "Admin-Panel öffnen",
     "views": "Ansichten",
     "records_count": "%{count} Datensätze",

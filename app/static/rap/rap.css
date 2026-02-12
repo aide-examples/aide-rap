@@ -269,6 +269,16 @@ html[data-theme="dark"] .process-selector-group-label {
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Compact title: H3-like size, single line with ellipsis */
+#app-header .header h1 {
+    font-size: 0.95rem;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Settings dropdown in header */
 .header-settings-dropdown {
     position: relative;
@@ -6838,4 +6848,40 @@ html[data-theme="dark"] .process-selector-group-label {
 html[data-theme="dark"] .welcome-illustration {
     opacity: 0.85;
     filter: brightness(0.9);
+}
+
+/* =============================================================================
+   Responsive: Narrow screens (mobile landscape, small tablets)
+   ============================================================================= */
+@media (max-width: 768px) {
+    /* Header: tighter spacing */
+    #app-header .header {
+        padding: 4px 8px;
+    }
+
+    /* Header right side: reduce gaps */
+    #app-header .header > div:last-child {
+        gap: 6px;
+    }
+
+    /* Settings: icon only, hide "Settings" text + arrow */
+    .header-settings-btn span[data-i18n="settings_btn"] {
+        display: none;
+    }
+    .header-settings-btn .dropdown-arrow {
+        display: none;
+    }
+
+    /* Menu bar: tighter */
+    .rap-menu-bar {
+        padding: 0 4px;
+        height: 32px;
+    }
+    .rap-menu-bar .menu-item {
+        padding: 4px 8px;
+        font-size: 0.78rem;
+    }
+    .rap-menu-bar .menu-separator {
+        margin: 0 4px;
+    }
 }

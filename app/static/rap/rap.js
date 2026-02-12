@@ -278,9 +278,10 @@ async function tryUrlLogin() {
     // Initialize Framework Status Widget (Footer)
     if (typeof StatusWidget !== 'undefined') {
       StatusWidget.init('#status-widget', {
-        showUpdate: true,
+        showUpdate: false,
         showInstall: true,
         showLayoutToggle: false,
+        compactInfo: true,
         layoutDefault: 'page-fill',
         extraInfo: '<span id="sw-records-sep" class="status-footer-sep" style="display:none">·</span><span id="sw-records"></span>',
         extraActions: '<a href="https://github.com/aide-examples/aide-rap" target="_blank" class="status-powered-by">powered by AIDE RAP</a>'
@@ -373,7 +374,7 @@ async function tryUrlLogin() {
           sqlSep.textContent = '·';
 
           const sqlEl = document.createElement('a');
-          sqlEl.href = 'sql-browser/?url=api/admin/db-file';
+          sqlEl.href = 'sql-browser/?url=../api/admin/db-file';
           sqlEl.target = '_blank';
           sqlEl.className = 'status-admin-link';
           sqlEl.textContent = 'SQL';
