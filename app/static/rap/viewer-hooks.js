@@ -163,5 +163,38 @@
 
         // Process list items (for entity lists in Crud.md etc.)
         container.querySelectorAll('li').forEach(processElement);
+
+        // --- System docs (systems/*.md): collapse TOC and inject incoming flows ---
+        if (docPath && docPath.startsWith('systems/')) {
+            // Collapse the TOC by default — system docs are short, TOC is distracting
+            const toc = container.querySelector('.toc-container');
+            if (toc) toc.classList.add('collapsed');
+
+            // Extract system name from the H1 heading
+            const h1 = container.querySelector('h1');
+            const systemName = h1 ? h1.textContent.trim() : null;
+
+            if (systemName) {
+                // Find the "Input" H2 heading
+                const inputH2 = Array.from(container.querySelectorAll('h2'))
+                    .find(h => h.textContent.trim() === 'Input');
+
+                if (inputH2) {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = `/api/layout-editor/incoming-flows?system=${encodeURIComponent(systemName)}`;
+                    iframe.style.cssText = 'border:1px solid #ddd; border-radius:4px; width:100%; height:120px;';
+                    iframe.loading = 'lazy';
+
+                    // Insert after any existing content under ## Input (tables, text), or right after the heading
+                    let insertAfter = inputH2;
+                    let sibling = inputH2.nextElementSibling;
+                    while (sibling && sibling.tagName !== 'H2' && sibling.tagName !== 'H1') {
+                        insertAfter = sibling;
+                        sibling = sibling.nextElementSibling;
+                    }
+                    insertAfter.after(iframe);
+                }
+            }
+        }
     };
 })();

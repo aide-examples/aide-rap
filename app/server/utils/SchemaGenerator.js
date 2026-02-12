@@ -47,8 +47,8 @@ function parseAreasFromTable(mdContent) {
     // Supports both: [EntityName](classes/EntityName.md) and plain EntityName
     const tableRows = tableContent.match(/\|\s*([^|]+)\s*\|[^|]+\|/g) || [];
     for (const row of tableRows) {
-      // Skip header row
-      if (row.includes('Entity') && row.includes('Description')) continue;
+      // Skip header row (Entity/System table headers)
+      if ((row.includes('Entity') || row.includes('System')) && row.includes('Description')) continue;
       if (row.includes('---')) continue;
 
       const cellMatch = row.match(/\|\s*([^|]+)\s*\|/);

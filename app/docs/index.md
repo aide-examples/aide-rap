@@ -239,7 +239,85 @@ The workflow:
 
 This approach keeps documentation and diagrams in sync – change the Markdown, regenerate the diagram. No manual drawing tools needed.
 
-*Future potential: The same pattern could support state diagrams, sequence diagrams, or other UML artifacts – all driven by Markdown definitions with visual layout.*
+### System Landscape Diagrams
+
+Beyond data models, the same diagram infrastructure supports **System Landscape** diagrams – visualizing IT systems and their data flows.
+
+**Overview file** (`docs/SystemLandscape.md`):
+```markdown
+# System Landscape
+
+## System Diagram
+
+### Engine Management
+<div style="background-color: #FCE5CD;">
+
+| System | Description |
+|--------|-------------|
+| IRMA | Engine management system |
+
+</div>
+```
+
+Uses the same area format as `DataModel.md` – same area names, same colors. The `## System Diagram` marker (instead of `## Entity Descriptions`) tells the layout editor to load the system model.
+
+**System files** (`docs/systems/SystemName.md`):
+```markdown
+# SystemName
+
+Description of the system.
+
+#### Long Name
+Full system name
+
+#### Owner
+Department / Organization
+
+#### Vendor
+Internal Development | Vendor Name
+
+#### Technical Platform
+Node.js / Oracle / SAP / ...
+
+#### Access
+https://system.example.com
+
+#### Contact
+Responsible person
+
+## Flow: Data Flow Name
+
+Description of what data is sent.
+
+| Receiver | Trigger | Format | Transport |
+|----------|---------|--------|-----------|
+| OtherSystem | daily 06:00 UTC | JSON | REST API |
+| ThirdSystem | on event | XML | SFTP |
+
+## Input
+
+| Source | Content | Trigger | Format |
+|--------|---------|---------|--------|
+| Excel upload | Master data | manual | XLSX |
+```
+
+**Key concepts:**
+- Each system is described in its own Markdown file under `docs/systems/`
+- `####` sections define system properties (flexible, not a rigid schema)
+- `## Flow: Name` chapters describe **outgoing** data flows
+- Each flow has a description and a receiver table – a flow can have **multiple receivers**
+- `## Input` section lists external data sources without a defined system
+- In the diagram: systems render as boxes, flows as attributes, receiver connections as lines
+- Lines from one flow can go in **both directions** (left and right) depending on receiver positions
+
+**How it maps to the layout editor model:**
+
+| System concept | Layout model | Diagram |
+|----------------|-------------|---------|
+| System | class (box) | Colored box with area color |
+| Outgoing Flow | attribute | Flow name in box |
+| Flow → Receiver | relationship | Arrow from flow to receiver box |
+| Area | area | Background color grouping |
 
 ---
 
@@ -267,11 +345,13 @@ aide-rap/
 │       └── <name>/               # One directory per system
 │           ├── docs/
 │           │   ├── DataModel.md          # Data model with areas
+│           │   ├── SystemLandscape.md    # IT systems and data flows
 │           │   ├── Types.md              # Custom type definitions
 │           │   ├── Crud.md               # Entity selector layout
 │           │   ├── Views.md              # View selector layout
 │           │   ├── Processes.md          # Process selector layout
 │           │   ├── classes/              # Entity Markdown files
+│           │   ├── systems/              # System Markdown files
 │           │   ├── views/                # View definitions (by area)
 │           │   ├── processes/            # Process guides (by area)
 │           │   └── imports/              # XLSX import definitions
@@ -362,6 +442,7 @@ See [Configuration](configuration.md) for the full reference.
 - [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships
 - [Computed Entities](attribute-markers.md#computed-entity-pairs) – `[PAIRS=Source(chain1, chain2)]` for auto-derived M:N mapping tables
 - [Calculations](calculations.md) – `## Client Calculations` and `## Server Calculations` for derived field values
+- [Import System](import-system.md) – XLSX import pipeline with transforms, filters, and source expressions
 - [Seed Data](seed-data.md) – Import, export, and AI-generate test data
 
 ### Operations

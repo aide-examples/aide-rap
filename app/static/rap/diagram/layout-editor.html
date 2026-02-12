@@ -46,9 +46,12 @@
         const ConnectionCalculator = window.ConnectionCalculator;
 
         // Import constants from shared module
-        const { BOX_WIDTH, BOX_HEIGHT_COMPACT, ATTR_LINE_HEIGHT, HEADER_HEIGHT, BOX_PADDING,
-                STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_LABEL,
+        const { BOX_WIDTH, BOX_HEIGHT_COMPACT, COMPACT_WIDTH, HEADER_HEIGHT, BOX_PADDING,
+                STROKE_COLOR, STROKE_WIDTH, FONT_FAMILY, FONT_SIZE_CLASS, FONT_SIZE_ATTR, FONT_SIZE_COMPACT, FONT_SIZE_LABEL,
                 OPTIONAL_DASH, READONLY_DASH, READONLY_COLOR, LABEL_UNDERLINE, LABEL2_UNDERLINE } = DiagramConstants;
+        // ATTR_LINE_HEIGHT is dynamic — wider spacing for system diagrams
+        const ATTR_LINE_HEIGHT_DEFAULT = DiagramConstants.ATTR_LINE_HEIGHT;
+        let ATTR_LINE_HEIGHT = ATTR_LINE_HEIGHT_DEFAULT;
 
         /**
          * Escape text for use in XML/SVG.
@@ -142,34 +145,8 @@
                 return calcDetailedWidth();
             }
 
-            // Compact mode: at least as wide as detailed view
-            const minWidth = calcDetailedWidth();
-            const description = classDef.description || '';
-            if (!description) return Math.max(nameWidth, minWidth);
-
-            const h = getBoxHeight(className);
-            const availableHeight = h - HEADER_HEIGHT - BOX_PADDING;
-            const maxLines = Math.max(1, Math.floor(availableHeight / ATTR_LINE_HEIGHT));
-            const textPadding = 20; // matches CSS: 8px padding * 2 + 1.5px border * 2
-
-            // Binary search for minimum width where description fits in maxLines
-            let lo = nameWidth;
-            let hi = 300;
-
-            const linesAtMax = wrapText(description, hi - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
-            if (linesAtMax.length > maxLines) return Math.max(hi, minWidth);
-
-            while (hi - lo > 2) {
-                const mid = Math.floor((lo + hi) / 2);
-                const lines = wrapText(description, mid - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
-                if (lines.length <= maxLines) {
-                    hi = mid;
-                } else {
-                    lo = mid;
-                }
-            }
-
-            return Math.max(nameWidth, hi, minWidth);
+            // Compact mode: fixed width, box height adapts to wrapped description
+            return Math.max(nameWidth, COMPACT_WIDTH);
         }
 
         // DOM elements
@@ -184,10 +161,23 @@
         const linkCardsPdf = document.getElementById('linkCardsPdf');
         const linkCardsDocx = document.getElementById('linkCardsDocx');
 
-        // Calculate box height based on visible attributes (same for compact and detailed)
+        // Calculate box height based on content
         function getBoxHeight(className) {
             const attrs = getVisibleAttributes(className);
-            return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+            const attrHeight = HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+
+            if (!showDetailed) {
+                // Compact: height grows to fit wrapped description text
+                const description = (model.classes[className] || {}).description || '';
+                if (description) {
+                    const w = getBoxWidth(className);
+                    const textPadding = 20;
+                    const lines = wrapText(description, w - textPadding, FONT_SIZE_COMPACT, FONT_FAMILY);
+                    const descHeight = HEADER_HEIGHT + lines.length * ATTR_LINE_HEIGHT_DEFAULT + BOX_PADDING;
+                    return Math.max(attrHeight, descHeight);
+                }
+            }
+            return attrHeight;
         }
 
         // Get area color for a class
@@ -268,6 +258,13 @@
                 model = data.model;
                 layout = data.layout;
                 isDirty = false;
+
+                // Adjust line height for system diagrams (wider spacing)
+                ATTR_LINE_HEIGHT = (model.docType === 'systems')
+                    ? DiagramConstants.ATTR_LINE_HEIGHT_SYSTEMS
+                    : ATTR_LINE_HEIGHT_DEFAULT;
+                // Update shared object so ConnectionCalculator picks it up
+                DiagramConstants.ATTR_LINE_HEIGHT = ATTR_LINE_HEIGHT;
 
 
                 // Update diagram links
@@ -424,44 +421,54 @@
 
             const entityNames = Object.keys(model.classes);
 
-            for (const className of Object.keys(model.classes)) {
-                const attrs = getVisibleAttributes(className);
+            // Helper: draw a single connection path
+            function drawConnectionPath(svg, fromClass, toClass, attrIdx, attr, positions) {
+                const fromPos = positions[fromClass] || { x: 50, y: 50 };
+                const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('fill', 'none');
+                pathEl.setAttribute('stroke', DiagramConstants.STROKE_COLOR);
+                pathEl.setAttribute('stroke-width', '1');
+                pathEl.setAttribute('marker-end', 'url(#arrowhead)');
 
-                for (let i = 0; i < attrs.length; i++) {
-                    const attr = attrs[i];
-                    const baseType = ConnectionCalculator.extractBaseType(attr.type);
+                if (attr.ui?.readonly) {
+                    pathEl.setAttribute('stroke-dasharray', READONLY_DASH);
+                } else if (attr.optional) {
+                    pathEl.setAttribute('stroke-dasharray', OPTIONAL_DASH);
+                }
 
-                    if (entityNames.includes(baseType)) {
-                        const fromPos = positions[className] || { x: 50, y: 50 };
-                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                        path.setAttribute('fill', 'none');
-                        path.setAttribute('stroke', DiagramConstants.STROKE_COLOR);
-                        path.setAttribute('stroke-width', '1');
-                        path.setAttribute('marker-end', 'url(#arrowhead)');
+                let pathD;
+                if (fromClass === toClass) {
+                    const bw = getBoxWidth(fromClass);
+                    const bh = getBoxHeight(fromClass);
+                    const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, bw, bh, attrIdx);
+                    pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
+                } else {
+                    const conn = getConnectionPoint(fromClass, toClass, attrIdx, positions);
+                    pathD = ConnectionCalculator.getNormalConnectionPath(conn);
+                }
 
-                        // Dashed/dotted line for optional or readonly relationships
-                        if (attr.ui?.readonly) {
-                            path.setAttribute('stroke-dasharray', READONLY_DASH);
-                        } else if (attr.optional) {
-                            path.setAttribute('stroke-dasharray', OPTIONAL_DASH);
+                pathEl.setAttribute('d', pathD);
+                svg.appendChild(pathEl);
+            }
+
+            if (model.relationships && model.relationships.length > 0) {
+                // Use explicit relationships (supports multi-receiver flows)
+                for (const rel of model.relationships) {
+                    if (!model.classes[rel.from] || !model.classes[rel.to]) continue;
+                    const attrs = getVisibleAttributes(rel.from);
+                    const attrIdx = attrs.findIndex(a => a.name === rel.displayName);
+                    if (attrIdx < 0) continue;
+                    drawConnectionPath(svg, rel.from, rel.to, attrIdx, attrs[attrIdx], positions);
+                }
+            } else {
+                // Fallback: scan attributes for type matching (legacy models without relationships)
+                for (const className of entityNames) {
+                    const attrs = getVisibleAttributes(className);
+                    for (let i = 0; i < attrs.length; i++) {
+                        const baseType = ConnectionCalculator.extractBaseType(attrs[i].type);
+                        if (entityNames.includes(baseType)) {
+                            drawConnectionPath(svg, className, baseType, i, attrs[i], positions);
                         }
-
-                        let pathD;
-
-                        if (className === baseType) {
-                            // Self-reference semicircle - originates at the attribute row
-                            const boxWidth = getBoxWidth(className);
-                            const bHeight = getBoxHeight(className);
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, boxWidth, bHeight, i);
-                            pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
-                        } else {
-                            // Normal connection
-                            const conn = getConnectionPoint(className, baseType, i, positions);
-                            pathD = ConnectionCalculator.getNormalConnectionPath(conn);
-                        }
-
-                        path.setAttribute('d', pathD);
-                        svg.appendChild(path);
                     }
                 }
             }
@@ -479,64 +486,48 @@
             const entityNames = Object.keys(model.classes);
             const layoutCtx = buildLayoutContext();
 
-            // Helper to get box height for a class (always attribute-based)
-            function boxHeight(className) {
-                const attrs = ConnectionCalculator.getVisibleAttributes(
-                    (model.classes[className] || {}).attributes, className, layoutCtx
-                );
-                return HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
-            }
-
             // Helper to get box width for a class (matches getBoxWidth logic)
             function boxWidth(className) {
                 const classDef = model.classes[className] || {};
                 const nameWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY) + 20;
 
-                // Calculate detailed mode width
-                function calcDetailedWidth() {
-                    if (!fitToContent) return BOX_WIDTH;
-                    const attrs = ConnectionCalculator.getVisibleAttributes(
-                        (model.classes[className] || {}).attributes, className, layoutCtx
-                    );
-                    let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
-                    for (const attr of attrs) {
-                        const attrText = ConnectionCalculator.formatAttribute(attr, entityNames);
-                        maxWidth = Math.max(maxWidth, measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY));
-                    }
-                    return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
+                if (!detailed) {
+                    // Compact mode: fixed width, height adapts to wrapped description
+                    return Math.max(nameWidth, COMPACT_WIDTH);
                 }
 
-                if (detailed) {
-                    return calcDetailedWidth();
+                // Detailed mode width
+                if (!fitToContent) return BOX_WIDTH;
+                const attrs = ConnectionCalculator.getVisibleAttributes(
+                    (model.classes[className] || {}).attributes, className, layoutCtx
+                );
+                let maxWidth = measureText(className, FONT_SIZE_CLASS, FONT_FAMILY);
+                for (const attr of attrs) {
+                    const attrText = ConnectionCalculator.formatAttribute(attr, entityNames);
+                    maxWidth = Math.max(maxWidth, measureText(attrText, FONT_SIZE_ATTR, FONT_FAMILY));
                 }
+                return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
+            }
 
-                // Compact mode: at least as wide as detailed view
-                const minWidth = calcDetailedWidth();
-                const description = classDef.description || '';
-                if (!description) return Math.max(nameWidth, minWidth);
+            // Helper to get box height for a class
+            function boxHeight(className) {
+                const attrs = ConnectionCalculator.getVisibleAttributes(
+                    (model.classes[className] || {}).attributes, className, layoutCtx
+                );
+                const attrHeight = HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
 
-                const h = boxHeight(className);
-                const availableHeight = h - HEADER_HEIGHT - BOX_PADDING;
-                const maxLines = Math.max(1, Math.floor(availableHeight / ATTR_LINE_HEIGHT));
-                const textPadding = 20;
-
-                let lo = nameWidth;
-                let hi = 300;
-
-                const linesAtMax = wrapText(description, hi - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
-                if (linesAtMax.length > maxLines) return Math.max(hi, minWidth);
-
-                while (hi - lo > 2) {
-                    const mid = Math.floor((lo + hi) / 2);
-                    const lines = wrapText(description, mid - textPadding, FONT_SIZE_ATTR, FONT_FAMILY);
-                    if (lines.length <= maxLines) {
-                        hi = mid;
-                    } else {
-                        lo = mid;
+                if (!detailed) {
+                    // Compact: height grows to fit wrapped description text
+                    const description = (model.classes[className] || {}).description || '';
+                    if (description) {
+                        const w = boxWidth(className);
+                        const textPadding = 20;
+                        const lines = wrapText(description, w - textPadding, FONT_SIZE_COMPACT, FONT_FAMILY);
+                        const descHeight = HEADER_HEIGHT + lines.length * ATTR_LINE_HEIGHT_DEFAULT + BOX_PADDING;
+                        return Math.max(attrHeight, descHeight);
                     }
                 }
-
-                return Math.max(nameWidth, hi, minWidth);
+                return attrHeight;
             }
 
             // Pre-compute widths for all entities
@@ -591,42 +582,52 @@
             parts.push('');
             parts.push('  <!-- Relationships -->');
 
+            // Helper: render a single SVG connection path
+            function svgConnectionPath(fromClass, toClass, attrIdx, attr) {
+                const fromPos = positions[fromClass] || { x: 50, y: 50 };
+                const isOptional = attr.optional;
+                const isReadonly = attr.ui?.readonly;
+                const dashAttr = isReadonly
+                    ? ` stroke-dasharray="${READONLY_DASH}"`
+                    : (isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '');
+
+                if (fromClass === toClass) {
+                    const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[fromClass], boxHeight(fromClass), attrIdx);
+                    const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
+                    parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
+                } else {
+                    const toPos = positions[toClass] || { x: 50, y: 50 };
+                    const fromHeight = boxHeight(fromClass);
+                    const toHeight = boxHeight(toClass);
+                    const conn = ConnectionCalculator.getConnectionPoint(
+                        fromPos, toPos, fromHeight, toHeight, attrIdx, detailed,
+                        widths[fromClass], widths[toClass]
+                    );
+                    const pathD = ConnectionCalculator.getNormalConnectionPath(conn);
+                    parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
+                }
+            }
+
             // Render relationships
-            for (const className of entityNames) {
-                const attrs = ConnectionCalculator.getVisibleAttributes(
-                    (model.classes[className] || {}).attributes, className, layoutCtx
-                );
-                const fromPos = positions[className] || { x: 50, y: 50 };
-
-                for (let i = 0; i < attrs.length; i++) {
-                    const attr = attrs[i];
-                    const baseType = ConnectionCalculator.extractBaseType(attr.type);
-
-                    if (entityNames.includes(baseType)) {
-                        const isOptional = attr.optional;
-                        const isReadonly = attr.ui?.readonly;
-                        const dashAttr = isReadonly
-                            ? ` stroke-dasharray="${READONLY_DASH}"`
-                            : (isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '');
-
-                        if (className === baseType) {
-                            // Self-reference semicircle - originates at the attribute row
-                            const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[className], boxHeight(className), i);
-                            const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
-
-                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
-                        } else {
-                            // Normal connection
-                            const toPos = positions[baseType] || { x: 50, y: 50 };
-                            const fromHeight = boxHeight(className);
-                            const toHeight = boxHeight(baseType);
-                            const conn = ConnectionCalculator.getConnectionPoint(
-                                fromPos, toPos, fromHeight, toHeight, i, detailed,
-                                widths[className], widths[baseType]
-                            );
-                            const pathD = ConnectionCalculator.getNormalConnectionPath(conn);
-
-                            parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
+            if (model.relationships && model.relationships.length > 0) {
+                for (const rel of model.relationships) {
+                    if (!model.classes[rel.from] || !model.classes[rel.to]) continue;
+                    const attrs = ConnectionCalculator.getVisibleAttributes(
+                        (model.classes[rel.from] || {}).attributes, rel.from, layoutCtx
+                    );
+                    const attrIdx = attrs.findIndex(a => a.name === rel.displayName);
+                    if (attrIdx < 0) continue;
+                    svgConnectionPath(rel.from, rel.to, attrIdx, attrs[attrIdx]);
+                }
+            } else {
+                for (const className of entityNames) {
+                    const attrs = ConnectionCalculator.getVisibleAttributes(
+                        (model.classes[className] || {}).attributes, className, layoutCtx
+                    );
+                    for (let i = 0; i < attrs.length; i++) {
+                        const baseType = ConnectionCalculator.extractBaseType(attrs[i].type);
+                        if (entityNames.includes(baseType)) {
+                            svgConnectionPath(className, baseType, i, attrs[i]);
                         }
                     }
                 }
@@ -668,7 +669,7 @@
                     const maxTextWidth = w - 10; // 5px padding on each side
                     for (let i = 0; i < visibleAttrs.length; i++) {
                         const attr = visibleAttrs[i];
-                        const attrY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
+                        const attrY = sepY + BOX_PADDING / 2 + (i + 0.5) * ATTR_LINE_HEIGHT + FONT_SIZE_ATTR * 0.35;
                         const cleanType = ConnectionCalculator.extractBaseType(attr.type);
 
                         // Determine styling based on schema ui flags
@@ -702,17 +703,15 @@
                         }
                     }
                 } else {
-                    // Compact mode: word-wrapped description text
+                    // Compact mode: word-wrapped description text (all lines shown, no truncation)
                     const description = classDef.description || '';
                     if (description) {
                         const textPadding = 5;
-                        const lines = wrapText(description, w - textPadding * 2, FONT_SIZE_ATTR, FONT_FAMILY);
-                        const availableLines = Math.max(1, Math.floor((h - HEADER_HEIGHT - BOX_PADDING) / ATTR_LINE_HEIGHT));
-                        const displayLines = lines.slice(0, availableLines);
+                        const lines = wrapText(description, w - textPadding * 2, FONT_SIZE_COMPACT, FONT_FAMILY);
 
-                        for (let i = 0; i < displayLines.length; i++) {
-                            const lineY = sepY + (i + 1) * ATTR_LINE_HEIGHT - 2;
-                            parts.push(`  <text x="${pos.x + textPadding}" y="${lineY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="#555">${escapeXml(displayLines[i])}</text>`);
+                        for (let i = 0; i < lines.length; i++) {
+                            const lineY = sepY + BOX_PADDING / 2 + (i + 0.5) * ATTR_LINE_HEIGHT_DEFAULT + FONT_SIZE_COMPACT * 0.35;
+                            parts.push(`  <text x="${pos.x + textPadding}" y="${lineY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_COMPACT}" fill="#555">${escapeXml(lines[i])}</text>`);
                         }
                     }
                 }
@@ -863,6 +862,7 @@
                     attrs.forEach(attr => {
                         const line = document.createElement('div');
                         line.className = 'attr-line';
+                        line.style.lineHeight = ATTR_LINE_HEIGHT + 'px';
                         const baseType = ConnectionCalculator.extractBaseType(attr.type);
                         if (entityNames.includes(baseType)) {
                             // FK attribute: bold name only

@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const { getSchema } = require('../config/database');
 const { filterColumnsForDiagram } = require('../utils/DiagramUtils');
+const { parseSystemLandscape, systemsToModel } = require('../utils/SystemDiagramParser');
 
 /**
  * Transform schema format to model format expected by Layout-Editor.
@@ -78,13 +79,13 @@ module.exports = function(cfg, options = {}) {
             const docsDir = cfg.paths.docs;
             const files = fs.readdirSync(docsDir);
 
-            // Find .md files that have entity tables (data models)
+            // Find .md files that contain diagram markers
             const docs = [];
             for (const file of files) {
                 if (file.endsWith('.md')) {
                     const content = fs.readFileSync(path.join(docsDir, file), 'utf-8');
-                    // Check if it contains entity descriptions (data model marker)
-                    if (content.includes('## Entity Descriptions') || content.includes('## Class Diagram')) {
+                    if (content.includes('## Entity Descriptions') || content.includes('## Class Diagram') ||
+                        content.includes('## System Diagram')) {
                         docs.push(file.replace(/\.md$/, ''));
                     }
                 }
@@ -106,9 +107,17 @@ module.exports = function(cfg, options = {}) {
             const docsDir = cfg.paths.docs;
             const layoutPath = path.join(docsDir, `${docName}-layout.json`);
 
-            // Get model from cached schema (single source of truth)
-            const schema = getSchema();
-            const model = schemaToModel(schema);
+            // Detect document type and build model accordingly
+            let model;
+            const mdPath = path.join(docsDir, `${docName}.md`);
+            if (fs.existsSync(mdPath) && fs.readFileSync(mdPath, 'utf-8').includes('## System Diagram')) {
+                const systemsDir = path.join(docsDir, 'systems');
+                const parsed = parseSystemLandscape(mdPath, systemsDir);
+                model = systemsToModel(parsed);
+            } else {
+                const schema = getSchema();
+                model = schemaToModel(schema);
+            }
 
             // Load or create layout
             let layout = { classes: {}, canvas: { width: 1200, height: 900 } };
@@ -195,9 +204,9 @@ module.exports = function(cfg, options = {}) {
                 fs.writeFileSync(svgDetailedPath, svgDetailed);
             }
 
-            // Generate Entity Cards PDF and DOCX if model is provided
+            // Generate Entity Cards PDF and DOCX (only for data model, not systems)
             const model = req.body.model;
-            if (model && model.classes) {
+            if (model && model.classes && model.docType !== 'systems') {
                 if (generateEntityCardsPDF) {
                     const pdfPath = path.join(docsDir, 'EntityCards.pdf');
                     await generateEntityCardsPDF(model, pdfPath);
@@ -213,6 +222,68 @@ module.exports = function(cfg, options = {}) {
         } catch (e) {
             console.error('Failed to save layout:', e);
             res.status(500).json({ success: false, error: e.message });
+        }
+    });
+
+    // API: Incoming flows for a system (computed from all other systems' outgoing flows)
+    router.get('/api/layout-editor/incoming-flows', (req, res) => {
+        try {
+            const systemName = req.query.system;
+            if (!systemName) {
+                return res.status(400).json({ error: 'Missing system parameter' });
+            }
+
+            const docsDir = cfg.paths.docs;
+            const systemsDir = path.join(docsDir, 'systems');
+
+            // Find the landscape file to get context
+            const landscapePath = path.join(docsDir, 'SystemLandscape.md');
+            if (!fs.existsSync(landscapePath) || !fs.existsSync(systemsDir)) {
+                return res.json({ system: systemName, incoming: [] });
+            }
+
+            const parsed = parseSystemLandscape(landscapePath, systemsDir);
+            const model = systemsToModel(parsed);
+            const classDef = model.classes[systemName];
+
+            if (!classDef) {
+                return res.json({ system: systemName, incoming: [] });
+            }
+
+            const incoming = classDef.incomingFlows || [];
+
+            // Return as HTML or JSON based on Accept header
+            if (req.accepts('html')) {
+                let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; margin: 8px; color: #333; }
+  h3 { margin: 0 0 8px; font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: left; }
+  th { background: #f5f5f5; font-weight: 600; }
+  .empty { color: #888; font-style: italic; }
+</style></head><body>`;
+
+                html += `<h3>Incoming Flows for ${systemName}</h3>`;
+
+                if (incoming.length === 0) {
+                    html += '<p class="empty">No incoming flows from other systems.</p>';
+                } else {
+                    html += '<table><tr><th>From</th><th>Flow</th><th>Trigger</th><th>Format</th><th>Transport</th></tr>';
+                    for (const flow of incoming) {
+                        html += `<tr><td>${flow.from}</td><td>${flow.flow}</td><td>${flow.trigger}</td><td>${flow.format}</td><td>${flow.transport}</td></tr>`;
+                    }
+                    html += '</table>';
+                }
+
+                html += '</body></html>';
+                res.type('html').send(html);
+            } else {
+                res.json({ system: systemName, incoming });
+            }
+        } catch (e) {
+            console.error('Failed to compute incoming flows:', e);
+            res.status(500).json({ error: e.message });
         }
     });
 

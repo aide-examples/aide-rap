@@ -57,7 +57,7 @@
          * @param {number} toWidth - Target box width (optional, defaults to BOX_WIDTH)
          */
         getConnectionPoint(fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed, fromWidth, toWidth) {
-            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT, STUB_LENGTH } = DiagramConstants;
+            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT, BOX_PADDING, STUB_LENGTH } = DiagramConstants;
 
             // Use provided widths or fall back to default
             const actualFromWidth = fromWidth || BOX_WIDTH;
@@ -66,8 +66,8 @@
             const toCx = toPos.x + actualToWidth / 2;
             const toCy = toPos.y + toHeight / 2;
 
-            // Source Y: always use attribute row position (same in compact and detailed mode)
-            const fromY = fromPos.y + HEADER_HEIGHT + (attrIndex + 0.5) * ATTR_LINE_HEIGHT + 2;
+            // Source Y: attribute row center (BOX_PADDING/2 accounts for .attributes top padding)
+            const fromY = fromPos.y + HEADER_HEIGHT + BOX_PADDING / 2 + (attrIndex + 0.5) * ATTR_LINE_HEIGHT;
 
             // Source X: left or right edge depending on target position
             let fromX = toCx > fromPos.x + actualFromWidth / 2
@@ -96,7 +96,7 @@
          * @param {number} attrIndex - Index of the self-referencing attribute (0-based)
          */
         getSelfReferenceArc(pos, boxWidth, boxHeight, attrIndex = 0) {
-            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT } = DiagramConstants;
+            const { BOX_WIDTH, HEADER_HEIGHT, ATTR_LINE_HEIGHT, BOX_PADDING } = DiagramConstants;
 
             const actualWidth = boxWidth || BOX_WIDTH;
             const startX = pos.x + actualWidth;
@@ -104,7 +104,7 @@
             const endY = pos.y;
 
             // Start at the specific attribute row (center of the row)
-            const startY = pos.y + HEADER_HEIGHT + (attrIndex + 0.5) * ATTR_LINE_HEIGHT + 2;
+            const startY = pos.y + HEADER_HEIGHT + BOX_PADDING / 2 + (attrIndex + 0.5) * ATTR_LINE_HEIGHT;
 
             const vertDist = startY - endY;
             const radius = vertDist / 2;

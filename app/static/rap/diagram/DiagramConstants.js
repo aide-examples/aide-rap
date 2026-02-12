@@ -8,7 +8,9 @@
         // Box dimensions
         BOX_WIDTH: 140,
         BOX_HEIGHT_COMPACT: 30,
+        COMPACT_WIDTH: 160,
         ATTR_LINE_HEIGHT: 16,
+        ATTR_LINE_HEIGHT_SYSTEMS: 32,
         BOX_PADDING: 8,
         HEADER_HEIGHT: 24,
 
@@ -22,6 +24,7 @@
         FONT_FAMILY: 'Arial, sans-serif',
         FONT_SIZE_CLASS: 12,
         FONT_SIZE_ATTR: 10,
+        FONT_SIZE_COMPACT: 12,
         FONT_SIZE_LABEL: 9,
 
         // Optional relationship styling
