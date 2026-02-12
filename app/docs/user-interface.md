@@ -48,7 +48,24 @@ When navigating back, the system restores:
 - **View mode** (table, tree-v, tree-h, map, chart)
 - **Selected row** – highlights the row you navigated from in table view
 
-**Display Options** (Settings → Breadcrumb display):
+### Settings Dropdown
+
+The settings dropdown (⚙ in the header) controls display preferences. All settings are persisted to `localStorage`.
+
+**Tree View Settings:**
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| **Reference position** | End | Where back-references appear: End, First, or Inline |
+| **Show IDs** | Off | Display raw `_id` columns in table and tree views |
+| **Show Cycles** ↻ | Off | Show cycle markers in tree views (instead of hiding cycled nodes) |
+| **Show empty FK** | Off | Show FK fields with NULL values as empty lines in tree views |
+| **Show System Attributes** | Off | Show `_created_at`, `_updated_at`, `_version` columns |
+
+**Show empty FK** is useful for Detail Views where you want to see all FK fields regardless of whether they have a value — it makes the tree structure consistent even for incomplete records.
+
+**Breadcrumb Display:**
+
 | Option | Display | Tooltip |
 |--------|---------|---------|
 | **Full** | Entity + Label | – |

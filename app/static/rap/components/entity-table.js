@@ -500,6 +500,9 @@ const EntityTable = {
         if (!insertedAggregates.has(source)) {
           insertedAggregates.add(source);
           const aggInfo = aggregateSources.get(source);
+          // Build description from aggregate type and sub-field names
+          const fieldNames = aggInfo.subCols.map(c => c.aggregateField || c.name.replace(`${source}_`, ''));
+          const description = `${aggInfo.type}: ${fieldNames.join(', ')}`;
           // Create virtual canonical column
           result.push({
             name: source,
@@ -507,7 +510,8 @@ const EntityTable = {
             jsType: 'string',
             isAggregateCanonical: true,
             aggregateType: aggInfo.type,
-            subColumns: aggInfo.subCols.map(c => c.name)
+            subColumns: aggInfo.subCols.map(c => c.name),
+            description
           });
         }
         // Skip individual sub-columns

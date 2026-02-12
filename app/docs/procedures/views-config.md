@@ -297,6 +297,52 @@ Back-reference columns become correlated subqueries in the SELECT clause:
 
 Subquery aliases use `_br` for the child table and `_br_{field}` for internal joins.
 
+### Indirect Back-References (Shared FK Correlation)
+
+Standard back-references correlate via `_br.fk_id = b.id` — the child entity points directly to the base entity. **Indirect back-references** correlate through a shared FK target: both the base entity and the child entity have FKs pointing to the *same* third entity.
+
+**Syntax:**
+
+```
+Entity<refFk=baseFk(params).column AS Label
+```
+
+| Part | Description | Example |
+|------|-------------|---------|
+| `refFk` | FK on the child entity (points to shared target) | `engine` |
+| `baseFk` | FK on the base entity (points to same target) | `engine` |
+
+**Key difference from standard back-refs:**
+
+| Type | Correlation | Use case |
+|------|-------------|----------|
+| `Entity<fk(...)` | `_br.fk_id = b.id` | Child points to base |
+| `Entity<refFk=baseFk(...)` | `_br.refFk_id = b.baseFk_id` | Both point to same target |
+
+**Example:** Get the latest usage log for the same engine as an allocation:
+
+```json
+{
+  "base": "EngineAllocation",
+  "columns": [
+    "engine._label AS Engine",
+    "start_date",
+    "EngineUsageLog<engine=engine(ORDER BY log_date DESC, LIMIT 1).total_flight_hours AS Hours",
+    "EngineUsageLog<engine=engine(ORDER BY log_date DESC, LIMIT 1).total_cycles AS Cycles"
+  ]
+}
+```
+
+Here `EngineAllocation.engine_id` and `EngineUsageLog.engine_id` both point to `Engine`. The generated SQL:
+
+```sql
+(SELECT _br.total_flight_hours FROM engine_usage_log _br
+ WHERE _br.engine_id = b.engine_id
+ ORDER BY _br.log_date DESC LIMIT 1) AS "Hours"
+```
+
+> Both FKs must reference the **same target entity**. The server validates this at startup and logs an error if they diverge.
+
 ---
 
 ## UI Behavior
@@ -752,6 +798,81 @@ The `position` column (type `geo`) provides the coordinates for map markers.
 ### See Also
 
 - [Aggregate Types: geo](../aggregate-types.md#built-in-geo) — GPS coordinate storage
+
+---
+
+## Detail Views (Single-Record Templates)
+
+Detail Views are a second view type alongside SQL-based table views. Instead of generating a flat SQL view, they render a **curated tree** for a single record selected by the user. Data is fetched via individual API calls, not a pre-built SQL view.
+
+### When to Use
+
+- Drill-down dashboards for a single record (e.g., "Engine Detail")
+- Curated tree structures with specific attributes, sort orders, and limits
+- Combining data from many related entities that would be impractical as a flat table
+
+### File Format
+
+Detail views use a ` ```detail ` code block instead of a ` ```json ` block:
+
+````markdown
+# Engine Detail
+
+```detail
+base: Engine
+: serial_number, type, state, manufacture_date, owner
+  EngineAllocation(ORDER BY start_date DESC, LIMIT 5): start_date, aircraft, installation_position
+    aircraft: current_tail_sign, type
+  EngineUsageLog(ORDER BY log_date DESC, LIMIT 3): log_date, total_flight_hours, total_cycles
+  current_lessor: name, country
+```
+````
+
+### Template Syntax
+
+The template is an indentation-based tree definition:
+
+```
+base: EntityName                                          ← Root entity
+: attr1, attr2, attr3                                     ← Visible attributes for root
+  BackRefEntity(ORDER BY col DESC, LIMIT n): col1, col2   ← Back-reference children
+    fk_field: col3, col4                                   ← Nested FK from child
+  fk_field: col5, col6                                     ← FK from root
+```
+
+**Line format:** `[indent][name][(params)][: attributes]`
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| **PascalCase** name | Back-reference entity | `EngineAllocation` |
+| **snake_case** name | Foreign key field | `current_lessor` |
+| `(params)` | Query params for back-refs | `(ORDER BY start_date DESC, LIMIT 5)` |
+| `: attr1, attr2` | Comma-separated visible columns | `: start_date, aircraft` |
+
+**Indentation:** 2 spaces per nesting level. Children are rendered under their parent node.
+
+### Parameters (Back-References Only)
+
+| Parameter | Effect |
+|-----------|--------|
+| `ORDER BY col [ASC\|DESC]` | Sort back-reference records |
+| `LIMIT n` | Maximum records to fetch |
+
+### API Flow
+
+1. User selects the detail view from the Views dropdown
+2. A record selection dialog appears (pick one record from the base entity)
+3. The client fetches the selected record via `GET /api/entities/{entity}/{id}`
+4. For each back-reference in the template: `GET /api/entities/{refEntity}?filter=...&sort=...&limit=...`
+5. The tree is rendered with only the template-specified attributes and children
+
+### UI Behavior
+
+- Detail views appear in the Views dropdown alongside SQL views
+- Attribute layout is forced to **row** mode (compact horizontal display)
+- Template children are auto-expanded on load
+- Only template-defined attributes and back-references are shown (no generic tree exploration)
+- Clicking a record in a back-reference table opens it in the detail panel
 
 ---
 

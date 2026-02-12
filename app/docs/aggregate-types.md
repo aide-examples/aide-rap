@@ -286,11 +286,13 @@ The canonical display format is: `"{email} ({phone})"` (e.g., "info@shop.de (+49
 
 ---
 
-## Future Aggregate Types
+## Custom Aggregate Types
 
-### Custom Aggregates (planned)
+Beyond the built-in types (`geo`, `address`, `contact`), you can define custom aggregate types. There are two scopes:
 
-Define custom aggregate types in `Types.md`:
+### Global Custom Aggregates
+
+Define types in `Types.md` (shared across all entities):
 
 ```markdown
 ### USAddress [AGGREGATE]
@@ -305,6 +307,44 @@ Define custom aggregate types in `Types.md`:
 
 **Canonical:** `"{zip} {city}, {state}"`
 ```
+
+### Entity-Scoped Aggregates
+
+Define types in the entity's own `## Types` section. These are only available within that entity.
+
+```markdown
+# EngineTypeDemand
+
+## Types
+
+### Rate [AGGREGATE]
+
+Rate breakdown by budget and forecast.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| budget | number | Budget rate [OPTIONAL] |
+| forecast | number | Forecast rate [OPTIONAL] |
+
+## Attributes
+
+| Attribute | Type | Description | Example |
+|-----------|------|-------------|---------|
+| engine_type | EngineType | Engine type [UK1] | 1 |
+| op_rate_fh | Rate | Flight hour rate | 125.50 |
+| op_rate_fc | Rate | Flight cycle rate | 350.00 |
+```
+
+Each `Rate` attribute expands to two database columns (e.g. `op_rate_fh_budget`, `op_rate_fh_forecast`). In the CRUD table, the sub-columns are grouped under a single canonical column header.
+
+**Key points:**
+
+- The `[AGGREGATE]` marker on the `###` heading is required
+- The `## Types` section must appear before `## Attributes` in the entity file
+- Allowed field types: `string`, `int`, `number`, `date`, `bool`, `boolean`, `mail`, `url`
+- Fields marked `[OPTIONAL]` in the description become nullable columns
+- Entity-scoped types take precedence over global types with the same name
+- Canonical format defaults to comma-separated field values if no `**Canonical:**` is specified
 
 ---
 
