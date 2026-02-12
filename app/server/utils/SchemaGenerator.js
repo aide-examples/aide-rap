@@ -1397,7 +1397,11 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     if (name === 'id') {
       sqlType = 'INTEGER PRIMARY KEY';
     } else if (isRequired && !foreignKey) {
-      sqlType += ' NOT NULL';
+      // Computed fields (DAILY, CALCULATED) are populated after INSERT, so skip NOT NULL
+      const isComputed = /\[(DAILY|CALCULATED|IMMEDIATE|HOURLY|ON_DEMAND)[=\]]/.test(desc);
+      if (!isComputed) {
+        sqlType += ' NOT NULL';
+      }
     }
 
     // Add DEFAULT clause if explicit default is specified

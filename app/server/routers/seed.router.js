@@ -11,6 +11,7 @@ module.exports = function(cfg) {
     const router = express.Router();
     const SeedManager = require('../utils/SeedManager');
     const { getSchema, getDatabase, populateComputedEntities } = require('../config/database');
+    const ComputedFieldService = require('../services/ComputedFieldService');
 
     // Initialize SeedManager with system-specific seed directory
     SeedManager.init(cfg.paths.seed);
@@ -92,6 +93,7 @@ module.exports = function(cfg) {
                 sourceDir: req.body?.sourceDir || 'seed'
             };
             const result = await SeedManager.loadEntity(req.params.entity, null, options);
+            ComputedFieldService.runAll();
             res.json({ success: true, ...result });
         } catch (e) {
             console.error(`Failed to load seed for ${req.params.entity}:`, e);
@@ -115,6 +117,7 @@ module.exports = function(cfg) {
         try {
             const results = await SeedManager.loadAll();
             populateComputedEntities();
+            ComputedFieldService.runAll();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to load all seeds:', e);
@@ -127,6 +130,7 @@ module.exports = function(cfg) {
         try {
             const results = await SeedManager.importAll();
             populateComputedEntities();
+            ComputedFieldService.runAll();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to import all:', e);
@@ -150,6 +154,7 @@ module.exports = function(cfg) {
         try {
             const results = await SeedManager.resetAll();
             populateComputedEntities();
+            ComputedFieldService.runAll();
             res.json({ success: true, ...results });
         } catch (e) {
             console.error('Failed to reset all:', e);
@@ -235,7 +240,6 @@ module.exports = function(cfg) {
     router.post('/api/seed/reinitialize', (req, res) => {
         try {
             const { reinitialize } = require('../config/database');
-            const ComputedFieldService = require('../services/ComputedFieldService');
             const { clearDiagramCache } = require('./schema.router');
 
             const result = reinitialize();
@@ -277,6 +281,7 @@ module.exports = function(cfg) {
         try {
             const results = await SeedManager.restoreBackup();
             populateComputedEntities();
+            ComputedFieldService.runAll();
             res.json({ success: true, results });
         } catch (e) {
             console.error('Failed to restore backup:', e);
@@ -288,6 +293,7 @@ module.exports = function(cfg) {
     router.post('/api/seed/restore/:entity', async (req, res) => {
         try {
             const result = await SeedManager.restoreEntity(req.params.entity);
+            ComputedFieldService.runAll();
             res.json({ success: true, ...result });
         } catch (e) {
             console.error(`Failed to restore ${req.params.entity}:`, e);
