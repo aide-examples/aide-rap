@@ -1,0 +1,11 @@
+services:
+  irma:
+    build:
+      context: ..
+      dockerfile: aide-rap/Dockerfile
+    ports:
+      - "80:18354"      # Customer accesses http://server (no port needed)
+    restart: unless-stopped
+    # Uncomment to use external data volume instead of baked-in data:
+    # volumes:
+    #   - ./data:/app/app/systems/irma/data
