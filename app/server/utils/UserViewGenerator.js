@@ -427,12 +427,12 @@ function parseBackRefParams(paramsStr) {
  * @param {Object} schema - Full schema object
  */
 function resolveBackRefPath(pathStr, baseEntityName, schema) {
-  const match = pathStr.match(/^(\w+)<(\w+)\(([^)]*)\)(?:\.(.+))?$/);
+  const match = pathStr.match(/^(\w+)<(\w+)(?:=(\w+))?\(([^)]*)\)(?:\.(.+))?$/);
   if (!match) {
     throw new Error(`Invalid back-reference syntax: "${pathStr}"`);
   }
 
-  const [, refEntityName, fkFieldName, paramsStr, tailPath] = match;
+  const [, refEntityName, fkFieldName, baseFkFieldName, paramsStr, tailPath] = match;
 
   // Validate child entity
   const refEntity = schema.entities[refEntityName];
@@ -440,7 +440,7 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
     throw new Error(`Back-ref entity "${refEntityName}" not found in schema`);
   }
 
-  // Find FK column in child entity that points to base entity
+  // Find FK column in child entity
   const fkCol = findFKColumn(refEntity, fkFieldName);
   if (!fkCol || !fkCol.foreignKey) {
     throw new Error(
@@ -448,12 +448,30 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
     );
   }
 
-  // Verify FK target matches the view's base entity
-  if (fkCol.foreignKey.entity !== baseEntityName) {
-    throw new Error(
-      `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
-      `not "${baseEntityName}" (back-ref: "${pathStr}")`
-    );
+  // Indirect back-ref: Entity<refFk=baseFk(...) — correlate via shared FK target
+  let baseFkCol = null;
+  if (baseFkFieldName) {
+    const baseEntity = schema.entities[baseEntityName];
+    baseFkCol = findFKColumn(baseEntity, baseFkFieldName);
+    if (!baseFkCol || !baseFkCol.foreignKey) {
+      throw new Error(
+        `FK "${baseFkFieldName}" not found in base entity "${baseEntityName}" (back-ref: "${pathStr}")`
+      );
+    }
+    if (fkCol.foreignKey.entity !== baseFkCol.foreignKey.entity) {
+      throw new Error(
+        `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
+        `but "${baseFkFieldName}" in "${baseEntityName}" points to "${baseFkCol.foreignKey.entity}" (back-ref: "${pathStr}")`
+      );
+    }
+  } else {
+    // Direct back-ref: FK must point to the base entity
+    if (fkCol.foreignKey.entity !== baseEntityName) {
+      throw new Error(
+        `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
+        `not "${baseEntityName}" (back-ref: "${pathStr}")`
+      );
+    }
   }
 
   const params = parseBackRefParams(paramsStr);
@@ -580,7 +598,9 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
     j => `LEFT JOIN ${j.table} ${j.alias} ON ${j.onLeft} = ${j.onRight}`
   ).join(' ');
 
-  let whereClause = `_br.${fkCol.name} = b.id`;
+  let whereClause = baseFkCol
+    ? `_br.${fkCol.name} = b.${baseFkCol.name}`
+    : `_br.${fkCol.name} = b.id`;
   for (const cond of params.where) {
     const condCol = refEntity.columns.find(c => c.name === cond.column || c.displayName === cond.column);
     const colName = condCol ? condCol.name : cond.column;
@@ -660,13 +680,13 @@ function resolveBackRefPath(pathStr, baseEntityName, schema) {
  * @returns {Array<{ path, label, jsType, selectExpr, entityName, [aggregateSource], [aggregateType], [aggregateField] }>}
  */
 function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPrefix = null, includeMetadata = false) {
-  // Parse back-ref: Entity<fk(params).tailPath
-  const match = pathStr.match(/^(\w+)<(\w+)\(([^)]*)\)(?:\.(.+))?$/);
+  // Parse back-ref: Entity<fk(params).tailPath or Entity<fk=baseFk(params).tailPath
+  const match = pathStr.match(/^(\w+)<(\w+)(?:=(\w+))?\(([^)]*)\)(?:\.(.+))?$/);
   if (!match) {
     throw new Error(`Invalid back-reference syntax for aggregate expansion: "${pathStr}"`);
   }
 
-  const [, refEntityName, fkFieldName, paramsStr, tailPath] = match;
+  const [, refEntityName, fkFieldName, baseFkFieldName, paramsStr, tailPath] = match;
 
   // Validate child entity
   const refEntity = schema.entities[refEntityName];
@@ -674,7 +694,7 @@ function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPre
     throw new Error(`Back-ref entity "${refEntityName}" not found in schema`);
   }
 
-  // Find FK column in child entity that points to base entity
+  // Find FK column in child entity
   const fkCol = findFKColumn(refEntity, fkFieldName);
   if (!fkCol || !fkCol.foreignKey) {
     throw new Error(
@@ -682,12 +702,29 @@ function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPre
     );
   }
 
-  // Verify FK target matches the view's base entity
-  if (fkCol.foreignKey.entity !== baseEntityName) {
-    throw new Error(
-      `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
-      `not "${baseEntityName}" (back-ref: "${pathStr}")`
-    );
+  // Indirect back-ref: correlate via shared FK target
+  let baseFkCol = null;
+  if (baseFkFieldName) {
+    const baseEntity = schema.entities[baseEntityName];
+    baseFkCol = findFKColumn(baseEntity, baseFkFieldName);
+    if (!baseFkCol || !baseFkCol.foreignKey) {
+      throw new Error(
+        `FK "${baseFkFieldName}" not found in base entity "${baseEntityName}" (back-ref: "${pathStr}")`
+      );
+    }
+    if (fkCol.foreignKey.entity !== baseFkCol.foreignKey.entity) {
+      throw new Error(
+        `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
+        `but "${baseFkFieldName}" in "${baseEntityName}" points to "${baseFkCol.foreignKey.entity}" (back-ref: "${pathStr}")`
+      );
+    }
+  } else {
+    if (fkCol.foreignKey.entity !== baseEntityName) {
+      throw new Error(
+        `FK "${fkFieldName}" in "${refEntityName}" points to "${fkCol.foreignKey.entity}", ` +
+        `not "${baseEntityName}" (back-ref: "${pathStr}")`
+      );
+    }
   }
 
   const params = parseBackRefParams(paramsStr);
@@ -748,7 +785,9 @@ function expandBackRefAggregateColumns(pathStr, baseEntityName, schema, labelPre
   }
 
   // Build WHERE clause
-  let whereClause = `_br.${fkCol.name} = b.id`;
+  let whereClause = baseFkCol
+    ? `_br.${fkCol.name} = b.${baseFkCol.name}`
+    : `_br.${fkCol.name} = b.id`;
   for (const cond of params.where) {
     const condCol = refEntity.columns.find(c => c.name === cond.column || c.displayName === cond.column);
     const colName = condCol ? condCol.name : cond.column;

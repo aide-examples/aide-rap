@@ -977,6 +977,7 @@ const EntityExplorer = {
 
     const segments = [];
     let groupHtml = null;
+    let currentGroupLabel = '';
 
     for (const entry of viewsData.groups) {
       if (entry.type === 'column_break') {
@@ -985,13 +986,15 @@ const EntityExplorer = {
         groupHtml = null;
       } else if (entry.type === 'separator') {
         if (groupHtml) segments.push({ html: groupHtml + '</div>' });
+        currentGroupLabel = entry.label;
         groupHtml = `<div class="view-selector-group"><div class="view-selector-group-label" style="background-color: ${entry.color};">${entry.label}</div>`;
       } else if (entry.type === 'view') {
         const view = viewsData.views.find(v => v.name === entry.name);
         if (view) {
           const desc = view.description || '';
           const titleAttr = desc ? ` title="${DomUtils.escapeHtml(desc)}"` : '';
-          groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" data-description="${DomUtils.escapeHtml(desc)}" style="border-left-color: ${view.color};"${titleAttr}>
+          const docPath = currentGroupLabel ? `views/${currentGroupLabel}/${view.name}.md` : '';
+          groupHtml += `<div class="view-selector-item" data-value="${view.name}" data-base="${view.base}" data-color="${view.color}" data-description="${DomUtils.escapeHtml(desc)}" data-doc-path="${docPath}" style="border-left-color: ${view.color};"${titleAttr}>
             <span class="view-name">${view.name}</span>
           </div>`;
         }
@@ -1001,10 +1004,15 @@ const EntityExplorer = {
 
     this.viewSelectorMenu.innerHTML = this.buildColumnsHtml(segments);
 
-    // Add click handlers
+    // Add click and right-click handlers
     this.viewSelectorMenu.querySelectorAll('.view-selector-item').forEach(item => {
       item.addEventListener('click', () => {
         this.selectViewFromDropdown(item.dataset.value, item.dataset.base, item.dataset.color, { description: item.dataset.description || '' });
+      });
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const docPath = item.dataset.docPath;
+        if (docPath) window.open(`about?doc=${encodeURIComponent(docPath)}`, '_blank');
       });
     });
   },
