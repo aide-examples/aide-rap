@@ -48,10 +48,12 @@ fi
 sleep 2
 
 # 1. Stop PM2 (clean SQLite shutdown)
-echo "Stopping PM2 process '$PM2_NAME'..."
+#    Try both known names — install.sh historically used 'aide-rap-irma'
+echo "Stopping PM2 processes..."
 pm2 stop "$PM2_NAME" 2>&1
-STOP_EXIT=$?
-echo "pm2 stop exit code: $STOP_EXIT"
+echo "pm2 stop $PM2_NAME exit code: $?"
+pm2 stop "aide-rap-irma" 2>&1
+echo "pm2 stop aide-rap-irma exit code: $?"
 
 # 2. Wait and verify process is actually dead
 echo "Waiting for process to stop..."
@@ -59,12 +61,15 @@ for i in $(seq 1 10); do
     # Check if pm2 process is still running
     STATUS=$(pm2 jlist 2>/dev/null | python3 -c "
 import sys, json
+names = ['$PM2_NAME', 'aide-rap-irma']
 procs = json.load(sys.stdin)
 for p in procs:
-    if p.get('name') == '$PM2_NAME':
-        print(p.get('pm2_env', {}).get('status', 'unknown'))
-        sys.exit(0)
-print('not_found')
+    if p.get('name') in names:
+        s = p.get('pm2_env', {}).get('status', 'unknown')
+        if s != 'stopped':
+            print(s)
+            sys.exit(0)
+print('stopped')
 " 2>/dev/null || echo "unknown")
 
     if [ "$STATUS" = "stopped" ] || [ "$STATUS" = "not_found" ]; then
@@ -116,13 +121,40 @@ echo "Installing aide-frame dependencies..."
 cd "$INSTALL_DIR/aide-frame/js/aide_frame"
 npm ci --omit=dev 2>&1
 
-# 7. Restart PM2
-echo "Starting PM2 process '$PM2_NAME'..."
+# 7. Remove stale PM2 entry and start fresh
+#    After unzip, PM2's saved process config may reference old paths.
+#    Always delete + start fresh to avoid "started but crashes immediately" issues.
+echo "Cleaning up old PM2 entries..."
 cd "$INSTALL_DIR"
-pm2 start "$PM2_NAME" 2>&1 || {
-    echo "pm2 start by name failed, trying full command..."
-    pm2 start app/rap.js --name "$PM2_NAME" -- -s irma 2>&1
-}
+pm2 delete "$PM2_NAME" 2>/dev/null
+# Also try alternative name (install.sh historically used aide-rap-irma)
+pm2 delete "aide-rap-irma" 2>/dev/null
+
+echo "Starting PM2 process '$PM2_NAME'..."
+pm2 start app/rap.js --name "$PM2_NAME" -- -s irma 2>&1
+START_EXIT=$?
+echo "pm2 start exit code: $START_EXIT"
+
+# 8. Verify process is actually running
+sleep 3
+RUNNING_STATUS=$(pm2 jlist 2>/dev/null | python3 -c "
+import sys, json
+procs = json.load(sys.stdin)
+for p in procs:
+    if p.get('name') == '$PM2_NAME':
+        print(p.get('pm2_env', {}).get('status', 'unknown'))
+        sys.exit(0)
+print('not_found')
+" 2>/dev/null || echo "unknown")
+
+echo "Post-start status: $RUNNING_STATUS"
+
+if [ "$RUNNING_STATUS" = "online" ]; then
+    echo "Process is running. Saving PM2 state..."
+    pm2 save 2>&1
+else
+    echo "WARNING: Process not online (status: $RUNNING_STATUS). Check pm2 logs."
+fi
 
 echo ""
 echo "=== Reinstall completed at $(date) ==="
