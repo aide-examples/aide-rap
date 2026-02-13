@@ -5,16 +5,17 @@
  * can send human-readable labels instead of internal IDs.
  *
  * Endpoints:
- * GET    /api/integrate/:entity/lookup   - Lookup records by field value
- * POST   /api/integrate/:entity          - Create record with FK label resolution
- * PUT    /api/integrate/:entity/:id      - Update record with FK label resolution
+ * GET    /api/integrate/:entity/options   - Picklist: id + label for dropdowns
+ * GET    /api/integrate/:entity/lookup    - Lookup records by field value
+ * POST   /api/integrate/:entity           - Create record with FK label resolution
+ * PUT    /api/integrate/:entity/:id       - Update record with FK label resolution
  */
 
 const express = require('express');
 const service = require('../services/GenericService');
 const { buildLabelLookup, resolveConceptualFKs } = require('../utils/SeedManager');
 const calculationService = require('../services/CalculationService');
-const { getSchema } = require('../config/database');
+const { getSchema, getDatabase } = require('../config/database');
 const { EntityNotFoundError } = require('../errors/NotFoundError');
 
 const router = express.Router();
@@ -90,6 +91,72 @@ function resolveLabels(entityName, data) {
 
   return resolveConceptualFKs(entityName, data, lookups);
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/integrate/:entity/options[?field=X&value=Y]
+//
+// Returns compact picklist: [{ id, label, label2? }] for dropdown binding.
+// Uses LABEL/LABEL2 annotations or labelExpression from entity schema.
+// Supports optional ?field=&value= filter (e.g., ?field=is_leaf&value=1).
+// ---------------------------------------------------------------------------
+
+router.get('/:entity/options', validateEntity, (req, res, next) => {
+  try {
+    const { entity } = req.params;
+    const { field, value } = req.query;
+    const schema = getSchema();
+    const entityMeta = schema.entities[entity];
+    const db = getDatabase();
+
+    const viewName = entityMeta.tableName + '_view';
+    const hasComputedLabel = !!entityMeta.labelExpression;
+
+    // Determine label column(s)
+    let selectCols, labelKey, label2Key;
+
+    if (hasComputedLabel) {
+      // Entity has [LABEL=concat(...)]: view provides _label
+      selectCols = 'id, _label as label';
+      labelKey = 'label';
+    } else {
+      // Use [LABEL] and [LABEL2] annotated columns
+      const labelCol = entityMeta.columns.find(c => c.ui?.label);
+      const label2Col = entityMeta.columns.find(c => c.ui?.label2);
+
+      if (!labelCol) {
+        return res.status(400).json({
+          error: { code: 'NO_LABEL', message: `Entity '${entity}' has no [LABEL] column` }
+        });
+      }
+
+      selectCols = `id, "${labelCol.name}" as label`;
+      labelKey = 'label';
+      if (label2Col) {
+        selectCols += `, "${label2Col.name}" as label2`;
+        label2Key = 'label2';
+      }
+    }
+
+    // Build optional filter
+    let whereClause = '';
+    const params = [];
+
+    if (field && value !== undefined) {
+      const col = entityMeta.columns.find(c => c.name === field);
+      if (col) {
+        whereClause = ` WHERE "${field}" = ?`;
+        params.push(col.jsType === 'number' ? parseInt(value, 10) : value);
+      }
+    }
+
+    const sql = `SELECT ${selectCols} FROM ${viewName}${whereClause} ORDER BY label`;
+    const rows = db.prepare(sql).all(...params);
+
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/integrate/:entity/lookup?field=serial_number&value=GE-123456

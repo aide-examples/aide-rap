@@ -31,6 +31,35 @@ Works on: `/api/entities`, `/api/views`, `/api/integrate/.../lookup`
 
 ## Endpoints
 
+### Options — Picklist for dropdowns
+
+```
+GET /api/integrate/:entity/options[?field=X&value=Y]
+```
+
+Returns a compact array `[{ id, label, label2? }]` for dropdown/picklist binding. Automatically uses the entity's LABEL system:
+
+- **`[LABEL]` column** → returned as `label`
+- **`[LABEL=concat(...)]`** → computed `_label` returned as `label`
+- **`[LABEL2]` column** → returned as `label2` (if present)
+
+Results are sorted alphabetically by label.
+
+| Example | Result |
+|---------|--------|
+| `EngineType/options` | All engine types with labels |
+| `EngineType/options?field=is_leaf&value=1` | Only leaf types (no parent categories) |
+| `Engine/options` | All engines with computed labels (ESN-Type) |
+
+**Response:**
+```json
+[
+  { "id": 11, "label": "CF34-10" },
+  { "id": 12, "label": "CF-34-8" },
+  { "id": 30, "label": "CF34-10E5A1" }
+]
+```
+
 ### Lookup — Find records by field value (with FK resolution)
 
 ```
@@ -90,5 +119,6 @@ Supports Optimistic Concurrency Control via `If-Match` header or `_version` in b
 | FK label resolution | No | N/A (labels in view) | Yes (auto) |
 | `?field=&value=` | Yes | Yes | Yes |
 | `?filter=` (advanced) | Yes | Yes | No |
+| Options/Picklist | No | No | Yes (`/options`) |
 | Target audience | Internal UI | Both | External tools |
 | Scope check | Entity scope | No | Entity scope |
