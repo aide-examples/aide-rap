@@ -65,10 +65,21 @@ For automated deployments, use the two-step process:
 **Step 1 — Local: Pack and upload**
 
 ```bash
-./deploy.sh    # Packs ZIP, uploads via sftp to server (password prompted)
+./deploy.sh                          # Upload ZIP only (keep existing server config)
+./deploy.sh --base-path /irma        # Upload ZIP + deploy.env with reverse proxy path
+./deploy.sh --port 18355 --system demo --base-path /demo   # Full customization
 ```
 
-This creates `aide-rap-latest.zip` and uploads it to the server's parent directory via sftp.
+Options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--base-path <path>` | *(none)* | Base URL path for reverse proxy (e.g., `/irma`) |
+| `--port <port>` | `18354` | Application port |
+| `--pm2-name <name>` | `aide-irma` | PM2 process name |
+| `--system <name>` | `irma` | System name (subdirectory in systems/) |
+
+When options are provided, `deploy.sh` generates a `deploy.env` file and uploads it alongside the ZIP. This file lives **outside** the ZIP directory and survives unzip overwrites. If no options are given, only the ZIP is uploaded and any existing `deploy.env` on the server is preserved.
 
 **Step 2 — Server: Re-Install via Admin UI**
 
@@ -76,10 +87,12 @@ Open the Seed Manager in the web UI (admin role required) and click **⚠ Re-Ins
 
 1. Checks that `aide-rap-latest.zip` exists on the server
 2. Spawns `reinstall.sh` as a detached process
-3. Stops PM2 (clean SQLite shutdown)
-4. Unzips with full overwrite (code + database)
-5. Runs `npm ci` for dependencies
-6. Restarts PM2
+3. Reads `deploy.env` for runtime config (port, PM2 name, app args)
+4. Stops the application (port-based kill, not PM2 name-based)
+5. Unzips with full overwrite (code + database)
+6. Runs `npm ci` for dependencies
+7. Starts PM2 with fresh config (delete + start, not restart)
+8. Verifies the application is listening on the configured port
 
 The page auto-reloads after 15 seconds.
 
@@ -87,9 +100,22 @@ The page auto-reloads after 15 seconds.
 
 | File | Location | Purpose |
 |------|----------|---------|
-| `deploy.sh` | Local dev machine | Pack + sftp upload |
-| `reinstall.sh` | Server (aide-rap root) | PM2 stop → unzip → npm → PM2 start |
+| `deploy.sh` | Local dev machine | Pack + sftp upload + deploy.env generation |
+| `deploy.env` | Server (parent dir) | Runtime config: port, PM2 name, app args |
+| `reinstall.sh` | Server (aide-rap root) | Stop → unzip → npm → PM2 start |
 | `reinstall.log` | Server (aide-rap root) | Log of last reinstall |
+
+**Server directory layout:**
+
+```
+/var/www/vhosts/followthescore.org/
+├── aide-rap-latest.zip          ← uploaded by deploy.sh
+├── deploy.env                   ← uploaded by deploy.sh (optional)
+└── aide-rap/                    ← installation directory
+    ├── reinstall.sh
+    ├── reinstall.log
+    └── ...
+```
 
 **Configuration:** Edit `deploy.sh` to set `REMOTE_HOST` and `REMOTE_DIR` for your target server.
 
