@@ -58,6 +58,41 @@ pm2 start rap
 
 **Important:** Always stop the server before overwriting files. SQLite uses WAL (Write-Ahead Logging) — overwriting database files while the server runs can cause corruption.
 
+### Push-Button Update (deploy.sh + Re-Install)
+
+For automated deployments, use the two-step process:
+
+**Step 1 — Local: Pack and upload**
+
+```bash
+./deploy.sh    # Packs ZIP, uploads via sftp to server (password prompted)
+```
+
+This creates `aide-rap-latest.zip` and uploads it to the server's parent directory via sftp.
+
+**Step 2 — Server: Re-Install via Admin UI**
+
+Open the Seed Manager in the web UI (admin role required) and click **⚠ Re-Install**. This:
+
+1. Checks that `aide-rap-latest.zip` exists on the server
+2. Spawns `reinstall.sh` as a detached process
+3. Stops PM2 (clean SQLite shutdown)
+4. Unzips with full overwrite (code + database)
+5. Runs `npm ci` for dependencies
+6. Restarts PM2
+
+The page auto-reloads after 15 seconds.
+
+**Files involved:**
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `deploy.sh` | Local dev machine | Pack + sftp upload |
+| `reinstall.sh` | Server (aide-rap root) | PM2 stop → unzip → npm → PM2 start |
+| `reinstall.log` | Server (aide-rap root) | Log of last reinstall |
+
+**Configuration:** Edit `deploy.sh` to set `REMOTE_HOST` and `REMOTE_DIR` for your target server.
+
 ## Option 2: Docker Deployment
 
 ### Prerequisites

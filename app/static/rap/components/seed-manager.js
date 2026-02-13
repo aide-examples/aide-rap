@@ -343,6 +343,7 @@ const SeedManager = {
             <button class="btn-seed btn-reset-all">${i18n.t('admin_reset_all')}</button>
             <button class="btn-seed btn-reinit" title="${i18n.t('admin_reinit_tooltip')}">${i18n.t('admin_reinit')}</button>
             <button class="btn-seed btn-reload-views" title="${i18n.t('admin_reload_views_tooltip')}">${i18n.t('admin_reload_views')}</button>
+            ${window.currentUser?.role === 'admin' ? '<button class="btn-seed btn-reinstall" title="Re-install server from uploaded update package">⚠ Re-Install</button>' : ''}
           </div>
         </div>
       </div>
@@ -416,6 +417,7 @@ const SeedManager = {
     this.container.querySelector('.btn-restore-media')?.addEventListener('click', () => this.restoreMediaLinks());
     this.container.querySelector('.btn-reinit')?.addEventListener('click', () => this.reinitialize());
     this.container.querySelector('.btn-reload-views')?.addEventListener('click', () => this.reloadViews());
+    this.container.querySelector('.btn-reinstall')?.addEventListener('click', () => this.reinstallServer());
     this.container.querySelector('.btn-new-system')?.addEventListener('click', () => this.openModelBuilder());
   },
 
@@ -737,6 +739,74 @@ const SeedManager = {
       this.showMessage(`Views reloaded (${data.viewCount} views). Refresh browser to see changes.`);
     } catch (err) {
       this.showMessage(err.message, true);
+    }
+  },
+
+  /**
+   * Re-Install: trigger server reinstall from uploaded ZIP package.
+   * Server stops via PM2, unzips update, restarts. Page auto-reloads.
+   */
+  async reinstallServer() {
+    // Step 1: Check if update package is available
+    try {
+      const statusRes = await fetch('api/admin/reinstall/status');
+      const status = await statusRes.json();
+
+      if (!status.zipAvailable) {
+        this.showMessage('No update package found. Upload aide-rap-latest.zip first.', true);
+        return;
+      }
+    } catch (err) {
+      this.showMessage('Could not check reinstall status: ' + err.message, true);
+      return;
+    }
+
+    // Step 2: Confirm — this is destructive
+    const proceed = confirm(
+      'RE-INSTALL SERVER\n\n' +
+      'This will:\n' +
+      '• Stop the server\n' +
+      '• Replace ALL files including the database\n' +
+      '• Restart the server\n\n' +
+      'The page will reload automatically after ~15 seconds.\n\n' +
+      'Continue?'
+    );
+    if (!proceed) return;
+
+    // Step 3: Trigger reinstall
+    try {
+      const res = await fetch('api/admin/reinstall', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        this.showMessage(data.error || 'Reinstall failed', true);
+        return;
+      }
+
+      // Close the modal and show a full-page overlay
+      this.close();
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);color:white;display:flex;align-items:center;justify-content:center;z-index:10000;font-size:1.2em;flex-direction:column;gap:1em;';
+      overlay.innerHTML = `
+        <div style="font-size:1.5em;font-weight:bold;">⚠ Server is restarting...</div>
+        <div id="reinstall-countdown">Reloading in 15 seconds</div>
+        <div style="opacity:0.6;font-size:0.85em;">If the page doesn't reload, refresh manually.</div>
+      `;
+      document.body.appendChild(overlay);
+
+      // Countdown + auto-reload
+      let seconds = 15;
+      const countdownEl = overlay.querySelector('#reinstall-countdown');
+      const timer = setInterval(() => {
+        seconds--;
+        if (countdownEl) countdownEl.textContent = `Reloading in ${seconds} seconds`;
+        if (seconds <= 0) {
+          clearInterval(timer);
+          window.location.reload();
+        }
+      }, 1000);
+    } catch (err) {
+      this.showMessage('Reinstall error: ' + err.message, true);
     }
   },
 

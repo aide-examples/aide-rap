@@ -4,9 +4,15 @@
  */
 
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const { spawn } = require('child_process');
 const logger = require('../utils/logger');
 const { reloadUserViews, getDatabasePath } = require('../config/database');
 const ExternalQueryService = require('../services/ExternalQueryService');
+
+// aide-rap project root (parent of app/)
+const PROJECT_DIR = path.resolve(__dirname, '..', '..', '..');
 
 module.exports = function(systemConfig) {
   const router = express.Router();
@@ -85,6 +91,57 @@ module.exports = function(systemConfig) {
       logger.error('External query failed', { provider, term, error: err.message });
       res.status(502).json({ error: err.message });
     }
+  });
+
+  /**
+   * POST /api/admin/reinstall
+   * Trigger server reinstall from uploaded ZIP package.
+   * Spawns reinstall.sh as detached process, then the server restarts via PM2.
+   */
+  router.post('/api/admin/reinstall', (req, res) => {
+    const scriptPath = path.join(PROJECT_DIR, 'reinstall.sh');
+    const zipPath = path.join(path.dirname(PROJECT_DIR), 'aide-rap-latest.zip');
+
+    if (!fs.existsSync(scriptPath)) {
+      return res.status(404).json({ error: 'reinstall.sh not found on server' });
+    }
+    if (!fs.existsSync(zipPath)) {
+      return res.status(404).json({ error: 'No update package found (aide-rap-latest.zip)' });
+    }
+
+    // Spawn detached child — survives when PM2 stops the Node process
+    const child = spawn('bash', [scriptPath], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    logger.warn('Reinstall initiated by admin', { user: req.user?.userId || req.user?.role });
+    res.json({
+      status: 'reinstalling',
+      message: 'Server will restart in ~10 seconds. Page will auto-reload.'
+    });
+  });
+
+  /**
+   * GET /api/admin/reinstall/status
+   * Check if an update package is available and return reinstall log tail.
+   */
+  router.get('/api/admin/reinstall/status', (req, res) => {
+    const zipPath = path.join(path.dirname(PROJECT_DIR), 'aide-rap-latest.zip');
+    const logPath = path.join(PROJECT_DIR, 'reinstall.log');
+
+    const result = { zipAvailable: fs.existsSync(zipPath) };
+
+    if (fs.existsSync(logPath)) {
+      try {
+        const log = fs.readFileSync(logPath, 'utf8');
+        const lines = log.split('\n');
+        result.lastReinstall = lines.slice(-10).join('\n');
+      } catch (e) { /* ignore */ }
+    }
+
+    res.json(result);
   });
 
   return router;
