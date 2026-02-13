@@ -286,8 +286,8 @@ function update(entityName, id, data, expectedVersion = null) {
     throw new VersionConflictError(entityName, id, expectedVersion, currentRecord);
   }
 
-  // Validate and transform
-  const validated = validator.validate(entityName, data);
+  // Validate and transform (partial — only provided fields, skip required check for missing)
+  const validated = validator.validatePartial(entityName, data);
   convertBooleansForSql(entity, validated);
 
   // Set system columns (update timestamp)

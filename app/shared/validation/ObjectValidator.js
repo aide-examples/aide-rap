@@ -152,6 +152,46 @@ class ObjectValidator {
   }
 
   /**
+   * Validates only the provided fields (for partial updates).
+   * Skips required-check for fields not present in obj.
+   * @param {string} entityType - Entity type
+   * @param {Object} obj - Partial object to validate
+   * @returns {Object} - Validated and transformed partial object
+   * @throws {ValidationError} - On validation errors
+   */
+  validatePartial(entityType, obj) {
+    const rules = this.rules.get(entityType);
+
+    if (!rules) {
+      throw new Error(`No validation rules defined for entity type: ${entityType}`);
+    }
+
+    const errors = [];
+    const transformed = { ...obj };
+
+    // Only validate fields that are present in the input
+    for (const [fieldName, value] of Object.entries(obj)) {
+      const fieldRules = rules[fieldName];
+      if (!fieldRules) continue; // ignore unknown fields (will be filtered out by repository)
+      const fieldErrors = this._validateField(fieldName, value, fieldRules);
+      errors.push(...fieldErrors);
+    }
+
+    if (errors.length > 0) {
+      throw new this.ValidationError(errors);
+    }
+
+    // Transform only the provided fields
+    for (const [fieldName] of Object.entries(obj)) {
+      const fieldRules = rules[fieldName];
+      if (!fieldRules) continue;
+      transformed[fieldName] = this._transformField(obj[fieldName], fieldRules);
+    }
+
+    return transformed;
+  }
+
+  /**
    * Validates a single field (for client UI)
    * @param {string} entityType - Entity type
    * @param {string} fieldName - Field name
