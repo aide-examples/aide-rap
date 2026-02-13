@@ -93,6 +93,10 @@ function resolveLabels(entityName, data) {
 
 // ---------------------------------------------------------------------------
 // GET /api/integrate/:entity/lookup?field=serial_number&value=GE-123456
+//
+// Supports FK label resolution: if "field" is a FK name (e.g. "type"),
+// "value" is resolved via label lookup against the referenced entity.
+// Example: ?field=type&value=CFM56-7B27 → filters by type_id=<resolved id>
 // ---------------------------------------------------------------------------
 
 router.get('/:entity/lookup', validateEntity, (req, res, next) => {
@@ -106,9 +110,37 @@ router.get('/:entity/lookup', validateEntity, (req, res, next) => {
       });
     }
 
-    // Use existing filter syntax for exact match on entity column
+    // Check if field is a FK column (e.g. "type" → "type_id" exists)
+    const schema = getSchema();
+    const entityMeta = schema.entities[entity];
+    const fkColumn = entityMeta?.columns.find(c => c.name === field + '_id' && c.foreignKey);
+
+    let filterString;
+
+    if (fkColumn) {
+      // FK field: resolve label to ID via target entity lookup
+      const targetEntity = fkColumn.foreignKey.entity;
+      const lookup = buildLabelLookup(targetEntity);
+      const resolvedId = lookup[value];
+
+      if (resolvedId === undefined) {
+        return res.status(404).json({
+          error: {
+            code: 'FK_NOT_FOUND',
+            message: `No ${targetEntity} found with label '${value}'`,
+            correlationId: req.correlationId
+          }
+        });
+      }
+
+      filterString = `${fkColumn.name}:${resolvedId}`;
+    } else {
+      // Direct column match (existing behavior)
+      filterString = `${field}:${value}`;
+    }
+
     const result = service.listEntities(entity, {
-      filter: `${field}:${value}`,
+      filter: filterString,
       limit: 50
     }, req.correlationId);
 

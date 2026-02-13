@@ -147,10 +147,15 @@ module.exports = function() {
       }
 
       const db = getDatabase();
-      const { sort, order, filter, limit, offset } = req.query;
+      const { sort, order, filter, field, value, limit, offset } = req.query;
+
+      // Support ?field=X&value=Y as alternative to ?filter= (for external tools like HCL Leap)
+      const effectiveFilter = (field && value !== undefined)
+        ? `=${field}:${value}`
+        : filter;
 
       // Parse filter using shared FilterParser
-      const { conditions, params } = parseFilter(filter, {
+      const { conditions, params } = parseFilter(effectiveFilter, {
         // Resolve column by sqlAlias or label
         resolveColumn: (colName) => {
           if (colName === 'id') return { sqlName: 'id', jsType: 'number' };

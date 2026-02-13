@@ -197,12 +197,17 @@ router.get('/:entity/:id/lineage', validateEntity, (req, res, next) => {
 router.get('/:entity', validateEntity, (req, res, next) => {
   try {
     const { entity } = req.params;
-    const { sort, order, filter, limit, offset } = req.query;
+    const { sort, order, filter, field, value, limit, offset } = req.query;
+
+    // Support ?field=X&value=Y as alternative to ?filter= (for external tools like HCL Leap)
+    const effectiveFilter = (field && value !== undefined)
+      ? `${field}:${value}`
+      : filter;
 
     const options = {};
     if (sort) options.sort = sort;
     if (order) options.order = order;
-    if (filter) options.filter = filter;
+    if (effectiveFilter) options.filter = effectiveFilter;
     if (limit) options.limit = parseInt(limit, 10);
     if (offset) options.offset = parseInt(offset, 10);
 
