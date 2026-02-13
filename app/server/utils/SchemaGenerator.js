@@ -1319,8 +1319,15 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     const desc = attr.description || '';
     const example = attr.example || '';
 
-    // Determine if required (example is not 'null' and not marked [OPTIONAL])
-    const isRequired = example.toLowerCase() !== 'null' && name !== 'id' && !attr.optional;
+    // Determine if required:
+    // - example column is not 'null'
+    // - not the 'id' column
+    // - not marked [OPTIONAL]
+    // - not READONLY or computed (DAILY, CALCULATED, etc.) — these are system-managed
+    const isReadonly = /\[READONLY\]/i.test(desc);
+    const isComputed = /\[(DAILY|CALCULATED|IMMEDIATE|HOURLY|ON_DEMAND)[=\]]/i.test(desc);
+    const isRequired = example.toLowerCase() !== 'null' && name !== 'id' && !attr.optional
+      && !isReadonly && !isComputed;
 
     // Parse constraints from description
     const constraints = parseConstraints(desc);

@@ -591,6 +591,11 @@ if (authEnabled) {
 }
 app.use(require('./server/routers/schema.router')(cfg));
 
+// Global error handler for all API routes (catches errors from IntegrationRouter,
+// meta endpoint, schema router, etc. that are mounted after the backend's errorHandler)
+const { errorHandler } = require('./server/middleware');
+app.use('/api', errorHandler);
+
 // =============================================================================
 // 8. START SERVER
 // =============================================================================
