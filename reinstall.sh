@@ -70,10 +70,13 @@ sleep 2
 # ============================================================
 echo "=== Stopping application ==="
 
-# Try PM2 stop with all known names (best effort, may fail silently)
-echo "Attempting PM2 stop all..."
-pm2 stop all 2>&1
-echo "pm2 stop all exit code: $?"
+# Stop only OUR process (by configured name + legacy name). Never "pm2 stop all"!
+echo "Stopping PM2 process '$PM2_NAME'..."
+pm2 stop "$PM2_NAME" 2>&1
+echo "pm2 stop $PM2_NAME exit code: $?"
+echo "Stopping PM2 process 'aide-rap-irma' (legacy)..."
+pm2 stop "aide-rap-irma" 2>&1
+echo "pm2 stop aide-rap-irma exit code: $?"
 
 # Wait for port to become free (up to 15 seconds)
 echo "Waiting for port $PORT to become free..."
