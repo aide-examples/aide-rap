@@ -59,8 +59,8 @@ function parseAreasFromTable(mdContent) {
         if (linkMatch) {
           entityName = linkMatch[1].trim();
         }
-        // Only accept PascalCase names (entity names)
-        if (entityName && /^[A-Z][a-zA-Z0-9]*$/.test(entityName)) {
+        // Accept PascalCase names (entities) and names with hyphens/underscores (systems)
+        if (entityName && /^[A-Z][a-zA-Z0-9_-]*$/.test(entityName)) {
           classToArea[entityName] = areaKey;
         }
       }

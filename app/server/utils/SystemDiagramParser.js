@@ -187,6 +187,8 @@ function systemsToModel(parsed) {
       name: flow.name,
       type: flow.receivers[0]?.system || '',
       description: flow.description || '',
+      format: flow.receivers[0]?.format || '',
+      transport: flow.receivers[0]?.transport || '',
       optional: false,
       ui: {}
     }));

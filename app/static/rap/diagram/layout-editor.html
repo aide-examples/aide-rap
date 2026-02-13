@@ -39,11 +39,13 @@
     <!-- Diagram modules -->
     <script src="static/rap/diagram/DiagramConstants.js"></script>
     <script src="static/rap/diagram/ConnectionCalculator.js"></script>
+    <script src="static/rap/diagram/FlowIcons.js"></script>
 
     <script>
         // Create local references to shared modules (loaded via <script> tags above)
         const DiagramConstants = window.DiagramConstants;
         const ConnectionCalculator = window.ConnectionCalculator;
+        const FlowIcons = window.FlowIcons;
 
         // Import constants from shared module
         const { BOX_WIDTH, BOX_HEIGHT_COMPACT, COMPACT_WIDTH, HEADER_HEIGHT, BOX_PADDING,
@@ -123,6 +125,49 @@
             return lines;
         }
 
+        /**
+         * Compute per-attribute vertical slot layout.
+         * For system diagrams: wraps flow names, variable slot heights.
+         * For DataModel: uniform slot heights (ATTR_LINE_HEIGHT each).
+         * @param {Array} attrs - Visible attributes array
+         * @param {number} boxW - Box width for text wrapping
+         * @param {boolean} wrap - Whether to wrap attribute names
+         * @returns {{ centers: number[], slotHeights: number[], totalAttrHeight: number }}
+         *   centers[i] = Y offset from attributes section start to slot center
+         */
+        // Space reserved for flow icons (format + transport): 2×12px icons + 2px gap + 4px margin
+        const FLOW_ICON_SPACE = 30;
+        // Flow names in system diagrams use a slightly larger font than DataModel attributes
+        const FONT_SIZE_FLOW = 11;
+
+        function getAttrYCenters(attrs, boxW, wrap) {
+            // Reserve icon space if any attr has format/transport
+            const hasIcons = wrap && attrs.some(a => a.format || a.transport);
+            const iconReserve = hasIcons ? FLOW_ICON_SPACE : 0;
+            const textWidth = boxW - 20 - iconReserve;
+            const centers = [];
+            const slotHeights = [];
+            let cumY = 0;
+
+            const fontSize = wrap ? FONT_SIZE_FLOW : FONT_SIZE_ATTR;
+            for (const attr of attrs) {
+                let slotH;
+                if (wrap) {
+                    const lines = wrapText(attr.name, textWidth, fontSize, FONT_FAMILY);
+                    // Add vertical padding for multi-line entries so text doesn't touch the next slot
+                    const padding = lines.length > 1 ? 8 : 0;
+                    slotH = Math.max(lines.length * ATTR_LINE_HEIGHT_DEFAULT + padding, ATTR_LINE_HEIGHT);
+                } else {
+                    slotH = ATTR_LINE_HEIGHT;
+                }
+                centers.push(cumY + slotH / 2);
+                slotHeights.push(slotH);
+                cumY += slotH;
+            }
+
+            return { centers, slotHeights, totalAttrHeight: cumY };
+        }
+
         // Calculate box width based on content
         function getBoxWidth(className) {
             const classDef = model.classes[className] || {};
@@ -142,6 +187,12 @@
             }
 
             if (showDetailed) {
+                // System diagrams: fixed width, flow names wrap (+icon space if needed)
+                if (model.docType === 'systems') {
+                    const attrs = (model.classes[className] || {}).attributes || [];
+                    const hasIcons = attrs.some(a => a.format || a.transport);
+                    return Math.max(nameWidth, COMPACT_WIDTH) + (hasIcons ? FLOW_ICON_SPACE : 0);
+                }
                 return calcDetailedWidth();
             }
 
@@ -164,13 +215,15 @@
         // Calculate box height based on content
         function getBoxHeight(className) {
             const attrs = getVisibleAttributes(className);
-            const attrHeight = HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+            const isSystem = model.docType === 'systems';
+            const w = getBoxWidth(className);
+            const { totalAttrHeight } = getAttrYCenters(attrs, w, isSystem);
+            const attrHeight = HEADER_HEIGHT + totalAttrHeight + BOX_PADDING;
 
             if (!showDetailed) {
                 // Compact: height grows to fit wrapped description text
                 const description = (model.classes[className] || {}).description || '';
                 if (description) {
-                    const w = getBoxWidth(className);
                     const textPadding = 20;
                     const lines = wrapText(description, w - textPadding, FONT_SIZE_COMPACT, FONT_FAMILY);
                     const descHeight = HEADER_HEIGHT + lines.length * ATTR_LINE_HEIGHT_DEFAULT + BOX_PADDING;
@@ -392,6 +445,17 @@
             drawConnections(svg, positions);
         }
 
+        // Compute absolute attrY for system diagrams (wrapped slots), or undefined for DataModel
+        function computeAttrY(className, attrIdx, positions) {
+            if (model.docType !== 'systems') return undefined;
+            const attrs = getVisibleAttributes(className);
+            const w = getBoxWidth(className);
+            const { centers } = getAttrYCenters(attrs, w, true);
+            if (attrIdx >= centers.length) return undefined;
+            const pos = positions[className] || { x: 50, y: 50 };
+            return pos.y + HEADER_HEIGHT + BOX_PADDING / 2 + centers[attrIdx];
+        }
+
         // Get connection points for a relationship (using shared module)
         function getConnectionPoint(fromClass, toClass, attrIndex, positions) {
             const fromPos = positions[fromClass] || { x: 50, y: 50 };
@@ -400,9 +464,10 @@
             const toHeight = getBoxHeight(toClass);
             const fromWidth = getBoxWidth(fromClass);
             const toWidth = getBoxWidth(toClass);
+            const attrY = computeAttrY(fromClass, attrIndex, positions);
 
             return ConnectionCalculator.getConnectionPoint(
-                fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed, fromWidth, toWidth
+                fromPos, toPos, fromHeight, toHeight, attrIndex, showDetailed, fromWidth, toWidth, attrY
             );
         }
 
@@ -440,7 +505,8 @@
                 if (fromClass === toClass) {
                     const bw = getBoxWidth(fromClass);
                     const bh = getBoxHeight(fromClass);
-                    const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, bw, bh, attrIdx);
+                    const selfAttrY = computeAttrY(fromClass, attrIdx, positions);
+                    const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, bw, bh, attrIdx, selfAttrY);
                     pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
                 } else {
                     const conn = getConnectionPoint(fromClass, toClass, attrIdx, positions);
@@ -486,6 +552,8 @@
             const entityNames = Object.keys(model.classes);
             const layoutCtx = buildLayoutContext();
 
+            const isSystem = model.docType === 'systems';
+
             // Helper to get box width for a class (matches getBoxWidth logic)
             function boxWidth(className) {
                 const classDef = model.classes[className] || {};
@@ -496,7 +564,14 @@
                     return Math.max(nameWidth, COMPACT_WIDTH);
                 }
 
-                // Detailed mode width
+                // System diagrams: fixed width, flow names wrap (+icon space if needed)
+                if (isSystem) {
+                    const attrs = (model.classes[className] || {}).attributes || [];
+                    const hasIcons = attrs.some(a => a.format || a.transport);
+                    return Math.max(nameWidth, COMPACT_WIDTH) + (hasIcons ? FLOW_ICON_SPACE : 0);
+                }
+
+                // Detailed mode width for DataModel
                 if (!fitToContent) return BOX_WIDTH;
                 const attrs = ConnectionCalculator.getVisibleAttributes(
                     (model.classes[className] || {}).attributes, className, layoutCtx
@@ -509,18 +584,24 @@
                 return Math.max(BOX_WIDTH * 0.6, maxWidth + 20);
             }
 
-            // Helper to get box height for a class
-            function boxHeight(className) {
-                const attrs = ConnectionCalculator.getVisibleAttributes(
+            // Helper to get visible attrs for a class
+            function svgAttrs(className) {
+                return ConnectionCalculator.getVisibleAttributes(
                     (model.classes[className] || {}).attributes, className, layoutCtx
                 );
-                const attrHeight = HEADER_HEIGHT + attrs.length * ATTR_LINE_HEIGHT + BOX_PADDING;
+            }
+
+            // Helper to get box height for a class
+            function boxHeight(className) {
+                const attrs = svgAttrs(className);
+                const w = boxWidth(className);
+                const { totalAttrHeight } = getAttrYCenters(attrs, w, isSystem);
+                const attrHeight = HEADER_HEIGHT + totalAttrHeight + BOX_PADDING;
 
                 if (!detailed) {
                     // Compact: height grows to fit wrapped description text
                     const description = (model.classes[className] || {}).description || '';
                     if (description) {
-                        const w = boxWidth(className);
                         const textPadding = 20;
                         const lines = wrapText(description, w - textPadding, FONT_SIZE_COMPACT, FONT_FAMILY);
                         const descHeight = HEADER_HEIGHT + lines.length * ATTR_LINE_HEIGHT_DEFAULT + BOX_PADDING;
@@ -545,14 +626,16 @@
             }
 
             // Calculate legend height
-            // Left: areas, Right: type categories (aggregates, enums, patterns)
+            // Left: areas, Right: type categories or icon legend (system diagrams)
             const numAreas = Object.keys(model.areas || {}).length;
             const globalTypesObj = model.globalTypes || {};
             const hasEnums = Object.values(globalTypesObj).some(t => t.kind === 'enum');
             const hasAggregates = Object.values(globalTypesObj).some(t => t.kind === 'aggregate');
             const hasPatterns = Object.values(globalTypesObj).some(t => t.kind === 'pattern');
-            const numTypeCategories = (hasEnums ? 1 : 0) + (hasAggregates ? 1 : 0) + (hasPatterns ? 1 : 0);
-            const legendRows = Math.max(numAreas, numTypeCategories);
+            const numRightRows = isSystem
+                ? 2  // format + transport icon rows
+                : (hasEnums ? 1 : 0) + (hasAggregates ? 1 : 0) + (hasPatterns ? 1 : 0);
+            const legendRows = Math.max(numAreas, numRightRows);
             const legendHeight = 30 + legendRows * 20 + 20; // header + rows + bottom padding
 
             const width = maxX;
@@ -566,21 +649,30 @@
                 '    </marker>'
             ];
 
-            // ClipPath defs for compact mode (header background clipping)
-            if (!detailed) {
-                for (const className of entityNames) {
-                    if (!(className in positions)) continue;
-                    const pos = positions[className];
-                    const h = boxHeight(className);
-                    const w = widths[className];
-                    parts.push(`    <clipPath id="clip-${escapeXml(className)}"><rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" rx="3"/></clipPath>`);
-                }
+            // ClipPath defs for header background clipping (rounded box corners)
+            for (const className of entityNames) {
+                if (!(className in positions)) continue;
+                const pos = positions[className];
+                const h = boxHeight(className);
+                const w = widths[className];
+                parts.push(`    <clipPath id="clip-${escapeXml(className)}"><rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" rx="3"/></clipPath>`);
             }
 
             parts.push('  </defs>');
             parts.push(`  <rect width="${width}" height="${height}" fill="white"/>`);
             parts.push('');
             parts.push('  <!-- Relationships -->');
+
+            // Compute absolute attrY for system diagrams (wrapped slots)
+            function svgAttrY(className, attrIdx) {
+                if (!isSystem) return undefined;
+                const attrs = svgAttrs(className);
+                const w = widths[className];
+                const { centers } = getAttrYCenters(attrs, w, true);
+                if (attrIdx >= centers.length) return undefined;
+                const pos = positions[className] || { x: 50, y: 50 };
+                return pos.y + HEADER_HEIGHT + BOX_PADDING / 2 + centers[attrIdx];
+            }
 
             // Helper: render a single SVG connection path
             function svgConnectionPath(fromClass, toClass, attrIdx, attr) {
@@ -590,9 +682,10 @@
                 const dashAttr = isReadonly
                     ? ` stroke-dasharray="${READONLY_DASH}"`
                     : (isOptional ? ` stroke-dasharray="${OPTIONAL_DASH}"` : '');
+                const attrY = svgAttrY(fromClass, attrIdx);
 
                 if (fromClass === toClass) {
-                    const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[fromClass], boxHeight(fromClass), attrIdx);
+                    const arc = ConnectionCalculator.getSelfReferenceArc(fromPos, widths[fromClass], boxHeight(fromClass), attrIdx, attrY);
                     const pathD = ConnectionCalculator.getSelfReferenceArcPath(arc);
                     parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
                 } else {
@@ -601,7 +694,7 @@
                     const toHeight = boxHeight(toClass);
                     const conn = ConnectionCalculator.getConnectionPoint(
                         fromPos, toPos, fromHeight, toHeight, attrIdx, detailed,
-                        widths[fromClass], widths[toClass]
+                        widths[fromClass], widths[toClass], attrY
                     );
                     const pathD = ConnectionCalculator.getNormalConnectionPath(conn);
                     parts.push(`  <path d="${pathD}" fill="none" stroke="${STROKE_COLOR}" stroke-width="1" marker-end="url(#arrowhead)"${dashAttr}/>`);
@@ -646,14 +739,10 @@
                 const h = boxHeight(className);
                 const w = widths[className];
 
-                if (detailed) {
-                    // Detailed mode: full area color background
-                    parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" fill="${color}" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
-                } else {
-                    // Compact mode: white body + colored header (clipped to rounded box)
-                    parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" fill="white" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
-                    parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${HEADER_HEIGHT}" fill="${color}" clip-path="url(#clip-${escapeXml(className)})"/>`);
-                }
+                // White body + colored header (clipped to rounded box corners)
+                parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${h}" fill="white" stroke="${STROKE_COLOR}" stroke-width="${STROKE_WIDTH}" rx="3"/>`);
+                parts.push(`  <rect x="${pos.x}" y="${pos.y}" width="${w}" height="${HEADER_HEIGHT}" fill="${color}" clip-path="url(#clip-${escapeXml(className)})"/>`);
+
 
                 // Class name (centered in header)
                 const textY = pos.y + HEADER_HEIGHT / 2 + 4;
@@ -665,11 +754,12 @@
 
                 if (detailed) {
                     // Detailed mode: attributes (FK attrs as bold name, others as name: type)
-                    const visibleAttrs = ConnectionCalculator.getVisibleAttributes(classDef.attributes, className, layoutCtx);
+                    const visibleAttrs = svgAttrs(className);
                     const maxTextWidth = w - 10; // 5px padding on each side
+                    const slotInfo = isSystem ? getAttrYCenters(visibleAttrs, w, true) : null;
+                    let slotCumY = 0;
                     for (let i = 0; i < visibleAttrs.length; i++) {
                         const attr = visibleAttrs[i];
-                        const attrY = sepY + BOX_PADDING / 2 + (i + 0.5) * ATTR_LINE_HEIGHT + FONT_SIZE_ATTR * 0.35;
                         const cleanType = ConnectionCalculator.extractBaseType(attr.type);
 
                         // Determine styling based on schema ui flags
@@ -678,28 +768,59 @@
                         const isLabel2 = attr.ui?.label2;
                         const fillColor = isReadonly ? READONLY_COLOR : '#000';
 
-                        let displayText;
-                        if (entityNames.includes(cleanType)) {
-                            // FK attribute: bold name only
-                            displayText = fitToContent ? attr.name : truncateText(attr.name, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold" fill="${fillColor}">${escapeXml(displayText)}</text>`);
-                        } else if (ConnectionCalculator.isAggregateType(cleanType)) {
-                            // Aggregate type: «name» notation
-                            const fullText = `«${attr.name}»`;
-                            displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="${fillColor}">${escapeXml(displayText)}</text>`);
-                        } else {
-                            const fullText = `${attr.name}: ${cleanType}`;
-                            displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
-                            parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="${fillColor}">${escapeXml(displayText)}</text>`);
-                        }
+                        if (isSystem && slotInfo) {
+                            // System diagrams: wrap flow names within slot
+                            const slotH = slotInfo.slotHeights[i];
+                            const hasAttrIcons = attr.format || attr.transport;
+                            const iconReserve = hasAttrIcons ? FLOW_ICON_SPACE : 0;
+                            const wrappedLines = wrapText(attr.name, maxTextWidth - iconReserve, FONT_SIZE_FLOW, FONT_FAMILY);
+                            const textBlockH = wrappedLines.length * ATTR_LINE_HEIGHT_DEFAULT;
+                            const textStartY = sepY + BOX_PADDING / 2 + slotCumY + (slotH - textBlockH) / 2;
 
-                        // Add underline for LABEL/LABEL2
-                        if (isLabel || isLabel2) {
-                            const textWidth = measureText(displayText, FONT_SIZE_ATTR, FONT_FAMILY);
-                            const underlineY = attrY + 2;
-                            const dashAttr = isLabel2 ? ' stroke-dasharray="3,2"' : '';
-                            parts.push(`  <line x1="${pos.x + 5}" y1="${underlineY}" x2="${pos.x + 5 + textWidth}" y2="${underlineY}" stroke="${fillColor}" stroke-width="1"${dashAttr}/>`);
+                            for (let j = 0; j < wrappedLines.length; j++) {
+                                const lineY = textStartY + (j + 0.5) * ATTR_LINE_HEIGHT_DEFAULT + FONT_SIZE_FLOW * 0.35;
+                                const weight = entityNames.includes(cleanType) ? ' font-weight="bold"' : '';
+                                parts.push(`  <text x="${pos.x + 5}" y="${lineY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_FLOW}"${weight} fill="${fillColor}">${escapeXml(wrappedLines[j])}</text>`);
+                            }
+
+                            // Flow icons at right edge of box, vertically centered in slot
+                            if (hasAttrIcons && FlowIcons) {
+                                const slotCenterY = sepY + BOX_PADDING / 2 + slotCumY + slotH / 2;
+                                let iconX = pos.x + w - 5; // right edge minus padding
+                                if (attr.transport) {
+                                    const markup = FlowIcons.toSVGMarkup(attr.transport, iconX - 12, slotCenterY - 6, 12);
+                                    if (markup) { parts.push('  ' + markup); iconX -= 14; }
+                                }
+                                if (attr.format) {
+                                    const markup = FlowIcons.toSVGMarkup(attr.format, iconX - 12, slotCenterY - 6, 12);
+                                    if (markup) parts.push('  ' + markup);
+                                }
+                            }
+                            slotCumY += slotH;
+                        } else {
+                            // DataModel: single-line attributes
+                            const attrY = sepY + BOX_PADDING / 2 + (i + 0.5) * ATTR_LINE_HEIGHT + FONT_SIZE_ATTR * 0.35;
+                            let displayText;
+                            if (entityNames.includes(cleanType)) {
+                                displayText = fitToContent ? attr.name : truncateText(attr.name, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                                parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" font-weight="bold" fill="${fillColor}">${escapeXml(displayText)}</text>`);
+                            } else if (ConnectionCalculator.isAggregateType(cleanType)) {
+                                const fullText = `«${attr.name}»`;
+                                displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                                parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="${fillColor}">${escapeXml(displayText)}</text>`);
+                            } else {
+                                const fullText = `${attr.name}: ${cleanType}`;
+                                displayText = fitToContent ? fullText : truncateText(fullText, maxTextWidth, FONT_SIZE_ATTR, FONT_FAMILY);
+                                parts.push(`  <text x="${pos.x + 5}" y="${attrY}" font-family="${FONT_FAMILY}" font-size="${FONT_SIZE_ATTR}" fill="${fillColor}">${escapeXml(displayText)}</text>`);
+                            }
+
+                            // Add underline for LABEL/LABEL2 (DataModel only)
+                            if (isLabel || isLabel2) {
+                                const textWidth = measureText(displayText, FONT_SIZE_ATTR, FONT_FAMILY);
+                                const underlineY = attrY + 2;
+                                const dashAttr = isLabel2 ? ' stroke-dasharray="3,2"' : '';
+                                parts.push(`  <line x1="${pos.x + 5}" y1="${underlineY}" x2="${pos.x + 5 + textWidth}" y2="${underlineY}" stroke="${fillColor}" stroke-width="1"${dashAttr}/>`);
+                            }
                         }
                     }
                 } else {
@@ -773,44 +894,95 @@
 
             // Headers
             parts.push(`  <text x="${legendX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Areas:</text>`);
-            parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Types:</text>`);
-            legendY += 20;
 
-            // Build left (areas) and right (type categories) rows
+            // Right column: Types for DataModel, Icons for System diagrams
             const areas = Object.entries(model.areas || {});
-            const typeCategories = [];
-            if (aggregateTypes.length > 0) typeCategories.push({ label: 'Aggregates', types: aggregateTypes });
-            if (enumTypes.length > 0) typeCategories.push({ label: 'Enums', types: enumTypes });
-            if (patternTypes.length > 0) typeCategories.push({ label: 'Patterns', types: patternTypes });
 
-            const maxRows = Math.max(areas.length, typeCategories.length);
+            if (isSystem && detailed) {
+                // System diagrams: show format + transport icon legend
+                parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Symbols:</text>`);
+                legendY += 20;
 
-            for (let row = 0; row < maxRows; row++) {
-                // Left: Area (if exists for this row)
-                if (row < areas.length) {
-                    const [areaId, areaDef] = areas[row];
-                    const areaColor = areaDef.color || '#FFFFFF';
-                    const areaName = areaDef.name || areaId;
-                    parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
-                    parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
-                }
-
-                // Right: Type category (if exists for this row)
-                if (row < typeCategories.length) {
-                    const cat = typeCategories[row];
-                    parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="10" font-weight="bold">${cat.label}:</text>`);
-
-                    let typeX = typesStartX + measureText(cat.label + ':', 10, FONT_FAMILY) + 8;
-                    for (const typeName of cat.types) {
-                        const textWidth = measureText(typeName, 9, FONT_FAMILY);
-                        const typeColor = getTypeColor(typeName);
-                        parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${typeColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
-                        parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
-                        typeX += textWidth + 6 + typeSpacing;
+                // Collect used format/transport keywords from all flows
+                const usedFormats = new Set();
+                const usedTransports = new Set();
+                for (const classDef of Object.values(model.classes || {})) {
+                    for (const attr of (classDef.attributes || [])) {
+                        if (attr.format) usedFormats.add(attr.format.toUpperCase().trim());
+                        if (attr.transport) usedTransports.add(attr.transport.toUpperCase().trim());
                     }
                 }
 
+                // Build icon rows: format first, then transport
+                const iconRows = [];
+                if (usedFormats.size > 0) iconRows.push({ label: 'Format', keywords: [...usedFormats] });
+                if (usedTransports.size > 0) iconRows.push({ label: 'Transport', keywords: [...usedTransports] });
+
+                const maxRows = Math.max(areas.length, iconRows.length);
+
+                for (let row = 0; row < maxRows; row++) {
+                    if (row < areas.length) {
+                        const [areaId, areaDef] = areas[row];
+                        const areaColor = areaDef.color || '#FFFFFF';
+                        const areaName = areaDef.name || areaId;
+                        parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+                        parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
+                    }
+
+                    if (row < iconRows.length) {
+                        const iconRow = iconRows[row];
+                        parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="10" font-weight="bold">${iconRow.label}:</text>`);
+                        let iconX = typesStartX + measureText(iconRow.label + ':', 10, FONT_FAMILY) + 10;
+                        for (const kw of iconRow.keywords) {
+                            const markup = FlowIcons.toSVGMarkup(kw, iconX, legendY - 10, 12);
+                            if (markup) {
+                                parts.push('  ' + markup);
+                                iconX += 14;
+                            }
+                            parts.push(`  <text x="${iconX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(kw)}</text>`);
+                            iconX += measureText(kw, 9, FONT_FAMILY) + 8;
+                        }
+                    }
+
+                    legendY += 20;
+                }
+            } else {
+                // DataModel: show type categories (aggregates, enums, patterns)
+                parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="12" font-weight="bold">Types:</text>`);
                 legendY += 20;
+
+                const typeCategories = [];
+                if (aggregateTypes.length > 0) typeCategories.push({ label: 'Aggregates', types: aggregateTypes });
+                if (enumTypes.length > 0) typeCategories.push({ label: 'Enums', types: enumTypes });
+                if (patternTypes.length > 0) typeCategories.push({ label: 'Patterns', types: patternTypes });
+
+                const maxRows = Math.max(areas.length, typeCategories.length);
+
+                for (let row = 0; row < maxRows; row++) {
+                    if (row < areas.length) {
+                        const [areaId, areaDef] = areas[row];
+                        const areaColor = areaDef.color || '#FFFFFF';
+                        const areaName = areaDef.name || areaId;
+                        parts.push(`  <rect x="${legendX}" y="${legendY - 10}" width="14" height="14" fill="${areaColor}" stroke="${STROKE_COLOR}" stroke-width="1"/>`);
+                        parts.push(`  <text x="${legendX + 20}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="11">${escapeXml(areaName)}</text>`);
+                    }
+
+                    if (row < typeCategories.length) {
+                        const cat = typeCategories[row];
+                        parts.push(`  <text x="${typesStartX}" y="${legendY}" font-family="${FONT_FAMILY}" font-size="10" font-weight="bold">${cat.label}:</text>`);
+
+                        let typeX = typesStartX + measureText(cat.label + ':', 10, FONT_FAMILY) + 8;
+                        for (const typeName of cat.types) {
+                            const textWidth = measureText(typeName, 9, FONT_FAMILY);
+                            const typeColor = getTypeColor(typeName);
+                            parts.push(`  <rect x="${typeX}" y="${legendY - 9}" width="${textWidth + 6}" height="${typeBoxHeight + 2}" fill="${typeColor}" stroke="${STROKE_COLOR}" stroke-width="0.5" rx="2"/>`);
+                            parts.push(`  <text x="${typeX + 3}" y="${legendY - 1}" font-family="${FONT_FAMILY}" font-size="9">${escapeXml(typeName)}</text>`);
+                            typeX += textWidth + 6 + typeSpacing;
+                        }
+                    }
+
+                    legendY += 20;
+                }
             }
 
             // Watermark in bottom right corner (aligned with legend start)
@@ -819,8 +991,8 @@
             const wmX = width - 15;
             const wmYBase = entitiesMaxY + 50; // Same as legend start
             const today = new Date().toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
-            parts.push(`  <text x="${wmX}" y="${wmYBase}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Artificial Intelligence for Development Engineers <tspan fill="#0066cc">(http://github.com/aide-examples)</tspan></text>`);
-            parts.push(`  <text x="${wmX}" y="${wmYBase + 14}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Rapid Application Prototype</text>`);
+            parts.push(`  <text x="${wmX}" y="${wmYBase}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Artificial Intelligence for Development Engineers</text>`);
+            parts.push(`  <text x="${wmX}" y="${wmYBase + 14}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">Rapid Application Prototype <tspan fill="#0066cc">(http://github.com/aide-examples)</tspan></text>`);
             parts.push(`  <text x="${wmX}" y="${wmYBase + 28}" text-anchor="end" font-family="${FONT_FAMILY}" font-size="11" fill="#555">${today}</text>`);
 
             parts.push('</svg>');
@@ -838,52 +1010,88 @@
             box.style.height = getBoxHeight(className) + 'px';
             box.style.width = getBoxWidth(className) + 'px';
 
-            if (showDetailed) {
-                // Detailed mode: full area color background
-                box.style.backgroundColor = getColor(className);
-            }
-
             // Header
             const header = document.createElement('div');
             header.className = 'header';
             header.textContent = className;
-            if (!showDetailed) {
-                // Compact mode: only header has area color
-                header.style.backgroundColor = getColor(className);
-            }
+            header.style.backgroundColor = getColor(className);
             box.appendChild(header);
 
             if (showDetailed) {
                 // Detailed view: attributes (FK attrs shown as bold name only)
                 const attrs = getVisibleAttributes(className);
                 if (attrs.length > 0) {
+                    const isSystem = model.docType === 'systems';
+                    const w = getBoxWidth(className);
+                    const slotInfo = isSystem ? getAttrYCenters(attrs, w, true) : null;
                     const attrsDiv = document.createElement('div');
                     attrsDiv.className = 'attributes';
-                    attrs.forEach(attr => {
+                    attrs.forEach((attr, idx) => {
                         const line = document.createElement('div');
                         line.className = 'attr-line';
-                        line.style.lineHeight = ATTR_LINE_HEIGHT + 'px';
                         const baseType = ConnectionCalculator.extractBaseType(attr.type);
-                        if (entityNames.includes(baseType)) {
-                            // FK attribute: bold name only
-                            line.textContent = attr.name;
-                            line.style.fontWeight = 'bold';
-                        } else if (ConnectionCalculator.isAggregateType(baseType)) {
-                            // Aggregate type: «name» notation
-                            line.textContent = `«${attr.name}»`;
+
+                        if (isSystem) {
+                            // System diagrams: wrap flow names, variable slot height, larger font
+                            line.style.height = slotInfo.slotHeights[idx] + 'px';
+                            line.style.lineHeight = ATTR_LINE_HEIGHT_DEFAULT + 'px';
+                            line.style.fontSize = FONT_SIZE_FLOW + 'px';
+                            line.style.whiteSpace = 'normal';
+                            line.style.display = 'flex';
+                            line.style.alignItems = 'center';
+
+                            // Text in a flex child (allows icons on the right)
+                            const textSpan = document.createElement('span');
+                            textSpan.textContent = attr.name;
+                            textSpan.style.flex = '1';
+                            textSpan.style.minWidth = '0';
+                            if (entityNames.includes(baseType)) {
+                                textSpan.style.fontWeight = 'bold';
+                            }
+                            line.appendChild(textSpan);
+
+                            // Flow icons (format + transport) at right edge
+                            if (attr.format || attr.transport) {
+                                const iconWrap = document.createElement('span');
+                                iconWrap.style.display = 'flex';
+                                iconWrap.style.alignItems = 'center';
+                                iconWrap.style.gap = '2px';
+                                iconWrap.style.marginLeft = '4px';
+                                iconWrap.style.flexShrink = '0';
+                                if (attr.format) {
+                                    const el = FlowIcons.createSVGElement(attr.format);
+                                    if (el) iconWrap.appendChild(el);
+                                }
+                                if (attr.transport) {
+                                    const el = FlowIcons.createSVGElement(attr.transport);
+                                    if (el) iconWrap.appendChild(el);
+                                }
+                                if (iconWrap.children.length > 0) {
+                                    line.appendChild(iconWrap);
+                                }
+                            }
                         } else {
-                            line.textContent = `${attr.name}: ${baseType}`;
-                        }
-                        // Apply marker styles from schema ui flags
-                        if (attr.ui?.readonly) {
-                            line.style.color = READONLY_COLOR;
-                        }
-                        if (attr.ui?.label && !attr.ui?.label2) {
-                            line.style.textDecoration = 'underline';
-                            line.style.textDecorationStyle = LABEL_UNDERLINE;
-                        } else if (attr.ui?.label2) {
-                            line.style.textDecoration = 'underline';
-                            line.style.textDecorationStyle = LABEL2_UNDERLINE;
+                            // DataModel: single-line attributes
+                            line.style.lineHeight = ATTR_LINE_HEIGHT + 'px';
+                            if (entityNames.includes(baseType)) {
+                                line.textContent = attr.name;
+                                line.style.fontWeight = 'bold';
+                            } else if (ConnectionCalculator.isAggregateType(baseType)) {
+                                line.textContent = `«${attr.name}»`;
+                            } else {
+                                line.textContent = `${attr.name}: ${baseType}`;
+                            }
+                            // Apply marker styles from schema ui flags
+                            if (attr.ui?.readonly) {
+                                line.style.color = READONLY_COLOR;
+                            }
+                            if (attr.ui?.label && !attr.ui?.label2) {
+                                line.style.textDecoration = 'underline';
+                                line.style.textDecorationStyle = LABEL_UNDERLINE;
+                            } else if (attr.ui?.label2) {
+                                line.style.textDecoration = 'underline';
+                                line.style.textDecorationStyle = LABEL2_UNDERLINE;
+                            }
                         }
                         attrsDiv.appendChild(line);
                     });

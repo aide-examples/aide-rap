@@ -291,8 +291,8 @@ Description of what data is sent.
 
 | Receiver | Trigger | Format | Transport |
 |----------|---------|--------|-----------|
-| OtherSystem | daily 06:00 UTC | JSON | REST API |
-| ThirdSystem | on event | XML | SFTP |
+| OtherSystem | daily 06:00 UTC | JSON | API-SEND |
+| ThirdSystem | on event | XML | UPLOAD |
 
 ## Input
 
@@ -310,12 +310,46 @@ Description of what data is sent.
 - In the diagram: systems render as boxes, flows as attributes, receiver connections as lines
 - Lines from one flow can go in **both directions** (left and right) depending on receiver positions
 
+#### Format & Transport Icons
+
+In **detail view**, each flow name is followed by small icons showing the data **format** and **transport method**. The keywords come from the `Format` and `Transport` columns of the receiver table.
+
+**Perspective rule:** Keywords always describe the flow from the **data owner's** perspective – the system that defines the flow.
+
+**Format keywords** (what is sent):
+
+| Keyword | Description |
+|---------|-------------|
+| `JSON` | JSON data |
+| `XML` | XML document |
+| `XLSX` | Excel spreadsheet |
+| `CSV` | Comma-separated values |
+| `PDF` | PDF document |
+| `DOCX` | Word document |
+
+**Transport keywords** (how the data reaches the receiver):
+
+| Keyword | Initiative | Description |
+|---------|-----------|-------------|
+| `MAIL` | Ours | We send the data by email |
+| `API-SEND` | Ours | We push data via API call to the receiver |
+| `UPLOAD` | Ours | We place the data in the receiver's inbox (file transfer) |
+| `API-RESPONSE` | Theirs | The receiver requests data via API, we respond |
+| `DOWNLOAD` | Theirs | The receiver pulls the data from us (file transfer) |
+
+*"Ours"* = The data owner initiates the transfer.
+*"Theirs"* = The receiver initiates the transfer, we deliver.
+
+Icons are rendered as small SVGs (12×12 px) right-aligned in the flow slot. They appear in both the interactive canvas and the exported SVG. In **compact view**, flows are hidden, so no icons are shown.
+
+Icon definitions live in `app/static/rap/diagram/FlowIcons.js`. Static SVG files are in `app/static/icons/flow/`.
+
 **How it maps to the layout editor model:**
 
 | System concept | Layout model | Diagram |
 |----------------|-------------|---------|
 | System | class (box) | Colored box with area color |
-| Outgoing Flow | attribute | Flow name in box |
+| Outgoing Flow | attribute | Flow name in box + format/transport icons |
 | Flow → Receiver | relationship | Arrow from flow to receiver box |
 | Area | area | Background color grouping |
 
