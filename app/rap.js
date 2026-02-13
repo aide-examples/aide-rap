@@ -185,6 +185,9 @@ const server = new HttpServer({
 
 const app = server.getApp();
 
+// Store server reference on app for admin reinstall endpoint (server.stop())
+app._httpServer = server;
+
 // =============================================================================
 // 7a. AUTHENTICATION
 // =============================================================================

@@ -6,9 +6,9 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { execSync } = require('child_process');
 const logger = require('../utils/logger');
-const { reloadUserViews, getDatabasePath } = require('../config/database');
+const { reloadUserViews, getDatabasePath, getDatabase, closeDatabase } = require('../config/database');
 const ExternalQueryService = require('../services/ExternalQueryService');
 
 // aide-rap project root (parent of app/)
@@ -95,31 +95,80 @@ module.exports = function(systemConfig) {
 
   /**
    * POST /api/admin/reinstall
-   * Trigger server reinstall from uploaded ZIP package.
-   * Spawns reinstall.sh as detached process, then the server restarts via PM2.
+   * In-process reinstall: flush DB, unzip new code, npm ci, then exit.
+   * PM2 auto-restarts the process with the original arguments (--base-path etc.)
    */
   router.post('/api/admin/reinstall', (req, res) => {
-    const scriptPath = path.join(PROJECT_DIR, 'reinstall.sh');
-    const zipPath = path.join(path.dirname(PROJECT_DIR), 'aide-rap-latest.zip');
+    const parentDir = path.dirname(PROJECT_DIR);
+    const zipPath = path.join(parentDir, 'aide-rap-latest.zip');
+    const logPath = path.join(PROJECT_DIR, 'reinstall.log');
 
-    if (!fs.existsSync(scriptPath)) {
-      return res.status(404).json({ error: 'reinstall.sh not found on server' });
-    }
     if (!fs.existsSync(zipPath)) {
       return res.status(404).json({ error: 'No update package found (aide-rap-latest.zip)' });
     }
 
-    // Spawn detached child — survives when PM2 stops the Node process
-    const child = spawn('bash', [scriptPath], {
-      detached: true,
-      stdio: 'ignore'
-    });
-    child.unref();
-
     logger.warn('Reinstall initiated by admin', { user: req.user?.userId || req.user?.role });
+
+    // Send response while connection is still alive
     res.json({
       status: 'reinstalling',
-      message: 'Server will restart in ~10 seconds. Page will auto-reload.'
+      message: 'Server will restart in ~30 seconds. Page will auto-reload.'
+    });
+
+    // After response is flushed: do everything in-process, then exit
+    res.on('finish', () => {
+      // Log helper — writes to reinstall.log + app logger
+      const logLines = [];
+      const log = (msg) => {
+        const line = `[${new Date().toISOString()}] ${msg}`;
+        logLines.push(line);
+        logger.info(msg);
+      };
+
+      try {
+        log('=== Reinstall started ===');
+
+        // 1. Stop HTTP server (no more incoming requests)
+        const httpServer = req.app._httpServer;
+        if (httpServer) {
+          httpServer.stop();
+          log('HTTP server stopped');
+        }
+
+        // 2. Flush SQLite WAL to disk and close DB
+        const db = getDatabase();
+        if (db) {
+          db.pragma('wal_checkpoint(TRUNCATE)');
+          log('SQLite WAL checkpoint completed');
+        }
+        closeDatabase();
+        log('Database closed');
+
+        // 3. Unzip new code (overwrites everything except DB)
+        log('Unzipping...');
+        execSync(`unzip -o "${zipPath}"`, { cwd: parentDir, timeout: 60000 });
+        log('Unzip completed');
+
+        // 4. Install dependencies
+        log('Installing dependencies...');
+        execSync('npm ci --omit=dev', { cwd: PROJECT_DIR, timeout: 120000 });
+        log('Main dependencies installed');
+
+        const aideFrameDir = path.join(PROJECT_DIR, 'aide-frame', 'js', 'aide_frame');
+        if (fs.existsSync(path.join(aideFrameDir, 'package.json'))) {
+          execSync('npm ci --omit=dev', { cwd: aideFrameDir, timeout: 60000 });
+          log('aide-frame dependencies installed');
+        }
+
+        log('=== Reinstall completed — exiting for PM2 restart ===');
+        fs.writeFileSync(logPath, logLines.join('\n') + '\n');
+        process.exit(0);
+      } catch (err) {
+        log(`ERROR: ${err.message}`);
+        log('=== Reinstall FAILED ===');
+        fs.writeFileSync(logPath, logLines.join('\n') + '\n');
+        process.exit(1);
+      }
     });
   });
 

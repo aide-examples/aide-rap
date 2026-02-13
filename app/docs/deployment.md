@@ -65,44 +65,48 @@ For automated deployments, use the two-step process:
 **Step 1 — Local: Pack and upload**
 
 ```bash
-./deploy.sh                          # Upload ZIP only (keep existing server config)
-./deploy.sh --base-path /irma        # Upload ZIP + deploy.env with reverse proxy path
-./deploy.sh --port 18355 --system demo --base-path /demo   # Full customization
+./deploy.sh
 ```
 
-Options:
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--base-path <path>` | *(none)* | Base URL path for reverse proxy (e.g., `/irma`) |
-| `--port <port>` | `18354` | Application port |
-| `--pm2-name <name>` | `aide-irma` | PM2 process name |
-| `--system <name>` | `irma` | System name (subdirectory in systems/) |
-
-When options are provided, `deploy.sh` generates a `deploy.env` file and uploads it alongside the ZIP. This file lives **outside** the ZIP directory and survives unzip overwrites. If no options are given, only the ZIP is uploaded and any existing `deploy.env` on the server is preserved.
+This runs `pack.sh` to create the ZIP (resolving symlinks), then uploads it to the server via sftp.
 
 **Step 2 — Server: Re-Install via Admin UI**
 
-Open the Seed Manager in the web UI (admin role required) and click **⚠ Re-Install**. This:
+Open the Seed Manager in the web UI (admin role required) and click **⚠ Re-Install**. This runs entirely in-process:
 
-1. Checks that `aide-rap-latest.zip` exists on the server
-2. Spawns `reinstall.sh` as a detached process
-3. Reads `deploy.env` for runtime config (port, PM2 name, app args)
-4. Stops the application (port-based kill, not PM2 name-based)
-5. Unzips with full overwrite (code + database)
-6. Runs `npm ci` for dependencies
-7. Starts PM2 with fresh config (delete + start, not restart)
-8. Verifies the application is listening on the configured port
+1. Stops the HTTP server (no more incoming requests)
+2. Flushes SQLite WAL to disk and closes the database
+3. Unzips the new code (overwrites everything except the database)
+4. Runs `npm ci` for dependencies
+5. Calls `process.exit(0)` — PM2 auto-restarts with the original arguments
 
 The page auto-reloads after 15 seconds.
+
+**PM2 Setup (one-time, manual):**
+
+PM2 must be configured once on the server. It remembers the startup arguments across restarts:
+
+```bash
+pm2 start app/rap.js --name aide-irma -- -s irma --base-path /irma
+pm2 save
+```
+
+**Manual Recovery via SSH:**
+
+If the Admin UI is not reachable, use `reinstall.sh` directly:
+
+```bash
+./reinstall.sh [port]    # Default port: 18354
+```
+
+This unzips, installs dependencies, kills the process by port, and waits for PM2 to restart.
 
 **Files involved:**
 
 | File | Location | Purpose |
 |------|----------|---------|
-| `deploy.sh` | Local dev machine | Pack + sftp upload + deploy.env generation |
-| `deploy.env` | Server (parent dir) | Runtime config: port, PM2 name, app args |
-| `reinstall.sh` | Server (aide-rap root) | Stop → unzip → npm → PM2 start |
+| `deploy.sh` | Local dev machine | Pack + sftp upload |
+| `reinstall.sh` | Server (aide-rap root) | Manual recovery only |
 | `reinstall.log` | Server (aide-rap root) | Log of last reinstall |
 
 **Server directory layout:**
@@ -110,7 +114,6 @@ The page auto-reloads after 15 seconds.
 ```
 /var/www/vhosts/followthescore.org/
 ├── aide-rap-latest.zip          ← uploaded by deploy.sh
-├── deploy.env                   ← uploaded by deploy.sh (optional)
 └── aide-rap/                    ← installation directory
     ├── reinstall.sh
     ├── reinstall.log
