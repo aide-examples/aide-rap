@@ -6,7 +6,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ZIP_NAME="aide-rap-latest.zip"
 ZIP_PATH="/tmp/$ZIP_NAME"
-REMOTE_HOST="followthescore.org"
+REMOTE_HOST="root@followthescore.org"
 REMOTE_DIR="/var/www/vhosts/followthescore.org"
 
 echo "=== AIDE RAP Deploy ==="
