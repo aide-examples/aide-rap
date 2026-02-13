@@ -88,6 +88,31 @@ Two modes are supported:
 
 **Implicit NOT NULL filtering:** When the target field is a FK type (e.g., `latest_project: Project`), records where that FK is NULL are automatically excluded.
 
+#### 3. Tree Leaf Detection (IS_LEAF)
+
+| Syntax | Meaning |
+|--------|---------|
+| `IS_LEAF(fk_column)` | True when no record in the same table references this record via the self-FK |
+
+**Example:** `[DAILY=IS_LEAF(parent_type)]` → true for engine types with no sub-types
+
+```markdown
+| is_leaf | bool [DEFAULT=true] | Leaf node [READONLY] [DAILY=IS_LEAF(parent_type)] | true |
+```
+
+**Generated SQL:**
+```sql
+UPDATE engine_type
+SET is_leaf = (
+  CASE WHEN id NOT IN (
+    SELECT parent_type_id FROM engine_type WHERE parent_type_id IS NOT NULL
+  ) THEN 1 ELSE 0 END
+)
+WHERE is_leaf IS NOT (...)
+```
+
+**Use case:** Expose only leaf nodes via API filter (`?filter=is_leaf:1`) for external integrations that need concrete types, not category nodes.
+
 ### Path Navigation
 
 After the filter, a path through FK relationships follows:

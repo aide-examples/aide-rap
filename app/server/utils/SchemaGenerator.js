@@ -600,14 +600,27 @@ function parseMediaAnnotations(description) {
  * Condition can be:
  * - Boolean expression: exit_date=null OR exit_date>TODAY
  * - Aggregate function: MAX(end_date), MIN(start_date)
+ * - Tree leaf detection: IS_LEAF(fk_column) — true when no record references this via self-FK
  *
  * Examples:
  * - [DAILY=Registration[exit_date=null OR exit_date>TODAY].operator]
  * - [DAILY=EngineAllocation[MAX(end_date)].aircraft]
+ * - [DAILY=IS_LEAF(parent_type)]
  *
  * Returns: { schedule, sourceEntity, condition, targetField, aggregate?, aggregateField? }
+ *   or for IS_LEAF: { schedule, type: 'IS_LEAF', fkColumn }
  */
 function parseComputedAnnotation(description) {
+  // Match IS_LEAF(fk_column) — tree leaf detection (no children reference this record)
+  const leafMatch = description.match(/\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND|ONCHANGE)=IS_LEAF\((\w+)\)\]/i);
+  if (leafMatch) {
+    return {
+      schedule: leafMatch[1].toUpperCase(),
+      type: 'IS_LEAF',
+      fkColumn: leafMatch[2]
+    };
+  }
+
   // Match [SCHEDULE=Entity[condition].field]
   const match = description.match(/\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND|ONCHANGE)=(\w+)\[([^\]]+)\]\.(\w+)\]/i);
   if (!match) {

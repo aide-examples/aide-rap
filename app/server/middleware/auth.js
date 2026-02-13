@@ -8,6 +8,9 @@
  * Sets req.user = { role: 'admin'|'user'|'guest' } if valid
  */
 function authMiddleware(req, res, next) {
+    // If already authenticated (e.g. via API key), skip session check
+    if (req.user) return next();
+
     const session = req.signedCookies?.['rap-session'];
 
     if (!session) {

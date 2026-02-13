@@ -75,9 +75,10 @@ function conditionToSQL(condition, alias = '') {
  * Build SQL UPDATE statement for a computed field
  * Only updates rows where the value actually changes (avoids false "updated" counts)
  *
- * Supports two modes:
+ * Supports three modes:
  * 1. Condition mode: [exit_date=null OR exit_date>TODAY] → WHERE clause
  * 2. Aggregate mode: [MAX(end_date)] → ORDER BY clause (NULL = highest priority)
+ * 3. IS_LEAF mode: IS_LEAF(fk_column) → true when no record references this via self-FK
  *
  * @param {Object} field - { entity, column, rule }
  * @returns {string} SQL UPDATE statement
@@ -86,6 +87,18 @@ function buildUpdateSQL(field) {
   const { entity, column, rule } = field;
   const targetTable = entity.tableName;
   const targetColumn = column.name;
+
+  // IS_LEAF mode: boolean — true when no record in the same table references this via fk_column
+  if (rule.type === 'IS_LEAF') {
+    const fkColumnName = rule.fkColumn + '_id'; // parent_type → parent_type_id
+    const subquery = `CASE WHEN id NOT IN (
+      SELECT ${fkColumnName} FROM ${targetTable} WHERE ${fkColumnName} IS NOT NULL
+    ) THEN 1 ELSE 0 END`;
+
+    return `UPDATE ${targetTable}
+SET ${targetColumn} = (${subquery})
+WHERE ${targetColumn} IS NOT (${subquery})`;
+  }
 
   // Parse rule: sourceEntity, condition, targetField
   const sourceTable = toSnakeCase(rule.sourceEntity);
@@ -253,7 +266,9 @@ function getStatus() {
       entity: f.entity.className,
       column: f.column.name,
       schedule: f.rule.schedule,
-      rule: `${f.rule.sourceEntity}[${f.rule.condition}].${f.rule.targetField}`
+      rule: f.rule.type === 'IS_LEAF'
+        ? `IS_LEAF(${f.rule.fkColumn})`
+        : `${f.rule.sourceEntity}[${f.rule.condition}].${f.rule.targetField}`
     }))
   };
 }

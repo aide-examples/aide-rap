@@ -333,6 +333,9 @@ if (enabledEntitiesRaw.length > 0) {
         // All authenticated users (guest, user, admin) can READ data
         app.use('/api/entities', authMiddleware, requireRole('guest', 'user', 'admin'));
 
+        // Entity scope restriction for API key users
+        app.use('/api/entities/:entity', checkEntityScope);
+
         // Only user/admin can CREATE, UPDATE, DELETE (but allow export routes for all)
         app.use('/api/entities', (req, res, next) => {
             if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
