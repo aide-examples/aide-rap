@@ -166,6 +166,16 @@ if (obj.engine_id && obj.aircraft_id) {
 - Both `lookup()` and `exists()` return fallback values in the browser (`null` / `false`) — constraints using them are **server-only**
 - The cache is per validation batch: during imports, repeated lookups/exists checks for the same parameters are served from memory
 
+#### FK Dropdown Filtering via PAIRS
+
+When an entity has a `[PAIRS=...]` annotation linking two FK fields (e.g., `EngineTypeCompatibility` linking engine and aircraft types), the framework automatically provides **smart dropdown filtering** in forms:
+
+1. **Discovery**: `/api/meta` includes `fkDependencies` on the source entity, telling the client which FK fields are linked
+2. **Filtering**: When the user selects a value in one FK dropdown, the other is automatically re-filtered to show only compatible options via `GET /api/entities/:entity/fk-options/:targetField`
+3. **Backstop**: The `exists()` constraint still validates on save — even if filtering is bypassed (API, import)
+
+No additional configuration needed — the PAIRS annotation drives both the compatibility table and the dropdown filtering.
+
 ### Error Messages Section
 
 Define multilingual messages for custom constraint codes:

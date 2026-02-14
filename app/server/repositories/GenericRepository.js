@@ -64,6 +64,25 @@ function createExistsFn(db) {
 }
 
 /**
+ * Compute FK dependencies for an entity from PAIRS annotations.
+ * Scans all entities for PAIRS that reference entityName as sourceEntity.
+ * Returns bidirectional dependency pairs for client-side dropdown filtering.
+ */
+function computeFkDependencies(entityName) {
+  const schema = getSchema();
+  const deps = [];
+  for (const entity of Object.values(schema.entities)) {
+    if (!entity.pairs || entity.pairs.sourceEntity !== entityName) continue;
+    const fields = entity.pairs.chains.map(chain => chain[0] + '_id');
+    if (fields.length === 2) {
+      deps.push({ triggerField: fields[0], affectedField: fields[1], pairsEntity: entity.className });
+      deps.push({ triggerField: fields[1], affectedField: fields[0], pairsEntity: entity.className });
+    }
+  }
+  return deps;
+}
+
+/**
  * Initialize validation rules for an entity
  */
 function ensureValidationRules(entityName) {
@@ -183,6 +202,122 @@ function handleSqliteError(err, entityName, operation, data = {}) {
  * @param {string} entityName - Entity name (e.g., 'Aircraft')
  * @param {Object} options - { sort, order, filter, limit, offset }
  */
+/**
+ * Get filtered FK options based on PAIRS dependencies.
+ * Follows FK chains to build a SQL query that filters the target entity
+ * by compatibility with the selected source value.
+ *
+ * @param {string} entityName - The editing entity (e.g., "EngineAllocation")
+ * @param {string} targetField - The FK field to filter (e.g., "aircraft_id")
+ * @param {string} sourceField - The FK field that was selected (e.g., "engine_id")
+ * @param {number} sourceValue - The selected ID value
+ * @returns {{ data: Array }} Filtered records from the target entity
+ */
+function findFilteredFkOptions(entityName, targetField, sourceField, sourceValue) {
+  const schema = getSchema();
+  const db = getDatabase();
+
+  // Find the PAIRS entity linking these fields
+  const deps = computeFkDependencies(entityName);
+  const dep = deps.find(d => d.triggerField === sourceField && d.affectedField === targetField);
+  if (!dep) {
+    throw new Error(`No FK dependency found: ${sourceField} → ${targetField} on ${entityName}`);
+  }
+
+  const pairsEntity = schema.entities[dep.pairsEntity];
+  const sourceEntity = schema.entities[entityName];
+  if (!pairsEntity || !sourceEntity) {
+    throw new Error(`Entity not found: ${dep.pairsEntity} or ${entityName}`);
+  }
+
+  // Identify source and target chains
+  const sourceRoot = sourceField.replace(/_id$/, '');
+  const targetRoot = targetField.replace(/_id$/, '');
+  const sourceChainIdx = pairsEntity.pairs.chains.findIndex(c => c[0] === sourceRoot);
+  const targetChainIdx = pairsEntity.pairs.chains.findIndex(c => c[0] === targetRoot);
+  if (sourceChainIdx === -1 || targetChainIdx === -1) {
+    throw new Error(`Chain not found for ${sourceRoot} or ${targetRoot} in ${dep.pairsEntity}`);
+  }
+
+  const sourceChain = pairsEntity.pairs.chains[sourceChainIdx];
+  const targetChain = pairsEntity.pairs.chains[targetChainIdx];
+
+  // Resolve source chain: sourceValue → follow FKs → get the PAIRS join key
+  // e.g., engine_id=5 → Engine(5).type_id → value for pairs.engine_type_id
+  let sourceSubquery;
+  if (sourceChain.length === 1) {
+    // Single hop: source value IS the pairs column value
+    sourceSubquery = '?';
+  } else {
+    // Multi-hop: build nested subqueries
+    // Chain ["engine","type"]: engine_id=5 → SELECT type_id FROM engine WHERE id = 5
+    let currentEntity = sourceEntity;
+    let sql = '?';
+    for (let i = 0; i < sourceChain.length - 1; i++) {
+      const fkName = sourceChain[i + (i === 0 ? 0 : 0)];
+      // For the first step, we start from sourceField value
+      // For subsequent steps, chain through FKs
+      if (i === 0) {
+        // First step: look up in the FK target entity
+        const fkCol = currentEntity.columns.find(c => c.name === sourceField);
+        if (!fkCol || !fkCol.foreignKey) break;
+        const nextEntity = schema.entities[fkCol.foreignKey.entity];
+        if (!nextEntity) break;
+        // Get the next FK column name from the chain
+        const nextFkName = sourceChain[i + 1] + '_id';
+        sql = `SELECT ${nextFkName} FROM ${nextEntity.tableName} WHERE id = ${sql}`;
+        currentEntity = nextEntity;
+      } else {
+        const stepFkName = sourceChain[i + 1] + '_id';
+        const fkCol = currentEntity.columns.find(c => c.name === sourceChain[i] + '_id');
+        if (!fkCol || !fkCol.foreignKey) break;
+        const nextEntity = schema.entities[fkCol.foreignKey.entity];
+        if (!nextEntity) break;
+        sql = `SELECT ${stepFkName} FROM ${nextEntity.tableName} WHERE id IN (${sql})`;
+        currentEntity = nextEntity;
+      }
+    }
+    sourceSubquery = sql;
+  }
+
+  // Get PAIRS column names (FK columns in order of chains)
+  const pairsFkCols = pairsEntity.columns.filter(c => c.foreignKey);
+  const sourcePairsCol = pairsFkCols[sourceChainIdx]?.name;
+  const targetPairsCol = pairsFkCols[targetChainIdx]?.name;
+  if (!sourcePairsCol || !targetPairsCol) {
+    throw new Error(`PAIRS columns not found at indices ${sourceChainIdx}, ${targetChainIdx}`);
+  }
+
+  // Resolve target chain backwards: pairs value → find matching target entity records
+  // e.g., pairs.aircraft_type_id → Aircraft WHERE type_id IN (...)
+  const targetFkCol = sourceEntity.columns.find(c => c.name === targetField);
+  if (!targetFkCol || !targetFkCol.foreignKey) {
+    throw new Error(`FK column ${targetField} not found on ${entityName}`);
+  }
+  const targetEntityName = targetFkCol.foreignKey.entity;
+  const targetEntity = schema.entities[targetEntityName];
+  if (!targetEntity) {
+    throw new Error(`Target entity ${targetEntityName} not found`);
+  }
+
+  // Determine the filter column on the target entity
+  // For chain ["aircraft","type"]: targetEntity=Aircraft, filter by type_id
+  let targetFilterCol;
+  if (targetChain.length === 1) {
+    targetFilterCol = 'id';
+  } else {
+    targetFilterCol = targetChain[targetChain.length - 1] + '_id';
+  }
+
+  // Build the complete query
+  const pairsSubquery = `SELECT ${targetPairsCol} FROM ${pairsEntity.tableName} WHERE ${sourcePairsCol} IN (${sourceSubquery})`;
+  const viewName = targetEntity.tableName + '_view';
+  const sql = `SELECT * FROM ${viewName} WHERE ${targetFilterCol} IN (${pairsSubquery}) ORDER BY id ASC`;
+
+  const rows = db.prepare(sql).all(parseInt(sourceValue, 10));
+  return { data: rows, total: rows.length };
+}
+
 function findAll(entityName, options = {}) {
   const entity = getEntityMeta(entityName);
   const db = getDatabase();
@@ -593,7 +728,9 @@ function getExtendedSchemaInfo(entityName) {
     )?.column || null,
     // API Refresh: entity can be updated from external API
     apiRefresh: entity.apiRefresh || null,
-    apiRefreshOnLoad: entity.apiRefreshOnLoad || null
+    apiRefreshOnLoad: entity.apiRefreshOnLoad || null,
+    // FK dependencies derived from PAIRS annotations (for dropdown filtering)
+    ...(() => { const d = computeFkDependencies(entityName); return d.length > 0 ? { fkDependencies: d } : {}; })()
   };
 }
 
@@ -834,5 +971,6 @@ module.exports = {
   getValidator,
   ensureValidationRules,
   enrichRecord,
-  enrichRecords
+  enrichRecords,
+  findFilteredFkOptions
 };

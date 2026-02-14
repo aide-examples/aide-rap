@@ -44,6 +44,15 @@ function listEntities(entityName, options = {}, correlationId = null) {
 }
 
 /**
+ * Get filtered FK options based on PAIRS dependencies
+ */
+function getFilteredFkOptions(entityName, targetField, sourceField, sourceValue, correlationId = null) {
+  const log = correlationId ? logger.withCorrelation(correlationId) : logger;
+  log.debug(`FK filter: ${entityName}.${targetField} where ${sourceField}=${sourceValue}`);
+  return repository.findFilteredFkOptions(entityName, targetField, sourceField, sourceValue);
+}
+
+/**
  * Get a single entity by ID
  */
 function getEntity(entityName, id, correlationId = null) {
@@ -231,5 +240,6 @@ module.exports = {
   getBackReferences,
   batchCreate,
   runInTransaction,
-  getDistinctValues
+  getDistinctValues,
+  getFilteredFkOptions
 };

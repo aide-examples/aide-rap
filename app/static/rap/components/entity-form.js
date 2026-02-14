@@ -171,6 +171,9 @@ const EntityForm = {
     // Load FK dropdown options asynchronously
     await this.loadFKDropdowns();
 
+    // Setup FK dependency listeners (PAIRS-based dropdown filtering)
+    this.setupFkDependencies();
+
     // Initialize media field handlers
     this.initMediaFields();
 
@@ -1019,6 +1022,109 @@ const EntityForm = {
   },
 
   /**
+   * Build options array from records for an FK field (shared label logic)
+   */
+  buildFkOptions(records, fieldName) {
+    const schema = SchemaCache.getExtended(this.currentEntity);
+    const col = schema.columns.find(c => c.name === fieldName);
+    const targetEntity = col?.foreignKey?.entity;
+    const refSchema = SchemaCache.getExtended(targetEntity);
+    const hasComputedLabel = refSchema?.ui?.hasComputedLabel;
+    const labelFields = refSchema?.ui?.labelFields || [];
+
+    return records.map(rec => {
+      let label = `#${rec.id}`;
+      if (hasComputedLabel && rec._label) {
+        label = rec._label;
+      } else if (labelFields.length > 0 && rec[labelFields[0]]) {
+        label = rec[labelFields[0]];
+        if (labelFields.length > 1 && rec[labelFields[1]]) {
+          label += ` (${rec[labelFields[1]]})`;
+        }
+      }
+      return { id: rec.id, label };
+    });
+  },
+
+  /**
+   * Setup FK dependency listeners based on PAIRS annotations.
+   * When a trigger FK changes, the affected FK dropdown is re-filtered.
+   */
+  setupFkDependencies() {
+    const schema = SchemaCache.getExtended(this.currentEntity);
+    const deps = schema?.fkDependencies;
+    if (!deps || deps.length === 0) return;
+
+    this._fkRefreshing = false;
+
+    for (const dep of deps) {
+      const triggerEl = document.querySelector(`[name="${dep.triggerField}"]`);
+      if (!triggerEl) continue;
+
+      triggerEl.addEventListener('change', async () => {
+        if (this._fkRefreshing) return;
+        this._fkRefreshing = true;
+        try {
+          await this.refreshFkOptions(dep.affectedField, dep.triggerField, triggerEl.value);
+        } finally {
+          this._fkRefreshing = false;
+        }
+      });
+    }
+  },
+
+  /**
+   * Refresh FK dropdown with filtered options from the server.
+   */
+  async refreshFkOptions(affectedField, triggerField, sourceValue) {
+    // Find the affected element (could be <select> or hidden input)
+    let affectedEl = document.querySelector(`select[name="${affectedField}"], input[name="${affectedField}"].fk-hidden-value`);
+    if (!affectedEl) return;
+
+    const currentValue = affectedEl.value;
+
+    let records;
+    if (!sourceValue) {
+      // No trigger value: load ALL options (unfiltered)
+      const schema = SchemaCache.getExtended(this.currentEntity);
+      const col = schema.columns.find(c => c.name === affectedField);
+      const targetEntity = col?.foreignKey?.entity;
+      if (!targetEntity) return;
+      const result = await ApiClient.getAll(targetEntity);
+      records = result.data || [];
+    } else {
+      // Filtered options from server
+      const result = await ApiClient.getFkOptions(this.currentEntity, affectedField, { [triggerField]: sourceValue });
+      records = result.data || [];
+    }
+
+    const options = this.buildFkOptions(records, affectedField);
+
+    // For combobox, we need to find the container and replace from the hidden input
+    if (affectedEl.classList.contains('fk-hidden-value')) {
+      // Combobox mode: remove old search input and datalist, re-render
+      const searchInput = affectedEl.nextElementSibling;
+      const datalist = searchInput?.nextElementSibling;
+      if (searchInput?.classList.contains('fk-combobox')) searchInput.remove();
+      if (datalist?.tagName === 'DATALIST') datalist.remove();
+
+      // Create a temporary select placeholder for re-rendering
+      const tempSelect = document.createElement('select');
+      tempSelect.name = affectedField;
+      tempSelect.className = 'form-input fk-select';
+      affectedEl.replaceWith(tempSelect);
+      affectedEl = tempSelect;
+    }
+
+    // Re-render as dropdown or combobox based on count
+    if (records.length <= this.FK_DROPDOWN_THRESHOLD) {
+      this.renderFKDropdown(affectedEl, options, currentValue);
+    } else {
+      this.renderFKCombobox(affectedEl, options, currentValue, affectedField);
+    }
+  },
+
+  /**
    * Render FK field as a simple dropdown (for small datasets)
    */
   renderFKDropdown(select, options, currentValue) {
@@ -1081,9 +1187,13 @@ const EntityForm = {
       const match = options.find(opt => opt.label === typed);
 
       if (match) {
+        const changed = hiddenInput.value !== String(match.id);
         hiddenInput.value = match.id;
+        if (changed) hiddenInput.dispatchEvent(new Event('change'));
       } else if (typed === '') {
+        const changed = hiddenInput.value !== '';
         hiddenInput.value = '';
+        if (changed) hiddenInput.dispatchEvent(new Event('change'));
       }
       // If no match and not empty, keep previous value (user still typing)
     });
@@ -1099,9 +1209,13 @@ const EntityForm = {
       } else {
         searchInput.classList.remove('error');
         if (match) {
+          const changed = hiddenInput.value !== String(match.id);
           hiddenInput.value = match.id;
+          if (changed) hiddenInput.dispatchEvent(new Event('change'));
         } else {
+          const changed = hiddenInput.value !== '';
           hiddenInput.value = '';
+          if (changed) hiddenInput.dispatchEvent(new Event('change'));
         }
       }
     });

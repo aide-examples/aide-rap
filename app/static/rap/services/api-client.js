@@ -146,6 +146,15 @@ const ApiClient = {
   },
 
   /**
+   * Get filtered FK options based on PAIRS dependencies
+   */
+  async getFkOptions(entityName, targetField, params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    const url = `${this.getEntityUrl(entityName)}/fk-options/${targetField}${qs ? '?' + qs : ''}`;
+    return this.request(url);
+  },
+
+  /**
    * Get a single record by ID
    */
   async getById(entityName, id) {

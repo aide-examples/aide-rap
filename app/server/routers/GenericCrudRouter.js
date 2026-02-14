@@ -192,6 +192,37 @@ router.get('/:entity/:id/lineage', validateEntity, (req, res, next) => {
 });
 
 /**
+ * GET /api/entities/:entity/fk-options/:targetField - Get filtered FK options
+ * Uses PAIRS dependencies to return only compatible records.
+ * Query params: triggerField=value (e.g., ?engine_id=5)
+ */
+router.get('/:entity/fk-options/:targetField', validateEntity, (req, res, next) => {
+  try {
+    const { entity, targetField } = req.params;
+    // Find the trigger field and value from query params
+    const schema = service.getExtendedSchema(entity);
+    const deps = schema.fkDependencies || [];
+    const dep = deps.find(d => d.affectedField === targetField);
+    if (!dep) {
+      return res.status(400).json({ error: `No FK dependency found for ${targetField}` });
+    }
+    const sourceValue = req.query[dep.triggerField];
+    if (!sourceValue) {
+      // No source value: return all records of the target entity
+      const targetCol = schema.columns.find(c => c.name === targetField);
+      if (!targetCol || !targetCol.foreignKey) {
+        return res.status(400).json({ error: `${targetField} is not a FK column` });
+      }
+      return res.json(service.listEntities(targetCol.foreignKey.entity, {}, req.correlationId));
+    }
+    const result = service.getFilteredFkOptions(entity, targetField, dep.triggerField, sourceValue, req.correlationId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/entities/:entity - List all records
  */
 router.get('/:entity', validateEntity, (req, res, next) => {

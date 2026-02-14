@@ -223,6 +223,8 @@ The isomorphic `ObjectValidator` (in `shared/validation/`) works identically in 
 
 In addition to single-field rules, **object-level constraints** (`## Constraints` section) validate cross-field relationships: `TimeRange(start_date, end_date)`, `NumericRange(min, max)`, and custom JS snippets with multilingual error messages. Custom JS constraints can use `lookup(entityName, id)` and `exists(entityName, conditions)` for cross-entity validation (server-side with batch cache). See [validation.md](validation.md) for full documentation.
 
+Entities linked through `[PAIRS=...]` annotations get **automatic FK dropdown filtering**: selecting a value in one FK dropdown filters the other to show only compatible options. The server derives dependencies from PAIRS metadata and provides a filtering endpoint — no extra configuration needed.
+
 ### Visual Diagram Editor
 
 Design your data model visually with an interactive layout editor:
