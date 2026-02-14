@@ -2139,8 +2139,8 @@ const EntityExplorer = {
     // Show loading while building tree
     this.tableContainer.innerHTML = '<div class="loading-spinner"></div>';
 
-    // Load detail view with template
-    await EntityTree.loadDetailView(baseName, this.selectedId, allRecords, viewSchema.template);
+    // Load detail view via server composer (single API call)
+    await EntityTree.loadDetailView(viewName, baseName, this.selectedId, allRecords, viewSchema.template);
 
     this.updateRecordStatus();
   },

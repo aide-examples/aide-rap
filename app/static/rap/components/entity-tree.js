@@ -140,7 +140,8 @@ const EntityTree = {
     async loadEntity(entityName, records, options = {}) {
         this.currentEntity = entityName;
         this.records = records;
-        this.detailTemplate = null;  // Clear detail template when loading normal entity
+        this.detailTemplate = null;  // Clear detail view state when loading normal entity
+        this.detailData = null;
         this.state.clear();
 
         // If a selectedId is provided, pre-expand the node and its outbound FKs
@@ -171,29 +172,39 @@ const EntityTree = {
     },
 
     /**
-     * Load and display a detail (template-driven) view for a single record.
-     * The template controls which attributes, FKs, and back-refs are shown.
+     * Load and display a server-composed detail view.
+     * One API call fetches the complete tree — no follow-up requests needed.
+     * @param {string} viewName - Detail view name (e.g., "Engine Detail")
      * @param {string} entityName - Base entity name
      * @param {number} selectedId - ID of the selected record
-     * @param {Array} records - All records of the base entity
+     * @param {Array} records - All records of the base entity (for root node label)
      * @param {Object} template - Parsed detail template { base, rootAttributes, children }
      */
-    async loadDetailView(entityName, selectedId, records, template) {
+    async loadDetailView(viewName, entityName, selectedId, records, template) {
         this.currentEntity = entityName;
         this.records = records;
         this.detailTemplate = template;
+        this.detailData = null;
         this.state.clear();
+
+        // Fetch complete detail tree from server
+        try {
+            const resp = await fetch(`api/views/${encodeURIComponent(viewName)}?field=id&value=${selectedId}`);
+            if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+            const result = await resp.json();
+            this.detailData = result.data;
+        } catch (e) {
+            this.container.innerHTML = `<div class="tree-error">Failed to load detail view: ${e.message}</div>`;
+            return;
+        }
 
         // Expand root node
         const nodeId = `${entityName}-${selectedId}`;
         this.state.setSelection(nodeId);
         this.state.expand(nodeId);
 
-        // Pre-expand all template-defined children
-        const record = records.find(r => r.id === selectedId);
-        if (record) {
-            await this.expandFromTemplate(entityName, record, template.children);
-        }
+        // Pre-expand all template nodes from server data (no API calls)
+        this.preExpandDetailData(entityName, this.detailData, template.children);
 
         // Force compact row layout for detail views
         this.attributeLayout = 'row';
@@ -208,45 +219,36 @@ const EntityTree = {
     },
 
     /**
-     * Pre-expand nodes according to detail template children.
-     * @param {string} entityName - Current entity
-     * @param {Object} record - Current record
-     * @param {Array} children - Template children to expand
+     * Pre-expand all detail view nodes using server data (synchronous, no API calls).
+     * Walks the template tree with corresponding data to determine node IDs.
      */
-    async expandFromTemplate(entityName, record, children) {
-        if (!children || children.length === 0) return;
-
-        const schema = await SchemaCache.getExtended(entityName);
+    preExpandDetailData(entityName, data, children) {
+        if (!children || children.length === 0 || !data) return;
 
         for (const child of children) {
-            if (child.type === 'fk') {
-                // FK field: find the column and expand if has value
-                const col = schema.columns.find(c =>
-                    (c.name === child.field || c.name === child.field + '_id') && c.foreignKey
+            if (child.type === 'fk' && data[child.field]) {
+                const fkData = data[child.field];
+                const parentSchema = SchemaCache.getExtended(entityName);
+                const fkCol = parentSchema?.columns.find(c =>
+                    c.foreignKey && (c.name === child.field || c.name === child.field + '_id')
                 );
-                if (col && record[col.name]) {
-                    const fkId = record[col.name];
-                    const fkNodeId = `fk-${col.foreignKey.entity}-${fkId}-from-${record.id}`;
-                    this.state.expand(fkNodeId);
+                const targetEntity = fkCol?.foreignKey?.entity || child.field;
+                const nodeId = `detail-fk-${targetEntity}-${fkData.id}-from-${data.id}`;
+                this.state.expand(nodeId);
 
-                    // Recurse into FK children if template has sub-children
-                    if (child.children.length > 0) {
-                        try {
-                            const fkRecord = await ApiClient.getById(col.foreignKey.entity, fkId);
-                            if (fkRecord) {
-                                await this.expandFromTemplate(col.foreignKey.entity, fkRecord, child.children);
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
+                if (child.children?.length > 0) {
+                    this.preExpandDetailData(targetEntity, fkData, child.children);
                 }
-            } else if (child.type === 'backref') {
-                // Back-reference: find matching back-ref and expand
-                if (schema.backReferences) {
-                    for (const ref of schema.backReferences) {
-                        if (ref.entity === child.entity) {
-                            const backrefNodeId = `backref-${ref.entity}-${ref.column}-to-${entityName}-${record.id}`;
-                            this.state.expand(backrefNodeId);
-                        }
+            } else if (child.type === 'backref' && data[child.entity]) {
+                const records = data[child.entity];
+                const nodeId = `detail-br-${child.entity}-in-${entityName}-${data.id}`;
+                this.state.expand(nodeId);
+
+                if (child.children?.length > 0) {
+                    for (const rec of records) {
+                        const rowNodeId = `detail-row-${child.entity}-${rec.id}-in-${entityName}-${data.id}`;
+                        this.state.expand(rowNodeId);
+                        this.preExpandDetailData(child.entity, rec, child.children);
                     }
                 }
             }
@@ -305,7 +307,8 @@ const EntityTree = {
             showNullFKs: this.showNullFKs,
             showSystem: EntityTable.showSystem, // Shared with EntityTable
             backRefPreviewLimit: this.treeConfig?.backRefPreviewLimit || 10,
-            detailTemplate: this.detailTemplate || null
+            detailTemplate: this.detailTemplate || null,
+            detailData: this.detailData || null
         };
     },
 

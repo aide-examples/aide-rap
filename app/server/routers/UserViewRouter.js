@@ -69,6 +69,123 @@ function buildViewSchema(view) {
   };
 }
 
+/**
+ * Resolve an attribute value from an entity view row.
+ * FK display names (e.g., "type") are resolved to their _label column.
+ */
+function resolveAttr(entity, row, attr) {
+  const fk = entity.foreignKeys.find(fk => fk.displayName === attr);
+  if (fk) return row[attr + '_label'] ?? row[fk.column] ?? null;
+  return row[attr] ?? null;
+}
+
+/**
+ * Query a detail view template and return nested JSON.
+ * Uses entity SQL views (vw_*) for automatic FK label resolution.
+ */
+function queryDetailView(view, field, value, schema, db) {
+  const tpl = view.template;
+  const baseEntity = schema.entities[tpl.base];
+  if (!baseEntity) return { error: `Base entity "${tpl.base}" not found`, status: 500 };
+
+  // Resolve filter field: FK displayName → _label column, _label → _label
+  let sqlField = field;
+  const fk = baseEntity.foreignKeys.find(fk => fk.displayName === field);
+  if (fk) sqlField = field + '_label';
+
+  const viewName = `${baseEntity.tableName}_view`;
+  const baseRow = db.prepare(`SELECT * FROM ${viewName} WHERE "${sqlField}" = ?`).get(value);
+  if (!baseRow) return { error: `No ${tpl.base} found with ${field} = ${value}`, status: 404 };
+
+  // Build root record from template attributes
+  const result = { id: baseRow.id };
+  for (const attr of (tpl.rootAttributes || [])) {
+    result[attr] = resolveAttr(baseEntity, baseRow, attr);
+  }
+
+  // Process children (back-refs and FK drill-downs)
+  for (const child of (tpl.children || [])) {
+    if (child.type === 'backref') {
+      result[child.entity] = queryBackRefNode(child, baseRow.id, tpl.base, schema, db);
+    } else if (child.type === 'fk') {
+      const fkData = queryFkNode(child, baseRow, baseEntity, schema, db);
+      // Preserve attribute label on FK drill-down object (attribute may already exist)
+      if (fkData && result[child.field] !== undefined) {
+        fkData._label = result[child.field];
+      }
+      result[child.field] = fkData;
+    }
+  }
+
+  return { data: result };
+}
+
+function queryBackRefNode(node, parentId, parentEntityName, schema, db) {
+  const childEntity = schema.entities[node.entity];
+  if (!childEntity) return [];
+
+  const fkToParent = childEntity.foreignKeys.find(fk => fk.references.entity === parentEntityName);
+  if (!fkToParent) return [];
+
+  // Build SQL with optional ORDER BY / LIMIT from template params
+  let sql = `SELECT * FROM ${childEntity.tableName}_view WHERE "${fkToParent.column}" = ?`;
+  if (node.params) {
+    // Template params: "ORDER BY start_date DESC, LIMIT 5" → fix comma before LIMIT
+    sql += ' ' + node.params.replace(/,\s*LIMIT/i, ' LIMIT');
+  }
+
+  const rows = db.prepare(sql).all(parentId);
+  return rows.map(row => {
+    const record = { id: row.id };
+    for (const attr of (node.attributes || [])) {
+      record[attr] = resolveAttr(childEntity, row, attr);
+    }
+    for (const child of (node.children || [])) {
+      if (child.type === 'fk') {
+        const fkData = queryFkNode(child, row, childEntity, schema, db);
+        if (fkData && record[child.field] !== undefined) {
+          fkData._label = record[child.field];
+        }
+        record[child.field] = fkData;
+      } else if (child.type === 'backref') {
+        record[child.entity] = queryBackRefNode(child, row.id, node.entity, schema, db);
+      }
+    }
+    return record;
+  });
+}
+
+function queryFkNode(node, parentRow, parentEntity, schema, db) {
+  const fk = parentEntity.foreignKeys.find(fk => fk.displayName === node.field);
+  if (!fk) return null;
+
+  const fkId = parentRow[fk.column];
+  if (!fkId) return null;
+
+  const refEntity = schema.entities[fk.references.entity];
+  if (!refEntity) return null;
+
+  const row = db.prepare(`SELECT * FROM ${refEntity.tableName}_view WHERE id = ?`).get(fkId);
+  if (!row) return null;
+
+  const record = { id: row.id };
+  for (const attr of (node.attributes || [])) {
+    record[attr] = resolveAttr(refEntity, row, attr);
+  }
+  for (const child of (node.children || [])) {
+    if (child.type === 'fk') {
+      const fkData = queryFkNode(child, row, refEntity, schema, db);
+      if (fkData && record[child.field] !== undefined) {
+        fkData._label = record[child.field];
+      }
+      record[child.field] = fkData;
+    } else if (child.type === 'backref') {
+      record[child.entity] = queryBackRefNode(child, row.id, fk.references.entity, schema, db);
+    }
+  }
+  return record;
+}
+
 module.exports = function() {
   const router = express.Router();
   const { getSchema, getDatabase } = require('../config/database');
@@ -148,6 +265,17 @@ module.exports = function() {
 
       const db = getDatabase();
       const { sort, order, filter, field, value, limit, offset } = req.query;
+
+      // Detail views: assemble tree from template
+      if (view.detail) {
+        if (!field || value === undefined) {
+          return res.status(400).json({ error: 'Detail views require ?field=...&value=... parameters' });
+        }
+        const schema = getSchema();
+        const result = queryDetailView(view, field, value, schema, db);
+        if (result.error) return res.status(result.status).json({ error: result.error });
+        return res.json({ ...result, view: view.name, detail: true });
+      }
 
       // Support ?field=X&value=Y as alternative to ?filter= (for external tools like HCL Leap)
       const effectiveFilter = (field && value !== undefined)
