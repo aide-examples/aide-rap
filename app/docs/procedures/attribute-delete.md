@@ -82,6 +82,7 @@ The SchemaGenerator will:
 - [ ] Attribute no longer appears in UI
 - [ ] No "orphaned column" warning at startup
 - [ ] CRUD operations continue to work
+- [ ] Import mapping updated (if import exists)
 
 ---
 
@@ -92,6 +93,12 @@ The SchemaGenerator will:
 If `app/systems/<system>/data/seed/ENTITY_NAME.json` contains the attribute:
 - Can remain as-is (will be ignored on import)
 - Or manually remove from JSON
+
+### Import Mapping
+
+If `app/systems/<system>/docs/imports/ENTITY_NAME.md` exists and contains the attribute:
+- Remove the row from the **Mapping** table
+- If the source column was also used in **Source Edit** or **Source Filter**, remove those references too
 
 ### Foreign Key Attributes
 

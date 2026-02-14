@@ -55,6 +55,28 @@ The SchemaGenerator will:
 
 ---
 
+## Step 3: Update Import Mapping (if exists)
+
+Check if an import definition exists for this entity:
+
+```
+app/systems/<system>/docs/imports/ENTITY_NAME.md
+```
+
+If it exists, add a row for the new attribute in the **Mapping** table:
+
+- If the attribute **has a source column** in the Excel: map source → target with optional transform
+- If the attribute **has no source column** (manually managed): add with empty source
+
+```markdown
+| Source Column Name                      | ATTR_NAME | transform |
+|                                         | ATTR_NAME | |
+```
+
+This ensures the import definition stays in sync with the entity schema.
+
+---
+
 ## Step 4: Update Existing Data (Optional)
 
 If a `[DEFAULT=x]` was specified, existing rows will initially have `NULL`. To set the default retroactively:
@@ -77,6 +99,7 @@ UPDATE project SET priority_level = 50 WHERE priority_level IS NULL;
 - [ ] New attribute is editable (unless READONLY)
 - [ ] Default value is set for new records
 - [ ] Existing records have correct value (after UPDATE)
+- [ ] Import mapping updated (if import exists)
 
 ---
 
