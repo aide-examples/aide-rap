@@ -31,9 +31,12 @@ Whole numbers without decimal places. Stored as SQLite INTEGER.
 |-----------|------|-------------|---------|
 | hours_worked | int | Total hours worked | 15000 |
 | quantity | int | Item quantity | 42 |
+| position | int [MIN=0] [MAX=4] | Constrained to 0..4 | 1 |
 ```
 
 **UI**: Number input without decimal places.
+
+Use `[MIN=x]` and `[MAX=x]` annotations to constrain the value range. These generate client-side on-blur validation and server-side checks.
 
 ### `number` / `real` — Floating Point
 

@@ -25,6 +25,8 @@ Type annotations are placed in the **Type column** after the type name.
 |-----|-------------|--------|
 | `[OPTIONAL]` | Nullable field | Column allows NULL values |
 | `[DEFAULT=x]` | Explicit default value | SQL DEFAULT clause, **implies OPTIONAL** |
+| `[MIN=x]` | Minimum value (numeric) | Validation: must be at least x |
+| `[MAX=x]` | Maximum value (numeric) | Validation: must be at most x |
 
 > **Note:** `[DEFAULT=x]` automatically makes the field optional. If there's a default value, the field doesn't need to be provided during INSERT.
 
@@ -270,7 +272,7 @@ See [Computed References](computed-references.md) for full syntax.
 
 | Marker Type | Column |
 |-------------|--------|
-| `[OPTIONAL]`, `[DEFAULT=x]` | **Type** column |
+| `[OPTIONAL]`, `[DEFAULT=x]`, `[MIN=x]`, `[MAX=x]` | **Type** column |
 | `[LABEL]`, `[LABEL2]`, `[READONLY]`, `[HIDDEN]`, `[TRUNCATE=n]`, `[NOWRAP]` | **Description** column |
 | `[UNIQUE]`, `[UK1]`, `[INDEX]`, `[IX1]` | **Description** column |
 | `[SIZE=]`, `[DIMENSION=]`, etc. | **Description** column |

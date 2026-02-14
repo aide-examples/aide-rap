@@ -219,7 +219,7 @@ The same `ObjectValidator` and validation rules run in both places:
 
 The isomorphic `ObjectValidator` (in `shared/validation/`) works identically in Node.js and the browser. Rules are generated once from Markdown by `SchemaGenerator`, delivered via `/api/meta`, and loaded into `SchemaCache` on the client. Pattern regex, required fields, enum constraints — all defined once, enforced everywhere.
 
-In addition to single-field rules, **object-level constraints** (`## Constraints` section) validate cross-field relationships: `TimeRange(start_date, end_date)`, `NumericRange(min, max)`, and custom JS snippets with multilingual error messages. See [validation.md](validation.md) for full documentation.
+In addition to single-field rules, **object-level constraints** (`## Constraints` section) validate cross-field relationships: `TimeRange(start_date, end_date)`, `NumericRange(min, max)`, and custom JS snippets with multilingual error messages. Custom JS constraints can use `lookup(entityName, id)` for cross-entity validation (server-side with batch cache). See [validation.md](validation.md) for full documentation.
 
 ### Visual Diagram Editor
 
@@ -473,7 +473,7 @@ See [Configuration](configuration.md) for the full reference.
 - [Configuration](configuration.md) – System config, pagination, authentication, UI layout files
 - [Admin Tools](admin-tools.md) – Seed Manager, Media Store, bulk operations
 - [Scalar Types](scalar-types.md) – `int`, `number`, `string`, `date`, `bool` – built-in attribute types
-- [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, and more
+- [Attribute Markers](attribute-markers.md) – `[LABEL]`, `[READONLY]`, `[UNIQUE]`, `[DEFAULT=x]`, `[MIN=x]`, `[MAX=x]`, and more
 - [Aggregate Types](aggregate-types.md) – `geo`, `address`, and custom composite types
 - [Computed References](computed-references.md) – `[DAILY=rule]`, `[IMMEDIATE=rule]` for algorithmically computed FK relationships
 - [Computed Entities](attribute-markers.md#computed-entity-pairs) – `[PAIRS=Source(chain1, chain2)]` for auto-derived M:N mapping tables

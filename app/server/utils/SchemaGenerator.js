@@ -984,17 +984,20 @@ function decodeHtmlEntities(text) {
 
 /**
  * Extract type annotations from type string
- * Supported: [DEFAULT=x], [OPTIONAL]
+ * Supported: [DEFAULT=x], [OPTIONAL], [MIN=x], [MAX=x]
  * Note: [DEFAULT=x] implies [OPTIONAL] - if there's a default, the field is not required
  *
  * e.g., "MaintenanceCategory [DEFAULT=A]" -> { type: "MaintenanceCategory", default: "A", optional: true }
  * e.g., "EngineType [OPTIONAL]" -> { type: "EngineType", default: null, optional: true }
+ * e.g., "int [MIN=0] [MAX=4]" -> { type: "int", min: 0, max: 4 }
  * e.g., "int" -> { type: "int", default: null, optional: false }
  */
 function extractTypeAnnotations(typeStr) {
   let type = typeStr;
   let defaultValue = null;
   let optional = false;
+  let min = null;
+  let max = null;
 
   const defaultMatch = type.match(/\[DEFAULT=([^\]]+)\]/i);
   if (defaultMatch) {
@@ -1008,7 +1011,19 @@ function extractTypeAnnotations(typeStr) {
     type = type.replace(/\s*\[OPTIONAL\]/i, '').trim();
   }
 
-  return { type, default: defaultValue, optional };
+  const minMatch = type.match(/\[MIN=([^\]]+)\]/i);
+  if (minMatch) {
+    min = parseFloat(minMatch[1].trim());
+    type = type.replace(/\s*\[MIN=[^\]]+\]/i, '').trim();
+  }
+
+  const maxMatch = type.match(/\[MAX=([^\]]+)\]/i);
+  if (maxMatch) {
+    max = parseFloat(maxMatch[1].trim());
+    type = type.replace(/\s*\[MAX=[^\]]+\]/i, '').trim();
+  }
+
+  return { type, default: defaultValue, optional, min, max };
 }
 
 /**
@@ -1107,6 +1122,24 @@ function parseEntityFile(fileContent) {
           }
         }
 
+        // Fallback: extract [MIN=x]/[MAX=x] from Description column if not in Type column
+        let min = typeInfo.min;
+        let max = typeInfo.max;
+        if (min === null) {
+          const descMinMatch = desc.match(/\[MIN=([^\]]+)\]/i);
+          if (descMinMatch) {
+            min = parseFloat(descMinMatch[1].trim());
+            desc = desc.replace(/\s*\[MIN=[^\]]+\]/i, '').trim();
+          }
+        }
+        if (max === null) {
+          const descMaxMatch = desc.match(/\[MAX=([^\]]+)\]/i);
+          if (descMaxMatch) {
+            max = parseFloat(descMaxMatch[1].trim());
+            desc = desc.replace(/\s*\[MAX=[^\]]+\]/i, '').trim();
+          }
+        }
+
         const attr = {
           name: parts[0],
           type: extractTypeName(typeInfo.type),
@@ -1114,6 +1147,8 @@ function parseEntityFile(fileContent) {
           description: desc
         };
         if (typeInfo.optional) attr.optional = true;
+        if (min !== null && !isNaN(min)) attr.min = min;
+        if (max !== null && !isNaN(max)) attr.max = max;
         if (parts.length >= 4) {
           attr.example = parts[3];
         }
@@ -1731,6 +1766,8 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
       if (isRequired) {
         rules.required = true;
       }
+      if (attr.min !== null && attr.min !== undefined) rules.min = attr.min;
+      if (attr.max !== null && attr.max !== undefined) rules.max = attr.max;
       validationRules[name] = rules;
     }
 

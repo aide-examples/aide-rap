@@ -21,6 +21,14 @@ class ObjectValidator {
     this.objectRules = new Map();
 
     /**
+     * Lookup function for cross-entity constraints in custom JS.
+     * Server: set to a function(entityName, id) that does DB query with cache.
+     * Browser: remains null → lookup() returns null → constraints with lookup are skipped.
+     * @type {Function|null}
+     */
+    this.lookupFn = null;
+
+    /**
      * Available rule types and their validators
      */
     this.validators = {
@@ -782,8 +790,9 @@ class ObjectValidator {
 
     try {
       // eslint-disable-next-line no-new-func
-      const fn = new Function('obj', 'error', rule.code);
-      fn(obj, errorFn);
+      const lookupFn = this.lookupFn || (() => null);
+      const fn = new Function('obj', 'error', 'lookup', rule.code);
+      fn(obj, errorFn, lookupFn);
     } catch (e) {
       // Custom validation code error — treat as warning, don't block
       errors.push({

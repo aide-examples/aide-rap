@@ -1241,6 +1241,18 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     const ObjectValidator = require('../../shared/validation/ObjectValidator');
     validator = new ObjectValidator();
     validator.defineRules(entityName, entity.validationRules, false, entity.objectRules || null);
+    // Cross-entity lookup for custom constraints (batch cache lives for entire import)
+    const lookupCache = new Map();
+    validator.lookupFn = (lookupEntity, id) => {
+      if (!id) return null;
+      const key = `${lookupEntity}:${id}`;
+      if (lookupCache.has(key)) return lookupCache.get(key);
+      const targetEntity = schema.entities[lookupEntity];
+      if (!targetEntity) return null;
+      const record = db.prepare(`SELECT * FROM ${targetEntity.tableName} WHERE id = ?`).get(id);
+      lookupCache.set(key, record || null);
+      return record || null;
+    };
   }
 
   // Check for self-referential FKs - if present, disable FK constraints during import

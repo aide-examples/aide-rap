@@ -27,6 +27,8 @@ Field validation rules are **auto-generated** from entity attribute definitions.
 | `date` type | `pattern` (ISO date) | Must match YYYY-MM-DD |
 | `mail` type | `pattern` (email regex) | Must be a valid email |
 | `url` type | `pattern` (URL regex) | Must be a valid URL |
+| `[MIN=x]` annotation | `min: x` | Must be at least x |
+| `[MAX=x]` annotation | `max: x` | Must be at most x |
 | Pattern type (e.g. IATACode) | `pattern` from TypeRegistry | Must match `^[A-Z]{2}$` |
 | Enum type | `enum` with valid values | Must be one of the defined values |
 
@@ -114,6 +116,30 @@ The code receives:
 - **`error(fields, code)`** — Call this to report a validation error:
   - `fields`: Array of column names. First = primary (gets error message), rest = related (get red border only)
   - `code`: Error code, mapped to messages in `## Error Messages`
+- **`lookup(entityName, id)`** — Load a record from another entity by ID (cross-entity constraint):
+  - Server: synchronous DB query with per-batch cache (efficient for imports)
+  - Browser: returns `null` (server acts as backstop — guard with `if (result)`)
+
+#### Cross-Entity Constraints with `lookup()`
+
+Use `lookup()` to validate against data from related entities:
+
+```markdown
+```js
+if (obj.aircraft_id && obj.installation_position) {
+  const ac = lookup('Aircraft', obj.aircraft_id);
+  if (ac) {
+    const acType = lookup('AircraftType', ac.type_id);
+    if (acType && obj.installation_position > acType.number_of_engines) {
+      error(['installation_position'], 'POS_EXCEEDS_ENGINES');
+    }
+  }
+}
+` ``
+```
+
+- `lookup()` returns `null` in the browser — constraints using it are **server-only**
+- The cache is per validation batch: during imports, repeated lookups for the same entity+id are served from memory
 
 ### Error Messages Section
 

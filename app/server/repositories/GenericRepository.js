@@ -21,6 +21,26 @@ const logger = require('../utils/logger');
 const validator = new ObjectValidator();
 
 /**
+ * Create a lookup function for cross-entity constraints.
+ * Returns a function(entityName, id) that does a cached DB query.
+ * Cache lives for one validation batch (create/update call).
+ */
+function createLookupFn(db) {
+  const cache = new Map();
+  return (entityName, id) => {
+    if (!id) return null;
+    const key = `${entityName}:${id}`;
+    if (cache.has(key)) return cache.get(key);
+    const schema = getSchema();
+    const entity = schema.entities[entityName];
+    if (!entity) return null;
+    const record = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id = ?`).get(id);
+    cache.set(key, record || null);
+    return record || null;
+  };
+}
+
+/**
  * Initialize validation rules for an entity
  */
 function ensureValidationRules(entityName) {
@@ -238,7 +258,8 @@ function create(entityName, data) {
   const entity = ensureValidationRules(entityName);
   const db = getDatabase();
 
-  // Validate and transform
+  // Validate and transform (with cross-entity lookup for custom constraints)
+  validator.lookupFn = createLookupFn(db);
   const validated = validator.validate(entityName, data);
   convertBooleansForSql(entity, validated);
 
@@ -286,7 +307,8 @@ function update(entityName, id, data, expectedVersion = null) {
     throw new VersionConflictError(entityName, id, expectedVersion, currentRecord);
   }
 
-  // Validate and transform (partial — only provided fields, skip required check for missing)
+  // Validate and transform (partial — with cross-entity lookup for custom constraints)
+  validator.lookupFn = createLookupFn(db);
   const validated = validator.validatePartial(entityName, data);
   convertBooleansForSql(entity, validated);
 
