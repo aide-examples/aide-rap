@@ -402,10 +402,9 @@ class ObjectValidator {
       const example = fieldRules.patternExample;
 
       if (description) {
-        // Description already includes example info, just use it
-        message = `${fieldName}: ${description}`;
+        message = `Field "${fieldName}" must be a ${description[0].toLowerCase() + description.slice(1)}`;
       } else if (example) {
-        message = `${fieldName} must match format: ${example}`;
+        message = `Field "${fieldName}" must match format: ${example}`;
       } else {
         message = `Field "${fieldName}" has an invalid format`;
       }

@@ -247,12 +247,24 @@ const ApiClient = {
 // Schema cache — pre-loaded from /api/meta at startup
 const SchemaCache = {
   extendedCache: {},
+  validator: null,
 
   /**
    * Pre-load all extended schemas from meta response
+   * Also initializes the client-side ObjectValidator with rules from all entities
    */
   preload(schemas) {
     this.extendedCache = { ...schemas };
+
+    // Initialize client-side validator (dual-layer validation)
+    if (window.ObjectValidator) {
+      this.validator = new ObjectValidator();
+      for (const [entityName, schema] of Object.entries(schemas)) {
+        if (schema.validationRules) {
+          this.validator.defineRules(entityName, schema.validationRules);
+        }
+      }
+    }
   },
 
   /**
@@ -262,8 +274,17 @@ const SchemaCache = {
     return this.extendedCache[entityName] || null;
   },
 
+  /**
+   * Get the client-side ObjectValidator instance
+   * @returns {ObjectValidator|null}
+   */
+  getValidator() {
+    return this.validator;
+  },
+
   clear() {
     this.extendedCache = {};
+    this.validator = null;
   },
 };
 

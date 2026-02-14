@@ -481,6 +481,9 @@ app.get('/api/meta', (req, res) => {
 // 7e. STATIC ROUTES
 // =============================================================================
 
+// Shared modules (isomorphic: server + browser)
+app.use('/shared', require('express').static(path.join(APP_DIR, 'shared')));
+
 // SQL Browser — embedded sqlite-viewer (static files, no auth needed for files,
 // the /api/admin/db-file endpoint is protected above)
 app.use('/sql-browser', require('express').static(path.join(APP_DIR, 'static', 'rap', 'sql-browser')));

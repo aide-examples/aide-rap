@@ -213,11 +213,11 @@ The system sends your schema + instructions to an LLM (Gemini or Claude) and rec
 
 ### Dual-Layer Validation
 
-The same validation rules run in both places:
-- **Frontend**: Instant feedback while typing
-- **Backend**: Security and integrity guarantee
+The same `ObjectValidator` and validation rules run in both places:
+- **Frontend**: On-blur field validation + pre-submit check — instant feedback without server roundtrip
+- **Backend**: Security and integrity guarantee — always authoritative
 
-Pattern regex, required fields, enum constraints, min/max values – all defined once in your Markdown, enforced everywhere.
+The isomorphic `ObjectValidator` (in `shared/validation/`) works identically in Node.js and the browser. Rules are generated once from Markdown by `SchemaGenerator`, delivered via `/api/meta`, and loaded into `SchemaCache` on the client. Pattern regex, required fields, enum constraints — all defined once, enforced everywhere.
 
 ### Visual Diagram Editor
 

@@ -1374,8 +1374,9 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
 
         columns.push(column);
 
-        // Add validation rules for each sub-field
-        validationRules[colName] = { type: field.type === 'number' ? 'number' : 'string' };
+        // Add validation rules for each sub-field (use type-specific rules from TypeRegistry)
+        const subTypeRules = typeRegistry.toValidationRules(field.type, className);
+        validationRules[colName] = subTypeRules || { type: field.type === 'number' ? 'number' : 'string' };
       }
 
       // Skip normal column creation for aggregate types

@@ -107,6 +107,7 @@ const EntityForm = {
                 <input type="${inputType}" ${stepAttr} ${readonlyAttr} class="form-input"
                        id="field-${subCol.name}" name="${subCol.name}"
                        value="${value !== null && value !== undefined ? value : ''}">
+                <div class="field-error" id="error-${subCol.name}"></div>
               </div>`;
         }
 
@@ -157,13 +158,14 @@ const EntityForm = {
     // Event listeners
     const form = document.getElementById('entity-form');
     form.addEventListener('submit', (e) => this.onSubmit(e));
-    form.addEventListener('input', () => this.onInput());
+    form.addEventListener('input', (e) => this.onInput(e));
 
     document.getElementById('btn-cancel').addEventListener('click', () => this.onCancel());
 
-    // Track dirty state
+    // Track dirty state + blur validation
     form.querySelectorAll('.form-input').forEach(input => {
       input.addEventListener('change', () => this.checkDirty());
+      input.addEventListener('blur', () => this.validateFieldOnBlur(input));
     });
 
     // Load FK dropdown options asynchronously
@@ -1243,15 +1245,14 @@ const EntityForm = {
     `;
   },
 
-  onInput() {
-    // Clear field errors on input
-    const form = document.getElementById('entity-form');
-    form.querySelectorAll('.form-input.error').forEach(input => {
+  onInput(e) {
+    // Clear error only for the field being edited
+    const input = e?.target?.closest('.form-input');
+    if (input) {
       input.classList.remove('error');
-    });
-    form.querySelectorAll('.field-error').forEach(err => {
-      err.textContent = '';
-    });
+      const errorEl = document.getElementById(`error-${input.name}`);
+      if (errorEl) errorEl.textContent = '';
+    }
   },
 
   checkDirty() {
@@ -1340,6 +1341,23 @@ const EntityForm = {
     // Clear previous errors
     this.clearErrors();
 
+    // Client-side validation (dual-layer: same rules as server)
+    const validator = SchemaCache.getValidator();
+    if (validator && validator.hasRules(this.currentEntity)) {
+      try {
+        if (isEdit) {
+          validator.validatePartial(this.currentEntity, data);
+        } else {
+          validator.validate(this.currentEntity, data);
+        }
+      } catch (err) {
+        if (err.isValidationError) {
+          this.showValidationErrors(err.errors);
+          return; // Don't submit to server
+        }
+      }
+    }
+
     try {
       let result;
       if (isEdit) {
@@ -1401,17 +1419,71 @@ const EntityForm = {
     }
 
     if (err.details && Array.isArray(err.details)) {
-      // Validation errors
-      err.details.forEach(detail => {
-        const input = document.getElementById(`field-${detail.field}`);
-        const errorEl = document.getElementById(`error-${detail.field}`);
-        if (input) input.classList.add('error');
-        if (errorEl) errorEl.textContent = detail.message;
-      });
+      this.showValidationErrors(err.details);
     } else {
       // General error
       alert(i18n.t('error_generic', { message: err.message }));
     }
+  },
+
+  /**
+   * Display validation errors inline on form fields
+   * @param {Array<{field, message}>} errors
+   */
+  showValidationErrors(errors) {
+    for (const detail of errors) {
+      const input = document.getElementById(`field-${detail.field}`);
+      const errorEl = document.getElementById(`error-${detail.field}`);
+      if (input) input.classList.add('error');
+      if (errorEl) errorEl.textContent = detail.message;
+    }
+  },
+
+  /**
+   * Validate a single field on blur (dual-layer: same rules as server)
+   */
+  validateFieldOnBlur(input) {
+    if (input.disabled) return; // Skip readonly/computed fields
+    const fieldName = input.name;
+    if (!fieldName || !this.currentEntity) return;
+
+    const validator = SchemaCache.getValidator();
+    if (!validator || !validator.hasRules(this.currentEntity)) return;
+
+    // Skip fields without validation rules (e.g., unknown fields)
+    if (!validator.getRule(this.currentEntity, fieldName, 'type') &&
+        !validator.getRule(this.currentEntity, fieldName, 'required')) return;
+
+    const value = this.getFieldValue(input);
+
+    // Clear previous error for this field
+    const errorEl = document.getElementById(`error-${fieldName}`);
+    input.classList.remove('error');
+    if (errorEl) errorEl.textContent = '';
+
+    try {
+      validator.validateField(this.currentEntity, fieldName, value);
+    } catch (err) {
+      if (err.isValidationError && err.errors.length > 0) {
+        input.classList.add('error');
+        if (errorEl) errorEl.textContent = err.errors[0].message;
+      }
+    }
+  },
+
+  /**
+   * Extract typed value from an input element for validation
+   */
+  getFieldValue(input) {
+    if (input.type === 'checkbox') return input.checked;
+    const value = input.value;
+    if (value === '' || value === null || value === undefined) return null;
+    if (input.type === 'number') return parseFloat(value);
+    // FK selects: parse as integer
+    if (input.classList.contains('fk-select') || input.classList.contains('fk-hidden-value')) {
+      return parseInt(value, 10);
+    }
+    return value;
   },
 
   clearErrors() {
