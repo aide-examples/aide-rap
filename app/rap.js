@@ -169,7 +169,8 @@ function viewerPageAuth(req, res, next) {
         } catch (e) { /* invalid session */ }
     }
     // Not authenticated → redirect to app root (SPA shows login)
-    res.redirect('./');
+    // Preserve original URL so user returns here after login
+    res.redirect('./?returnTo=' + encodeURIComponent(req.originalUrl));
 }
 
 const basePath = cfg.basePath || '';

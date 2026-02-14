@@ -330,8 +330,13 @@ const LoginDialog = {
                 this.hide();
                 // Store role for UI adjustments
                 window.currentUser = { role: data.role };
-                // Reload page to reinitialize with authenticated session
-                window.location.reload();
+                // Navigate to returnTo URL if present (e.g., from protected docs page redirect)
+                const returnTo = new URLSearchParams(window.location.search).get('returnTo');
+                if (returnTo && returnTo.startsWith('/')) {
+                    window.location.href = returnTo;
+                } else {
+                    window.location.reload();
+                }
             } else {
                 const error = await res.json();
                 errorDiv.textContent = error.error || 'Login failed';
