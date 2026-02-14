@@ -106,6 +106,7 @@ module.exports = function(cfg) {
         res.cookie('rap-session', JSON.stringify(session), {
             httpOnly: true,
             signed: true,
+            secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
             maxAge: sessionTimeout * 1000,
             sameSite: 'strict',
             path: cfg.basePath || '/'

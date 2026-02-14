@@ -150,6 +150,9 @@ paths.register('RAP_DOCS_DIR', path.join(APP_DIR, 'docs'));   // Generic RAP pla
 
 // Auth setup (needed early for viewerAuth on docs pages)
 const sessionSecret = cfg.auth?.sessionSecret || 'aide-rap-default-secret';
+if (sessionSecret.includes('default') || sessionSecret.includes('change')) {
+    console.warn('WARNING: Using default session secret! Set auth.sessionSecret in config.json');
+}
 const { authMiddleware, requireRole } = require('./server/middleware');
 const authEnabled = cfg.auth?.enabled === true && !opts.noauth;
 
@@ -221,8 +224,15 @@ const app = server.getApp();
 app._httpServer = server;
 
 // =============================================================================
-// 7a. AUTHENTICATION
+// 7a. SECURITY + AUTHENTICATION
 // =============================================================================
+
+// Security headers (clickjacking, MIME sniffing, etc.)
+const helmet = require('helmet');
+app.use(helmet({
+    contentSecurityPolicy: false,  // SPA loads inline scripts
+    crossOriginEmbedderPolicy: false  // Allow loading external resources
+}));
 
 // Rate limiting — protect against brute-force and flooding
 const rateLimit = require('express-rate-limit');
