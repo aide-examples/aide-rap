@@ -158,13 +158,17 @@ function enrichRecords(entityName, records) {
 }
 
 /**
- * Convert boolean values to SQLite INTEGER (0/1) in-place.
- * better-sqlite3 cannot bind JS booleans directly.
+ * Convert JS values to SQLite-compatible types in-place:
+ * - Booleans → INTEGER (0/1) — better-sqlite3 cannot bind JS booleans
+ * - JSON objects/arrays → TEXT (JSON.stringify) — SQLite stores JSON as TEXT
  */
-function convertBooleansForSql(entity, data) {
+function convertForSql(entity, data) {
   for (const col of entity.columns) {
-    if (col.jsType === 'boolean' && data[col.name] !== undefined && data[col.name] !== null) {
+    if (data[col.name] === undefined || data[col.name] === null) continue;
+    if (col.jsType === 'boolean') {
       data[col.name] = data[col.name] ? 1 : 0;
+    } else if (col.customType === 'json' && typeof data[col.name] === 'object') {
+      data[col.name] = JSON.stringify(data[col.name]);
     }
   }
 }
@@ -420,7 +424,7 @@ function create(entityName, data) {
   validator.lookupFn = createLookupFn(db);
   validator.existsFn = createExistsFn(db);
   const validated = validator.validate(entityName, data);
-  convertBooleansForSql(entity, validated);
+  convertForSql(entity, validated);
 
   // Build INSERT statement (system columns use SQLite DEFAULTs)
   const columns = entity.columns
@@ -470,7 +474,7 @@ function update(entityName, id, data, expectedVersion = null) {
   validator.lookupFn = createLookupFn(db);
   validator.existsFn = createExistsFn(db);
   const validated = validator.validatePartial(entityName, data);
-  convertBooleansForSql(entity, validated);
+  convertForSql(entity, validated);
 
   // Set system columns (update timestamp)
   validated._updated_at = new Date().toISOString();
