@@ -137,6 +137,8 @@ Example usage:
 | attachment | media | Uploaded file |
 ```
 
+Numeric types support `[MIN=x]` and `[MAX=x]` annotations for value range constraints. See [Scalar Types](scalar-types.md) for full reference including custom pattern types and numeric ranges.
+
 ## Aggregate Types – Composite Fields
 
 Some data naturally groups together – like GPS coordinates (latitude + longitude) or addresses (street, city, zip, country). Aggregate types let you define these as a single logical field that expands to multiple database columns.
