@@ -90,6 +90,43 @@ In `app/systems/SYSTEM/docs/Crud.md`, add the entity to the appropriate section:
 
 ---
 
+## Step 3b: Create Import Definition (if external data exists)
+
+If the entity will be populated from an external data source (Excel, CSV), create an import mapping file:
+
+`app/systems/SYSTEM/docs/imports/ENTITY_NAME.md`
+
+```markdown
+# ENTITY_NAME Import
+
+Source: extern/source-file.xlsx
+Sheet: Sheet Name
+MaxRows: 100000
+Limit: 100000
+
+
+## Source Edit
+
+
+## Source Filter
+
+
+## Mapping
+
+| Source | Target | Transform |
+|--------|--------|-----------|
+| SourceColumn1 | target_field1 | |
+| SourceColumn2 | target_field2 | date:DD.MM.YYYY |
+|                | fk_field      | |
+```
+
+**Tips:**
+- List all target fields, even if the source column is not yet mapped (leave Source empty)
+- Use transforms for type conversion: `string`, `date:FORMAT`, `number`, `replace:/pattern/replacement/`
+- FK fields resolve by LABEL automatically — just provide the display value
+
+---
+
 ## Step 4: Remove from Types.md (if converting enum)
 
 If converting an existing enum type to an entity, remove the enum definition from `app/systems/SYSTEM/docs/Types.md`.
@@ -193,6 +230,7 @@ The order matters:
 1. Entity file first (defines the schema)
 2. DataModel.md (for documentation)
 3. Crud.md (for UI visibility)
+3b. Import definition (if external data exists)
 4. Types.md cleanup (if converting enum)
 5. Server restart (applies changes)
 6. Layout positioning (cosmetic)
