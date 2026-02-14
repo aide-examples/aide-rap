@@ -29,6 +29,14 @@ class ObjectValidator {
     this.lookupFn = null;
 
     /**
+     * Exists function for cross-entity constraints in custom JS.
+     * Server: set to a function(entityName, conditions) that checks if a matching record exists.
+     * Browser: remains null → exists() returns false → constraints with exists are server-only.
+     * @type {Function|null}
+     */
+    this.existsFn = null;
+
+    /**
      * Available rule types and their validators
      */
     this.validators = {
@@ -791,8 +799,9 @@ class ObjectValidator {
     try {
       // eslint-disable-next-line no-new-func
       const lookupFn = this.lookupFn || (() => null);
-      const fn = new Function('obj', 'error', 'lookup', rule.code);
-      fn(obj, errorFn, lookupFn);
+      const existsFn = this.existsFn || (() => false);
+      const fn = new Function('obj', 'error', 'lookup', 'exists', rule.code);
+      fn(obj, errorFn, lookupFn, existsFn);
     } catch (e) {
       // Custom validation code error — treat as warning, don't block
       errors.push({

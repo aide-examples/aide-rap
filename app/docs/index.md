@@ -221,7 +221,7 @@ The same `ObjectValidator` and validation rules run in both places:
 
 The isomorphic `ObjectValidator` (in `shared/validation/`) works identically in Node.js and the browser. Rules are generated once from Markdown by `SchemaGenerator`, delivered via `/api/meta`, and loaded into `SchemaCache` on the client. Pattern regex, required fields, enum constraints — all defined once, enforced everywhere.
 
-In addition to single-field rules, **object-level constraints** (`## Constraints` section) validate cross-field relationships: `TimeRange(start_date, end_date)`, `NumericRange(min, max)`, and custom JS snippets with multilingual error messages. Custom JS constraints can use `lookup(entityName, id)` for cross-entity validation (server-side with batch cache). See [validation.md](validation.md) for full documentation.
+In addition to single-field rules, **object-level constraints** (`## Constraints` section) validate cross-field relationships: `TimeRange(start_date, end_date)`, `NumericRange(min, max)`, and custom JS snippets with multilingual error messages. Custom JS constraints can use `lookup(entityName, id)` and `exists(entityName, conditions)` for cross-entity validation (server-side with batch cache). See [validation.md](validation.md) for full documentation.
 
 ### Visual Diagram Editor
 

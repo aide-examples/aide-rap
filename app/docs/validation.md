@@ -119,6 +119,10 @@ The code receives:
 - **`lookup(entityName, id)`** — Load a record from another entity by ID (cross-entity constraint):
   - Server: synchronous DB query with per-batch cache (efficient for imports)
   - Browser: returns `null` (server acts as backstop — guard with `if (result)`)
+- **`exists(entityName, conditions)`** — Check if a record matching the conditions exists (cross-entity constraint):
+  - `conditions`: Object with column name → value pairs, e.g. `{ engine_type_id: 5, aircraft_type_id: 3 }`
+  - Server: `SELECT 1 ... WHERE col1 = ? AND col2 = ?` with per-batch cache
+  - Browser: returns `false` (server acts as backstop)
 
 #### Cross-Entity Constraints with `lookup()`
 
@@ -138,8 +142,29 @@ if (obj.aircraft_id && obj.installation_position) {
 ` ``
 ```
 
-- `lookup()` returns `null` in the browser — constraints using it are **server-only**
-- The cache is per validation batch: during imports, repeated lookups for the same entity+id are served from memory
+#### Existence Checks with `exists()`
+
+Use `exists()` to validate against junction/mapping tables:
+
+```markdown
+```js
+if (obj.engine_id && obj.aircraft_id) {
+  const engine = lookup('Engine', obj.engine_id);
+  const aircraft = lookup('Aircraft', obj.aircraft_id);
+  if (engine && aircraft) {
+    if (!exists('EngineTypeCompatibility', {
+      engine_type_id: engine.type_id,
+      aircraft_type_id: aircraft.type_id
+    })) {
+      error(['engine_id', 'aircraft_id'], 'INCOMPATIBLE_ENGINE_TYPE');
+    }
+  }
+}
+` ``
+```
+
+- Both `lookup()` and `exists()` return fallback values in the browser (`null` / `false`) — constraints using them are **server-only**
+- The cache is per validation batch: during imports, repeated lookups/exists checks for the same parameters are served from memory
 
 ### Error Messages Section
 

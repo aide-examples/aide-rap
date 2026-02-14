@@ -1253,6 +1253,21 @@ async function loadEntity(entityName, lookups = null, options = {}) {
       lookupCache.set(key, record || null);
       return record || null;
     };
+    // Cross-entity exists for custom constraints (batch cache lives for entire import)
+    const existsCache = new Map();
+    validator.existsFn = (existsEntity, conditions) => {
+      if (!conditions || typeof conditions !== 'object') return false;
+      const targetEntity = schema.entities[existsEntity];
+      if (!targetEntity) return false;
+      const keys = Object.keys(conditions).sort();
+      const cacheKey = `${existsEntity}:${keys.map(k => `${k}=${conditions[k]}`).join(',')}`;
+      if (existsCache.has(cacheKey)) return existsCache.get(cacheKey);
+      const where = keys.map(k => `${k} = ?`).join(' AND ');
+      const values = keys.map(k => conditions[k]);
+      const result = !!db.prepare(`SELECT 1 FROM ${targetEntity.tableName} WHERE ${where} LIMIT 1`).get(...values);
+      existsCache.set(cacheKey, result);
+      return result;
+    };
   }
 
   // Check for self-referential FKs - if present, disable FK constraints during import

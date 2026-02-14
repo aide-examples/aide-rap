@@ -41,6 +41,29 @@ function createLookupFn(db) {
 }
 
 /**
+ * Create an exists function for cross-entity constraints.
+ * Returns a function(entityName, conditions) that checks if a matching record exists.
+ * Cache lives for one validation batch (create/update call).
+ */
+function createExistsFn(db) {
+  const cache = new Map();
+  return (entityName, conditions) => {
+    if (!conditions || typeof conditions !== 'object') return false;
+    const schema = getSchema();
+    const entity = schema.entities[entityName];
+    if (!entity) return false;
+    const keys = Object.keys(conditions).sort();
+    const cacheKey = `${entityName}:${keys.map(k => `${k}=${conditions[k]}`).join(',')}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
+    const where = keys.map(k => `${k} = ?`).join(' AND ');
+    const values = keys.map(k => conditions[k]);
+    const result = !!db.prepare(`SELECT 1 FROM ${entity.tableName} WHERE ${where} LIMIT 1`).get(...values);
+    cache.set(cacheKey, result);
+    return result;
+  };
+}
+
+/**
  * Initialize validation rules for an entity
  */
 function ensureValidationRules(entityName) {
@@ -258,8 +281,9 @@ function create(entityName, data) {
   const entity = ensureValidationRules(entityName);
   const db = getDatabase();
 
-  // Validate and transform (with cross-entity lookup for custom constraints)
+  // Validate and transform (with cross-entity lookup/exists for custom constraints)
   validator.lookupFn = createLookupFn(db);
+  validator.existsFn = createExistsFn(db);
   const validated = validator.validate(entityName, data);
   convertBooleansForSql(entity, validated);
 
@@ -307,8 +331,9 @@ function update(entityName, id, data, expectedVersion = null) {
     throw new VersionConflictError(entityName, id, expectedVersion, currentRecord);
   }
 
-  // Validate and transform (partial — with cross-entity lookup for custom constraints)
+  // Validate and transform (partial — with cross-entity lookup/exists for custom constraints)
   validator.lookupFn = createLookupFn(db);
+  validator.existsFn = createExistsFn(db);
   const validated = validator.validatePartial(entityName, data);
   convertBooleansForSql(entity, validated);
 
