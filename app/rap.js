@@ -148,10 +148,38 @@ paths.register('DOCS_DIR', cfg.paths.docs);
 paths.register('HELP_DIR', cfg.paths.help);
 paths.register('RAP_DOCS_DIR', path.join(APP_DIR, 'docs'));   // Generic RAP platform docs
 
+// Auth setup (needed early for viewerAuth on docs pages)
+const sessionSecret = cfg.auth?.sessionSecret || 'aide-rap-default-secret';
+const { authMiddleware, requireRole } = require('./server/middleware');
+const authEnabled = cfg.auth?.enabled === true && !opts.noauth;
+
+// Viewer auth: redirect to app root (login page) if not authenticated
+function viewerPageAuth(req, res, next) {
+    // Already authenticated via API key
+    if (req.user) return next();
+    // Check session cookie
+    const session = req.signedCookies?.['rap-session'];
+    if (session) {
+        try {
+            const sessionData = typeof session === 'string' ? JSON.parse(session) : session;
+            if (!sessionData.expires || Date.now() <= sessionData.expires) {
+                req.user = { role: sessionData.role };
+                return next();
+            }
+        } catch (e) { /* invalid session */ }
+    }
+    // Not authenticated → redirect to app root (SPA shows login)
+    res.redirect('./');
+}
+
+const basePath = cfg.basePath || '';
+
 const server = new HttpServer({
     port: cfg.port,
-    basePath: cfg.basePath || '',
+    basePath,
     appDir: APP_DIR,
+    // Cookie parser must run before auth middleware on viewer routes
+    earlyMiddleware: [cookieParser(sessionSecret)],
     docsConfig: {
         appName: `AIDE RAP [${systemName}]`,
         titleHtml: cfg.titleHtml || null,
@@ -159,6 +187,9 @@ const server = new HttpServer({
         docsEditable: cfg.docsEditable,
         helpEditable: cfg.helpEditable,
         viewerHooks: '/static/rap/viewer-hooks.js',
+        backLink: basePath ? basePath + '/' : '/',
+        // Protect docs/help pages with auth (redirect to login if not authenticated)
+        viewerAuth: authEnabled ? viewerPageAuth : null,
         // Point docs to system-specific directory
         docsDir: cfg.paths.docs,
         // views/ has subdirectories (areas) that should stay nested, not become top-level sections
@@ -192,8 +223,8 @@ app._httpServer = server;
 // 7a. AUTHENTICATION
 // =============================================================================
 
-// Cookie parser for session cookies (required for auth)
-const sessionSecret = cfg.auth?.sessionSecret || 'aide-rap-default-secret';
+// Cookie parser is registered via earlyMiddleware on HttpServer (before docs routes)
+// Re-register here for all other routes too
 app.use(cookieParser(sessionSecret));
 
 // API key authentication (for external workflow tools like HCL Leap, Power Automate)
@@ -212,13 +243,15 @@ app.options('/api/*', (req, res) => {
 // Auth router (login, logout, session check)
 app.use(require('./server/routers/auth.router')(cfg));
 
-// Auth middleware - only active when auth is enabled (and --noauth not set)
-const { authMiddleware, requireRole } = require('./server/middleware');
-const authEnabled = cfg.auth?.enabled === true && !opts.noauth;
-
 if (opts.noauth) {
     console.log('Authentication disabled via --noauth flag');
     cfg.noauth = true;  // Pass to auth router
+}
+
+// Blanket auth: ALL /api routes require authentication (login or API key)
+// Auth router is mounted above, so /api/auth/* routes are handled before this
+if (authEnabled) {
+    app.use('/api', authMiddleware, requireRole('guest', 'user', 'admin'));
 }
 
 // Conditional auth middleware factory
@@ -505,8 +538,11 @@ app.get('/favicon.ico', (req, res) => {
 // System-specific icons (e.g., for custom titleHtml)
 app.use('/icons', require('express').static(path.join(SYSTEM_DIR, 'icons')));
 
-// Main page
+// Main page — redirect ?doc= deep links to the docs viewer
 app.get('/', (req, res) => {
+    if (req.query.doc) {
+        return res.redirect('about?doc=' + encodeURIComponent(req.query.doc));
+    }
     const htmlPath = path.join(APP_DIR, 'static', 'rap', 'rap.html');
     if (cfg.basePath) {
         let html = fs.readFileSync(htmlPath, 'utf8');

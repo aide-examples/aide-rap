@@ -74,6 +74,25 @@ GET /api/integrate/:entity/lookup?field=<column>&value=<value>
 | `?field=type&value=CF34-10` | Resolves "CF34-10" → EngineType id, filters by `type_id` |
 | `?field=type&value=UNKNOWN` | Returns 404 with `FK_NOT_FOUND` error |
 
+### FK-Options — Filtered picklist based on compatibility
+
+```
+GET /api/entities/:entity/fk-options/:targetField?triggerField=id
+```
+
+Returns records of the target FK entity filtered by compatibility rules (derived from `[PAIRS]` annotations). Use this when two FK dropdowns are linked — selecting a value in one should filter the other.
+
+| Example | Result |
+|---------|--------|
+| `EngineAllocation/fk-options/aircraft_id?engine_id=42` | Aircraft compatible with Engine 42's type |
+| `EngineAllocation/fk-options/engine_id?aircraft_id=7` | Engines compatible with Aircraft 7's type |
+
+**Response:** Same format as entity list — `{ data: [...], total: N }`. Each record includes `_label` (if the target entity has a computed label) and all view columns.
+
+**Without trigger value:** If the trigger field parameter is omitted, returns ALL records of the target entity (unfiltered fallback).
+
+**Note:** This endpoint is on `/api/entities/` (not `/api/integrate/`), but is accessible with API key authentication. The API key must have scope for the entity (e.g., `EngineAllocation`).
+
 ### Entity List — Standard CRUD with simple filter
 
 ```
@@ -120,5 +139,6 @@ Supports Optimistic Concurrency Control via `If-Match` header or `_version` in b
 | `?field=&value=` | Yes | Yes | Yes |
 | `?filter=` (advanced) | Yes | Yes | No |
 | Options/Picklist | No | No | Yes (`/options`) |
+| FK-Options (filtered) | Yes (`/fk-options`) | No | No |
 | Target audience | Internal UI | Both | External tools |
 | Scope check | Entity scope | No | Entity scope |
