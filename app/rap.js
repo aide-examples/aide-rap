@@ -224,6 +224,23 @@ app._httpServer = server;
 // 7a. AUTHENTICATION
 // =============================================================================
 
+// Rate limiting — protect against brute-force and flooding
+const rateLimit = require('express-rate-limit');
+app.use('/api/auth/login', rateLimit({
+    windowMs: 60 * 1000,   // 1 minute
+    max: 5,                 // 5 login attempts per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many login attempts, please try again later' }
+}));
+app.use('/api', rateLimit({
+    windowMs: 60 * 1000,   // 1 minute
+    max: 300,               // 300 API requests per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later' }
+}));
+
 // Cookie parser is registered via earlyMiddleware on HttpServer (before docs routes)
 // Re-register here for all other routes too
 app.use(cookieParser(sessionSecret));
