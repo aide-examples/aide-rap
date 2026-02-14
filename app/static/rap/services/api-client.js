@@ -261,7 +261,7 @@ const SchemaCache = {
       this.validator = new ObjectValidator();
       for (const [entityName, schema] of Object.entries(schemas)) {
         if (schema.validationRules) {
-          this.validator.defineRules(entityName, schema.validationRules);
+          this.validator.defineRules(entityName, schema.validationRules, false, schema.objectRules || null);
         }
       }
     }

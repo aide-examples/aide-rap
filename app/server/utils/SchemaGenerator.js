@@ -854,6 +854,123 @@ function parseServerCalculationsSection(fileContent) {
 }
 
 /**
+ * Parse ## Constraints section from entity markdown.
+ * Supports two types of constraints:
+ * 1. Built-in rules: TimeRange(fieldA, fieldB) or NumericRange(fieldA, fieldB)
+ *    Optional custom message: TimeRange(a, b) : "Custom error message"
+ * 2. Custom JS blocks: ```js ... ``` with error(fields, code) calls
+ *
+ * @param {string} fileContent - Markdown content
+ * @returns {{ builtinRules: Array, customCode: string|null }}
+ */
+function parseConstraintsSection(fileContent) {
+  const builtinRules = [];
+  let customCode = null;
+  const lines = fileContent.split('\n');
+  let inSection = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (trimmed === '## Constraints') {
+      inSection = true;
+      continue;
+    }
+    if (inSection && trimmed.startsWith('## ')) break;
+    if (!inSection) continue;
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    // Parse built-in rule: FunctionName(fieldA, fieldB) [: "message"]
+    const builtinMatch = trimmed.match(
+      /^(TimeRange|NumericRange)\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)(?:\s*:\s*"([^"]*)")?$/
+    );
+    if (builtinMatch) {
+      builtinRules.push({
+        name: builtinMatch[1],
+        fieldA: builtinMatch[2],
+        fieldB: builtinMatch[3],
+        message: builtinMatch[4] || null
+      });
+      continue;
+    }
+
+    // Parse ```js code block
+    if (trimmed === '```js') {
+      const jsLines = [];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '```') {
+        jsLines.push(lines[i]);
+        i++;
+      }
+      customCode = jsLines.join('\n').trim();
+      continue;
+    }
+
+    // Unknown line — warn
+    if (trimmed && !trimmed.startsWith('```')) {
+      console.warn(`[Schema Warning] Unparseable constraint: "${trimmed}"`);
+    }
+  }
+
+  return { builtinRules, customCode };
+}
+
+/**
+ * Parse ## Error Messages section from entity markdown.
+ * Table format: | Code | en | de |
+ *
+ * @param {string} fileContent - Markdown content
+ * @returns {Object} { CODE: { en: "...", de: "..." }, ... }
+ */
+function parseErrorMessagesSection(fileContent) {
+  const messages = {};
+  const lines = fileContent.split('\n');
+  let inSection = false;
+  let languages = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed === '## Error Messages') {
+      inSection = true;
+      continue;
+    }
+    if (inSection && trimmed.startsWith('## ')) break;
+    if (!inSection) continue;
+
+    // Skip empty lines
+    if (!trimmed || !trimmed.startsWith('|')) continue;
+
+    // Parse header row to detect language columns
+    if (!languages) {
+      const headers = trimmed.split('|').map(s => s.trim()).filter(Boolean);
+      if (headers[0]?.toLowerCase() === 'code') {
+        languages = headers.slice(1).map(h => h.toLowerCase());
+      }
+      continue;
+    }
+
+    // Skip separator row (|---|----|)
+    if (trimmed.match(/^\|[\s-|]+$/)) continue;
+
+    // Parse data row
+    const cells = trimmed.split('|').map(s => s.trim()).filter(Boolean);
+    if (cells.length >= 2) {
+      const code = cells[0];
+      const translations = {};
+      for (let i = 0; i < languages.length && i + 1 < cells.length; i++) {
+        translations[languages[i]] = cells[i + 1];
+      }
+      messages[code] = translations;
+    }
+  }
+
+  return messages;
+}
+
+/**
  * Decode HTML entities
  */
 function decodeHtmlEntities(text) {
@@ -1047,6 +1164,10 @@ function parseEntityFile(fileContent) {
     );
   }
 
+  // Parse ## Constraints and ## Error Messages sections
+  const constraints = parseConstraintsSection(fileContent);
+  const errorMessages = parseErrorMessagesSection(fileContent);
+
   return {
     className,
     description,
@@ -1056,7 +1177,9 @@ function parseEntityFile(fileContent) {
     // Legacy: keep 'calculations' for backward compat during transition
     calculations: legacyCalculations,
     localTypes,
-    entityAnnotations
+    entityAnnotations,
+    constraints,
+    errorMessages
   };
 }
 
@@ -1086,7 +1209,9 @@ function parseEntityDescriptions(mdContent, mdPath) {
             clientCalculations: parsed.clientCalculations,
             serverCalculations: parsed.serverCalculations,
             localTypes: parsed.localTypes,
-            entityAnnotations: parsed.entityAnnotations
+            entityAnnotations: parsed.entityAnnotations,
+            constraints: parsed.constraints,
+            errorMessages: parsed.errorMessages
           };
         }
       }
@@ -1304,6 +1429,78 @@ function getTypeInfo(typeName, entityName) {
  * @param {object} classDef - Class definition from markdown
  * @param {string[]} allEntityNames - All known entity names (for FK detection via type)
  */
+/**
+ * Resolve a conceptual field name to the actual DB column name.
+ * FK fields: "aircraft" → "aircraft_id", regular fields: "start_date" → "start_date"
+ * @param {string} fieldName - Conceptual field name from markdown
+ * @param {Array} columns - Generated columns array
+ * @returns {string} - Resolved column name
+ */
+function resolveColumnName(fieldName, columns) {
+  // Direct match (regular fields)
+  if (columns.find(c => c.name === fieldName)) return fieldName;
+  // FK match: conceptual name → column with displayName
+  const fkCol = columns.find(c => c.displayName === fieldName);
+  if (fkCol) return fkCol.name;
+  // Fallback: try with _id suffix
+  if (columns.find(c => c.name === fieldName + '_id')) return fieldName + '_id';
+  // Last resort: return as-is (will be caught by validation at runtime)
+  return fieldName;
+}
+
+/**
+ * Build object-level validation rules from parsed ## Constraints section.
+ * Resolves conceptual field names to DB column names and generates default messages.
+ *
+ * @param {object} classDef - Parsed class definition
+ * @param {Array} columns - Generated columns
+ * @param {string} className - Entity name (for warnings)
+ * @returns {Array} - Object rules array
+ */
+function buildObjectRules(classDef, columns, className) {
+  const constraints = classDef.constraints;
+  if (!constraints) return [];
+
+  const { builtinRules, customCode } = constraints;
+  const errorMessages = classDef.errorMessages || {};
+  const objectRules = [];
+
+  // Process built-in rules (TimeRange, NumericRange)
+  for (const rule of builtinRules) {
+    const columnA = resolveColumnName(rule.fieldA, columns);
+    const columnB = resolveColumnName(rule.fieldB, columns);
+
+    // Warn if fields not found
+    if (columnA === rule.fieldA && !columns.find(c => c.name === columnA)) {
+      console.warn(`[Schema Warning] ${className}: Constraint field "${rule.fieldA}" not found`);
+    }
+    if (columnB === rule.fieldB && !columns.find(c => c.name === columnB)) {
+      console.warn(`[Schema Warning] ${className}: Constraint field "${rule.fieldB}" not found`);
+    }
+
+    objectRules.push({
+      type: 'builtin',
+      name: rule.name,
+      columnA,
+      columnB,
+      fieldA: rule.fieldA,
+      fieldB: rule.fieldB,
+      message: rule.message || null  // null = use built-in default
+    });
+  }
+
+  // Process custom JS code
+  if (customCode) {
+    objectRules.push({
+      type: 'custom',
+      code: customCode,
+      messages: Object.keys(errorMessages).length > 0 ? errorMessages : undefined
+    });
+  }
+
+  return objectRules;
+}
+
 function generateEntitySchema(className, classDef, allEntityNames = []) {
   const tableName = toSnakeCase(className);
   const columns = [];
@@ -1580,6 +1777,9 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     columns.push({ ...sysCol });
   }
 
+  // Build object-level validation rules from parsed constraints
+  const objectRules = buildObjectRules(classDef, columns, className);
+
   return {
     className,
     tableName,
@@ -1587,6 +1787,7 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     area: classDef.area || 'unknown',
     columns,
     validationRules,
+    objectRules: objectRules.length > 0 ? objectRules : undefined,
     uniqueKeys,
     indexes,
     foreignKeys,

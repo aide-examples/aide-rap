@@ -32,7 +32,7 @@ function ensureValidationRules(entityName) {
   }
 
   if (!validator.hasRules(entityName)) {
-    validator.defineRules(entityName, entity.validationRules);
+    validator.defineRules(entityName, entity.validationRules, false, entity.objectRules || null);
     logger.debug(`Defined validation rules for ${entityName}`);
   }
 
@@ -405,7 +405,8 @@ function getSchemaInfo(entityName) {
         table: col.foreignKey.table
       } : null
     })),
-    validationRules: entity.validationRules
+    validationRules: entity.validationRules,
+    objectRules: entity.objectRules || null
   };
 }
 
@@ -532,6 +533,7 @@ function getExtendedSchemaInfo(entityName) {
       };
     }),
     validationRules: entity.validationRules,
+    objectRules: entity.objectRules || null,
     // Include enumFields for client-side value formatting
     enumFields: entity.enumFields || {},
     // Include prefilter fields for large dataset filtering

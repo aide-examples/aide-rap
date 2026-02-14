@@ -90,7 +90,9 @@ module.exports = function(cfg) {
             const options = {
                 skipInvalid: req.body?.skipInvalid === true,
                 mode: req.body?.mode || 'replace',
-                sourceDir: req.body?.sourceDir || 'seed'
+                sourceDir: req.body?.sourceDir || 'seed',
+                validateFields: req.body?.validateFields === true,
+                validateConstraints: req.body?.validateConstraints !== false  // Default: true
             };
             const result = await SeedManager.loadEntity(req.params.entity, null, options);
             ComputedFieldService.runAll();

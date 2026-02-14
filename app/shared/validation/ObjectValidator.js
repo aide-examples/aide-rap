@@ -15,6 +15,12 @@ class ObjectValidator {
     this.rules = new Map();
 
     /**
+     * Object-level (cross-field) rules
+     * @type {Map<string, Array>} - entityType -> [{ type, ... }]
+     */
+    this.objectRules = new Map();
+
+    /**
      * Available rule types and their validators
      */
     this.validators = {
@@ -76,11 +82,14 @@ class ObjectValidator {
    * @param {boolean} allowOverwrite - Allow overwriting existing rules (default: false)
    * @throws {Error} - If rules already exist and allowOverwrite=false
    */
-  defineRules(entityType, fieldRules, allowOverwrite = false) {
+  defineRules(entityType, fieldRules, allowOverwrite = false, objectRules = null) {
     if (this.rules.has(entityType) && !allowOverwrite) {
       throw new Error(`Validation rules for entity type "${entityType}" are already defined. Set allowOverwrite=true to replace.`);
     }
     this.rules.set(entityType, fieldRules);
+    if (objectRules && objectRules.length > 0) {
+      this.objectRules.set(entityType, objectRules);
+    }
   }
 
   /**
@@ -131,12 +140,16 @@ class ObjectValidator {
     const errors = [];
     const transformed = { ...obj };
 
-    // Phase 1: Validation (collect all errors)
+    // Phase 1: Field validation (collect all errors)
     for (const [fieldName, fieldRules] of Object.entries(rules)) {
       const value = obj[fieldName];
       const fieldErrors = this._validateField(fieldName, value, fieldRules);
       errors.push(...fieldErrors);
     }
+
+    // Phase 1b: Object-level validation (cross-field rules)
+    const objectErrors = this._validateObjectRules(entityType, obj);
+    errors.push(...objectErrors);
 
     // On errors: abort before transformation
     if (errors.length > 0) {
@@ -176,6 +189,12 @@ class ObjectValidator {
       const fieldErrors = this._validateField(fieldName, value, fieldRules);
       errors.push(...fieldErrors);
     }
+
+    // Object-level validation (cross-field rules)
+    // Built-in rules skip when values are null, so partial updates work correctly.
+    // Custom JS receives the partial obj — server has full record as backstop.
+    const objectErrors = this._validateObjectRules(entityType, obj);
+    errors.push(...objectErrors);
 
     if (errors.length > 0) {
       throw new this.ValidationError(errors);
@@ -223,6 +242,33 @@ class ObjectValidator {
     const rules = this.rules.get(entityType);
     if (!rules || !rules[fieldName]) return undefined;
     return rules[fieldName][ruleName];
+  }
+
+  // ==================== Selective validation (non-throwing) ====================
+
+  /**
+   * Validate only field-level rules (type, pattern, required, enum).
+   * Returns array of error objects (empty = valid). Does NOT throw.
+   * Used by SeedManager when importValidation.fieldRules is enabled.
+   */
+  validateFieldRulesOnly(entityType, obj) {
+    const rules = this.rules.get(entityType);
+    if (!rules) return [];
+
+    const errors = [];
+    for (const [fieldName, fieldRules] of Object.entries(rules)) {
+      errors.push(...this._validateField(fieldName, obj[fieldName], fieldRules));
+    }
+    return errors;
+  }
+
+  /**
+   * Validate only cross-field (object-level) rules (TimeRange, NumericRange, Custom JS).
+   * Returns array of error objects (empty = valid). Does NOT throw.
+   * Used by SeedManager when importValidation.objectRules is enabled.
+   */
+  validateObjectRulesOnly(entityType, obj) {
+    return this._validateObjectRules(entityType, obj);
   }
 
   // ==================== Internal validation methods ====================
@@ -648,6 +694,107 @@ class ObjectValidator {
     }
 
     return null;
+  }
+
+  // ==================== Object-level (cross-field) validators ====================
+
+  /**
+   * Validate cross-field / object-level rules
+   * @param {string} entityType - Entity type
+   * @param {Object} obj - Object being validated
+   * @returns {Array} - Array of error objects (empty if valid)
+   */
+  _validateObjectRules(entityType, obj) {
+    const rules = this.objectRules.get(entityType);
+    if (!rules || rules.length === 0) return [];
+
+    const errors = [];
+
+    for (const rule of rules) {
+      if (rule.type === 'builtin') {
+        const error = this._validateBuiltinRule(rule, obj);
+        if (error) errors.push(error);
+      } else if (rule.type === 'custom') {
+        const customErrors = this._validateCustomRule(rule, obj);
+        errors.push(...customErrors);
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Validate a built-in constraint rule (TimeRange, NumericRange).
+   * Both check: fieldA <= fieldB. Skip if either value is null/empty.
+   */
+  _validateBuiltinRule(rule, obj) {
+    const valA = obj[rule.columnA];
+    const valB = obj[rule.columnB];
+
+    // Skip if either field is null/undefined/empty
+    if (valA == null || valA === '' || valB == null || valB === '') return null;
+
+    // Both TimeRange and NumericRange: fieldA <= fieldB
+    if (valA > valB) {
+      // Generate default message if none provided
+      let message = rule.message;
+      if (!message) {
+        if (rule.name === 'TimeRange') {
+          message = `"${rule.fieldA}" must be on or before "${rule.fieldB}"`;
+        } else {
+          message = `"${rule.fieldA}" must be less than or equal to "${rule.fieldB}"`;
+        }
+      }
+
+      return {
+        field: rule.columnA,
+        relatedFields: [rule.columnB],
+        code: 'OBJECT_' + rule.name.toUpperCase(),
+        message
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate a custom JS constraint.
+   * Executes designer-provided JS code with `obj` and `error(fields, code)`.
+   * Messages are resolved from the rule's message table.
+   */
+  _validateCustomRule(rule, obj) {
+    const errors = [];
+    const messages = rule.messages || {};
+
+    // Error callback for custom code: error(['field1', 'field2'], 'CODE')
+    const errorFn = (fields, code) => {
+      if (!Array.isArray(fields) || fields.length === 0) return;
+      const msgDef = messages[code];
+      // Use 'en' as default language (i18n language selection handled by caller)
+      const message = msgDef ? (msgDef.en || Object.values(msgDef)[0] || code) : code;
+      errors.push({
+        field: fields[0],
+        relatedFields: fields.slice(1),
+        code: 'OBJECT_CUSTOM',
+        message
+      });
+    };
+
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('obj', 'error', rule.code);
+      fn(obj, errorFn);
+    } catch (e) {
+      // Custom validation code error — treat as warning, don't block
+      errors.push({
+        field: '_custom',
+        relatedFields: [],
+        code: 'OBJECT_CUSTOM_ERROR',
+        message: `Custom constraint error: ${e.message}`
+      });
+    }
+
+    return errors;
   }
 
   // ==================== Transformer implementations ====================

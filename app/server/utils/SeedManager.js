@@ -1170,7 +1170,11 @@ function countSeedConflicts(entityName, sourceDir = 'seed') {
 async function loadEntity(entityName, lookups = null, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-  const { skipInvalid = false, mode = 'replace', preserveSystemColumns = false, sourceDir = 'seed' } = options;
+  const {
+    skipInvalid = false, mode = 'replace', preserveSystemColumns = false, sourceDir = 'seed',
+    validateFields = false,
+    validateConstraints = true
+  } = options;
 
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
@@ -1228,6 +1232,15 @@ async function loadEntity(entityName, lookups = null, options = {}) {
     const validation = validateImport(entityName, records);
     invalidRows = new Set(validation.invalidRows.map(r => r - 1)); // Convert to 0-based
     validationWarnings = validation.warnings || [];
+  }
+
+  // Initialize ObjectValidator for import validation (if any validation is enabled)
+  const needsValidation = validateFields || validateConstraints;
+  let validator = null;
+  if (needsValidation && entity.validationRules) {
+    const ObjectValidator = require('../../shared/validation/ObjectValidator');
+    validator = new ObjectValidator();
+    validator.defineRules(entityName, entity.validationRules, false, entity.objectRules || null);
   }
 
   // Check for self-referential FKs - if present, disable FK constraints during import
@@ -1331,6 +1344,26 @@ async function loadEntity(entityName, lookups = null, options = {}) {
         fuzzyMatchMap.get(key).count++;
       } else {
         fuzzyMatchMap.set(key, { ...fm, count: 1 });
+      }
+    }
+
+    // Validate record against field-level and/or cross-field rules (if enabled)
+    if (validator) {
+      const validationErrors = [];
+      if (validateFields) {
+        validationErrors.push(...validator.validateFieldRulesOnly(entityName, resolved));
+      }
+      if (validateConstraints) {
+        validationErrors.push(...validator.validateObjectRulesOnly(entityName, resolved));
+      }
+      if (validationErrors.length > 0) {
+        for (const err of validationErrors) {
+          if (errors.length < 10) {
+            errors.push(`Row ${i + 1}: ${err.message}`);
+          }
+        }
+        skipped++;
+        continue;
       }
     }
 

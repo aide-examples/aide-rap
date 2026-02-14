@@ -1432,10 +1432,19 @@ const EntityForm = {
    */
   showValidationErrors(errors) {
     for (const detail of errors) {
+      // Primary field: red border + error message
       const input = document.getElementById(`field-${detail.field}`);
       const errorEl = document.getElementById(`error-${detail.field}`);
       if (input) input.classList.add('error');
       if (errorEl) errorEl.textContent = detail.message;
+
+      // Related fields (cross-field errors): red border only, no duplicate message
+      if (detail.relatedFields) {
+        for (const relField of detail.relatedFields) {
+          const relInput = document.getElementById(`field-${relField}`);
+          if (relInput) relInput.classList.add('error');
+        }
+      }
     }
   },
 

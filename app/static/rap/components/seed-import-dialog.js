@@ -23,6 +23,8 @@ const SeedImportDialog = {
   importConflicts: [],
   importMeta: null,  // { conflictCount, dbRowCount }
   previewLimit: 100,  // Default preview limit, null = show all
+  validateFields: false,
+  validateConstraints: true,
 
   // Rule tab state
   ruleOriginalContent: null,
@@ -249,6 +251,10 @@ const SeedImportDialog = {
                         <label><input type="radio" name="load-mode" value="skip_conflicts"> Skip</label>
                         <label><input type="radio" name="load-mode" value="replace"> Replace</label>
                       </div>
+                      <div class="load-validation-options">
+                        <label title="Validate field types (string, number, pattern, enum) during import"><input type="checkbox" id="chk-validate-fields"> Fields</label>
+                        <label title="Validate cross-field constraints (TimeRange, custom rules) during import"><input type="checkbox" id="chk-validate-constraints" checked> Constraints</label>
+                      </div>
                       <button class="btn-seed" id="btn-export-json" disabled>Export JSON</button>
                       <button class="btn-seed" id="btn-export-csv" disabled>Export CSV</button>
                       <button class="btn-seed btn-save" id="btn-load-db">Load into Database</button>
@@ -389,6 +395,14 @@ const SeedImportDialog = {
     // Export buttons
     this.modalElement.querySelector('#btn-export-json')?.addEventListener('click', () => this.exportImportJson());
     this.modalElement.querySelector('#btn-export-csv')?.addEventListener('click', () => this.exportImportCsv());
+
+    // Validation checkboxes
+    this.modalElement.querySelector('#chk-validate-fields')?.addEventListener('change', (e) => {
+      this.validateFields = e.target.checked;
+    });
+    this.modalElement.querySelector('#chk-validate-constraints')?.addEventListener('change', (e) => {
+      this.validateConstraints = e.target.checked;
+    });
 
     // Rule editor
     const ruleEditor = this.modalElement.querySelector('#rule-editor');
@@ -797,7 +811,7 @@ ${mappingTable}
       const res = await fetch(`api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sourceDir: 'import', mode, skipInvalid: true })
+        body: JSON.stringify({ sourceDir: 'import', mode, skipInvalid: true, validateFields: this.validateFields, validateConstraints: this.validateConstraints })
       });
       const result = await res.json();
 
@@ -1114,7 +1128,7 @@ ${mappingTable}
       const loadRes = await fetch(`api/seed/load/${this.entityName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skipInvalid: true, mode })
+        body: JSON.stringify({ skipInvalid: true, mode, validateFields: this.validateFields, validateConstraints: this.validateConstraints })
       });
       const loadResult = await loadRes.json();
 
