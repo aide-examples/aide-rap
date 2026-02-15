@@ -399,7 +399,7 @@ async function tryUrlLogin() {
                 const res = await fetch('api/admin/reports', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
-                  reportBtn.title = `Reports updated: ${data.files.join(', ')}`;
+                  window.open('about?doc=reports/index.md', '_blank');
                 } else {
                   reportBtn.title = `Report failed: ${data.error}`;
                 }
