@@ -16,6 +16,65 @@ const {
 const { resolveConceptualFKs, findByUniqueField } = require('./FKResolver');
 const { resolveMediaUrls, flattenAggregates } = require('./MediaResolver');
 const { validateImport, findExistingByUnique, getFirstUniqueValue } = require('./ImportValidator');
+const { getNeutralValue } = require('../NeutralValues');
+
+/**
+ * Assess data quality for a record: check FK resolution, required fields, validation.
+ * Returns a bitmask (_ql) and deficit details (_qd).
+ *
+ * @param {object} entity - Entity schema object
+ * @param {object} resolved - Record with resolved FKs
+ * @param {Array} fkWarnings - FK resolution warnings from resolveConceptualFKs
+ * @param {object|null} validator - ObjectValidator instance (or null)
+ * @param {string} entityName - Entity class name
+ * @returns {{ ql: number, qd: Array }} Quality assessment result
+ */
+function assessQuality(entity, resolved, fkWarnings, validator, entityName) {
+  let ql = 0;
+  const qd = [];
+
+  // FK unresolvable (bit 8)
+  for (const fkWarn of fkWarnings) {
+    ql |= 8;
+    qd.push({ field: fkWarn.field, ql: 8, value: fkWarn.value,
+              message: `FK label not found in ${fkWarn.targetEntity}` });
+  }
+
+  // Required fields: check non-OPTIONAL, non-system columns for empty values
+  for (const col of entity.columns) {
+    if (col.system || col.name === 'id') continue;
+    if (col.optional) continue;
+    // Skip aggregate sub-columns (derived from parent field, not directly provided)
+    if (col.aggregateSource) continue;
+    // Skip columns already reported as FK warnings (avoid double-reporting)
+    if (qd.some(d => d.field === col.name)) continue;
+
+    const value = resolved[col.name];
+    if (value === null || value === undefined || value === '') {
+      if (col.foreignKey) {
+        ql |= 4;  // Required FK empty
+        qd.push({ field: col.name, ql: 4, value: null, message: 'Required FK field is empty' });
+      } else {
+        ql |= 2;  // Required field empty
+        qd.push({ field: col.name, ql: 2, value: null, message: 'Required field is empty' });
+      }
+    }
+  }
+
+  // Field validation rules (bit 1) + Cross-field/object rules (bit 16)
+  if (validator) {
+    for (const err of validator.validateFieldRulesOnly(entityName, resolved)) {
+      ql |= 1;
+      qd.push({ field: err.field, ql: 1, value: resolved[err.field], message: err.message });
+    }
+    for (const err of validator.validateObjectRulesOnly(entityName, resolved)) {
+      ql |= 16;
+      qd.push({ field: err.field || '_object', ql: 16, value: null, message: err.message });
+    }
+  }
+
+  return { ql, qd };
+}
 
 /**
  * Load seed data for a specific entity.
@@ -36,7 +95,8 @@ async function loadEntity(db, entity, schema, sourceDir, seedDir, lookups = null
     validateFields = false,
     validateConstraints = true,
     mediaService = null,
-    typeRegistry = null
+    typeRegistry = null,
+    acceptQL = 0
   } = options;
 
   if (!entity) {
@@ -158,9 +218,19 @@ async function loadEntity(db, entity, schema, sourceDir, seedDir, lookups = null
   const insert = db.prepare(insertSql);
   const update = db.prepare(updateSql);
 
+  // Quality-aware INSERT: includes _ql and _qd columns (used when acceptQL > 0)
+  let qInsert = null;
+  if (acceptQL > 0) {
+    const qColumns = [...columnsWithoutId, '_ql', '_qd'];
+    const qInsertSql = `INSERT INTO ${entity.tableName} (${qColumns.join(', ')}) VALUES (${qColumns.map(() => '?').join(', ')})`;
+    qInsert = db.prepare(qInsertSql);
+  }
+
   let loaded = 0;
   let updated = 0;
   let skipped = 0;
+  let qualityAccepted = 0;
+  let qualityRejected = 0;
   const errors = [];
   const mediaErrors = [];
   const fkErrorMap = new Map();
@@ -221,8 +291,51 @@ async function loadEntity(db, entity, schema, sourceDir, seedDir, lookups = null
       }
     }
 
-    // Validate record against field-level and/or cross-field rules
-    if (validator) {
+    // Quality mode: handle unresolved FKs by pointing to null reference record (id=1)
+    if (acceptQL > 0 && fkWarnings.length > 0) {
+      for (const fkWarn of fkWarnings) {
+        const fkDef = entity.foreignKeys.find(fk => fk.displayName === fkWarn.field);
+        if (fkDef) {
+          resolved[fkDef.column] = 1; // Point to null reference record
+        }
+      }
+    }
+
+    // Quality-aware validation and insertion
+    let useQualityInsert = false;
+    let recordQL = 0;
+    let recordQD = null;
+
+    if (acceptQL > 0) {
+      // Quality mode: assess quality, neutralize if accepted, skip if not
+      const { ql, qd } = assessQuality(entity, resolved, fkWarnings, validator, entityName);
+
+      if (ql > 0) {
+        if ((ql & ~acceptQL) === 0) {
+          // All deficit bits within accepted mask → neutralize and insert
+          for (const deficit of qd) {
+            if (deficit.ql === 16) continue; // Cross-field: no neutralization needed
+            const col = entity.columns.find(c => c.name === deficit.field);
+            if (col && !col.foreignKey) { // FKs already handled above (→ id=1)
+              resolved[deficit.field] = getNeutralValue(col);
+            }
+          }
+          useQualityInsert = true;
+          recordQL = ql;
+          recordQD = JSON.stringify(qd);
+          qualityAccepted++;
+        } else {
+          qualityRejected++;
+          if (errors.length < 10) {
+            errors.push(`Row ${i + 1}: quality deficit _ql=${ql} not accepted (mask=${acceptQL})`);
+          }
+          skipped++;
+          continue;
+        }
+      }
+      // ql === 0 → clean record, falls through to normal insert path
+    } else if (validator) {
+      // Standard mode (no AcceptQL): skip records with validation errors
       const validationErrors = [];
       if (validateFields) {
         validationErrors.push(...validator.validateFieldRulesOnly(entityName, resolved));
@@ -257,7 +370,13 @@ async function loadEntity(db, entity, schema, sourceDir, seedDir, lookups = null
     const toSqlValue = (v) => v === true ? 1 : v === false ? 0 : v ?? null;
 
     try {
-      if (mode === 'replace') {
+      if (useQualityInsert) {
+        // Quality INSERT: includes _ql and _qd columns
+        const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
+        values.push(recordQL, recordQD);
+        qInsert.run(...values);
+        loaded++;
+      } else if (mode === 'replace') {
         const values = columns.map(col => toSqlValue(resolved[col]));
         insertReplace.run(...values);
         loaded++;
@@ -316,6 +435,10 @@ async function loadEntity(db, entity, schema, sourceDir, seedDir, lookups = null
   }
 
   const result = { loaded, updated, skipped, replaced, errors };
+
+  // Add quality statistics
+  if (qualityAccepted > 0) result.qualityAccepted = qualityAccepted;
+  if (qualityRejected > 0) result.qualityRejected = qualityRejected;
 
   // Add validation warnings (FK lookup failures from validateImport) - aggregated
   if (validationWarnings.length > 0) {
@@ -417,7 +540,8 @@ function clearEntity(db, entity, schema) {
     }
   }
 
-  const result = db.prepare(`DELETE FROM ${entity.tableName}`).run();
+  // Preserve null reference record (id=1) — needed for quality imports
+  const result = db.prepare(`DELETE FROM ${entity.tableName} WHERE id != 1`).run();
   return { deleted: result.changes };
 }
 
@@ -509,7 +633,8 @@ function clearAll(db, schema) {
   const reversed = [...schema.orderedEntities].reverse();
   for (const entity of reversed) {
     try {
-      const result = db.prepare(`DELETE FROM ${entity.tableName}`).run();
+      // Preserve null reference record (id=1)
+      const result = db.prepare(`DELETE FROM ${entity.tableName} WHERE id != 1`).run();
       results[entity.className] = { deleted: result.changes };
     } catch (err) {
       results[entity.className] = { error: err.message };

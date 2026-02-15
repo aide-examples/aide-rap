@@ -52,6 +52,7 @@ WHERE status IN ('Active', 'On Leave', 'Probation')
 | `MaxRows:` | No | Row limit for XLSX reading (default: 100000) |
 | `Limit:` | No | Row limit applied early (caps XLSX reading for fast testing) |
 | `First:` | No | Deduplicate rows by this source column (keep first occurrence) |
+| `AcceptQL:` | No | Quality deficit acceptance bitmask (see [Data Quality](data-quality.md)) |
 
 **MaxRows vs Limit:**
 - `MaxRows` limits how many rows are read from the XLSX file (performance optimization for very large files)
@@ -332,6 +333,40 @@ First: Lessor
 ## Source Filter
 Lessor: /.+/
 ```
+
+---
+
+## Quality Acceptance (AcceptQL)
+
+The `AcceptQL:` directive controls how records with data quality deficits are handled during load. Without AcceptQL, records that fail FK resolution or validation are skipped. With AcceptQL, they are stored with quality metadata for later repair.
+
+```markdown
+Source: extern/data.xlsx
+AcceptQL: 8
+```
+
+The value is a bitmask matching the [quality level bits](data-quality.md#quality-level-bitmask):
+
+| Value | Accepts |
+|-------|---------|
+| 1 | Validation failures |
+| 2 | Required fields empty |
+| 4 | Required FK fields empty |
+| 8 | FK labels unresolvable |
+| 15 | All of the above |
+
+**Accept logic:** `(computedQL & ~acceptQL) === 0` — all deficit bits must be within the mask.
+
+**Example:** `AcceptQL: 8` accepts records with unresolvable FK labels but rejects records with validation failures or empty required fields.
+
+When a record is accepted with deficits:
+1. Defective fields are replaced with [neutral values](data-quality.md#neutral-values)
+2. Unresolvable FKs point to the null reference record (id=1)
+3. Original values and error details are preserved in `_qd`
+4. The record is stored with `_ql` = computed deficit bitmask
+5. The record is hidden from normal API queries (`WHERE _ql = 0`)
+
+The AcceptQL value is stored in a `.meta.json` file alongside the import JSON, so the seed pipeline picks it up automatically during load.
 
 ---
 

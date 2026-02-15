@@ -299,7 +299,8 @@ class ImportManager {
       mapping: [],    // Array of { source, target, transform } - allows same source multiple times
       sourceEdit: [],    // Array of { column, pattern, replacement, flags } - regex edits on XLSX columns
       sourceFilter: [],  // Array of { column, regex } - pre-mapping filter on XLSX columns
-      filter: null
+      filter: null,
+      acceptQL: null     // Bitmask: which quality deficits to accept during load (see data-quality.md)
     };
 
     let inMapping = false;
@@ -400,6 +401,15 @@ class ImportManager {
       // Parse Label: directive (display label for UI)
       if (trimmed.startsWith('Label:')) {
         definition.label = trimmed.substring(6).trim();
+        continue;
+      }
+
+      // Parse AcceptQL: directive (quality deficit acceptance bitmask)
+      if (trimmed.startsWith('AcceptQL:')) {
+        const val = parseInt(trimmed.substring(9).trim(), 10);
+        if (!isNaN(val) && val > 0) {
+          definition.acceptQL = val;
+        }
         continue;
       }
 
@@ -1441,6 +1451,14 @@ class ImportManager {
       const outputPath = path.join(this.importDir, `${entityName}.json`);
       fs.writeFileSync(outputPath, JSON.stringify(filteredData, null, 2));
 
+      // Write import metadata (AcceptQL) for SeedManager to read during load
+      const metaPath = path.join(this.importDir, `${entityName}.meta.json`);
+      if (definition.acceptQL) {
+        fs.writeFileSync(metaPath, JSON.stringify({ acceptQL: definition.acceptQL }));
+      } else if (fs.existsSync(metaPath)) {
+        fs.unlinkSync(metaPath); // Clean up stale metadata
+      }
+
       return {
         success: true,
         recordsRead,
@@ -1450,6 +1468,7 @@ class ImportManager {
         recordsFiltered,
         recordsLimited,
         recordsWritten,
+        acceptQL: definition.acceptQL || undefined,
         outputFile: `import/${entityName}.json`
       };
     } catch (e) {

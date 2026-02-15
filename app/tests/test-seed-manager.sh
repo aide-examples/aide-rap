@@ -391,6 +391,144 @@ assert "Count unchanged after merge ($BEFORE_COUNT)" "[ '$AFTER_COUNT' = '$BEFOR
 echo ""
 
 # ============================================================================
+# Test 19: Null Record Protection during Clear
+# ============================================================================
+
+echo -e "${YELLOW}--- Test 19: Null Record Protection ---${NC}"
+
+DB_PATH="app/systems/book/data/rap.sqlite"
+
+# Helper: direct DB query via better-sqlite3 (sqlite3 CLI not available)
+db_query() {
+  node -e "const db=require('better-sqlite3')('$DB_PATH');const r=db.prepare(\`$1\`).get();console.log(r?Object.values(r)[0]:'');db.close()"
+}
+db_exec() {
+  node -e "const db=require('better-sqlite3')('$DB_PATH');db.prepare(\`$1\`).run();db.close()"
+}
+
+# Check null records exist (server must have been started with --reinit)
+NULL_PUB=$(db_query "SELECT COUNT(*) FROM publisher WHERE id = 1 AND _ql = 256")
+if [ "$NULL_PUB" != "1" ]; then
+  echo -e "  ${RED}SKIP${NC} Tests 19-24: No null records at id=1 (start server with --reinit first)"
+  echo ""
+else
+
+# Clear Book entity
+post "/api/seed/clear/Book" '{}' > /dev/null
+
+# Check that id=1 (null reference record) still exists after clear
+NULL_BOOK=$(db_query "SELECT COUNT(*) FROM book WHERE id = 1 AND _ql = 256")
+assert "Null record (id=1) survives clear" "[ '$NULL_BOOK' = '1' ]"
+
+# Reload Book seed data for subsequent tests
+post "/api/seed/load/Book" '{"sourceDir":"seed"}' > /dev/null
+echo ""
+
+# ============================================================================
+# Test 20: AcceptQL Import — FK Unresolvable
+# ============================================================================
+
+echo -e "${YELLOW}--- Test 20: AcceptQL Import ---${NC}"
+
+# Save original Book seed, then upload test data with bad FK
+ORIG_SEED=$(get "/api/seed/content/Book?sourceDir=seed")
+ORIG_SEED_DATA=$(json_field "$ORIG_SEED" "json.dumps(d.get('records', []))")
+
+# Upload defective seed: book with unknown author
+QUALITY_SEED='[{"title":"Quality Test Book","isbn":"978-0-00-999000-1","publication_date":"2024-01-01","price":9.99,"page_count":100,"is_available":true,"genre":"FIC","binding":"PB","condition":1,"author":"Unknown Person","publisher":"Penguin Random House"}]'
+post "/api/seed/upload/Book" "$QUALITY_SEED" > /dev/null
+
+# Load with acceptQL=8 (accept FK unresolvable) in merge mode
+QUALITY_LOAD=$(post "/api/seed/load/Book" '{"sourceDir":"seed","acceptQL":8,"mode":"merge"}')
+Q_ACCEPTED=$(json_field "$QUALITY_LOAD" "d.get('qualityAccepted', 0)")
+assert "Quality record accepted (qualityAccepted=1)" "[ '$Q_ACCEPTED' = '1' ]"
+
+Q_SUCCESS=$(json_field "$QUALITY_LOAD" "d.get('success', False)")
+assert "Quality load succeeds" "[ '$Q_SUCCESS' = 'True' ]"
+
+# Restore original seed file
+post "/api/seed/upload/Book" "$ORIG_SEED_DATA" > /dev/null
+echo ""
+
+# ============================================================================
+# Test 21: Quality Record Filtered from Normal API
+# ============================================================================
+
+echo -e "${YELLOW}--- Test 21: Quality Record Filtered ---${NC}"
+
+# Normal API should NOT show the quality record
+BOOK_LIST=$(get "/api/entities/Book")
+BOOK_TOTAL=$(json_field "$BOOK_LIST" "d.get('totalCount', 0)")
+assert "Book count = 8 (quality record hidden)" "[ '$BOOK_TOTAL' = '8' ]"
+echo ""
+
+# ============================================================================
+# Test 22: Quality Record Exists in DB
+# ============================================================================
+
+echo -e "${YELLOW}--- Test 22: Quality Record in DB ---${NC}"
+
+# Direct DB query should find the quality record
+Q_COUNT=$(db_query "SELECT COUNT(*) FROM book WHERE _ql > 0 AND _ql != 256")
+assert "Quality record exists in DB (_ql > 0)" "[ '$Q_COUNT' -gt 0 ]"
+
+# Check the specific _ql value (should be 8 = FK unresolvable)
+Q_VALUE=$(db_query "SELECT _ql FROM book WHERE _ql > 0 AND _ql != 256 LIMIT 1")
+assert "Quality record has _ql = 8 (FK unresolvable)" "[ '$Q_VALUE' = '8' ]"
+echo ""
+
+# ============================================================================
+# Test 23: Quality Deficit Details (_qd)
+# ============================================================================
+
+echo -e "${YELLOW}--- Test 23: Quality Deficit (_qd) ---${NC}"
+
+# Check _qd contains the original value and error info
+QD_RAW=$(db_query "SELECT _qd FROM book WHERE _ql = 8 LIMIT 1")
+QD_HAS_FIELD=$(echo "$QD_RAW" | python3 -c "import sys,json; qd=json.loads(sys.stdin.read()); print(any(d.get('field')=='author' for d in qd))" 2>/dev/null)
+assert "_qd references 'author' field" "[ '$QD_HAS_FIELD' = 'True' ]"
+
+QD_HAS_VALUE=$(echo "$QD_RAW" | python3 -c "import sys,json; qd=json.loads(sys.stdin.read()); print(any(d.get('value')=='Unknown Person' for d in qd))" 2>/dev/null)
+assert "_qd preserves original value 'Unknown Person'" "[ '$QD_HAS_VALUE' = 'True' ]"
+
+QD_HAS_QL=$(echo "$QD_RAW" | python3 -c "import sys,json; qd=json.loads(sys.stdin.read()); print(any(d.get('ql')==8 for d in qd))" 2>/dev/null)
+assert "_qd has ql=8 entry" "[ '$QD_HAS_QL' = 'True' ]"
+echo ""
+
+# ============================================================================
+# Test 24: AcceptQL Rejection — Deficit Outside Mask
+# ============================================================================
+
+echo -e "${YELLOW}--- Test 24: AcceptQL Rejection ---${NC}"
+
+# Save current seed and upload defective data
+post "/api/seed/upload/Book" "$QUALITY_SEED" > /dev/null
+
+# Clean up existing quality records first
+db_exec "DELETE FROM book WHERE _ql > 0 AND _ql != 256"
+
+# Load with acceptQL=2 (only accept 'required field empty', NOT FK errors)
+REJECT_LOAD=$(post "/api/seed/load/Book" '{"sourceDir":"seed","acceptQL":2,"mode":"merge"}')
+R_REJECTED=$(json_field "$REJECT_LOAD" "d.get('qualityRejected', 0)")
+assert "Quality record rejected (qualityRejected=1)" "[ '$R_REJECTED' = '1' ]"
+
+R_ACCEPTED=$(json_field "$REJECT_LOAD" "d.get('qualityAccepted', 0)")
+assert "No quality records accepted" "[ '$R_ACCEPTED' = '0' ]"
+
+# Verify no new quality records in DB
+Q_COUNT_AFTER=$(db_query "SELECT COUNT(*) FROM book WHERE _ql > 0 AND _ql != 256")
+assert "No quality record in DB after rejection" "[ '$Q_COUNT_AFTER' = '0' ]"
+
+# Restore original seed file
+post "/api/seed/upload/Book" "$ORIG_SEED_DATA" > /dev/null
+
+# Clean up any remaining quality records for clean state
+db_exec "DELETE FROM book WHERE _ql > 0 AND _ql != 256"
+echo ""
+
+fi # end null-record guard
+
+# ============================================================================
 # Summary
 # ============================================================================
 

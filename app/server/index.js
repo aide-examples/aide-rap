@@ -34,14 +34,14 @@ const logger = require('./utils/logger');
  * @param {string} config.paths.database - Database filename
  */
 function init(app, config) {
-  const { appDir, enabledEntities, entityPrefilters, requiredFilters, entityTableOptions, paths, viewsConfig, systemConfig } = config;
+  const { appDir, enabledEntities, entityPrefilters, requiredFilters, entityTableOptions, paths, viewsConfig, systemConfig, forceReinit } = config;
 
   // Paths (use config paths if provided, fallback to legacy paths)
   const dbPath = paths ? path.join(paths.data, paths.database) : path.join(appDir, 'data', 'rap.sqlite');
   const dataModelPath = paths ? path.join(paths.docs, 'DataModel.md') : path.join(appDir, 'docs', 'DataModel.md');
 
-  // Initialize database
-  initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, entityTableOptions);
+  // Initialize database (forceReinit drops all tables and recreates with null records)
+  initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, entityTableOptions, forceReinit);
 
   // Watch Views.md for hot-reload (development convenience)
   watchViewsFile();

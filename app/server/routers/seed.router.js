@@ -85,6 +85,7 @@ module.exports = function(cfg) {
     // - merge: UPDATE existing records (preserve id), INSERT new ones
     // - skip_conflicts: Skip records that conflict with existing ones
     // - sourceDir: 'seed' (default) or 'import'
+    // - acceptQL: bitmask for quality deficit acceptance (see data-quality.md)
     router.post('/api/seed/load/:entity', async (req, res) => {
         try {
             const options = {
@@ -94,6 +95,11 @@ module.exports = function(cfg) {
                 validateFields: req.body?.validateFields === true,
                 validateConstraints: req.body?.validateConstraints !== false  // Default: true
             };
+            // AcceptQL: accept records with quality deficits (bitmask, 0 = reject all defects)
+            if (req.body?.acceptQL != null) {
+                const val = parseInt(req.body.acceptQL, 10);
+                if (!isNaN(val) && val > 0) options.acceptQL = val;
+            }
             const result = await SeedManager.loadEntity(req.params.entity, null, options);
             ComputedFieldService.runAll();
             res.json({ success: true, ...result });

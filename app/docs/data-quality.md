@@ -204,19 +204,39 @@ For existing systems (e.g. IRMA) that already have data:
 
 This works because seed export uses LABEL values for FK references, not raw IDs. The ID reassignment happens naturally.
 
+## Schema Reinitialization (--reinit)
+
+For existing systems where `id=1` contains real data (created before null records were introduced), a migration cycle is needed:
+
+```
+./run -s <system> --reinit
+```
+
+**Flow:**
+1. Server prompts: "Haben Sie ein Backup erstellt? (y/N, 10s timeout)"
+2. On "y": auto-backup → drop all tables → recreate → null records at id=1
+3. Server starts normally
+4. Admin restores data via `POST /api/seed/restore` → data starts at id=2
+
+The `reinitialize()` function (API endpoint `POST /api/seed/reinitialize`) also performs schema rebuild + null record creation, but without dropping existing tables (non-destructive).
+
 ## Implementation Phases
 
-### Phase 1: Foundation
+### Phase 1: Foundation ✓
 - Add `_ql` and `_qd` to system columns
 - Define neutral values per type
 - Create null reference records on table creation
 - Add `WHERE _ql = 0` to all read queries in GenericRepository
 
-### Phase 2: Import Support
+### Phase 2: Import Support ✓
 - Parse `AcceptQL` directive in import definitions
-- Modify validation to return quality info instead of throwing
-- Implement neutralization and `_qd` recording
-- Support defective FK resolution (→ id=1)
+- Quality assessment (`assessQuality()`) returns bitmask instead of throwing
+- Neutralization of defective fields with type-appropriate values
+- `_qd` recording preserves original values and error messages
+- Defective FK resolution → id=1 (null reference record)
+- `.meta.json` metadata files pass AcceptQL from import to seed pipeline
+- Null record protection during clear/restore (`WHERE id != 1`)
+- `--reinit` CLI flag for migrating existing databases
 
 ### Phase 3: Data Cleansing UI
 - Quality filter setting

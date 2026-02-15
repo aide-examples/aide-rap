@@ -111,6 +111,17 @@ async function loadEntity(entityName, lookups = null, options = {}) {
   else if (sourceDir === 'backup') resolvedSourceDir = getBackupDir();
   else resolvedSourceDir = getSeedDir();
 
+  // Read import metadata (AcceptQL) if loading from import dir
+  if (sourceDir === 'import' && !restOptions.acceptQL) {
+    const metaFile = path.join(resolvedSourceDir, `${entityName}.meta.json`);
+    if (fs.existsSync(metaFile)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'));
+        if (meta.acceptQL) restOptions.acceptQL = meta.acceptQL;
+      } catch { /* ignore malformed meta */ }
+    }
+  }
+
   // Emit before event
   const seedFile = path.join(resolvedSourceDir, `${entityName}.json`);
   if (fs.existsSync(seedFile)) {

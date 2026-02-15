@@ -157,10 +157,10 @@ async function restoreEntity(db, entity, schema, backupDir, seedDir, options = {
     throw new Error(`No backup file found for ${entity.className}`);
   }
 
-  // Clear entity data first
+  // Clear entity data first (preserve null reference record at id=1)
   try {
     db.pragma('foreign_keys = OFF');
-    db.prepare(`DELETE FROM ${entity.tableName}`).run();
+    db.prepare(`DELETE FROM ${entity.tableName} WHERE id != 1`).run();
     db.pragma('foreign_keys = ON');
   } catch (err) {
     // Ignore errors during clear
@@ -188,11 +188,11 @@ async function restoreBackup(db, schema, backupDir, seedDir, options = {}) {
     throw new Error('No backup directory found');
   }
 
-  // Clear all entity data
+  // Clear all entity data (preserve null reference records at id=1)
   db.pragma('foreign_keys = OFF');
   for (const entity of [...schema.orderedEntities].reverse()) {
     try {
-      db.prepare(`DELETE FROM ${entity.tableName}`).run();
+      db.prepare(`DELETE FROM ${entity.tableName} WHERE id != 1`).run();
     } catch (err) {
       // Ignore errors
     }

@@ -522,8 +522,9 @@ function initMediaTables() {
  * @param {Object} [entityPrefilters] - Prefilter fields per entity { entityName: ['field1', 'field2'] }
  * @param {Object} [requiredFilters] - Required filter fields per entity { entityName: ['field1'] }
  * @param {Object} [tableOptions] - Table display options per entity { entityName: { mediaRowHeight: 100 } }
+ * @param {boolean} [forceReinit] - Force drop+recreate all tables (--reinit flag)
  */
-function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, tableOptions) {
+function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entityPrefilters, requiredFilters, tableOptions, forceReinit) {
   // Store params for reinitialize()
   storedDbPath = dbPath;
   storedDataModelPath = dataModelPath;
@@ -558,7 +559,23 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entit
   const currentHash = computeSchemaHash(schema);
   const storedHash = getStoredSchemaHash();
 
-  if (storedHash !== currentHash) {
+  if (forceReinit) {
+    logger.info('Force reinitialization requested (--reinit)');
+    // Auto-backup existing data before dropping tables
+    autoBackupBeforeDrop(schema.orderedEntities);
+
+    // Drop and recreate everything
+    dropAllTables(schema.orderedEntities);
+    createAllTables(schema.orderedEntities);
+    createAllViews(schema.orderedEntities);
+    createUserViews(viewsConfig);
+    saveSchemaHash(currentHash);
+
+    logger.info('Schema reinitialized (forced)', {
+      tables: schema.orderedEntities.length,
+      hash: currentHash.substring(0, 8) + '...'
+    });
+  } else if (storedHash !== currentHash) {
     if (storedHash) {
       logger.info('Schema changed - recreating all tables');
       // Auto-backup existing data before dropping tables
@@ -691,6 +708,20 @@ function reinitialize() {
     throw new Error('Cannot reinitialize: database was never initialized');
   }
 
+  db.pragma('foreign_keys = OFF');
+
+  // Re-read DataModel.md and regenerate schema (picks up new entities/columns)
+  schema = generateSchema(storedDataModelPath, storedEnabledEntities);
+
+  // Create any new tables (IF NOT EXISTS — safe for existing data)
+  createAllTables(schema.orderedEntities);
+
+  // Ensure system columns (_ql, _qd, etc.) exist
+  migrateSystemColumns(schema.orderedEntities);
+
+  // Ensure null reference records at id=1 (in canonical dependency order)
+  ensureNullRecords(schema.orderedEntities);
+
   // Re-read views from Views.md (so view changes take effect without restart)
   const requirementsDir = path.dirname(storedDataModelPath);
   const UISpecLoader = require('../utils/UISpecLoader');
@@ -700,11 +731,13 @@ function reinitialize() {
     logger.info('Views reloaded from markdown');
   }
 
-  // Refresh views only — preserves all table data
+  // Refresh views
   createAllViews(schema.orderedEntities);
   createUserViews(storedViewsConfig);
 
-  logger.info('Database reinitialized (views refreshed)', { entities: schema.orderedEntities.length });
+  db.pragma('foreign_keys = ON');
+
+  logger.info('Database reinitialized', { entities: schema.orderedEntities.length });
   return { success: true, entities: schema.orderedEntities.length };
 }
 

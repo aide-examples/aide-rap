@@ -52,6 +52,7 @@ args.addCommonArgs(program);  // Adds --log-level, --config, --regenerate-icons,
 program.requiredOption('-s, --system <name>', 'System name (required, subdirectory in systems/)');
 program.option('--noauth', 'Disable authentication (for development)');
 program.option('--import [entity]', 'Run import in batch mode (entity name or "all")');
+program.option('--reinit', 'Force schema reinitialization (drops all tables, creates null records)');
 program.parse();
 
 const opts = program.opts();
@@ -135,6 +136,56 @@ if (opts.import) {
     // Don't continue to server setup
     return;
 }
+
+// =============================================================================
+// 5b. REINIT MODE (--reinit)
+// =============================================================================
+
+if (opts.reinit) {
+    const readline = require('readline');
+
+    console.log('');
+    console.log('  ⚠  Schema-Reinitialisierung angefordert!');
+    console.log('     Alle Tabellen werden gelöscht und neu erstellt.');
+    console.log('     Null Records werden bei id=1 eingetragen.');
+    console.log('     Daten müssen anschließend über Restore wiederhergestellt werden.');
+    console.log('');
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    const timeout = setTimeout(() => {
+        console.log('');
+        console.log('  ⚠  Timeout — Reinitialisierung abgebrochen.');
+        console.log('     Server startet normal.');
+        console.log('     Für Reinitialisierung: erst Backup erstellen, dann erneut mit --reinit starten.');
+        console.log('');
+        rl.close();
+        opts.reinit = false;
+        startServer();
+    }, 10000);
+
+    rl.question('     Haben Sie ein Backup erstellt? (y/N, 10s timeout): ', (answer) => {
+        clearTimeout(timeout);
+        rl.close();
+        if (answer.trim().toLowerCase() === 'y') {
+            console.log('');
+            console.log('     Reinitialisierung bestätigt.');
+            opts._forceReinit = true;
+        } else {
+            console.log('');
+            console.log('  ⚠  Reinitialisierung abgebrochen — Server startet normal.');
+            opts.reinit = false;
+        }
+        startServer();
+    });
+
+    // Wrap remaining startup in function (called after prompt)
+    return;
+}
+
+startServer();
+
+function startServer() {
 
 console.log(`Starting AIDE RAP - System: ${systemName}`);
 
@@ -430,7 +481,8 @@ if (enabledEntitiesRaw.length > 0) {
         entityTableOptions,
         paths: cfg.paths,
         viewsConfig: mdViews || [],
-        systemConfig: cfg
+        systemConfig: cfg,
+        forceReinit: !!opts._forceReinit
     });
 
     // Integration API (for external workflow tools)
@@ -668,3 +720,5 @@ app.use('/api', errorHandler);
 // =============================================================================
 
 server.run();
+
+} // end startServer()
