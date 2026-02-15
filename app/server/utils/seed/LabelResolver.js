@@ -311,6 +311,49 @@ function buildLookupFromImportRecords(entity, records) {
   return buildLookupFromRows(rows, labelCol, label2Col);
 }
 
+/**
+ * Build a reverse lookup map for an entity: id -> label string
+ * Used by backup to convert FK IDs to portable label values.
+ *
+ * @param {object} db - Database instance
+ * @param {object} entity - Entity schema object
+ * @returns {object} - Reverse lookup map: id -> label
+ */
+function buildReverseLabelLookup(db, entity) {
+  if (!entity) return {};
+  const reverse = {};
+
+  if (entity.labelExpression) {
+    // Query from view which has the computed _label column
+    try {
+      const rows = db.prepare(
+        `SELECT id, _label FROM ${entity.tableName}_view`
+      ).all();
+      for (const row of rows) {
+        if (row._label) reverse[row.id] = row._label;
+      }
+      return reverse;
+    } catch {
+      // Fallback to column-based lookup below
+    }
+  }
+
+  // Standard column-based: use primary LABEL column
+  const labelCol = entity.columns.find(c => c.ui?.label);
+  if (labelCol) {
+    try {
+      const rows = db.prepare(
+        `SELECT id, ${labelCol.name} FROM ${entity.tableName}`
+      ).all();
+      for (const row of rows) {
+        if (row[labelCol.name]) reverse[row.id] = row[labelCol.name];
+      }
+    } catch { /* ignore */ }
+  }
+
+  return reverse;
+}
+
 module.exports = {
   buildLookupFromRows,
   addNormalizedKeys,
@@ -322,5 +365,6 @@ module.exports = {
   computeLabelFromExpression,
   buildLookupFromExpressionRecords,
   buildLabelLookupFromSeed,
-  buildLookupFromImportRecords
+  buildLookupFromImportRecords,
+  buildReverseLabelLookup
 };

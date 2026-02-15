@@ -145,113 +145,36 @@ function saveSchemaHash(hash) {
 
 /**
  * Auto-backup all entity data before dropping tables on schema change.
- * Converts FK IDs to label values for portability across schema rebuilds.
+ * Delegates to BackupManager.backupAll() for consistent FK label resolution.
  * Only runs when there is existing data and schema has changed.
  * Emits: db:backup:before, db:backup:after
  */
 function autoBackupBeforeDrop(orderedEntities) {
+  const BackupManager = require('../utils/seed/BackupManager');
   const backupDir = path.join(path.dirname(storedDbPath), 'backup');
 
-  // Emit before event
   eventBus.emit('db:backup:before', { path: backupDir, reason: 'schema-change' });
 
-  let totalRecords = 0;
-  const entityData = {};
+  try {
+    const result = BackupManager.backupAll(db, schema, backupDir, { legacyFallback: true });
+    const totalRecords = Object.values(result.entities).reduce((sum, n) => sum + n, 0);
 
-  // Collect data from existing tables (with FK label resolution)
-  for (const entity of orderedEntities) {
-    if (!tableExists(entity.tableName)) continue;
-
-    try {
-      // Exclude null reference records (_ql=256 at id=1) from backup
-      // Use try/catch for _ql column in case of legacy DB without data quality columns
-      let rows;
-      try {
-        rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id != 1 OR _ql != 256`).all();
-      } catch {
-        rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
-      }
-      if (rows.length === 0) continue;
-
-      const exportRows = rows.map(row => {
-        const exported = { ...row };
-        delete exported.id;
-
-        // Convert FK IDs to label values
-        for (const fk of entity.foreignKeys) {
-          const idValue = row[fk.column];
-          if (idValue === null || idValue === undefined) continue;
-
-          const refEntity = schema.entities[fk.references.entity];
-          if (!refEntity || !tableExists(refEntity.tableName)) continue;
-
-          const labelCol = refEntity.columns.find(c => c.ui?.label);
-          if (!labelCol) continue;
-
-          try {
-            const refRow = db.prepare(
-              `SELECT ${labelCol.name} FROM ${refEntity.tableName} WHERE id = ?`
-            ).get(idValue);
-
-            if (refRow && refRow[labelCol.name]) {
-              exported[fk.displayName] = refRow[labelCol.name];
-              delete exported[fk.column];
-            }
-          } catch {
-            // Keep numeric ID if lookup fails
-          }
-        }
-
-        // Remove computed columns
-        for (const col of entity.columns) {
-          if (col.computed && !col.foreignKey) {
-            delete exported[col.name];
-          }
-        }
-
-        return exported;
-      });
-
-      entityData[entity.className] = exportRows;
-      totalRecords += exportRows.length;
-    } catch (err) {
-      logger.warn(`Auto-backup: could not read ${entity.tableName}`, { error: err.message });
+    if (totalRecords === 0) {
+      logger.info('Auto-backup: no data to backup');
+      return;
     }
+
+    logger.info(`Auto-backup: saved ${totalRecords} records from ${Object.keys(result.entities).length} entities before schema drop`);
+    eventBus.emit('db:backup:after', {
+      path: backupDir,
+      totalRecords,
+      entityCount: Object.keys(result.entities).length
+    });
+  } catch (err) {
+    logger.error('Auto-backup failed', { error: err.message });
+    eventBus.emit('db:backup:error', { error: err.message });
+    throw err;
   }
-
-  if (totalRecords === 0) {
-    logger.info('Auto-backup: no data to backup');
-    return;
-  }
-
-  // Write backup files
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
-  }
-
-  for (const [className, records] of Object.entries(entityData)) {
-    const filePath = path.join(backupDir, `${className}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(records, null, 2));
-  }
-
-  // Clean up backup files for entities with no data
-  for (const entity of orderedEntities) {
-    if (!entityData[entity.className]) {
-      const filePath = path.join(backupDir, `${entity.className}.json`);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-  }
-
-  logger.info(`Auto-backup: saved ${totalRecords} records from ${Object.keys(entityData).length} entities before schema drop`);
-
-  // Emit after event
-  eventBus.emit('db:backup:after', {
-    path: backupDir,
-    totalRecords,
-    entityCount: Object.keys(entityData).length
-  });
 }
 
 /**

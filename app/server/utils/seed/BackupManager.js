@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { buildLabelLookup } = require('./LabelResolver');
+const { buildLabelLookup, buildReverseLabelLookup } = require('./LabelResolver');
 const DataLoader = require('./DataLoader');
 
 /**
@@ -48,18 +48,34 @@ function uploadEntity(entity, seedDir, jsonData) {
  * @param {object} db - Database instance
  * @param {object} schema - Full schema
  * @param {string} backupDir - Path to backup directory
+ * @param {object} options - { legacyFallback: bool } - legacyFallback for DBs without _ql column
  * @returns {object} - { entities: { name: count }, backupDir }
  */
-function backupAll(db, schema, backupDir) {
+function backupAll(db, schema, backupDir, options = {}) {
   if (!fs.existsSync(backupDir)) {
     fs.mkdirSync(backupDir, { recursive: true });
+  }
+
+  // Pre-build reverse label lookups for all entities (id -> label)
+  const reverseLookups = {};
+  for (const entity of schema.orderedEntities) {
+    reverseLookups[entity.className] = buildReverseLabelLookup(db, entity);
   }
 
   const results = {};
 
   for (const entity of schema.orderedEntities) {
     // Include all records (clean + defective) but exclude null reference records (id=1, _ql=256)
-    const rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id != 1 OR _ql != 256`).all();
+    let rows;
+    try {
+      rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id != 1 OR _ql != 256`).all();
+    } catch {
+      if (options.legacyFallback) {
+        rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+      } else {
+        throw new Error(`Failed to query ${entity.tableName} — missing _ql column?`);
+      }
+    }
 
     if (rows.length === 0) {
       const backupPath = path.join(backupDir, `${entity.className}.json`);
@@ -82,20 +98,10 @@ function backupAll(db, schema, backupDir) {
         const refEntity = schema.entities[fk.references.entity];
         if (!refEntity) continue;
 
-        const labelCol = refEntity.columns.find(c => c.ui?.label);
-        if (!labelCol) continue;
-
-        try {
-          const refRow = db.prepare(
-            `SELECT ${labelCol.name} FROM ${refEntity.tableName} WHERE id = ?`
-          ).get(idValue);
-
-          if (refRow && refRow[labelCol.name]) {
-            exported[fk.displayName] = refRow[labelCol.name];
-            delete exported[fk.column];
-          }
-        } catch {
-          // Keep numeric ID if lookup fails
+        const label = reverseLookups[refEntity.className]?.[idValue];
+        if (label) {
+          exported[fk.displayName] = label;
+          delete exported[fk.column];
         }
       }
 
