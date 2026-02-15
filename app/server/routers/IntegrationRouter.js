@@ -144,9 +144,13 @@ router.get('/:entity/options', validateEntity, (req, res, next) => {
     if (field && value !== undefined) {
       const col = entityMeta.columns.find(c => c.name === field);
       if (col) {
-        whereClause = ` WHERE "${field}" = ?`;
+        whereClause = ` WHERE _ql = 0 AND "${field}" = ?`;
         params.push(col.jsType === 'number' ? parseInt(value, 10) : value);
       }
+    }
+
+    if (!whereClause) {
+      whereClause = ' WHERE _ql = 0';
     }
 
     const sql = `SELECT ${selectCols} FROM ${viewName}${whereClause} ORDER BY label`;

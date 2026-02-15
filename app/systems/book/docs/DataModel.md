@@ -11,8 +11,9 @@ Entity definitions are stored in separate files under [classes/](classes/).
 
 | Entity | Description |
 |--------|-------------|
-| [Author](classes/Author.md) | 4 attributes |
-| [Book](classes/Book.md) | 4 attributes |
+| [Author](classes/Author.md) | 11 attributes — biographical, contact, address |
+| [Book](classes/Book.md) | 13 attributes — bibliographic, pricing, classification |
+| [Publisher](classes/Publisher.md) | 4 attributes — name, founding, address |
 </div>
 
 ## Class Diagram

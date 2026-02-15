@@ -1,4 +1,5 @@
 # CRUD
 
+- Publisher
 - Author
 - Book

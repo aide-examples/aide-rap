@@ -20,6 +20,11 @@ const logger = require('../utils/logger');
 // Shared validator instance
 const validator = new ObjectValidator();
 
+/** Quality filter condition: exclude defective and system records (_ql = 0) */
+function qlCondition() {
+  return '_ql = 0';
+}
+
 /**
  * Create a lookup function for cross-entity constraints.
  * Returns a function(entityName, id) that does a cached DB query.
@@ -348,6 +353,9 @@ function findAll(entityName, options = {}) {
       .map(c => c.name)
   });
 
+  // Quality filter: exclude defective and system records
+  conditions.unshift(qlCondition());
+
   const whereClause = buildWhereClause(conditions);
 
   // Build data query with WHERE, ORDER BY, and pagination
@@ -456,6 +464,11 @@ function create(entityName, data) {
  * @param {number|null} expectedVersion - Expected version for OCC (null = skip check)
  */
 function update(entityName, id, data, expectedVersion = null) {
+  // Protect null reference records (data quality system)
+  if (id === 1) {
+    throw new Error(`Cannot update system record (id=1) of ${entityName}`);
+  }
+
   const entity = ensureValidationRules(entityName);
   const db = getDatabase();
   const { VersionConflictError } = require('../errors/ConflictError');
@@ -514,6 +527,11 @@ function update(entityName, id, data, expectedVersion = null) {
  * Delete a record
  */
 function remove(entityName, id) {
+  // Protect null reference records (data quality system)
+  if (id === 1) {
+    throw new Error(`Cannot delete system record (id=1) of ${entityName}`);
+  }
+
   const entity = getEntityMeta(entityName);
   const db = getDatabase();
   const schema = getSchema();
@@ -528,7 +546,7 @@ function remove(entityName, id) {
     const refEntity = schema.entities[rel.entity];
     if (!refEntity) continue;
 
-    const countSql = `SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${rel.column} = ?`;
+    const countSql = `SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${rel.column} = ? AND ${qlCondition()}`;
     const { count } = db.prepare(countSql).get(id);
 
     if (count > 0) {
@@ -552,7 +570,7 @@ function count(entityName, filter = null) {
   const entity = getEntityMeta(entityName);
   const db = getDatabase();
 
-  let sql = `SELECT COUNT(*) as count FROM ${entity.tableName}`;
+  let sql = `SELECT COUNT(*) as count FROM ${entity.tableName} WHERE ${qlCondition()}`;
   const params = [];
 
   if (filter) {
@@ -562,7 +580,7 @@ function count(entityName, filter = null) {
 
     if (stringColumns.length > 0) {
       const filterConditions = stringColumns.map(col => `${col} LIKE ?`);
-      sql += ` WHERE (${filterConditions.join(' OR ')})`;
+      sql += ` AND (${filterConditions.join(' OR ')})`;
       const filterValue = `%${filter}%`;
       params.push(...stringColumns.map(() => filterValue));
     }
@@ -770,7 +788,7 @@ function getEntityCounts() {
     if (!entity) continue;
 
     try {
-      const row = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get();
+      const row = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName} WHERE ${qlCondition()}`).get();
       counts[name] = row.count;
     } catch (e) {
       counts[name] = 0;
@@ -860,7 +878,7 @@ function getBackReferences(entityName, id) {
 
     // Get referencing records from View (includes _label fields)
     const viewName = refEntity.tableName + '_view';
-    const sql = `SELECT * FROM ${viewName} WHERE ${rel.column} = ? ORDER BY id ASC`;
+    const sql = `SELECT * FROM ${viewName} WHERE ${rel.column} = ? AND ${qlCondition()} ORDER BY id ASC`;
     const rows = db.prepare(sql).all(id);
 
     if (rows.length > 0) {
@@ -914,15 +932,15 @@ function getDistinctValues(entityName, columnPath, extractType = 'select') {
     let sql, valueKey;
     if (extractType === 'year') {
       // Extract distinct years from date column
-      sql = `SELECT DISTINCT strftime('%Y', "${column}") as year FROM ${viewName} WHERE "${column}" IS NOT NULL ORDER BY year DESC`;
+      sql = `SELECT DISTINCT strftime('%Y', "${column}") as year FROM ${viewName} WHERE "${column}" IS NOT NULL AND ${qlCondition()} ORDER BY year DESC`;
       valueKey = 'year';
     } else if (extractType === 'month') {
       // Extract distinct year-months from date column
-      sql = `SELECT DISTINCT strftime('%Y-%m', "${column}") as month FROM ${viewName} WHERE "${column}" IS NOT NULL ORDER BY month DESC`;
+      sql = `SELECT DISTINCT strftime('%Y-%m', "${column}") as month FROM ${viewName} WHERE "${column}" IS NOT NULL AND ${qlCondition()} ORDER BY month DESC`;
       valueKey = 'month';
     } else {
       // Default: distinct values
-      sql = `SELECT DISTINCT "${column}" FROM ${viewName} WHERE "${column}" IS NOT NULL ORDER BY "${column}"`;
+      sql = `SELECT DISTINCT "${column}" FROM ${viewName} WHERE "${column}" IS NOT NULL AND ${qlCondition()} ORDER BY "${column}"`;
       valueKey = column;
     }
 
@@ -933,13 +951,13 @@ function getDistinctValues(entityName, columnPath, extractType = 'select') {
     try {
       let sql, valueKey;
       if (extractType === 'year') {
-        sql = `SELECT DISTINCT strftime('%Y', "${columnPath}") as year FROM ${viewName} WHERE "${columnPath}" IS NOT NULL ORDER BY year DESC`;
+        sql = `SELECT DISTINCT strftime('%Y', "${columnPath}") as year FROM ${viewName} WHERE "${columnPath}" IS NOT NULL AND ${qlCondition()} ORDER BY year DESC`;
         valueKey = 'year';
       } else if (extractType === 'month') {
-        sql = `SELECT DISTINCT strftime('%Y-%m', "${columnPath}") as month FROM ${viewName} WHERE "${columnPath}" IS NOT NULL ORDER BY month DESC`;
+        sql = `SELECT DISTINCT strftime('%Y-%m', "${columnPath}") as month FROM ${viewName} WHERE "${columnPath}" IS NOT NULL AND ${qlCondition()} ORDER BY month DESC`;
         valueKey = 'month';
       } else {
-        sql = `SELECT DISTINCT "${columnPath}" FROM ${viewName} WHERE "${columnPath}" IS NOT NULL ORDER BY "${columnPath}"`;
+        sql = `SELECT DISTINCT "${columnPath}" FROM ${viewName} WHERE "${columnPath}" IS NOT NULL AND ${qlCondition()} ORDER BY "${columnPath}"`;
         valueKey = columnPath;
       }
       const rows = db.prepare(sql).all();

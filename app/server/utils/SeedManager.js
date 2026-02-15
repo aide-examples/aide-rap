@@ -296,7 +296,7 @@ function buildLabelLookup(entityName) {
   // Check if entity has computed labelExpression (from entity-level [LABEL=expr])
   if (entity.labelExpression) {
     // Query from view which has the computed _label column
-    const sql = `SELECT id, _label FROM ${entity.tableName}_view ORDER BY id`;
+    const sql = `SELECT id, _label FROM ${entity.tableName}_view WHERE _ql = 0 ORDER BY id`;
     try {
       const rows = db.prepare(sql).all();
       lookup = buildLookupFromComputedLabel(rows);
@@ -315,7 +315,7 @@ function buildLabelLookup(entityName) {
     if (labelCol) selectCols.push(labelCol.name);
     if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
 
-    const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} ORDER BY id`;
+    const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} WHERE _ql = 0 ORDER BY id`;
     const rows = db.prepare(sql).all();
 
     lookup = buildLookupFromRows(rows, labelCol, label2Col);
@@ -1803,7 +1803,7 @@ function backupAll() {
   const results = {};
 
   for (const entity of schema.orderedEntities) {
-    const rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+    const rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE _ql = 0`).all();
 
     if (rows.length === 0) {
       // Remove existing backup file if entity is empty

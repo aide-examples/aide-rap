@@ -331,6 +331,19 @@ function migrateSystemColumns(orderedEntities) {
       logger.debug(`Added _version to ${entity.tableName}`);
     }
 
+    // Data quality columns
+    if (!colNamesAfter.includes('_ql')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN _ql INTEGER DEFAULT 0`);
+      logger.debug(`Added _ql to ${entity.tableName}`);
+    }
+    if (!colNamesAfter.includes('_qd')) {
+      db.exec(`ALTER TABLE ${entity.tableName} ADD COLUMN _qd TEXT`);
+      logger.debug(`Added _qd to ${entity.tableName}`);
+    }
+
+    // Index on _ql for efficient quality filtering
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_${entity.tableName}_ql ON ${entity.tableName}(_ql)`);
+
     // Set default values for existing records with NULL
     const result = db.prepare(`
       UPDATE ${entity.tableName}
@@ -342,6 +355,50 @@ function migrateSystemColumns(orderedEntities) {
 
     if (result.changes > 0) {
       logger.info(`Migrated ${result.changes} records in ${entity.tableName} with system columns`);
+    }
+  }
+}
+
+/**
+ * Ensure null reference records exist at id=1 for every entity.
+ * These are system records with _ql=256, filled with neutral values.
+ * Must be called after migrateSystemColumns(), with foreign_keys OFF.
+ * Inserts in dependency order (entities without FKs first).
+ */
+function ensureNullRecords(orderedEntities) {
+  const { buildNullRecord } = require('../utils/NeutralValues');
+
+  for (const entity of orderedEntities) {
+    // Skip system entities (AuditTrail etc.)
+    if (entity.system) continue;
+    if (!tableExists(entity.tableName)) continue;
+
+    // Check if id=1 exists and has _ql=256
+    const existing = db.prepare(
+      `SELECT id, _ql FROM ${entity.tableName} WHERE id = 1`
+    ).get();
+
+    if (existing && existing._ql === 256) continue;  // Already correct
+
+    if (existing) {
+      // id=1 exists but is a real record → can't insert null record
+      logger.warn(`Cannot create null record: id=1 already occupied in ${entity.tableName} (migration needed)`);
+      continue;
+    }
+
+    // Build null record with neutral values
+    const record = buildNullRecord(entity);
+    const columns = Object.keys(record);
+    const placeholders = columns.map(() => '?');
+    const values = columns.map(c => record[c]);
+
+    try {
+      db.prepare(
+        `INSERT INTO ${entity.tableName} (id, ${columns.join(', ')}) VALUES (1, ${placeholders.join(', ')})`
+      ).run(...values);
+      logger.debug(`Created null record in ${entity.tableName}`);
+    } catch (err) {
+      logger.error(`Failed to create null record in ${entity.tableName}: ${err.message}`);
     }
   }
 }
@@ -531,6 +588,9 @@ function initDatabase(dbPath, dataModelPath, enabledEntities, viewsConfig, entit
 
   // Migrate: ensure system columns exist and have values
   migrateSystemColumns(schema.orderedEntities);
+
+  // Ensure null reference records exist at id=1 (data quality system)
+  ensureNullRecords(schema.orderedEntities);
 
   // Initialize media storage tables
   initMediaTables();

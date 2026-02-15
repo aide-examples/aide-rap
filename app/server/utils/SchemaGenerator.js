@@ -100,6 +100,8 @@ const TYPE_MAP = {
  * - _created_at: Timestamp when record was created
  * - _updated_at: Timestamp of last modification
  * - _version: OCC version counter (starts at 1, incremented on update)
+ * - _ql: Quality Level bitmask (0 = clean, 256 = system/null record)
+ * - _qd: Quality Deficit JSON array (details of data quality issues)
  */
 const SYSTEM_COLUMNS = [
   {
@@ -128,6 +130,24 @@ const SYSTEM_COLUMNS = [
     required: false,
     system: true,
     ui: { readonly: true }
+  },
+  {
+    name: '_ql',
+    type: 'int',
+    sqlType: 'INTEGER DEFAULT 0',
+    jsType: 'number',
+    required: false,
+    system: true,
+    ui: { hidden: true, readonly: true }
+  },
+  {
+    name: '_qd',
+    type: 'json',
+    sqlType: 'TEXT',
+    jsType: 'string',
+    required: false,
+    system: true,
+    ui: { hidden: true, readonly: true }
   }
 ];
 
@@ -1140,6 +1160,14 @@ function parseEntityFile(fileContent) {
           }
         }
 
+        // Extract [NULL=value] annotation (neutral value override for data quality)
+        let nullOverride = null;
+        const nullMatch = desc.match(/\[NULL=([^\]]+)\]/i);
+        if (nullMatch) {
+          nullOverride = nullMatch[1].trim();
+          desc = desc.replace(/\s*\[NULL=[^\]]+\]/i, '').trim();
+        }
+
         const attr = {
           name: parts[0],
           type: extractTypeName(typeInfo.type),
@@ -1149,6 +1177,7 @@ function parseEntityFile(fileContent) {
         if (typeInfo.optional) attr.optional = true;
         if (min !== null && !isNaN(min)) attr.min = min;
         if (max !== null && !isNaN(max)) attr.max = max;
+        if (nullOverride !== null) attr.nullOverride = nullOverride;
         if (parts.length >= 4) {
           attr.example = parts[3];
         }
@@ -1732,6 +1761,11 @@ function generateEntitySchema(className, classDef, allEntityNames = []) {
     // Preserve optional flag from [OPTIONAL] annotation in Type column
     if (attr.optional) {
       column.optional = true;
+    }
+
+    // Neutral value override for data quality [NULL=value]
+    if (attr.nullOverride !== undefined) {
+      column.nullOverride = parseDefaultValue(attr.nullOverride, typeInfo.jsType);
     }
 
     if (computedRule) {
