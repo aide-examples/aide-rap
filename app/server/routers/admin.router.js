@@ -205,7 +205,7 @@ module.exports = function(systemConfig) {
 
       const files = [];
 
-      // 1. LOC Statistics
+      // 1. System-specific LOC Statistics
       const statsScript = path.join(FRAME_ROOT, 'tools', 'loc-stats.sh');
       if (fs.existsSync(statsScript)) {
         const stats = execSync(
@@ -214,6 +214,14 @@ module.exports = function(systemConfig) {
         );
         fs.writeFileSync(path.join(reportsDir, 'statistics.md'), stats);
         files.push('statistics.md');
+
+        // 2. Framework-wide LOC Statistics (aide-frame + aide-rap, no systems)
+        const frameworkStats = execSync(
+          `bash "${statsScript}" "${PROJECT_DIR}" --markdown --no-systems`,
+          { timeout: 30000 }
+        );
+        fs.writeFileSync(path.join(reportsDir, 'framework_statistics.md'), frameworkStats);
+        files.push('framework_statistics.md');
       }
 
       const depScript = path.join(FRAME_ROOT, 'tools', 'dependency-graph.js');
