@@ -383,6 +383,35 @@ async function tryUrlLogin() {
 
           footerInfo.appendChild(sqlSep);
           footerInfo.appendChild(sqlEl);
+
+          // Developer Report button (next to refresh in actions area)
+          const actionsEl = document.querySelector('.status-footer-actions');
+          const refreshBtn = actionsEl?.querySelector('button[title="Reload page"]');
+          if (actionsEl && refreshBtn) {
+            const reportBtn = document.createElement('button');
+            reportBtn.className = 'status-footer-btn';
+            reportBtn.title = 'Developer Report';
+            reportBtn.textContent = '\u{1F4CA}';
+            reportBtn.addEventListener('click', async () => {
+              reportBtn.disabled = true;
+              reportBtn.style.opacity = '0.5';
+              try {
+                const res = await fetch('api/admin/reports', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                  reportBtn.title = `Reports updated: ${data.files.join(', ')}`;
+                } else {
+                  reportBtn.title = `Report failed: ${data.error}`;
+                }
+              } catch (e) {
+                reportBtn.title = 'Report generation failed';
+              } finally {
+                reportBtn.disabled = false;
+                reportBtn.style.opacity = '';
+              }
+            });
+            actionsEl.insertBefore(reportBtn, refreshBtn);
+          }
         }
       }
     }

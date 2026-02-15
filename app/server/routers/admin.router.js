@@ -193,5 +193,55 @@ module.exports = function(systemConfig) {
     res.json(result);
   });
 
+  /**
+   * POST /api/admin/reports
+   * Generate developer reports (LOC statistics + client/server dependency graphs)
+   */
+  router.post('/api/admin/reports', (req, res) => {
+    try {
+      const FRAME_ROOT = path.join(PROJECT_DIR, 'aide-frame');
+      const reportsDir = path.join(systemConfig.systemDir, 'docs', 'reports');
+      fs.mkdirSync(reportsDir, { recursive: true });
+
+      const files = [];
+
+      // 1. LOC Statistics
+      const statsScript = path.join(FRAME_ROOT, 'tools', 'loc-stats.sh');
+      if (fs.existsSync(statsScript)) {
+        const stats = execSync(
+          `bash "${statsScript}" "${PROJECT_DIR}" --markdown --system ${systemConfig.systemName}`,
+          { timeout: 30000 }
+        );
+        fs.writeFileSync(path.join(reportsDir, 'statistics.md'), stats);
+        files.push('statistics.md');
+      }
+
+      const depScript = path.join(FRAME_ROOT, 'tools', 'dependency-graph.js');
+      if (fs.existsSync(depScript)) {
+        // 2. Client-Side Dependency Graph
+        const clientDeps = execSync(
+          `node "${depScript}" "${path.join(PROJECT_DIR, 'app', 'static', 'rap')}" --report`,
+          { timeout: 30000 }
+        );
+        fs.writeFileSync(path.join(reportsDir, 'client_dependencies.md'), clientDeps);
+        files.push('client_dependencies.md');
+
+        // 3. Server-Side Dependency Graph
+        const serverDeps = execSync(
+          `node "${depScript}" "${path.join(PROJECT_DIR, 'app', 'server')}" --server --report`,
+          { timeout: 30000 }
+        );
+        fs.writeFileSync(path.join(reportsDir, 'server_dependencies.md'), serverDeps);
+        files.push('server_dependencies.md');
+      }
+
+      logger.info(`Developer reports generated: ${files.join(', ')}`);
+      res.json({ success: true, files });
+    } catch (err) {
+      logger.error('Failed to generate reports', { error: err.message });
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   return router;
 };
