@@ -1,4 +1,4 @@
-# AIDE RAP [book_1] - Data Model Documentation
+# AIDE RAP [book] - Data Model Documentation
 
 A minimal model for authors and books
 
@@ -27,7 +27,7 @@ This system contains 2 entities:
 
 ## Getting Started
 
-1. Start the system: `./run -s book_1`
+1. Start the system: `./run -s book`
 2. Navigate to http://localhost:18360
 3. Use the entity selector to browse data
 4. Create records using the form panel

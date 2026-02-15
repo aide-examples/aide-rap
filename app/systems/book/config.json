@@ -1,7 +1,7 @@
 {
   "port": 18360,
   "log_level": "INFO",
-  "titleHtml": "<img src='/icons/book_1_logo.svg' alt='book_1' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>Authors &amp; Books</span>",
+  "titleHtml": "<img src='/icons/book_logo.svg' alt='book' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>Authors &amp; Books</span>",
   "auth": {
     "enabled": true,
     "passwords": {
@@ -9,7 +9,7 @@
       "user": "",
       "guest": ""
     },
-    "sessionSecret": "book1-session-secret-change-in-production",
+    "sessionSecret": "book-session-secret-change-in-production",
     "sessionTimeout": 86400
   },
   "pagination": {
@@ -25,8 +25,8 @@
   "helpEditable": true,
   "pwa": {
     "enabled": true,
-    "name": "AIDE RAP [book_1]",
-    "short_name": "book_1",
+    "name": "AIDE RAP [book]",
+    "short_name": "book",
     "description": "A minimal model for authors and books",
     "theme_color": "#59eb24",
     "background_color": "#f5f5f5",

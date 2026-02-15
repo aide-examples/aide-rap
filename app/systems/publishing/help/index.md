@@ -1,4 +1,4 @@
-# AIDE RAP [book_2] - User Guide
+# AIDE RAP [publishing] - User Guide
 
 Authoring, translating and publishing books
 

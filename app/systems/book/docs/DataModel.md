@@ -6,7 +6,7 @@
 
 Entity definitions are stored in separate files under [classes/](classes/).
 
-### AIDE RAP [book_1]
+### AIDE RAP [book]
 <div style="background-color: #E8F4E8; padding: 10px;">
 
 | Entity | Description |

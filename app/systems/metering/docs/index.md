@@ -1,4 +1,4 @@
-# AIDE RAP [flow] - Data Model Documentation
+# AIDE RAP [metering] - Data Model Documentation
 
 metering your flow of gas, water and electricity
 
@@ -30,7 +30,7 @@ This system contains 4 entities:
 
 ## Getting Started
 
-1. Start the system: `./run -s flow`
+1. Start the system: `./run -s metering`
 2. Navigate to http://localhost:18362
 3. Use the entity selector to browse data
 4. Create records using the form panel

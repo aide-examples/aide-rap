@@ -1,6 +1,6 @@
-# Book_2 System - Statistics
+# Publishing System - Statistics
 
-Lines of code for the **book_2** system.
+Lines of code for the **publishing** system.
 
 *Generated: 2026-02-08 20:51*
 

@@ -1,4 +1,4 @@
-# AIDE RAP [book_2] - Data Model Documentation
+# AIDE RAP [publishing] - Data Model Documentation
 
 Authoring, translating and publishing books
 
@@ -36,7 +36,7 @@ This system contains 11 entities:
 
 ## Getting Started
 
-1. Start the system: `./run -s book_2`
+1. Start the system: `./run -s publishing`
 2. Navigate to http://localhost:18361
 3. Use the entity selector to browse data
 4. Create records using the form panel

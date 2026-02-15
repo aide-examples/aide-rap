@@ -1,7 +1,7 @@
 {
   "port": 18361,
   "log_level": "INFO",
-  "titleHtml": "<img src='/icons/book_2_logo.svg' alt='book_2' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>Publishing &amp; Translation</span>",
+  "titleHtml": "<img src='/icons/publishing_logo.svg' alt='publishing' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'>Publishing &amp; Translation</span>",
   "auth": {
     "enabled": true,
     "passwords": {
@@ -9,7 +9,7 @@
       "user": "",
       "guest": ""
     },
-    "sessionSecret": "book2-session-secret-change-in-production",
+    "sessionSecret": "publishing-session-secret-change-in-production",
     "sessionTimeout": 86400
   },
   "pagination": {
@@ -25,8 +25,8 @@
   "helpEditable": true,
   "pwa": {
     "enabled": true,
-    "name": "AIDE RAP [book_2]",
-    "short_name": "book_2",
+    "name": "AIDE RAP [publishing]",
+    "short_name": "publishing",
     "description": "Authoring, translating and publishing books",
     "theme_color": "#eb7d24",
     "background_color": "#f5f5f5",

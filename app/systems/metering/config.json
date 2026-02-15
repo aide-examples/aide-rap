@@ -1,7 +1,7 @@
 {
   "port": 18362,
   "log_level": "INFO",
-  "titleHtml": "<img src='/icons/flow_logo.png' alt='FLOW' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'> &rArr; Water, Gas, Power ..</span>",
+  "titleHtml": "<img src='/icons/metering_logo.png' alt='metering' style='height:28px; vertical-align:middle; margin-right:8px'><span style='color:#9ca3af; font-size:0.85em'> &rArr; Water, Gas, Power ..</span>",
   "auth": {
     "enabled": false,
     "passwords": {
@@ -9,7 +9,7 @@
       "user": "",
       "guest": ""
     },
-    "sessionSecret": "flow-session-secret-change-in-production",
+    "sessionSecret": "metering-session-secret-change-in-production",
     "sessionTimeout": 86400
   },
   "pagination": {
@@ -25,8 +25,8 @@
   "helpEditable": true,
   "pwa": {
     "enabled": true,
-    "name": "AIDE RAP [flow]",
-    "short_name": "flow",
+    "name": "AIDE RAP [metering]",
+    "short_name": "metering",
     "description": "metering your flow of gas, water and electricity",
     "theme_color": "#2563eb",
     "background_color": "#f5f5f5",
@@ -38,7 +38,7 @@
       "line1_text": "aide",
       "line1_color": "#94a3b8",
       "line1_size": 0.25,
-      "line2_text": "flow",
+      "line2_text": "meter",
       "line2_color": "#ffffff",
       "line2_size": 0.38
     }

@@ -1,6 +1,6 @@
-# Flow System - Statistics
+# Metering System - Statistics
 
-Lines of code for the **flow** system.
+Lines of code for the **metering** system.
 
 *Generated: 2026-02-08 20:51*
 

@@ -1,4 +1,4 @@
-# AIDE RAP [book_1] - User Guide
+# AIDE RAP [book] - User Guide
 
 A minimal model for authors and books
 

@@ -1,6 +1,6 @@
-# Book_1 System - Statistics
+# Book System - Statistics
 
-Lines of code for the **book_1** system.
+Lines of code for the **book** system.
 
 *Generated: 2026-02-08 20:51*
 

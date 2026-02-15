@@ -1,4 +1,4 @@
-# AIDE RAP [flow] - User Guide
+# AIDE RAP [metering] - User Guide
 
 metering your flow of gas, water and electricity
 
