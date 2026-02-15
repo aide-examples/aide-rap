@@ -2,31 +2,92 @@
   {
     "first_name": "Jane",
     "last_name": "Austen",
+    "birth_date": "1775-12-16",
+    "death_date": "1817-07-18",
     "home_country": "United Kingdom",
-    "year_of_birth": 1775
+    "is_active": false,
+    "residence": {
+      "street": "Chawton Cottage",
+      "city": "Winchester",
+      "zip": "SO23",
+      "country": "United Kingdom"
+    },
+    "contact_info": {
+      "email": "austen@example.com"
+    }
   },
   {
     "first_name": "Gabriel",
     "last_name": "Garcia Marquez",
+    "birth_date": "1927-03-06",
+    "death_date": "2014-04-17",
     "home_country": "Colombia",
-    "year_of_birth": 1927
+    "is_active": false,
+    "residence": {
+      "city": "Mexico City",
+      "zip": "06600",
+      "country": "Mexico"
+    },
+    "contact_info": {
+      "email": "garcia@example.com",
+      "phone": "+52 55 1234 5678"
+    }
   },
   {
     "first_name": "Haruki",
     "last_name": "Murakami",
+    "birth_date": "1949-01-12",
     "home_country": "Japan",
-    "year_of_birth": 1949
+    "email": "murakami@example.com",
+    "homepage": "https://www.harukimurakami.com",
+    "is_active": true,
+    "residence": {
+      "city": "Tokyo",
+      "zip": "150-0001",
+      "country": "Japan"
+    },
+    "contact_info": {
+      "email": "murakami@lit.jp",
+      "phone": "+81 3 1234 5678"
+    },
+    "bio": "{\"awards\": [\"Franz Kafka Prize\", \"Jerusalem Prize\"], \"notable_works\": [\"Norwegian Wood\", \"1Q84\"]}"
   },
   {
     "first_name": "Chimamanda",
     "last_name": "Adichie",
+    "birth_date": "1977-09-15",
     "home_country": "Nigeria",
-    "year_of_birth": 1977
+    "email": "adichie@example.com",
+    "homepage": "https://www.chimamanda.com",
+    "is_active": true,
+    "residence": {
+      "city": "Baltimore",
+      "zip": "MD 21201",
+      "country": "United States"
+    },
+    "contact_info": {
+      "email": "adichie@lit.com",
+      "phone": "+1 410 555 1234"
+    },
+    "bio": "{\"awards\": [\"MacArthur Fellowship\", \"National Book Critics Circle Award\"], \"notable_works\": [\"Americanah\", \"Purple Hibiscus\"]}"
   },
   {
     "first_name": "Isabel",
     "last_name": "Allende",
+    "birth_date": "1942-08-02",
     "home_country": "Chile",
-    "year_of_birth": 1942
+    "email": "allende@example.com",
+    "homepage": "https://www.isabelallende.com",
+    "is_active": true,
+    "residence": {
+      "city": "San Rafael",
+      "zip": "CA 94960",
+      "country": "United States"
+    },
+    "contact_info": {
+      "email": "allende@lit.com",
+      "phone": "+1 415 555 5678"
+    },
+    "bio": "{\"awards\": [\"Presidential Medal of Freedom\", \"National Literature Prize\"], \"notable_works\": [\"The House of the Spirits\", \"Eva Luna\"]}"
   }
 ]

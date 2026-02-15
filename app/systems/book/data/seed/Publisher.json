@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Penguin Random House",
+    "founded_year": 1935,
+    "website": "https://www.penguinrandomhouse.com",
+    "headquarters": "10019 New York"
+  },
+  {
+    "name": "Editorial Sudamericana",
+    "founded_year": 1939,
+    "website": "https://www.megustaleer.com.ar",
+    "headquarters": "C1023 Buenos Aires"
+  },
+  {
+    "name": "Kodansha",
+    "founded_year": 1909,
+    "website": "https://www.kodansha.co.jp",
+    "headquarters": "112-8001 Tokyo"
+  }
+]

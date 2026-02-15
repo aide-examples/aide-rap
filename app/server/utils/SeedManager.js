@@ -1,19 +1,30 @@
 /**
- * SeedManager - Manages seed data loading and clearing for entities
+ * SeedManager - Facade for seed data management
  *
- * Single data source: seed/ directory
- * Supports import from JSON and CSV (both saved as JSON)
+ * This module is the ONLY file with access to global state (database singleton,
+ * EventBus, module-level SEED_DIR/mediaService). All sub-modules in seed/
+ * receive dependencies as explicit parameters — no hidden singleton imports.
+ *
+ * Public API is unchanged: all 24 exported functions keep their original signatures.
  */
 
 const fs = require('fs');
 const path = require('path');
 const eventBus = require('./EventBus');
+const LabelResolver = require('./seed/LabelResolver');
+const FKResolver = require('./seed/FKResolver');
+const ImportValidator = require('./seed/ImportValidator');
+const DataLoader = require('./seed/DataLoader');
+const BackupManager = require('./seed/BackupManager');
+const RefreshManager = require('./seed/RefreshManager');
 
 // Module-level seed directory (configured via init())
 let SEED_DIR = null;
 
 // Module-level MediaService instance (for resolving media URLs during seeding)
 let mediaService = null;
+
+// --- Global state accessors ---
 
 /**
  * Initialize SeedManager with a specific seed directory
@@ -23,12 +34,9 @@ let mediaService = null;
  */
 function init(seedDir, options = {}) {
   SEED_DIR = seedDir;
-  // Ensure seed directory exists
   if (!fs.existsSync(SEED_DIR)) {
     fs.mkdirSync(SEED_DIR, { recursive: true });
   }
-
-  // Store MediaService for media URL resolution during seeding
   if (options.mediaService) {
     mediaService = options.mediaService;
   }
@@ -42,166 +50,6 @@ function setMediaService(service) {
   mediaService = service;
 }
 
-/**
- * Check if a string is a valid URL
- * @param {string} str - String to check
- * @returns {boolean}
- */
-function isValidUrl(str) {
-  if (!str || typeof str !== 'string') return false;
-  try {
-    const url = new URL(str);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Extract URL from a markdown link [text](url) or return the string if it's a plain URL
- * @param {string} str - String to check (may be markdown link or plain URL)
- * @returns {string|null} - The URL or null if not a valid URL
- */
-function extractUrl(str) {
-  if (!str || typeof str !== 'string') return null;
-
-  // Check for markdown link [text](url)
-  const mdMatch = str.match(/^\[([^\]]*)\]\(([^)]+)\)$/);
-  if (mdMatch) {
-    const url = mdMatch[2];
-    return isValidUrl(url) ? url : null;
-  }
-
-  // Plain URL
-  return isValidUrl(str) ? str : null;
-}
-
-/**
- * Resolve media URLs in a record.
- * For each media-type field, if the value is a URL, fetch it via MediaService
- * and replace with the resulting media UUID.
- * @param {string} entityName - Entity name
- * @param {Object} record - Record to process
- * @returns {Promise<{record: Object, mediaErrors: Array}>} - Record with resolved media UUIDs and any errors
- */
-async function resolveMediaUrls(entityName, record) {
-  const mediaErrors = [];
-
-  if (!mediaService) {
-    console.warn(`[SeedManager] MediaService not set - cannot resolve media URLs`);
-    return { record, mediaErrors };
-  }
-
-  const { schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-  if (!entity) return { record, mediaErrors };
-
-  const resolved = { ...record };
-
-  // Find media-type columns
-  const mediaColumns = entity.columns.filter(c => c.customType === 'media');
-
-  // Debug: log what we found
-  if (mediaColumns.length > 0) {
-    console.log(`[SeedManager] ${entityName} has ${mediaColumns.length} media column(s): ${mediaColumns.map(c => c.name).join(', ')}`);
-  }
-
-  for (const col of mediaColumns) {
-    const value = record[col.name];
-
-    // Extract URL (handles both plain URLs and markdown links [text](url))
-    const url = extractUrl(value);
-
-    // Debug: log the value we're checking
-    if (value) {
-      console.log(`[SeedManager] Checking ${col.name}: "${value}" - extractedUrl: ${url || 'none'}`);
-    }
-
-    // Check if value is a URL (not already a UUID)
-    if (url) {
-      try {
-        console.log(`  Fetching media URL for ${col.name}: ${url.substring(0, 50)}...`);
-        // Pass media constraints from schema (e.g., maxWidth, maxHeight from [DIMENSION=800x600])
-        const constraints = col.media || null;
-        const result = await mediaService.uploadFromUrl(url, 'seed', constraints);
-        resolved[col.name] = result.id;
-        console.log(`  -> Stored as ${result.id}`);
-      } catch (err) {
-        console.warn(`  Warning: Could not fetch media URL for ${col.name}: ${err.message}`);
-        // Track the error for client feedback
-        mediaErrors.push({
-          field: col.name,
-          url: url.length > 80 ? url.substring(0, 80) + '...' : url,
-          error: err.message
-        });
-        // Set field to null (validation will fail later, or it might be optional)
-        resolved[col.name] = null;
-      }
-    }
-  }
-
-  return { record: resolved, mediaErrors };
-}
-
-/**
- * Flatten nested aggregate type values in a record.
- * Converts { position: { latitude: 48.1, longitude: 11.5 } }
- * to { position_latitude: 48.1, position_longitude: 11.5 }
- *
- * @param {string} entityName - Entity name
- * @param {Object} record - Record to process
- * @returns {Object} - Record with flattened aggregate values
- */
-function flattenAggregates(entityName, record) {
-  const { schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-  if (!entity) return record;
-
-  const { getTypeRegistry } = require('../../shared/types/TypeRegistry');
-  const typeRegistry = getTypeRegistry();
-
-  const flattened = { ...record };
-
-  // Find aggregate columns by looking for aggregateSource metadata
-  const aggregateSources = new Set();
-  for (const col of entity.columns) {
-    if (col.aggregateSource) {
-      aggregateSources.add(col.aggregateSource);
-    }
-  }
-
-  // For each aggregate source, check if record has nested value
-  for (const sourceName of aggregateSources) {
-    const nestedValue = record[sourceName];
-
-    if (nestedValue && typeof nestedValue === 'object' && !Array.isArray(nestedValue)) {
-      // Find the aggregate type from schema columns
-      const aggregateCol = entity.columns.find(c => c.aggregateSource === sourceName);
-      if (aggregateCol && aggregateCol.aggregateType) {
-        const fields = typeRegistry.getAggregateFields(aggregateCol.aggregateType);
-
-        if (fields) {
-          // Flatten nested object to prefixed fields
-          for (const field of fields) {
-            const flatKey = `${sourceName}_${field.name}`;
-            if (nestedValue[field.name] !== undefined) {
-              flattened[flatKey] = nestedValue[field.name];
-            }
-          }
-          // Remove the nested key
-          delete flattened[sourceName];
-        }
-      }
-    }
-  }
-
-  return flattened;
-}
-
-/**
- * Get the current seed directory
- * @returns {string} - The seed directory path
- */
 function getSeedDir() {
   if (!SEED_DIR) {
     throw new Error('SeedManager not initialized. Call init(seedDir) first.');
@@ -209,1965 +57,252 @@ function getSeedDir() {
   return SEED_DIR;
 }
 
-/**
- * Get the backup directory (sibling of seed directory)
- * @returns {string} - The backup directory path
- */
 function getBackupDir() {
   return path.join(path.dirname(getSeedDir()), 'backup');
 }
 
-/**
- * Get the import directory (sibling of seed directory)
- * @returns {string} - The import directory path
- */
 function getImportDir() {
   return path.join(path.dirname(getSeedDir()), 'import');
 }
 
-/**
- * Get database and schema from the database module
- */
 function getDbAndSchema() {
   const { getDatabase, getSchema } = require('../config/database');
   return { db: getDatabase(), schema: getSchema() };
 }
 
-/**
- * Build a lookup map from rows: LABEL value -> id
- * Supports primary LABEL, secondary LABEL2, combined, and index notation.
- */
-function buildLookupFromRows(rows, labelCol, label2Col) {
-  const lookup = {};
-  let rowIndex = 1;
-
-  for (const row of rows) {
-    const primaryVal = labelCol ? row[labelCol.name] : null;
-    const secondaryVal = label2Col ? row[label2Col.name] : null;
-
-    if (primaryVal) lookup[primaryVal] = row.id;
-    if (secondaryVal) lookup[secondaryVal] = row.id;
-    if (primaryVal && secondaryVal) {
-      lookup[`${primaryVal} (${secondaryVal})`] = row.id;
-    }
-    lookup[`#${rowIndex}`] = row.id;
-    rowIndex++;
-  }
-
-  return lookup;
+/** Get TypeRegistry instance (lazy, cached) */
+function getTypeRegistry() {
+  const { getTypeRegistry: getTR } = require('../../shared/types/TypeRegistry');
+  return getTR();
 }
 
-/**
- * Add normalized keys to a lookup for whitespace-insensitive fallback matching.
- * Strips all whitespace and lowercases to build a parallel _normalized map.
- * Used when exact label match fails — e.g., "PW1100G-JM" matches "PW 1100G-JM".
- */
-function addNormalizedKeys(lookup) {
-  const normalized = {};
-  for (const [key, id] of Object.entries(lookup)) {
-    if (key.startsWith('#')) continue;
-    const norm = key.replace(/\s+/g, '').toLowerCase();
-    if (!(norm in normalized)) normalized[norm] = id;
-  }
-  lookup._normalized = normalized;
+/** Common options bundle for sub-module calls */
+function getLoaderOptions(extra = {}) {
+  return { mediaService, typeRegistry: getTypeRegistry(), ...extra };
 }
 
-/**
- * Build a lookup map for an entity: LABEL value -> id
- * Used to resolve conceptual FK references (e.g., "manufacturer": "Airbus" -> manufacturer_id: 1)
- *
- * Supports multiple lookup keys:
- * - Primary LABEL field (e.g., "designation" -> "A320neo")
- * - Secondary LABEL2 field (e.g., "name" -> "Airbus A320neo")
- * - Combined format: "LABEL (LABEL2)" (e.g., "Airbus (France)")
- *   This matches the display format used in Views and exports.
- * - Index notation: "#1", "#2", etc. - maps to records by row order (id ascending)
- *   This supports AI-generated seed data that uses "#n" for FK references.
- * - Entity-level labelExpression: computed _label from view (e.g., concat(mfg, '-', serial))
- */
-function buildLabelLookup(entityName) {
-  const { db, schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
+// --- Facade delegation functions ---
 
-  if (!entity) return {};
-
-  let lookup;
-
-  // Check if entity has computed labelExpression (from entity-level [LABEL=expr])
-  if (entity.labelExpression) {
-    // Query from view which has the computed _label column
-    const sql = `SELECT id, _label FROM ${entity.tableName}_view WHERE _ql = 0 ORDER BY id`;
-    try {
-      const rows = db.prepare(sql).all();
-      lookup = buildLookupFromComputedLabel(rows);
-    } catch (e) {
-      // Fallback to column-based lookup if view doesn't exist yet
-      console.warn(`Warning: Could not use _label from view for ${entityName}, falling back to column lookup`);
-    }
-  }
-
-  if (!lookup) {
-    // Standard column-based lookup
-    const labelCol = entity.columns.find(c => c.ui?.label);
-    const label2Col = entity.columns.find(c => c.ui?.label2);
-
-    const selectCols = ['id'];
-    if (labelCol) selectCols.push(labelCol.name);
-    if (label2Col && label2Col.name !== labelCol?.name) selectCols.push(label2Col.name);
-
-    const sql = `SELECT ${selectCols.join(', ')} FROM ${entity.tableName} WHERE _ql = 0 ORDER BY id`;
-    const rows = db.prepare(sql).all();
-
-    lookup = buildLookupFromRows(rows, labelCol, label2Col);
-  }
-
-  // Build normalized lookup for whitespace-insensitive fallback matching
-  addNormalizedKeys(lookup);
-
-  return lookup;
-}
-
-/**
- * Build lookup map from rows with computed _label column
- */
-function buildLookupFromComputedLabel(rows) {
-  const lookup = {};
-  let rowIndex = 1;
-
-  for (const row of rows) {
-    const labelVal = row._label;
-    if (labelVal) lookup[labelVal] = row.id;
-    lookup[`#${rowIndex}`] = row.id;
-    rowIndex++;
-  }
-
-  return lookup;
-}
-
-/**
- * Check if needle segments appear as a subsequence in haystack segments.
- * Each needle segment must match a haystack segment, in order, but gaps are allowed.
- */
-function isSubsequence(needle, haystack) {
-  let hi = 0;
-  for (let ni = 0; ni < needle.length; ni++) {
-    while (hi < haystack.length && haystack[hi] !== needle[ni]) hi++;
-    if (hi >= haystack.length) return false;
-    hi++;
-  }
-  return true;
-}
-
-/**
- * Extract the separator from a concat-type labelExpression.
- * Returns the separator string if all literal parts are identical, null otherwise.
- */
-function getLabelSeparator(labelExpr) {
-  if (!labelExpr || labelExpr.type !== 'concat') return null;
-  const literals = labelExpr.parts
-    .filter(p => typeof p === 'object' && p.type === 'literal')
-    .map(p => p.value);
-  if (literals.length === 0) return null;
-  const unique = new Set(literals);
-  return unique.size === 1 ? literals[0] : null;
-}
-
-/**
- * Fuzzy label matching: find a unique label in lookup where the import value's
- * segments (split by separator) are a subsequence of the label's segments.
- * Returns { id, matchedLabel } if exactly one match, null otherwise.
- */
-function fuzzyLabelMatch(importValue, lookup, separator) {
-  if (!importValue || !separator) return null;
-  const importSegments = importValue.split(separator);
-  if (importSegments.length < 2) return null;
-
-  const candidates = [];
-  for (const [label, id] of Object.entries(lookup)) {
-    if (label.startsWith('#')) continue;
-    const labelSegments = label.split(separator);
-    if (importSegments.length >= labelSegments.length) continue;
-    if (isSubsequence(importSegments, labelSegments)) {
-      candidates.push({ id, matchedLabel: label });
-    }
-  }
-  return candidates.length === 1 ? candidates[0] : null;
-}
-
-/**
- * Compute a label value from an expression and a record (in-memory)
- * Used for seed/import records before they're in the database
- * @param {object} expr - { type: 'field'|'concat', field?: string, parts?: string[] }
- * @param {object} record - The record to compute label from
- * @returns {string|null} - Computed label value
- */
-function computeLabelFromExpression(expr, record) {
-  if (!expr) return null;
-
-  // Legacy format: { type: 'field', field: 'name' }
-  if (expr.type === 'field') {
-    return record[expr.field] ?? null;
-  }
-
-  // New format: { type: 'ref', name: 'name' }
-  if (expr.type === 'ref') {
-    return record[expr.name] ?? null;
-  }
-
-  if (expr.type === 'concat') {
-    const parts = expr.parts.map(p => {
-      // New structured format (objects with type property)
-      if (typeof p === 'object' && p !== null) {
-        if (p.type === 'literal') {
-          return p.value;
-        }
-        if (p.type === 'ref') {
-          return record[p.name] ?? '';
-        }
-        if (p.type === 'fkChain') {
-          // For FK chains, just use the first segment (the FK field name)
-          // The record has the conceptual value before FK resolution
-          const firstSegment = p.path.split('.')[0];
-          return record[firstSegment] ?? '';
-        }
-        return '';
-      }
-      // Legacy format: plain strings
-      if (typeof p === 'string') {
-        // Check if it's a quoted literal
-        if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
-          return p.slice(1, -1); // Remove quotes
-        }
-        // Field reference
-        return record[p] ?? '';
-      }
-      return '';
-    });
-    return parts.join('');
-  }
-
-  return null;
-}
-
-/**
- * Build lookup map from in-memory records using labelExpression
- * @param {array} records - Records to build lookup from
- * @param {object} labelExpr - Label expression { type, field/parts }
- * @returns {object} - Lookup map: label -> id (row index)
- */
-function buildLookupFromExpressionRecords(records, labelExpr) {
-  const lookup = {};
-  let rowIndex = 1;
-
-  for (const record of records) {
-    const labelVal = computeLabelFromExpression(labelExpr, record);
-    if (labelVal) lookup[labelVal] = rowIndex;
-    lookup[`#${rowIndex}`] = rowIndex;
-    rowIndex++;
-  }
-
-  return lookup;
-}
-
-/**
- * Build a lookup map from a seed JSON file (fallback when DB table is empty).
- * Returns { lookup, found } where found indicates if a seed file was used.
- */
-function buildLabelLookupFromSeed(entityName) {
-  const { schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-
-  if (!entity) return { lookup: {}, found: false };
-
-  try {
-    const seedFile = path.join(getSeedDir(), `${entityName}.json`);
-    if (!fs.existsSync(seedFile)) return { lookup: {}, found: false };
-
-    const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
-    if (!Array.isArray(seedData) || seedData.length === 0) return { lookup: {}, found: false };
-
-    let lookup;
-
-    // Check for entity-level labelExpression first
-    if (entity.labelExpression) {
-      lookup = buildLookupFromExpressionRecords(seedData, entity.labelExpression);
-    } else {
-      // Standard column-based lookup
-      const labelCol = entity.columns.find(c => c.ui?.label);
-      const label2Col = entity.columns.find(c => c.ui?.label2);
-
-      // Seed files use attribute names (not DB column names with _id suffix).
-      // LABEL/LABEL2 columns are always non-FK attributes, so names match.
-      const rows = seedData.map((r, idx) => ({
-        id: idx + 1,
-        ...(labelCol ? { [labelCol.name]: r[labelCol.name] ?? null } : {}),
-        ...(label2Col ? { [label2Col.name]: r[label2Col.name] ?? null } : {})
-      }));
-
-      lookup = buildLookupFromRows(rows, labelCol, label2Col);
-    }
-
-    addNormalizedKeys(lookup);
-    return { lookup, found: true };
-  } catch (e) {
-    return { lookup: {}, found: false };
-  }
-}
-
-/**
- * Build a lookup map from records being imported (for self-referential FKs).
- * Allows earlier records in the import to be referenced by later records.
- * E.g., EngineType "CFM56-5B" can reference "CFM56" if "CFM56" appears earlier.
- *
- * @param {object} entity - Entity schema
- * @param {array} records - Records being imported
- * @returns {object} - Lookup map: label -> row index (1-based, becomes id after insert)
- */
-function buildLookupFromImportRecords(entity, records) {
-  // Check for entity-level labelExpression first
-  if (entity.labelExpression) {
-    return buildLookupFromExpressionRecords(records, entity.labelExpression);
-  }
-
-  // Standard column-based lookup
-  const labelCol = entity.columns.find(c => c.ui?.label);
-  const label2Col = entity.columns.find(c => c.ui?.label2);
-
-  if (!labelCol && !label2Col) return {};
-
-  const rows = records.map((r, idx) => ({
-    id: idx + 1,  // Row index becomes id after insert
-    ...(labelCol ? { [labelCol.name]: r[labelCol.name] ?? null } : {}),
-    ...(label2Col ? { [label2Col.name]: r[label2Col.name] ?? null } : {})
-  }));
-
-  return buildLookupFromRows(rows, labelCol, label2Col);
-}
-
-/**
- * Resolve conceptual FK references in a record.
- * Converts { "manufacturer": "Airbus" } to { "manufacturer_id": 1 }
- *
- * @param {string} entityName - The entity being seeded
- * @param {object} record - The seed record (may have conceptual or technical FK names)
- * @param {object} lookups - Pre-built lookup maps for all entities
- * @returns {object} - { resolved: record with resolved FK IDs, fkWarnings: array of unresolved FKs }
- */
-function resolveConceptualFKs(entityName, record, lookups) {
-  const { schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-
-  if (!entity) return { resolved: record, fkWarnings: [], fuzzyMatches: [] };
-
-  const resolved = { ...record };
-  const fkWarnings = [];
-  const fuzzyMatches = [];
-
-  for (const fk of entity.foreignKeys) {
-    const conceptualName = fk.displayName;  // e.g., "manufacturer"
-    const technicalName = fk.column;        // e.g., "manufacturer_id"
-    const targetEntity = fk.references?.entity || entityName; // Fall back to self for self-refs
-
-    // Determine which key the record uses and extract the label value
-    let recordKey, labelValue;
-    if (conceptualName && conceptualName in record && typeof record[conceptualName] === 'string') {
-      recordKey = conceptualName;
-      labelValue = record[conceptualName];
-    } else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
-      // AI sometimes uses _id suffix despite prompt instructions
-      recordKey = technicalName;
-      labelValue = record[technicalName];
-    }
-
-    if (!labelValue) continue;
-
-    const lookup = lookups[targetEntity] || {};
-    const fieldLabel = conceptualName || technicalName;
-    let resolvedId = lookup[labelValue];
-
-    // Fallback 1: whitespace-normalized match (e.g., "PW1100G-JM" matches "PW 1100G-JM")
-    if (resolvedId === undefined && lookup._normalized) {
-      const norm = labelValue.replace(/\s+/g, '').toLowerCase();
-      resolvedId = lookup._normalized[norm];
-      if (resolvedId !== undefined) lookup[labelValue] = resolvedId; // cache
-    }
-
-    // Fallback 2: fuzzy match for concat-based labels (subsequence matching)
-    if (resolvedId === undefined) {
-      const targetEntitySchema = schema.entities[targetEntity];
-      const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
-      const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
-      if (fuzzyResult) {
-        resolvedId = fuzzyResult.id;
-        lookup[labelValue] = resolvedId; // cache
-        fuzzyMatches.push({ field: fieldLabel, value: labelValue, matchedLabel: fuzzyResult.matchedLabel, targetEntity });
-      }
-    }
-
-    // Fallback 3: UNIQUE field match (e.g., Engine serial_number "771706")
-    if (resolvedId === undefined) {
-      const uniqueId = findByUniqueField(targetEntity, labelValue);
-      if (uniqueId !== null) {
-        resolvedId = uniqueId;
-        lookup[labelValue] = resolvedId; // cache
-      }
-    }
-
-    if (resolvedId !== undefined) {
-      resolved[technicalName] = resolvedId;
-      if (recordKey !== technicalName) delete resolved[recordKey];
-    } else {
-      console.warn(`  Warning: Could not resolve ${fieldLabel}="${labelValue}" for ${entityName}`);
-      eventBus.emit('seed:resolve:warning', { entityName, field: fieldLabel, value: labelValue, targetEntity });
-      fkWarnings.push({ field: fieldLabel, value: labelValue, targetEntity });
-      if (recordKey === technicalName) {
-        resolved[technicalName] = null;
-      } else {
-        delete resolved[recordKey];
-      }
-    }
-  }
-
-  return { resolved, fkWarnings, fuzzyMatches };
-}
-
-/**
- * Count records in a seed file
- */
-function countSeedFile(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-  try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return Array.isArray(data) ? data.length : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Get status of all enabled entities
- * Returns row counts, seed file availability, and valid record counts
- */
 function getStatus() {
   const { db, schema } = getDbAndSchema();
-  const entities = [];
-
-  const backupDir = getBackupDir();
-  const importDir = getImportDir();
-
-  for (const entity of schema.orderedEntities) {
-    const rowCount = db.prepare(`SELECT COUNT(*) as count FROM ${entity.tableName}`).get().count;
-    const seedFile = `${entity.className}.json`;
-    const seedPath = path.join(getSeedDir(), seedFile);
-    const seedTotal = countSeedFile(seedPath);
-
-    // Calculate valid count if seed file exists
-    let seedValid = null;
-    if (seedTotal !== null && seedTotal > 0) {
-      try {
-        const records = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
-        const validation = validateImport(entity.className, records);
-        seedValid = validation.validCount;
-      } catch {
-        seedValid = 0;
-      }
-    }
-
-    // Count backup records
-    const backupPath = path.join(backupDir, seedFile);
-    const backupTotal = countSeedFile(backupPath);
-
-    // Count import records
-    const importPath = path.join(importDir, seedFile);
-    const importTotal = countSeedFile(importPath);
-
-    // Calculate valid count if import file exists
-    let importValid = null;
-    if (importTotal !== null && importTotal > 0) {
-      try {
-        const records = JSON.parse(fs.readFileSync(importPath, 'utf-8'));
-        const validation = validateImport(entity.className, records);
-        importValid = validation.validCount;
-      } catch {
-        importValid = 0;
-      }
-    }
-
-    entities.push({
-      name: entity.className,
-      tableName: entity.tableName,
-      rowCount,
-      seedTotal,      // Total records in seed file
-      seedValid,      // Valid records (can be loaded)
-      backupTotal,    // Total records in backup file
-      importTotal,    // Total records in import file
-      importValid     // Valid records in import file
-    });
-  }
-
-  // Pass 2: Compute FK readiness
-  const statusMap = {};
-  for (const e of entities) {
-    statusMap[e.name] = e;
-  }
-
-  for (const entity of schema.orderedEntities) {
-    const status = statusMap[entity.className];
-    const deps = [];
-    const missing = [];
-
-    for (const fk of entity.foreignKeys) {
-      const target = fk.references?.entity;
-      if (!target || target === entity.className) continue; // Skip self-references and broken FKs
-      if (!deps.includes(target)) deps.push(target);
-
-      const targetStatus = statusMap[target];
-      if (targetStatus) {
-        const hasData = targetStatus.rowCount > 0;
-        const hasSeed = targetStatus.seedTotal !== null && targetStatus.seedTotal > 0;
-        if (!hasData && !hasSeed && !missing.includes(target)) {
-          missing.push(target);
-        }
-      }
-    }
-
-    status.dependencies = deps;
-    status.missingDeps = missing;
-    status.ready = missing.length === 0;
-  }
-
-  return { entities };
+  return ImportValidator.getStatus(db, schema, getSeedDir(), getBackupDir(), getImportDir());
 }
 
-/**
- * Build lookup for unique columns: value -> existing record id
- * Used to detect import conflicts
- */
-function buildUniqueLookup(entityName) {
-  const { db, schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-
-  if (!entity) return {};
-
-  // Find unique columns (single-column constraints)
-  const uniqueCols = entity.columns.filter(c => c.unique).map(c => c.name);
-
-  // Find composite unique keys
-  const compositeKeys = Object.values(entity.uniqueKeys || {});
-
-  if (uniqueCols.length === 0 && compositeKeys.length === 0) return {};
-
-  const lookup = {};
-  const rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
-
-  for (const row of rows) {
-    // Single-column unique constraints
-    for (const col of uniqueCols) {
-      if (row[col] !== null && row[col] !== undefined) {
-        const key = `${col}:${row[col]}`;
-        lookup[key] = row.id;
-      }
-    }
-
-    // Composite unique keys
-    for (const keyCols of compositeKeys) {
-      const values = keyCols.map(c => row[c]);
-      if (values.every(v => v !== null && v !== undefined)) {
-        const key = keyCols.map((c, i) => `${c}:${values[i]}`).join('|');
-        lookup[key] = row.id;
-      }
-    }
-  }
-
-  return lookup;
-}
-
-/**
- * Check if an existing record has back-references from other entities
- * Returns count of referencing records
- */
-function countBackReferences(entityName, recordId) {
-  const { db, schema } = getDbAndSchema();
-  const inverseRels = schema.inverseRelationships[entityName] || [];
-
-  let totalRefs = 0;
-  const referencingEntities = [];
-
-  for (const rel of inverseRels) {
-    const refEntity = schema.entities[rel.entity];
-    if (!refEntity) continue;
-
-    const countSql = `SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${rel.column} = ?`;
-    const { count } = db.prepare(countSql).get(recordId);
-
-    if (count > 0) {
-      totalRefs += count;
-      referencingEntities.push({ entity: rel.entity, count });
-    }
-  }
-
-  return { totalRefs, referencingEntities };
-}
-
-/**
- * Validate import data and check FK references
- * Returns warnings for unresolved FKs, identifies valid/invalid records,
- * and detects conflicts with existing records that have back-references
- *
- * @param {string} entityName - Entity name
- * @param {array} records - Array of records to validate
- * @returns {object} - { valid, warnings, recordCount, validCount, invalidRows, conflicts }
- */
 function validateImport(entityName, records) {
-  const { schema } = getDbAndSchema();
+  const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-
   if (!entity) {
     return { valid: false, warnings: [{ message: `Entity ${entityName} not found` }], recordCount: 0, validCount: 0, invalidRows: [], conflicts: [] };
   }
-
-  if (!Array.isArray(records)) {
-    return { valid: false, warnings: [{ message: 'Data must be an array of records' }], recordCount: 0, validCount: 0, invalidRows: [], conflicts: [] };
-  }
-
-  const warnings = [];
-  const invalidRows = new Set();
-  const conflicts = [];
-  const seedFallbacks = []; // FK entities resolved from seed files (not loaded in DB)
-
-  // Build lookups for FK validation (with seed file fallback)
-  const lookups = {};
-  for (const fk of entity.foreignKeys) {
-    const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
-    if (!lookups[targetEntity]) {
-      // Self-referential FK: build lookup from records being validated
-      if (targetEntity === entityName) {
-        lookups[entityName] = buildLookupFromImportRecords(entity, records);
-      } else {
-        const dbLookup = buildLabelLookup(targetEntity);
-        if (Object.keys(dbLookup).length > 0) {
-          lookups[targetEntity] = dbLookup;
-        } else {
-          // DB table empty — fall back to seed file
-          const { lookup: seedLookup, found } = buildLabelLookupFromSeed(targetEntity);
-          lookups[targetEntity] = seedLookup;
-          if (found) {
-            seedFallbacks.push(targetEntity);
-          }
-        }
-      }
-    }
-  }
-
-  // Build unique lookup for conflict detection
-  const uniqueLookup = buildUniqueLookup(entityName);
-  const uniqueCols = entity.columns.filter(c => c.unique).map(c => c.name);
-  const compositeKeys = Object.entries(entity.uniqueKeys || {});
-
-  // Track seen values for intra-batch duplicate detection
-  const batchSeen = {};
-  for (const col of uniqueCols) {
-    batchSeen[col] = new Map(); // value -> first row number (1-based)
-  }
-  for (const [keyName] of compositeKeys) {
-    batchSeen[keyName] = new Map();
-  }
-
-  // Validate each record
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
-
-    // Check FK references
-    for (const fk of entity.foreignKeys) {
-      const conceptualName = fk.displayName;
-      const technicalName = fk.column;
-      const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
-      const fkColumn = entity.columns.find(c => c.name === technicalName);
-      const isOptionalFK = fkColumn?.optional === true;
-
-      // Determine which key the record uses and extract the label value
-      let fieldName, labelValue;
-      if (conceptualName && record[conceptualName]) {
-        fieldName = conceptualName;
-        labelValue = record[conceptualName];
-      } else if (technicalName in record && typeof record[technicalName] === 'string' && isNaN(Number(record[technicalName]))) {
-        fieldName = technicalName;
-        labelValue = record[technicalName];
-      }
-
-      if (!labelValue) continue;
-
-      const lookup = lookups[targetEntity] || {};
-
-      if (!lookup[labelValue]) {
-        // Fallback 1: fuzzy matching for concat-based labels
-        const targetEntitySchema = schema.entities[targetEntity];
-        const separator = targetEntitySchema ? getLabelSeparator(targetEntitySchema.labelExpression) : null;
-        const fuzzyResult = separator ? fuzzyLabelMatch(labelValue, lookup, separator) : null;
-
-        if (fuzzyResult) {
-          lookup[labelValue] = fuzzyResult.id; // cache for subsequent records
-        } else {
-          // Fallback 2: UNIQUE field match (e.g., Engine.serial_number)
-          const uniqueId = findByUniqueField(targetEntity, labelValue);
-          if (uniqueId !== null) {
-            lookup[labelValue] = uniqueId; // cache for subsequent records
-          } else {
-            warnings.push({
-              row: i + 1,
-              field: fieldName,
-              value: labelValue,
-              targetEntity,
-              message: `"${labelValue}" not found in ${targetEntity}`
-            });
-            // Only invalidate row for required FK fields — optional FKs get set to NULL during load
-            if (!isOptionalFK) {
-              invalidRows.add(i + 1);
-            }
-          }
-        }
-      }
-    }
-
-    // Check for unique constraint conflicts
-    for (const col of uniqueCols) {
-      if (record[col] !== null && record[col] !== undefined) {
-        const key = `${col}:${record[col]}`;
-        const existingId = uniqueLookup[key];
-
-        if (existingId) {
-          const { totalRefs, referencingEntities } = countBackReferences(entityName, existingId);
-          if (totalRefs > 0) {
-            conflicts.push({
-              row: i + 1,
-              field: col,
-              value: record[col],
-              existingId,
-              backRefs: totalRefs,
-              referencingEntities,
-              message: `"${record[col]}" exists (id=${existingId}) with ${totalRefs} back-references`
-            });
-          }
-        }
-      }
-    }
-
-    // Check composite unique key conflicts
-    for (const [keyName, keyCols] of compositeKeys) {
-      const values = keyCols.map(c => record[c]);
-      if (values.every(v => v !== null && v !== undefined)) {
-        const key = keyCols.map((c, i) => `${c}:${values[i]}`).join('|');
-        const existingId = uniqueLookup[key];
-
-        if (existingId) {
-          const { totalRefs, referencingEntities } = countBackReferences(entityName, existingId);
-          if (totalRefs > 0) {
-            conflicts.push({
-              row: i + 1,
-              field: keyName,
-              value: keyCols.map((c, i) => `${c}=${values[i]}`).join(', '),
-              existingId,
-              backRefs: totalRefs,
-              referencingEntities,
-              message: `Composite key ${keyName} exists (id=${existingId}) with ${totalRefs} back-references`
-            });
-          }
-        }
-      }
-    }
-
-    // Check intra-batch duplicates (same unique value in multiple rows of this batch)
-    for (const col of uniqueCols) {
-      const val = record[col];
-      if (val !== null && val !== undefined) {
-        const key = String(val);
-        if (batchSeen[col].has(key)) {
-          warnings.push({
-            row: i + 1,
-            field: col,
-            value: val,
-            message: `Duplicate "${val}" in batch — same value in row ${batchSeen[col].get(key)}`
-          });
-          invalidRows.add(i + 1);
-        } else {
-          batchSeen[col].set(key, i + 1);
-        }
-      }
-    }
-
-    for (const [keyName, keyCols] of compositeKeys) {
-      const values = keyCols.map(c => record[c]);
-      if (values.every(v => v !== null && v !== undefined)) {
-        const key = keyCols.map((c, j) => `${c}:${values[j]}`).join('|');
-        if (batchSeen[keyName].has(key)) {
-          warnings.push({
-            row: i + 1,
-            field: keyName,
-            value: keyCols.map((c, j) => `${c}=${values[j]}`).join(', '),
-            message: `Duplicate composite key ${keyName} in batch — same values in row ${batchSeen[keyName].get(key)}`
-          });
-          invalidRows.add(i + 1);
-        } else {
-          batchSeen[keyName].set(key, i + 1);
-        }
-      }
-    }
-  }
-
-  const invalidRowsArray = Array.from(invalidRows).sort((a, b) => a - b);
-
-  return {
-    valid: warnings.length === 0,
-    warnings,
-    recordCount: records.length,
-    validCount: records.length - invalidRows.size,
-    invalidRows: invalidRowsArray,
-    conflicts,
-    hasConflicts: conflicts.length > 0,
-    seedFallbacks // FK entities resolved from seed files instead of DB
-  };
+  return ImportValidator.validateImport(db, entity, schema, records, getSeedDir());
 }
 
-/**
- * Get the first unique column value from a record (for logging/tracking)
- * @param {Object} entity - Entity schema
- * @param {Object} record - Record data
- * @returns {any} - First unique column value or null
- */
-function getFirstUniqueValue(entity, record) {
-  // First try single-column unique constraints
-  const uniqueCols = entity.columns.filter(c => c.unique);
-  for (const col of uniqueCols) {
-    const value = record[col.name];
-    if (value != null) return value;
-  }
-
-  // Fall back to composite unique keys (UK1, UK2, etc.)
-  if (entity.uniqueKeys?.length > 0) {
-    const firstUk = entity.uniqueKeys[0];
-    const parts = firstUk.columns.map(colName => record[colName] ?? '').join('-');
-    if (parts && parts !== '-') return parts;
-  }
-
-  return null;
-}
-
-/**
- * Find existing record by unique constraint
- * Returns the id if a matching record exists, null otherwise
- */
-function findExistingByUnique(entityName, record) {
-  const { db, schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-
-  // Check single-column unique constraints
-  const uniqueCols = entity.columns.filter(c => c.unique);
-  for (const col of uniqueCols) {
-    const value = record[col.name];
-    if (value !== null && value !== undefined) {
-      const sql = `SELECT id FROM ${entity.tableName} WHERE ${col.name} = ?`;
-      const existing = db.prepare(sql).get(value);
-      if (existing) return existing.id;
-    }
-  }
-
-  // Check composite unique keys
-  for (const [, keyCols] of Object.entries(entity.uniqueKeys || {})) {
-    const values = keyCols.map(c => record[c]);
-    if (values.every(v => v !== null && v !== undefined)) {
-      const conditions = keyCols.map(c => `${c} = ?`).join(' AND ');
-      const sql = `SELECT id FROM ${entity.tableName} WHERE ${conditions}`;
-      const existing = db.prepare(sql).get(...values);
-      if (existing) return existing.id;
-    }
-  }
-
-  // Fallback: check LABEL column (business key) if no explicit unique constraints matched
-  if (uniqueCols.length === 0 && Object.keys(entity.uniqueKeys || {}).length === 0) {
-    const labelCol = entity.columns.find(c => c.ui?.label);
-    if (labelCol) {
-      const value = record[labelCol.name];
-      if (value !== null && value !== undefined) {
-        const sql = `SELECT id FROM ${entity.tableName} WHERE ${labelCol.name} = ?`;
-        const existing = db.prepare(sql).get(value);
-        if (existing) return existing.id;
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
- * Count how many seed records conflict with existing DB records (by unique constraint).
- * Used by the preview dialog to warn about duplicates before loading.
- * @param {string} entityName
- * @param {string} sourceDir - Source directory ('seed', 'import', or 'backup')
- * @returns {{ dbRowCount: number, conflictCount: number }}
- */
-function countSeedConflicts(entityName, sourceDir = 'seed') {
-  const { db, schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-
-  if (!entity) return { dbRowCount: 0, conflictCount: 0 };
-
-  const dbRowCount = db.prepare(`SELECT COUNT(*) as cnt FROM ${entity.tableName}`).get().cnt;
-  if (dbRowCount === 0) return { dbRowCount: 0, conflictCount: 0 };
-
-  // Determine source directory
-  let sourceDirectory;
-  if (sourceDir === 'import') {
-    sourceDirectory = getImportDir();
-  } else if (sourceDir === 'backup') {
-    sourceDirectory = getBackupDir();
-  } else {
-    sourceDirectory = getSeedDir();
-  }
-
-  // Read seed/import file
-  const seedFile = path.join(sourceDirectory, `${entityName}.json`);
-  if (!fs.existsSync(seedFile)) return { dbRowCount, conflictCount: 0 };
-
-  const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
-  if (!Array.isArray(records) || records.length === 0) return { dbRowCount, conflictCount: 0 };
-
-  // Build FK lookups for resolving conceptual names
-  const lookups = {};
-  for (const fk of entity.foreignKeys) {
-    const targetEntity = fk.references?.entity || entityName;  // Fall back to self
-    if (!lookups[targetEntity]) {
-      lookups[targetEntity] = buildLabelLookup(targetEntity);
-    }
-  }
-
-  // Resolve FKs and check each record for conflicts
-  let conflictCount = 0;
-  for (const record of records) {
-    const { resolved } = resolveConceptualFKs(entityName, record, lookups);
-    if (findExistingByUnique(entityName, resolved)) {
-      conflictCount++;
-    }
-  }
-
-  return { dbRowCount, conflictCount };
-}
-
-/**
- * Load seed data for a specific entity
- * Supports both technical FK notation (type_id: 3) and conceptual notation (type: "A320neo")
- *
- * @param {string} entityName - Entity name
- * @param {object} lookups - Pre-built label lookups for FK resolution (optional)
- * @param {object} options - { skipInvalid, mode: 'replace'|'merge'|'skip_conflicts', sourceDir: 'seed'|'import'|'backup' }
- *   - replace: INSERT OR REPLACE (default, may break FK refs)
- *   - merge: UPDATE existing records (preserve id), INSERT new ones
- *   - skip_conflicts: Skip records that would conflict with existing ones
- *   - sourceDir: Directory to load from ('seed' (default), 'import', or 'backup')
- * @returns {Promise<object>} - { loaded, updated, skipped }
- */
 async function loadEntity(entityName, lookups = null, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-  const {
-    skipInvalid = false, mode = 'replace', preserveSystemColumns = false, sourceDir = 'seed',
-    validateFields = false,
-    validateConstraints = true
-  } = options;
-
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
 
-  // Determine source directory
-  let sourceDirectory;
-  if (sourceDir === 'import') {
-    sourceDirectory = getImportDir();
-  } else if (sourceDir === 'backup') {
-    sourceDirectory = getBackupDir();
-  } else {
-    sourceDirectory = getSeedDir();
-  }
-
-  const seedFile = path.join(sourceDirectory, `${entityName}.json`);
-  if (!fs.existsSync(seedFile)) {
-    throw new Error(`No ${sourceDir} file found for ${entityName}`);
-  }
-
-  const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
-  if (!Array.isArray(records) || records.length === 0) {
-    return { loaded: 0, updated: 0, skipped: 0 };
-  }
+  // Resolve source directory from option string
+  const { sourceDir = 'seed', ...restOptions } = options;
+  let resolvedSourceDir;
+  if (sourceDir === 'import') resolvedSourceDir = getImportDir();
+  else if (sourceDir === 'backup') resolvedSourceDir = getBackupDir();
+  else resolvedSourceDir = getSeedDir();
 
   // Emit before event
-  eventBus.emit('seed:load:before', entityName, records.length);
-
-  // Build lookups for FK resolution if not provided (with seed file fallback)
-  if (!lookups) {
-    lookups = {};
-    for (const fk of entity.foreignKeys) {
-      const targetEntity = fk.references?.entity || entityName;  // Fall back to self for self-refs
-      if (!lookups[targetEntity]) {
-        // Self-referential FK: build lookup from records being imported
-        if (targetEntity === entityName) {
-          lookups[entityName] = buildLookupFromImportRecords(entity, records);
-        } else {
-          const dbLookup = buildLabelLookup(targetEntity);
-          if (Object.keys(dbLookup).length > 0) {
-            lookups[targetEntity] = dbLookup;
-          } else {
-            const { lookup: seedLookup } = buildLabelLookupFromSeed(targetEntity);
-            lookups[targetEntity] = seedLookup;
-          }
-        }
-      }
-    }
-  }
-
-  // If skipInvalid is true, validate first and get invalid row indices
-  let invalidRows = new Set();
-  let validationWarnings = [];
-  if (skipInvalid) {
-    const validation = validateImport(entityName, records);
-    invalidRows = new Set(validation.invalidRows.map(r => r - 1)); // Convert to 0-based
-    validationWarnings = validation.warnings || [];
-  }
-
-  // Initialize ObjectValidator for import validation (if any validation is enabled)
-  const needsValidation = validateFields || validateConstraints;
-  let validator = null;
-  if (needsValidation && entity.validationRules) {
-    const ObjectValidator = require('../../shared/validation/ObjectValidator');
-    validator = new ObjectValidator();
-    validator.defineRules(entityName, entity.validationRules, false, entity.objectRules || null);
-    // Cross-entity lookup for custom constraints (batch cache lives for entire import)
-    const lookupCache = new Map();
-    validator.lookupFn = (lookupEntity, id) => {
-      if (!id) return null;
-      const key = `${lookupEntity}:${id}`;
-      if (lookupCache.has(key)) return lookupCache.get(key);
-      const targetEntity = schema.entities[lookupEntity];
-      if (!targetEntity) return null;
-      const record = db.prepare(`SELECT * FROM ${targetEntity.tableName} WHERE id = ?`).get(id);
-      lookupCache.set(key, record || null);
-      return record || null;
-    };
-    // Cross-entity exists for custom constraints (batch cache lives for entire import)
-    const existsCache = new Map();
-    validator.existsFn = (existsEntity, conditions) => {
-      if (!conditions || typeof conditions !== 'object') return false;
-      const targetEntity = schema.entities[existsEntity];
-      if (!targetEntity) return false;
-      const keys = Object.keys(conditions).sort();
-      const cacheKey = `${existsEntity}:${keys.map(k => `${k}=${conditions[k]}`).join(',')}`;
-      if (existsCache.has(cacheKey)) return existsCache.get(cacheKey);
-      const where = keys.map(k => `${k} = ?`).join(' AND ');
-      const values = keys.map(k => conditions[k]);
-      const result = !!db.prepare(`SELECT 1 FROM ${targetEntity.tableName} WHERE ${where} LIMIT 1`).get(...values);
-      existsCache.set(cacheKey, result);
-      return result;
-    };
-  }
-
-  // Check for self-referential FKs - if present, disable FK constraints during import
-  // This allows records to reference other records in the same batch regardless of order
-  const hasSelfRef = entity.foreignKeys.some(fk => (fk.references?.entity || entityName) === entityName);
-  if (hasSelfRef) {
-    db.pragma('foreign_keys = OFF');
-  }
-
-  // Filter out computed columns (DAILY, IMMEDIATE, etc.) - they are auto-calculated
-  // Exception: computed FK columns are kept — seed data can provide initial relationship values
-  const isComputedColumn = (col) => {
-    if (col.foreignKey) return false;
-    if (col.computed) return true;  // Schema already parsed
-    const desc = col.description || '';
-    return /\[(DAILY|IMMEDIATE|HOURLY|ON_DEMAND)=/.test(desc);
-  };
-
-  // Exclude system columns unless preserveSystemColumns is true (for restore)
-  const columns = entity.columns
-    .filter(c => !isComputedColumn(c) && (preserveSystemColumns || !c.system))
-    .map(c => c.name);
-  const columnsWithoutId = columns.filter(c => c !== 'id');
-  const placeholders = columns.map(() => '?').join(', ');
-
-  // Prepare statements based on mode
-  const insertReplaceSql = `INSERT OR REPLACE INTO ${entity.tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-  const insertSql = `INSERT INTO ${entity.tableName} (${columnsWithoutId.join(', ')}) VALUES (${columnsWithoutId.map(() => '?').join(', ')})`;
-  const updateSetClause = columnsWithoutId.map(c => `${c} = ?`).join(', ');
-  const updateSql = `UPDATE ${entity.tableName} SET ${updateSetClause} WHERE id = ?`;
-
-  const insertReplace = db.prepare(insertReplaceSql);
-  const insert = db.prepare(insertSql);
-  const update = db.prepare(updateSql);
-
-  let loaded = 0;
-  let updated = 0;
-  let skipped = 0;
-  const errors = [];
-  const mediaErrors = [];
-  const fkErrorMap = new Map();  // key: "field|value|targetEntity" -> { field, value, targetEntity, count }
-  const fuzzyMatchMap = new Map();  // key: "field|value|matchedLabel|targetEntity" -> { ..., count }
-
-  // Track duplicates within the import batch (same LABEL value appearing multiple times)
-  const labelCol = entity.columns.find(c => c.ui?.label);
-  const seenLabels = new Map();  // label value -> first row number (1-based)
-  const duplicates = [];  // { value, firstRow, duplicateRow }
-
-  // Track which keys were updated (for reporting)
-  const updatedKeys = new Map();  // key value -> count
-
-  // Track row count before loading to detect silent replacements (INSERT OR REPLACE)
-  const beforeCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
-
-  for (let i = 0; i < records.length; i++) {
-    // Skip invalid records if requested
-    if (skipInvalid && invalidRows.has(i)) {
-      skipped++;
-      continue;
-    }
-
-    let record = records[i];
-
-    // Resolve media URLs (fetch URLs and replace with UUIDs)
-    const mediaResult = await resolveMediaUrls(entityName, record);
-    record = mediaResult.record;
-
-    // Collect media errors with row context
-    for (const mediaErr of mediaResult.mediaErrors) {
-      mediaErrors.push({
-        row: i + 1,
-        ...mediaErr
-      });
-    }
-
-    // Flatten nested aggregate values (e.g., { position: { latitude, longitude } } -> { position_latitude, position_longitude })
-    record = flattenAggregates(entityName, record);
-
-    // Resolve conceptual FK references (e.g., "type": "A320neo" -> "type_id": 3)
-    const { resolved, fkWarnings, fuzzyMatches } = resolveConceptualFKs(entityName, record, lookups);
-
-    // Collect FK resolution errors - aggregate by unique (field, value, targetEntity)
-    for (const fkWarn of fkWarnings) {
-      const key = `${fkWarn.field}|${fkWarn.value}|${fkWarn.targetEntity}`;
-      if (fkErrorMap.has(key)) {
-        fkErrorMap.get(key).count++;
-      } else {
-        fkErrorMap.set(key, {
-          field: fkWarn.field,
-          value: fkWarn.value,
-          targetEntity: fkWarn.targetEntity,
-          count: 1
-        });
-      }
-    }
-
-    // Collect fuzzy matches - aggregate by unique (field, value, matchedLabel, targetEntity)
-    for (const fm of fuzzyMatches) {
-      const key = `${fm.field}|${fm.value}|${fm.matchedLabel}|${fm.targetEntity}`;
-      if (fuzzyMatchMap.has(key)) {
-        fuzzyMatchMap.get(key).count++;
-      } else {
-        fuzzyMatchMap.set(key, { ...fm, count: 1 });
-      }
-    }
-
-    // Validate record against field-level and/or cross-field rules (if enabled)
-    if (validator) {
-      const validationErrors = [];
-      if (validateFields) {
-        validationErrors.push(...validator.validateFieldRulesOnly(entityName, resolved));
-      }
-      if (validateConstraints) {
-        validationErrors.push(...validator.validateObjectRulesOnly(entityName, resolved));
-      }
-      if (validationErrors.length > 0) {
-        for (const err of validationErrors) {
-          if (errors.length < 10) {
-            errors.push(`Row ${i + 1}: ${err.message}`);
-          }
-        }
-        skipped++;
-        continue;
-      }
-    }
-
-    // Track duplicates within import batch (same LABEL value appearing multiple times)
-    if (labelCol) {
-      const labelValue = resolved[labelCol.name];
-      if (labelValue != null) {
-        if (seenLabels.has(labelValue)) {
-          duplicates.push({
-            value: labelValue,
-            firstRow: seenLabels.get(labelValue),
-            duplicateRow: i + 1
-          });
-        } else {
-          seenLabels.set(labelValue, i + 1);
-        }
-      }
-    }
-
-    // SQLite3 cannot bind JS booleans — convert to 0/1
-    const toSqlValue = (v) => v === true ? 1 : v === false ? 0 : v ?? null;
-
+  const seedFile = path.join(resolvedSourceDir, `${entityName}.json`);
+  if (fs.existsSync(seedFile)) {
     try {
-      if (mode === 'replace') {
-        // Original behavior: INSERT OR REPLACE (may change id)
-        const values = columns.map(col => toSqlValue(resolved[col]));
-        insertReplace.run(...values);
-        loaded++;
-      } else if (mode === 'merge') {
-        // MERGE: Update existing (preserve id), insert new
-        const existingId = findExistingByUnique(entityName, resolved);
-        if (existingId) {
-          const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
-          values.push(existingId); // WHERE id = ?
-          update.run(...values);
-          updated++;
-
-          // Track which key was updated (use label column, labelExpression, or unique key)
-          // Note: Use 'record' (pre-FK resolution) for labelExpression since it contains readable FK values
-          let keyValue = null;
-          if (labelCol) {
-            keyValue = resolved[labelCol.name];
-          } else if (entity.labelExpression) {
-            keyValue = computeLabelFromExpression(entity.labelExpression, record);
-          } else {
-            keyValue = getFirstUniqueValue(entity, resolved);
-          }
-          if (keyValue != null) {
-            updatedKeys.set(keyValue, (updatedKeys.get(keyValue) || 0) + 1);
-          }
-        } else {
-          const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
-          insert.run(...values);
-          loaded++;
-        }
-      } else if (mode === 'skip_conflicts') {
-        // Skip records that conflict with existing ones
-        const existingId = findExistingByUnique(entityName, resolved);
-        if (existingId) {
-          skipped++;
-        } else {
-          const values = columnsWithoutId.map(col => toSqlValue(resolved[col]));
-          insert.run(...values);
-          loaded++;
-        }
-      }
-    } catch (err) {
-      console.error(`Error loading ${entityName} row ${i + 1}:`, err.message);
-      if (errors.length < 5) {
-        errors.push(`Row ${i + 1}: ${err.message}`);
-      }
-      skipped++;
+      const records = JSON.parse(fs.readFileSync(seedFile, 'utf-8'));
+      eventBus.emit('seed:load:before', entityName, Array.isArray(records) ? records.length : 0);
+    } catch {
+      eventBus.emit('seed:load:before', entityName, 0);
     }
   }
 
-  // Detect silent replacements: INSERT OR REPLACE overwrites rows with same unique key
-  const afterCount = db.prepare(`SELECT COUNT(*) as c FROM ${entity.tableName}`).get().c;
-  const netNew = afterCount - beforeCount;
-  const replaced = loaded > netNew ? loaded - netNew : 0;
-  if (replaced > 0) {
-    loaded = netNew;
-    if (errors.length < 5) {
-      errors.push(`${replaced} rows replaced existing rows (unique key collision)`);
-    }
-  }
+  const result = await DataLoader.loadEntity(db, entity, schema, resolvedSourceDir, getSeedDir(), lookups,
+    getLoaderOptions(restOptions));
 
-  const result = { loaded, updated, skipped, replaced, errors };
-
-  // Add validation warnings (FK lookup failures from validateImport) - aggregated by unique value
-  if (validationWarnings.length > 0) {
-    const warningMap = new Map();
-    for (const w of validationWarnings) {
-      const key = `${w.field}|${w.value}|${w.targetEntity}`;
-      if (warningMap.has(key)) {
-        warningMap.get(key).count++;
-      } else {
-        warningMap.set(key, {
-          field: w.field,
-          value: w.value,
-          targetEntity: w.targetEntity,
-          count: 1
-        });
-      }
-    }
-    result.fkErrors = Array.from(warningMap.values())
-      .sort((a, b) => b.count - a.count)  // Sort by count descending
-      .map(e => ({
-        field: e.field,
-        value: e.value,
-        targetEntity: e.targetEntity,
-        count: e.count,
-        message: `"${e.value}" not found in ${e.targetEntity} (${e.count} records)`
-      }));
-    result.fkErrorsTotal = validationWarnings.length;
-  }
-
-  // Add FK resolution errors if any occurred (from resolveConceptualFKs during load)
-  if (fkErrorMap.size > 0 && !result.fkErrors) {
-    const fkErrors = Array.from(fkErrorMap.values())
-      .sort((a, b) => b.count - a.count)  // Sort by count descending
-      .map(e => ({
-        field: e.field,
-        value: e.value,
-        targetEntity: e.targetEntity,
-        count: e.count,
-        message: `"${e.value}" not found in ${e.targetEntity} (${e.count} records)`
-      }));
-    result.fkErrors = fkErrors;
-    result.fkErrorsTotal = fkErrors.reduce((sum, e) => sum + e.count, 0);
-  }
-
-  // Add fuzzy match info (FK values resolved via segment subsequence matching)
-  if (fuzzyMatchMap.size > 0) {
-    result.fuzzyMatches = Array.from(fuzzyMatchMap.values())
-      .sort((a, b) => b.count - a.count)
-      .map(e => ({
-        field: e.field,
-        value: e.value,
-        matchedLabel: e.matchedLabel,
-        targetEntity: e.targetEntity,
-        count: e.count,
-        message: `"${e.value}" → "${e.matchedLabel}" in ${e.targetEntity} (${e.count} records)`
-      }));
-    result.fuzzyMatchTotal = Array.from(fuzzyMatchMap.values()).reduce((sum, e) => sum + e.count, 0);
-  }
-
-  // Add duplicate warnings (same LABEL value appearing multiple times in import)
-  if (duplicates.length > 0) {
-    result.duplicates = duplicates.map(d => ({
-      value: d.value,
-      firstRow: d.firstRow,
-      duplicateRow: d.duplicateRow,
-      message: `"${d.value}" appears in row ${d.firstRow} and ${d.duplicateRow} (row ${d.duplicateRow} overwrites)`
-    }));
-  }
-
-  // Add updated keys info (which keys were updated during merge)
-  if (updatedKeys.size > 0) {
-    result.updatedKeys = Array.from(updatedKeys.entries())
-      .sort((a, b) => b[1] - a[1])  // Sort by count descending
-      .map(([key, count]) => ({ key, count }));
-  }
-
-  // Add media errors if any occurred
-  if (mediaErrors.length > 0) {
-    result.mediaErrors = mediaErrors;
-  }
-
-  // Re-enable FK constraints if we disabled them for self-refs
-  if (hasSelfRef) {
-    db.pragma('foreign_keys = ON');
-  }
-
-  // Emit after event (MediaService listens to update media refs)
+  // Emit after events
   eventBus.emit('seed:load:after', entityName, result);
+  eventBus.emit('entity:changed', entityName);
 
   return result;
 }
 
-/**
- * Clear all data from a specific entity
- */
 function clearEntity(entityName) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
-
-  // Check for FK constraints - are there entities that reference this one?
-  // Skip self-references (they will be deleted along with the entity's data)
-  const backRefs = schema.inverseRelationships[entityName] || [];
-  for (const ref of backRefs) {
-    // Self-references don't block clearing - deleting all records handles them
-    if (ref.entity === entityName) continue;
-
-    const refEntity = schema.entities[ref.entity];
-    if (refEntity) {
-      try {
-        const refCount = db.prepare(`SELECT COUNT(*) as count FROM ${refEntity.tableName} WHERE ${ref.column} IS NOT NULL`).get().count;
-        if (refCount > 0) {
-          throw new Error(`Cannot clear ${entityName}: ${refCount} records in ${ref.entity} reference it`);
-        }
-      } catch (e) {
-        // Column might not exist if schema changed (e.g., enum→entity conversion)
-        // Skip the check - the FK constraint doesn't exist in the actual DB yet
-        if (e.message?.includes('no such column')) {
-          console.warn(`[SeedManager] Skipping FK check for ${ref.entity}.${ref.column} - column not in DB (schema may need rebuild)`);
-          continue;
-        }
-        throw e;
-      }
-    }
-  }
-
-  const result = db.prepare(`DELETE FROM ${entity.tableName}`).run();
-  return { deleted: result.changes };
+  return DataLoader.clearEntity(db, entity, schema);
 }
 
-/**
- * Load all available seed files
- * Builds label lookups incrementally for FK resolution
- */
 async function loadAll() {
-  const { schema } = getDbAndSchema();
-  const results = {};
+  const { db, schema } = getDbAndSchema();
+  const seedDir = getSeedDir();
 
-  // Build lookups incrementally as entities are loaded (for FK resolution)
-  const lookups = {};
-
-  // Collect entities with seed files
+  // Collect entities with seed files for the before event
   const entitiesToLoad = schema.orderedEntities
-    .filter(e => fs.existsSync(path.join(getSeedDir(), `${e.className}.json`)))
+    .filter(e => fs.existsSync(path.join(seedDir, `${e.className}.json`)))
     .map(e => e.className);
-
-  // Emit before event
   eventBus.emit('seed:loadAll:before', entitiesToLoad);
 
-  // Load in dependency order
-  for (const entity of schema.orderedEntities) {
-    const seedFile = path.join(getSeedDir(), `${entity.className}.json`);
-    if (fs.existsSync(seedFile)) {
-      try {
-        const result = await loadEntity(entity.className, lookups, { mode: 'merge' });
-        results[entity.className] = result;
+  const results = await DataLoader.loadAll(db, schema, seedDir, getLoaderOptions());
 
-        // Update lookup for this entity (so subsequent entities can reference it)
-        lookups[entity.className] = buildLabelLookup(entity.className);
-      } catch (err) {
-        results[entity.className] = { error: err.message };
-      }
+  // Emit per-entity events
+  for (const entityName of Object.keys(results)) {
+    if (!results[entityName].error) {
+      eventBus.emit('entity:changed', entityName);
     }
   }
-
-  // Emit after event
   eventBus.emit('seed:loadAll:after', results);
 
   return results;
 }
 
-/**
- * Import all available data files (prefers import/ over seed/)
- * For each entity, checks import directory first, falls back to seed if not found.
- * Builds label lookups incrementally for FK resolution.
- */
 async function importAll() {
-  const { schema } = getDbAndSchema();
-  const results = {};
-
-  // Build lookups incrementally as entities are loaded (for FK resolution)
-  const lookups = {};
-
+  const { db, schema } = getDbAndSchema();
   const importDir = getImportDir();
   const seedDir = getSeedDir();
 
-  // Collect entities with either import or seed files
+  // Collect entities for the before event
   const entitiesToLoad = schema.orderedEntities
     .filter(e =>
       fs.existsSync(path.join(importDir, `${e.className}.json`)) ||
       fs.existsSync(path.join(seedDir, `${e.className}.json`))
     )
     .map(e => e.className);
-
-  // Emit before event
   eventBus.emit('seed:importAll:before', entitiesToLoad);
 
-  // Load in dependency order
-  for (const entity of schema.orderedEntities) {
-    const importFile = path.join(importDir, `${entity.className}.json`);
-    const seedFile = path.join(seedDir, `${entity.className}.json`);
+  const results = await DataLoader.importAll(db, schema, importDir, seedDir, getLoaderOptions());
 
-    // Prefer import file, fall back to seed file
-    const sourceFile = fs.existsSync(importFile) ? importFile :
-                       fs.existsSync(seedFile) ? seedFile : null;
-
-    if (sourceFile) {
-      try {
-        // Determine source type for result info
-        const source = sourceFile === importFile ? 'import' : 'seed';
-
-        // Load entity using loadEntity which handles both directories
-        const result = await loadEntity(entity.className, lookups, {
-          mode: 'merge',
-          sourceDir: source
-        });
-
-        results[entity.className] = { ...result, source };
-
-        // Update lookup for this entity (so subsequent entities can reference it)
-        lookups[entity.className] = buildLabelLookup(entity.className);
-      } catch (err) {
-        results[entity.className] = { error: err.message };
-      }
+  // Emit per-entity events
+  for (const entityName of Object.keys(results)) {
+    if (!results[entityName].error) {
+      eventBus.emit('entity:changed', entityName);
     }
   }
-
-  // Emit after event
   eventBus.emit('seed:importAll:after', results);
 
   return results;
 }
 
-/**
- * Clear all entity data
- */
 function clearAll() {
   const { db, schema } = getDbAndSchema();
-  const results = {};
+  const results = DataLoader.clearAll(db, schema);
 
-  // Disable FK temporarily for bulk clear
-  db.pragma('foreign_keys = OFF');
-
-  // Clear in reverse dependency order
-  const reversed = [...schema.orderedEntities].reverse();
-  for (const entity of reversed) {
-    try {
-      const result = db.prepare(`DELETE FROM ${entity.tableName}`).run();
-      results[entity.className] = { deleted: result.changes };
-    } catch (err) {
-      results[entity.className] = { error: err.message };
-    }
-  }
-
-  db.pragma('foreign_keys = ON');
-
-  // Emit event so MediaService can clear media files
   eventBus.emit('seed:clearAll:after', results);
-
   return results;
 }
 
-/**
- * Reset all: clear then load
- */
 async function resetAll() {
   const clearResults = clearAll();
   const loadResults = await loadAll();
-
-  return {
-    cleared: clearResults,
-    loaded: loadResults
-  };
+  return { cleared: clearResults, loaded: loadResults };
 }
 
-/**
- * Upload/save data for an entity (saves to seed/)
- * Data is always saved as JSON, regardless of original format
- */
 function uploadEntity(entityName, jsonData) {
   const { schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
-
-  // Validate JSON data
-  let records;
-  if (typeof jsonData === 'string') {
-    records = JSON.parse(jsonData);
-  } else {
-    records = jsonData;
-  }
-
-  if (!Array.isArray(records)) {
-    throw new Error('Data must be an array of records');
-  }
-
-  const filePath = path.join(getSeedDir(), `${entityName}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(records, null, 2));
-
-  return { uploaded: records.length, file: `${entityName}.json` };
+  return BackupManager.uploadEntity(entity, getSeedDir(), jsonData);
 }
 
-/**
- * Backup all entity data to JSON files in the backup directory.
- * Exports current DB content (using conceptual FK names for portability).
- * @returns {object} - { entities: { name: count }, backupDir }
- */
+function buildLabelLookup(entityName) {
+  const { db, schema } = getDbAndSchema();
+  return LabelResolver.buildLabelLookup(db, schema.entities[entityName]);
+}
+
+function resolveConceptualFKs(entityName, record, lookups) {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+  if (!entity) return { resolved: record, fkWarnings: [], fuzzyMatches: [] };
+
+  // Create findByUniqueFn that resolves entity names to schema objects
+  const findByUniqueFn = (targetEntityName, value) => {
+    const targetEntity = schema.entities[targetEntityName];
+    return targetEntity ? FKResolver.findByUniqueField(db, targetEntity, value) : null;
+  };
+
+  const result = FKResolver.resolveConceptualFKs(entity, record, lookups, schema, findByUniqueFn);
+
+  // Emit warnings for unresolved FKs (moved from FKResolver)
+  for (const fkWarn of result.fkWarnings) {
+    console.warn(`  Warning: Could not resolve ${fkWarn.field}="${fkWarn.value}" for ${entityName}`);
+    eventBus.emit('seed:resolve:warning', { entityName, field: fkWarn.field, value: fkWarn.value, targetEntity: fkWarn.targetEntity });
+  }
+
+  return result;
+}
+
+function countSeedConflicts(entityName, sourceDir = 'seed') {
+  const { db, schema } = getDbAndSchema();
+  const entity = schema.entities[entityName];
+  if (!entity) return { dbRowCount: 0, conflictCount: 0 };
+
+  // Resolve source directory
+  let resolvedDir;
+  if (sourceDir === 'import') resolvedDir = getImportDir();
+  else if (sourceDir === 'backup') resolvedDir = getBackupDir();
+  else resolvedDir = getSeedDir();
+
+  return ImportValidator.countSeedConflicts(db, entity, schema, resolvedDir, getSeedDir());
+}
+
 function backupAll() {
   const { db, schema } = getDbAndSchema();
-  const backupDir = getBackupDir();
+  const result = BackupManager.backupAll(db, schema, getBackupDir());
 
-  // Ensure backup directory exists
-  if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
-  }
-
-  const results = {};
-
-  for (const entity of schema.orderedEntities) {
-    const rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE _ql = 0`).all();
-
-    if (rows.length === 0) {
-      // Remove existing backup file if entity is empty
-      const backupPath = path.join(backupDir, `${entity.className}.json`);
-      if (fs.existsSync(backupPath)) {
-        fs.unlinkSync(backupPath);
-      }
-      results[entity.className] = 0;
-      continue;
-    }
-
-    // Convert FK IDs to label values for portability
-    const exportRows = rows.map(row => {
-      const exported = { ...row };
-      delete exported.id; // Don't export auto-increment IDs
-
-      for (const fk of entity.foreignKeys) {
-        const idValue = row[fk.column];
-        if (idValue === null || idValue === undefined) continue;
-
-        // Look up label for this FK value
-        const refEntity = schema.entities[fk.references.entity];
-        if (!refEntity) continue;
-
-        const labelCol = refEntity.columns.find(c => c.ui?.label);
-        if (!labelCol) continue;
-
-        try {
-          const refRow = db.prepare(
-            `SELECT ${labelCol.name} FROM ${refEntity.tableName} WHERE id = ?`
-          ).get(idValue);
-
-          if (refRow && refRow[labelCol.name]) {
-            // Use conceptual name with label value
-            exported[fk.displayName] = refRow[labelCol.name];
-            delete exported[fk.column];
-          }
-        } catch {
-          // Keep numeric ID if lookup fails
-        }
-      }
-
-      // Remove computed columns (they are auto-calculated)
-      for (const col of entity.columns) {
-        if (col.computed && !col.foreignKey) {
-          delete exported[col.name];
-        }
-      }
-
-      // Nest aggregate fields (e.g., position_latitude + position_longitude -> position: { latitude, longitude })
-      const aggregateSources = new Map();  // sourceName -> { fieldName: value }
-      for (const col of entity.columns) {
-        if (col.aggregateSource && col.aggregateField) {
-          const source = col.aggregateSource;
-          if (!aggregateSources.has(source)) {
-            aggregateSources.set(source, {});
-          }
-          if (exported[col.name] !== undefined) {
-            aggregateSources.get(source)[col.aggregateField] = exported[col.name];
-            delete exported[col.name];
-          }
-        }
-      }
-      for (const [source, nested] of aggregateSources) {
-        if (Object.keys(nested).length > 0) {
-          exported[source] = nested;
-        }
-      }
-
-      return exported;
-    });
-
-    const backupPath = path.join(backupDir, `${entity.className}.json`);
-    fs.writeFileSync(backupPath, JSON.stringify(exportRows, null, 2));
-    results[entity.className] = exportRows.length;
-  }
-
-  // Emit event so MediaService can backup media files
-  eventBus.emit('seed:backup:after', { backupDir, results });
-
-  return { entities: results, backupDir };
+  eventBus.emit('seed:backup:after', { backupDir: result.backupDir, results: result.entities });
+  return result;
 }
 
-/**
- * Restore a single entity from backup JSON file.
- * @param {string} entityName - The entity to restore
- * @returns {Promise<object>} - Load result
- */
 async function restoreEntity(entityName) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-  const backupDir = getBackupDir();
-
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
 
-  const backupFile = path.join(backupDir, `${entityName}.json`);
-  if (!fs.existsSync(backupFile)) {
-    throw new Error(`No backup file found for ${entityName}`);
-  }
-
-  // Emit event for single-entity restore (media handling)
+  const backupDir = getBackupDir();
   eventBus.emit('seed:restore:entity:before', { entityName, backupDir });
 
-  // Clear entity data first
-  try {
-    db.pragma('foreign_keys = OFF');
-    db.prepare(`DELETE FROM ${entity.tableName}`).run();
-    db.pragma('foreign_keys = ON');
-  } catch (err) {
-    // Ignore errors during clear
-  }
+  const result = await BackupManager.restoreEntity(db, entity, schema, backupDir, getSeedDir(), getLoaderOptions());
 
-  // Temporarily point seed dir to backup dir for loadEntity
-  const originalSeedDir = SEED_DIR;
-  SEED_DIR = backupDir;
-
-  try {
-    const result = await loadEntity(entityName, null, { mode: 'replace', preserveSystemColumns: true });
-    return result;
-  } finally {
-    // Restore original seed dir
-    SEED_DIR = originalSeedDir;
-  }
+  eventBus.emit('entity:changed', entityName);
+  return result;
 }
 
-/**
- * Restore all entity data from backup JSON files.
- * Similar to loadAll but reads from backup/ instead of seed/.
- * @returns {Promise<object>} - Results per entity
- */
 async function restoreBackup() {
-  const { schema } = getDbAndSchema();
+  const { db, schema } = getDbAndSchema();
   const backupDir = getBackupDir();
 
-  if (!fs.existsSync(backupDir)) {
-    throw new Error('No backup directory found');
-  }
-
-  // Emit event so MediaService can restore media files BEFORE clearing
-  // (clearAll would delete media files, but we want to restore from backup)
   eventBus.emit('seed:restore:before', { backupDir });
 
-  // Clear all entity data (media already handled by restore:before)
-  const { db } = getDbAndSchema();
-  db.pragma('foreign_keys = OFF');
-  for (const entity of [...schema.orderedEntities].reverse()) {
-    try {
-      db.prepare(`DELETE FROM ${entity.tableName}`).run();
-    } catch (err) {
-      // Ignore errors
+  const results = await BackupManager.restoreBackup(db, schema, backupDir, getSeedDir(), getLoaderOptions());
+
+  // Emit per-entity events
+  for (const entityName of Object.keys(results)) {
+    if (!results[entityName].error) {
+      eventBus.emit('entity:changed', entityName);
     }
   }
-  db.pragma('foreign_keys = ON');
-
-  const results = {};
-  const lookups = {};
-
-  // Temporarily point seed dir to backup dir for loadEntity
-  const originalSeedDir = SEED_DIR;
-  SEED_DIR = backupDir;
-
-  try {
-    for (const entity of schema.orderedEntities) {
-      const backupFile = path.join(backupDir, `${entity.className}.json`);
-      if (fs.existsSync(backupFile)) {
-        try {
-          const result = await loadEntity(entity.className, lookups, { mode: 'replace', preserveSystemColumns: true });
-          results[entity.className] = result;
-          lookups[entity.className] = buildLabelLookup(entity.className);
-        } catch (err) {
-          results[entity.className] = { error: err.message };
-        }
-      }
-    }
-  } finally {
-    // Restore original seed dir
-    SEED_DIR = originalSeedDir;
-  }
-
   return results;
 }
 
-/**
- * Find a record by searching all UNIQUE columns of an entity
- * Used as fallback when LABEL matching fails during refresh FK resolution.
- *
- * @param {string} entityName - Entity name
- * @param {string} value - The value to search for
- * @returns {number|null} - The record ID or null
- */
-function findByUniqueField(entityName, value) {
-  const { db, schema } = getDbAndSchema();
-  const entity = schema.entities[entityName];
-  if (!entity) return null;
-
-  const uniqueCols = entity.columns.filter(c => c.unique);
-  for (const col of uniqueCols) {
-    const row = db.prepare(`SELECT id FROM ${entity.tableName} WHERE ${col.name} = ?`).get(value);
-    if (row) return row.id;
-  }
-  return null;
-}
-
-/**
- * Refresh entity records from external API data.
- * Matches API records to existing DB records via a match field, then UPDATEs.
- * Supports FK resolution: if a mapped target field is a foreign key and the value
- * is a string, it will be resolved via LABEL lookup or UNIQUE field matching.
- *
- * @param {string} entityName - Entity name
- * @param {Array} apiRecords - Mapped API records (from ImportManager.runRefresh)
- * @param {Object} matchConfig - { entityField, apiField }
- * @param {Object} [options] - { singleId: number } - If set, only update this record
- * @returns {Object} - { matched, updated, skipped, notFound, fkErrors }
- */
 function refreshEntity(entityName, apiRecords, matchConfig, options = {}) {
   const { db, schema } = getDbAndSchema();
   const entity = schema.entities[entityName];
-
   if (!entity) {
     throw new Error(`Entity ${entityName} not found in schema`);
   }
-
-  const { entityField, apiField } = matchConfig;
-
-  // Build FK map: conceptual name (displayName) -> FK definition
-  const fkMap = new Map();
-  for (const fk of entity.foreignKeys) {
-    if (fk.displayName) {
-      fkMap.set(fk.displayName, fk);
-    }
-  }
-
-  // Build label lookups for FK target entities (lazy, only when needed)
-  const fkLookups = {};
-  function getFkLookup(targetEntity) {
-    if (!fkLookups[targetEntity]) {
-      fkLookups[targetEntity] = buildLabelLookup(targetEntity);
-    }
-    return fkLookups[targetEntity];
-  }
-
-  // Get existing records from DB
-  let existingRows;
-  if (options.singleId) {
-    existingRows = db.prepare(
-      `SELECT id, ${entityField} FROM ${entity.tableName} WHERE id = ?`
-    ).all(options.singleId);
-  } else {
-    existingRows = db.prepare(
-      `SELECT id, ${entityField} FROM ${entity.tableName} WHERE ${entityField} IS NOT NULL`
-    ).all();
-  }
-
-  // Build match index: entityFieldValue -> dbId
-  const matchIndex = new Map();
-  for (const row of existingRows) {
-    const key = String(row[entityField]);
-    matchIndex.set(key, row.id);
-  }
-
-  const fkErrors = [];
-
-  // Resolve FK fields in all records before determining update columns
-  const resolvedRecords = apiRecords.map(record => {
-    const resolved = { ...record };
-    for (const [conceptualName, fk] of fkMap) {
-      if (conceptualName in resolved && resolved[conceptualName] !== null && resolved[conceptualName] !== undefined) {
-        const value = resolved[conceptualName];
-        // Only resolve string values (numeric IDs are already resolved)
-        if (typeof value === 'string') {
-          const targetEntity = fk.references?.entity;
-          if (!targetEntity) continue;
-
-          const lookup = getFkLookup(targetEntity);
-          let resolvedId = lookup[value];
-
-          // Fallback 1: whitespace-normalized match
-          if (resolvedId === undefined && lookup._normalized) {
-            const norm = value.replace(/\s+/g, '').toLowerCase();
-            resolvedId = lookup._normalized[norm];
-            if (resolvedId !== undefined) lookup[value] = resolvedId; // cache
-          }
-
-          // Fallback 2: try UNIQUE field matching
-          if (resolvedId === undefined) {
-            resolvedId = findByUniqueField(targetEntity, value);
-          }
-
-          if (resolvedId !== undefined && resolvedId !== null) {
-            resolved[fk.column] = resolvedId;  // e.g., engine_type_id = 5
-          } else {
-            fkErrors.push({ field: conceptualName, value, targetEntity });
-            // Don't set the field — leave it unchanged
-          }
-          delete resolved[conceptualName];
-        }
-      }
-    }
-    return resolved;
-  });
-
-  // Determine which columns to update (from resolved targets, excluding the match field)
-  const updateFields = [];
-  for (const record of resolvedRecords) {
-    for (const key of Object.keys(record)) {
-      if (key !== apiField && !updateFields.includes(key)) {
-        updateFields.push(key);
-      }
-    }
-    break; // Only need first record for field list
-  }
-
-  if (updateFields.length === 0) {
-    return { matched: 0, updated: 0, skipped: 0, notFound: apiRecords.length, fkErrors };
-  }
-
-  // Prepare UPDATE statement
-  const setClause = updateFields.map(f => `${f} = ?`).join(', ');
-  const updateStmt = db.prepare(
-    `UPDATE ${entity.tableName} SET ${setClause}, _updated_at = datetime('now') WHERE id = ?`
-  );
-
-  let matched = 0;
-  let updated = 0;
-  let skipped = 0;
-  let notFound = 0;
-
-  const updateMany = db.transaction((records) => {
-    for (const record of records) {
-      const apiKey = String(record[apiField]);
-      const dbId = matchIndex.get(apiKey);
-
-      if (dbId === undefined) {
-        notFound++;
-        continue;
-      }
-
-      matched++;
-
-      const values = updateFields.map(f => {
-        const v = record[f];
-        return v === undefined ? null : v;
-      });
-
-      try {
-        const result = updateStmt.run(...values, dbId);
-        if (result.changes > 0) {
-          updated++;
-        } else {
-          skipped++;
-        }
-      } catch (err) {
-        console.warn(`[refreshEntity] Error updating ${entityName} id=${dbId}:`, err.message);
-        skipped++;
-      }
-    }
-  });
-
-  updateMany(resolvedRecords);
-
-  return { matched, updated, skipped, notFound, fkErrors };
+  return RefreshManager.refreshEntity(db, entity, schema, apiRecords, matchConfig, options);
 }
 
 module.exports = {
