@@ -1822,80 +1822,11 @@ const EntityExplorer = {
     }
   },
 
-  renderList() {
-    if (!this.currentEntity) {
-      this.list.innerHTML = `<p class="empty-message">${i18n.t('select_entity_message')}</p>`;
-      return;
-    }
-
-    if (this.records.length === 0) {
-      const readonly = this.isCurrentEntityReadonly();
-      const newBtn = readonly ? '' : '<br><button class="empty-table-new-btn" onclick="DetailPanel.showCreateForm(EntityExplorer.currentEntity)">+ New</button>';
-      this.list.innerHTML = `<p class="empty-message">${i18n.t('no_records_found')}${newBtn}</p>`;
-      return;
-    }
-
-    // Get schema for display labels
-    this.renderListWithSchema();
-  },
-
   /**
    * Check if current entity is readonly (system entity)
    */
   isCurrentEntityReadonly() {
     return this.entityMetadata[this.currentEntity]?.readonly === true;
-  },
-
-  async renderListWithSchema() {
-    const schema = await SchemaCache.getExtended(this.currentEntity);
-    const labelFields = this.getLabelFields(schema);
-    const isReadonly = this.isCurrentEntityReadonly();
-
-    this.list.innerHTML = this.records.map(record => {
-      const title = labelFields.primary ? record[labelFields.primary] || `#${record.id}` : `#${record.id}`;
-      const subtitle = labelFields.secondary ? record[labelFields.secondary] : `ID: ${record.id}`;
-      const isSelected = record.id === this.selectedId;
-
-      // Hide edit/delete buttons for readonly entities
-      const actionsHtml = isReadonly ? '' : `
-          <div class="entity-row-actions">
-            <button class="btn-row-action btn-edit" data-id="${record.id}" title="${i18n.t('edit')}">&#9998;</button>
-            <button class="btn-row-action danger btn-delete" data-id="${record.id}" title="${i18n.t('delete')}">&#128465;</button>
-          </div>`;
-
-      return `
-        <div class="entity-row ${isSelected ? 'selected' : ''}" data-id="${record.id}">
-          <div class="entity-row-content">
-            <div class="entity-row-title">${DomUtils.escapeHtml(String(title))}</div>
-            <div class="entity-row-subtitle">${DomUtils.escapeHtml(String(subtitle))}</div>
-          </div>
-          ${actionsHtml}
-        </div>
-      `;
-    }).join('');
-
-    // Add event listeners
-    this.list.querySelectorAll('.entity-row').forEach(row => {
-      row.addEventListener('click', (e) => {
-        if (!e.target.classList.contains('btn-row-action')) {
-          this.onRowClick(parseInt(row.dataset.id));
-        }
-      });
-    });
-
-    this.list.querySelectorAll('.btn-edit').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.onEditClick(parseInt(btn.dataset.id));
-      });
-    });
-
-    this.list.querySelectorAll('.btn-delete').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.onDeleteClick(parseInt(btn.dataset.id));
-      });
-    });
   },
 
   async renderTree() {

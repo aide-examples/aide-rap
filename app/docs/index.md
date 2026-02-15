@@ -507,12 +507,3 @@ See [Configuration](configuration.md) for the full reference.
 - [Filter Dialogs](procedures/filter-dialogs.md) – Pre-load filters for large datasets (required/prefilter, text/dropdown/year/month, AND logic)
 - [Schema Migration](procedures/schema-migration.md) – Reinitialize database schema without server restart
 
----
-
-# Ideas
-
-- Detail Panel PDF Export
-- Process Context – Required initial object selection, context accumulation across steps
-- Breadcrumb Cooperation – Process learns context from user navigation via breadcrumb entries
-- Column visibility toggle
-- Drag & Drop column reordering
