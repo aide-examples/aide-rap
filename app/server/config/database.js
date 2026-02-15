@@ -163,7 +163,14 @@ function autoBackupBeforeDrop(orderedEntities) {
     if (!tableExists(entity.tableName)) continue;
 
     try {
-      const rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+      // Exclude null reference records (_ql=256 at id=1) from backup
+      // Use try/catch for _ql column in case of legacy DB without data quality columns
+      let rows;
+      try {
+        rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id != 1 OR _ql != 256`).all();
+      } catch {
+        rows = db.prepare(`SELECT * FROM ${entity.tableName}`).all();
+      }
       if (rows.length === 0) continue;
 
       const exportRows = rows.map(row => {
@@ -923,7 +930,7 @@ function populateComputedEntities() {
     }
 
     try {
-      db.exec(`DELETE FROM ${entity.tableName}`);
+      db.exec(`DELETE FROM ${entity.tableName} WHERE id != 1`);
       const result = db.exec(sql);
       const count = db.prepare(`SELECT COUNT(*) AS cnt FROM ${entity.tableName}`).get();
       logger.info(`[PAIRS] Populated ${entity.className}`, { rows: count.cnt });

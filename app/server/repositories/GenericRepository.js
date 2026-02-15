@@ -410,7 +410,9 @@ function findById(entityName, id, enrich = true) {
 
   // Read from View (includes _label fields for FKs) unless enrich=false
   const source = enrich ? entity.tableName + '_view' : entity.tableName;
-  const row = db.prepare(`SELECT * FROM ${source} WHERE id = ?`).get(id);
+  // Filter null/defective records for external access (enrich=true), but allow internal lookups
+  const qlFilter = enrich ? ` AND ${qlCondition()}` : '';
+  const row = db.prepare(`SELECT * FROM ${source} WHERE id = ?${qlFilter}`).get(id);
 
   if (!row) {
     throw new EntityNotFoundError(entityName, id);

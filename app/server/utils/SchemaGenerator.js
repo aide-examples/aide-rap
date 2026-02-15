@@ -2314,10 +2314,13 @@ function generatePairsSQL(entity, allEntities) {
   const targetCols = fkColumns.slice(0, pairs.chains.length).map(c => c.name);
   const joinClause = joins.length > 0 ? '\n' + joins.join('\n') : '';
 
+  // Exclude null reference records (id=1) from source data
+  const allConditions = [`src.id != 1`, ...whereNotNull];
+
   return `INSERT OR IGNORE INTO ${entity.tableName} (${targetCols.join(', ')})
 SELECT DISTINCT ${selects.join(', ')}
 FROM ${sourceEntity.tableName} src${joinClause}
-WHERE ${whereNotNull.join(' AND ')}`;
+WHERE ${allConditions.join(' AND ')}`;
 }
 
 // Note: Extended schema generation (UI annotations, labelFields, etc.) is handled by

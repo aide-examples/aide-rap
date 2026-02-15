@@ -58,7 +58,8 @@ function backupAll(db, schema, backupDir) {
   const results = {};
 
   for (const entity of schema.orderedEntities) {
-    const rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE _ql = 0`).all();
+    // Include all records (clean + defective) but exclude null reference records (id=1, _ql=256)
+    const rows = db.prepare(`SELECT * FROM ${entity.tableName} WHERE id != 1 OR _ql != 256`).all();
 
     if (rows.length === 0) {
       const backupPath = path.join(backupDir, `${entity.className}.json`);
@@ -168,7 +169,8 @@ async function restoreEntity(db, entity, schema, backupDir, seedDir, options = {
 
   // Load from backup dir (not seed dir)
   const result = await DataLoader.loadEntity(db, entity, schema, backupDir, seedDir, null, {
-    ...options, mode: 'replace', preserveSystemColumns: true
+    ...options, mode: 'replace', preserveSystemColumns: true,
+    validateConstraints: false
   });
   return result;
 }
@@ -207,7 +209,8 @@ async function restoreBackup(db, schema, backupDir, seedDir, options = {}) {
     if (fs.existsSync(backupFile)) {
       try {
         const result = await DataLoader.loadEntity(db, entity, schema, backupDir, seedDir, lookups, {
-          ...options, mode: 'replace', preserveSystemColumns: true
+          ...options, mode: 'replace', preserveSystemColumns: true,
+          validateConstraints: false // Skip cross-field validation during restore (data was previously valid)
         });
         results[entity.className] = result;
         lookups[entity.className] = buildLabelLookup(db, entity);

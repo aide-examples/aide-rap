@@ -237,6 +237,10 @@ The `reinitialize()` function (API endpoint `POST /api/seed/reinitialize`) also 
 - `.meta.json` metadata files pass AcceptQL from import to seed pipeline
 - Null record protection during clear/restore (`WHERE id != 1`)
 - `--reinit` CLI flag for migrating existing databases
+- Backup includes all records (clean + defective), excludes null reference records
+- Restore disables cross-field validation (data was previously valid)
+- PAIRS population excludes null records from source data
+- `findById` filters null/defective records for external API access
 
 ### Phase 3: Data Cleansing UI
 - Quality filter setting
@@ -246,6 +250,5 @@ The `reinitialize()` function (API endpoint `POST /api/seed/reinitialize`) also 
 - Show resulting `_ql` after save
 
 ### Phase 4: Backup/Restore Integration
-- Exclude null reference records from export
-- Ensure null records exist before restore
-- Handle `_ql` and `_qd` in export/import format
+- Handle defective records with FK→null reference in backup export (preserve original FK label from `_qd`)
+- Preserve `_ql` and `_qd` through backup/restore cycle for defective records
