@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 870 492" width="870" height="492">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+    <clipPath id="clip-Building"><rect x="50" y="30" width="160" height="80" rx="3"/></clipPath>
+    <clipPath id="clip-Meter"><rect x="420" y="40" width="160" height="144" rx="3"/></clipPath>
+    <clipPath id="clip-MeterManufacturer"><rect x="150" y="280" width="160" height="80" rx="3"/></clipPath>
+    <clipPath id="clip-MeterType"><rect x="50" y="130" width="160" height="80" rx="3"/></clipPath>
+    <clipPath id="clip-Reading"><rect x="330" y="250" width="160" height="112" rx="3"/></clipPath>
+    <clipPath id="clip-ResourceType"><rect x="660" y="100" width="160" height="80" rx="3"/></clipPath>
+  </defs>
+  <rect width="870" height="492" fill="white"/>
+
+  <!-- Relationships -->
+  <path d="M 420 172 L 395 172 L 210 170.60377358490567" fill="none" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 420 76 L 395 76 L 210 71.81132075471699" fill="none" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 580 140 L 605 140 L 660 140" fill="none" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 210 198 L 235 198 L 231.63934426229508 280" fill="none" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 490 286 L 515 286 L 506.2068965517241 184" fill="none" stroke="#333" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+  <!-- Class boxes -->
+  <rect x="50" y="30" width="160" height="80" fill="white" stroke="#333" stroke-width="1.5" rx="3"/>
+  <rect x="50" y="30" width="160" height="24" fill="#D9EAD3" clip-path="url(#clip-Building)"/>
+  <text x="130" y="46" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Building</text>
+  <line x1="50" y1="54" x2="210" y2="54" stroke="#333" stroke-width="1"/>
+  <rect x="420" y="40" width="160" height="144" fill="white" stroke="#333" stroke-width="1.5" rx="3"/>
+  <rect x="420" y="40" width="160" height="24" fill="#D6E4F0" clip-path="url(#clip-Meter)"/>
+  <text x="500" y="56" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Meter</text>
+  <line x1="420" y1="64" x2="580" y2="64" stroke="#333" stroke-width="1"/>
+  <text x="425" y="80.2" font-family="Arial, sans-serif" font-size="12" fill="#555">Physical metering device</text>
+  <text x="425" y="96.2" font-family="Arial, sans-serif" font-size="12" fill="#555">installed at a location.</text>
+  <rect x="150" y="280" width="160" height="80" fill="white" stroke="#333" stroke-width="1.5" rx="3"/>
+  <rect x="150" y="280" width="160" height="24" fill="#D9EAD3" clip-path="url(#clip-MeterManufacturer)"/>
+  <text x="230" y="296" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MeterManufacturer</text>
+  <line x1="150" y1="304" x2="310" y2="304" stroke="#333" stroke-width="1"/>
+  <text x="155" y="320.2" font-family="Arial, sans-serif" font-size="12" fill="#555">Company that</text>
+  <text x="155" y="336.2" font-family="Arial, sans-serif" font-size="12" fill="#555">manufactures metering</text>
+  <text x="155" y="352.2" font-family="Arial, sans-serif" font-size="12" fill="#555">devices.</text>
+  <rect x="50" y="130" width="160" height="80" fill="white" stroke="#333" stroke-width="1.5" rx="3"/>
+  <rect x="50" y="130" width="160" height="24" fill="#D9EAD3" clip-path="url(#clip-MeterType)"/>
+  <text x="130" y="146" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">MeterType</text>
+  <line x1="50" y1="154" x2="210" y2="154" stroke="#333" stroke-width="1"/>
+  <text x="55" y="170.2" font-family="Arial, sans-serif" font-size="12" fill="#555">Meter product type from a</text>
+  <text x="55" y="186.2" font-family="Arial, sans-serif" font-size="12" fill="#555">manufacturer.</text>
+  <rect x="330" y="250" width="160" height="112" fill="white" stroke="#333" stroke-width="1.5" rx="3"/>
+  <rect x="330" y="250" width="160" height="24" fill="#D6E4F0" clip-path="url(#clip-Reading)"/>
+  <text x="410" y="266" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Reading</text>
+  <line x1="330" y1="274" x2="490" y2="274" stroke="#333" stroke-width="1"/>
+  <text x="335" y="290.2" font-family="Arial, sans-serif" font-size="12" fill="#555">Meter reading at a specific</text>
+  <text x="335" y="306.2" font-family="Arial, sans-serif" font-size="12" fill="#555">point in time.</text>
+  <rect x="660" y="100" width="160" height="80" fill="white" stroke="#333" stroke-width="1.5" rx="3"/>
+  <rect x="660" y="100" width="160" height="24" fill="#D9EAD3" clip-path="url(#clip-ResourceType)"/>
+  <text x="740" y="116" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold">ResourceType</text>
+  <line x1="660" y1="124" x2="820" y2="124" stroke="#333" stroke-width="1"/>
+
+  <!-- Legend -->
+  <text x="20" y="412" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Areas:</text>
+  <text x="160" y="412" font-family="Arial, sans-serif" font-size="12" font-weight="bold">Types:</text>
+  <rect x="20" y="422" width="14" height="14" fill="#D6E4F0" stroke="#333" stroke-width="1"/>
+  <text x="40" y="432" font-family="Arial, sans-serif" font-size="11">Metering</text>
+  <rect x="20" y="442" width="14" height="14" fill="#D9EAD3" stroke="#333" stroke-width="1"/>
+  <text x="40" y="452" font-family="Arial, sans-serif" font-size="11">Static Data</text>
+
+  <!-- Watermark -->
+  <text x="855" y="412" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555">Artificial Intelligence for Development Engineers</text>
+  <text x="855" y="426" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555">Rapid Application Prototype <tspan fill="#0066cc">(http://github.com/aide-examples)</tspan></text>
+  <text x="855" y="440" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#555">15. Februar 2026</text>
+</svg>
