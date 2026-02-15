@@ -459,6 +459,12 @@ GET    /api/audit/schema/extended         # Audit schema for UI
 
 ---
 
+## Security
+
+Defense-in-depth: Helmet.js security headers, rate limiting (5/min login, 300/min API), signed httpOnly cookies with `sameSite: strict`, API key auth with per-key CORS and entity scopes, parameterized SQL queries, XSS escaping, and audit trail with correlation IDs.
+
+See [Security](security.md) for the full inventory.
+
 ## Configuration
 
 System configuration via `config.json` (port, pagination, PWA, layout), role-based authentication with SHA-256 password hashing, and UI layout via Markdown files (`Crud.md`, `Views.md`, `Processes.md`).
@@ -474,6 +480,7 @@ See [Configuration](configuration.md) for the full reference.
 ### Reference
 
 - [User Interface](user-interface.md) – Entity Explorer, breadcrumbs, views, context menus, export
+- [Security](security.md) – Authentication, HTTP headers, rate limiting, data protection, known limitations
 - [Configuration](configuration.md) – System config, pagination, authentication, UI layout files
 - [Admin Tools](admin-tools.md) – Seed Manager, Media Store, bulk operations
 - [Scalar Types](scalar-types.md) – `int`, `number`, `string`, `date`, `bool` – built-in attribute types
@@ -507,6 +514,5 @@ See [Configuration](configuration.md) for the full reference.
 - Detail Panel PDF Export
 - Process Context – Required initial object selection, context accumulation across steps
 - Breadcrumb Cooperation – Process learns context from user navigation via breadcrumb entries
-- Keyboard shortcuts (arrow keys, Enter for details)
 - Column visibility toggle
 - Drag & Drop column reordering

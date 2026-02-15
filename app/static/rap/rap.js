@@ -282,6 +282,7 @@ async function tryUrlLogin() {
         showInstall: true,
         showLayoutToggle: false,
         compactInfo: true,
+        refreshInterval: 0,
         layoutDefault: 'page-fill',
         extraInfo: '<span id="sw-records-sep" class="status-footer-sep" style="display:none">·</span><span id="sw-records"></span>',
         extraActions: '<a href="https://github.com/aide-examples/aide-rap" target="_blank" class="status-powered-by">powered by AIDE RAP</a>'

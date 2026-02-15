@@ -150,6 +150,20 @@ Syntax: `Entity<fk_field(params).column`
 
 See [Views Configuration](procedures/views-config.md) for the full syntax reference.
 
+### Keyboard Navigation
+
+The Entity Explorer supports keyboard shortcuts in Table and Tree views (disabled while editing a form):
+
+| Key | Action |
+|-----|--------|
+| **UP / DOWN** | Move selection to previous / next record |
+| **PAGE UP / DOWN** | Jump ~10 records |
+| **ENTER** | Open selected record in edit form |
+| **DEL** | Delete selected record (with confirmation) |
+| **ESC** | Close edit panel / clear selection |
+
+After deleting a record, the next record in the list is automatically selected.
+
 ### Context Menu
 
 Right-click any record (in table or tree) for quick actions:

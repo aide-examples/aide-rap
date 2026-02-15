@@ -679,6 +679,9 @@ const EntityExplorer = {
     // Initialize data model diagram component
     DataModelDiagram.init();
 
+    // Keyboard navigation (UP/DOWN, PAGE, ENTER, ESC, DEL)
+    KeyboardNav.init();
+
     // Show welcome screen on start
     this.showWelcome();
   },
@@ -1981,10 +1984,22 @@ const EntityExplorer = {
     );
 
     if (confirmed) {
+      // Remember index before deleting so we can select the successor
+      const idx = this.records.findIndex(r => r.id === id);
+
       try {
         await ApiClient.delete(this.currentEntity, id);
         await this.loadRecords();
-        if (this.selectedId === id) {
+
+        // Select successor (or predecessor if last was deleted)
+        if (this.records.length > 0) {
+          const nextIdx = Math.min(idx, this.records.length - 1);
+          const nextRecord = this.records[nextIdx];
+          this.selectedId = nextRecord.id;
+          this.updateSelection();
+          DetailPanel.showRecord(this.currentEntity, nextRecord);
+          KeyboardNav._scrollIntoView();
+        } else {
           this.selectedId = null;
           DetailPanel.clear();
         }
@@ -1995,14 +2010,22 @@ const EntityExplorer = {
   },
 
   updateSelection() {
-    // Update selection in both views
-    const container = this.viewMode === 'table' ? this.tableContainer : this.treeContainer;
-    if (!container) return;
-
-    container.querySelectorAll('.entity-row, .tree-item').forEach(row => {
-      const rowId = parseInt(row.dataset.id);
-      row.classList.toggle('selected', rowId === this.selectedId);
-    });
+    // Update selection in table view (EntityTable uses <tr data-id>)
+    if (this.tableContainer) {
+      this.tableContainer.querySelectorAll('tbody tr[data-id]').forEach(row => {
+        const rowId = parseInt(row.dataset.id);
+        row.classList.toggle('selected', rowId === this.selectedId);
+        row.classList.toggle('zebra', rowId !== this.selectedId &&
+          this.records.findIndex(r => r.id === rowId) % 2 === 1);
+      });
+      EntityTable.selectedId = this.selectedId;
+    }
+    // Update selection in tree view
+    if (this.treeContainer) {
+      this.treeContainer.querySelectorAll('.tree-node.root-node').forEach(node => {
+        node.classList.toggle('selected', parseInt(node.dataset.recordId) === this.selectedId);
+      });
+    }
   },
 
   clearSelection() {
