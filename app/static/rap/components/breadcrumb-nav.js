@@ -201,6 +201,7 @@ const BreadcrumbNav = {
         if (crumb.selectedId) {
           EntityExplorer.selectedId = crumb.selectedId;
           EntityExplorer.updateSelection();
+          KeyboardNav._scrollIntoView();
           const record = EntityExplorer.records.find(r => r.id === crumb.selectedId);
           if (record) {
             DetailPanel.showRecord(crumb.entity, record);
@@ -246,6 +247,7 @@ const BreadcrumbNav = {
         // Update selection highlight and show in detail panel
         if (crumb.selectedId) {
           EntityExplorer.updateSelection();
+          KeyboardNav._scrollIntoView();
           // For map view, open the marker popup after map initializes
           if (crumb.viewMode === 'map' && typeof EntityMap !== 'undefined') {
             setTimeout(() => EntityMap.openPopupForRecord(crumb.selectedId), 200);
@@ -307,6 +309,7 @@ const BreadcrumbNav = {
         if (crumb.selectedId) {
           EntityExplorer.selectedId = crumb.selectedId;
           EntityExplorer.updateSelection();
+          KeyboardNav._scrollIntoView();
           // For map view, open the marker popup after map initializes
           if (crumb.viewMode === 'map' && typeof EntityMap !== 'undefined') {
             setTimeout(() => EntityMap.openPopupForRecord(crumb.selectedId), 200);
