@@ -512,7 +512,7 @@ function generateExample(attr) {
  */
 function generateDataModel(entities, displayName, areas = {}, descriptions = {}) {
     let content = `# Data Model\n\n`;
-    content += `![Data Model Diagram](/docs-assets/DataModel-diagram.svg)\n\n`;
+    content += `![Data Model Diagram](/docs-assets/layout/DataModel-diagram.svg)\n\n`;
     content += `## Entity Descriptions\n\n`;
     content += `Entity definitions are stored in separate files under [classes/](classes/).\n\n`;
 
@@ -603,7 +603,7 @@ function generateDataModel(entities, displayName, areas = {}, descriptions = {})
     }
 
     content += `## Class Diagram\n\n`;
-    content += `![Data Model Diagram (Detailed)](/docs-assets/DataModel-diagram-detailed.svg)\n\n`;
+    content += `![Data Model Diagram (Detailed)](/docs-assets/layout/DataModel-diagram-detailed.svg)\n\n`;
     content += `<a href="/layout-editor?doc=DataModel" target="_blank"><button type="button">Edit Layout</button></a>\n\n`;
     content += `---\n\n`;
     content += `*Model generated with [Model Builder](/#model-builder). See [Design Brief](../design.md) for original requirements.*\n`;

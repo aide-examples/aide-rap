@@ -105,7 +105,8 @@ module.exports = function(cfg, options = {}) {
             docName = path.basename(docName).replace(/\.md$/i, '');
 
             const docsDir = cfg.paths.docs;
-            const layoutPath = path.join(docsDir, `${docName}-layout.json`);
+            const layoutDir = path.join(docsDir, 'layout');
+            const layoutPath = path.join(layoutDir, `${docName}-layout.json`);
 
             // Detect document type and build model accordingly
             let model;
@@ -162,8 +163,10 @@ module.exports = function(cfg, options = {}) {
 
             docName = path.basename(docName).replace(/\.md$/i, '');
             const docsDir = cfg.paths.docs;
-            const layoutPath = path.join(docsDir, `${docName}-layout.json`);
-            const drawioPath = path.join(docsDir, `${docName}-layout.drawio`);
+            const layoutDir = path.join(docsDir, 'layout');
+            if (!fs.existsSync(layoutDir)) fs.mkdirSync(layoutDir, { recursive: true });
+            const layoutPath = path.join(layoutDir, `${docName}-layout.json`);
+            const drawioPath = path.join(layoutDir, `${docName}-layout.drawio`);
 
             const layout = req.body.layout;
             if (!layout) {
@@ -195,12 +198,12 @@ module.exports = function(cfg, options = {}) {
             const svgDetailed = req.body.svgDetailed;
 
             if (svgCompact) {
-                const svgPath = path.join(docsDir, `${docName}-diagram.svg`);
+                const svgPath = path.join(layoutDir, `${docName}-diagram.svg`);
                 fs.writeFileSync(svgPath, svgCompact);
             }
 
             if (svgDetailed) {
-                const svgDetailedPath = path.join(docsDir, `${docName}-diagram-detailed.svg`);
+                const svgDetailedPath = path.join(layoutDir, `${docName}-diagram-detailed.svg`);
                 fs.writeFileSync(svgDetailedPath, svgDetailed);
             }
 
@@ -208,12 +211,12 @@ module.exports = function(cfg, options = {}) {
             const model = req.body.model;
             if (model && model.classes && model.docType !== 'systems') {
                 if (generateEntityCardsPDF) {
-                    const pdfPath = path.join(docsDir, 'EntityCards.pdf');
+                    const pdfPath = path.join(layoutDir, 'EntityCards.pdf');
                     await generateEntityCardsPDF(model, pdfPath);
                 }
                 if (generateEntityCardsDocx) {
                     const classesDir = path.join(docsDir, 'classes');
-                    const docxPath = path.join(docsDir, 'EntityCards.docx');
+                    const docxPath = path.join(layoutDir, 'EntityCards.docx');
                     await generateEntityCardsDocx(model, classesDir, docxPath);
                 }
             }
