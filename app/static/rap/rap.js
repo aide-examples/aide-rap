@@ -410,7 +410,7 @@ async function tryUrlLogin() {
                 reportBtn.style.opacity = '';
               }
             });
-            actionsEl.insertBefore(reportBtn, refreshBtn);
+            actionsEl.insertBefore(reportBtn, refreshBtn.nextSibling);
           }
         }
       }
